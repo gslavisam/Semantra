@@ -1,0 +1,10 @@
+<records>
+  <record>
+    <cust_id>1</cust_id>
+    <phone>0641234567</phone>
+  </record>
+  <record>
+    <cust_id>2</cust_id>
+    <phone>0659998888</phone>
+  </record>
+</records>

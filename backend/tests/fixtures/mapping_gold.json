@@ -1,0 +1,110 @@
+[
+  {
+    "source_columns": [
+      {
+        "name": "cust_ref",
+        "sample_values": ["0641234567", "0659876543"],
+        "distinct_sample_values": ["0641234567", "0659876543"],
+        "detected_patterns": ["phone"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["cust", "ref"]
+      }
+    ],
+    "target_columns": [
+      {
+        "name": "customer_id",
+        "sample_values": ["1", "2"],
+        "distinct_sample_values": ["1", "2"],
+        "detected_patterns": ["numeric_id"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["customer", "id"]
+      },
+      {
+        "name": "phone_number",
+        "sample_values": ["0641234567", "0659876543"],
+        "distinct_sample_values": ["0641234567", "0659876543"],
+        "detected_patterns": ["phone"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["phone", "number"]
+      }
+    ],
+    "ground_truth": {
+      "cust_ref": "phone_number"
+    }
+  },
+  {
+    "source_columns": [
+      {
+        "name": "client_mail",
+        "sample_values": ["ana@example.com", "marko@example.com"],
+        "distinct_sample_values": ["ana@example.com", "marko@example.com"],
+        "detected_patterns": ["email"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["client", "mail"]
+      }
+    ],
+    "target_columns": [
+      {
+        "name": "customer_email",
+        "sample_values": ["ana@example.com", "marko@example.com"],
+        "distinct_sample_values": ["ana@example.com", "marko@example.com"],
+        "detected_patterns": ["email"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["customer", "email"]
+      },
+      {
+        "name": "customer_phone",
+        "sample_values": ["0641234567", "0659998888"],
+        "distinct_sample_values": ["0641234567", "0659998888"],
+        "detected_patterns": ["phone"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["customer", "phone"]
+      }
+    ],
+    "ground_truth": {
+      "client_mail": "customer_email"
+    }
+  },
+  {
+    "source_columns": [
+      {
+        "name": "primary_phone",
+        "sample_values": ["0641234567", "0659998888"],
+        "distinct_sample_values": ["0641234567", "0659998888"],
+        "detected_patterns": ["phone"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["primary", "phone"]
+      },
+      {
+        "name": "contact_email",
+        "sample_values": ["ana@example.com", "marko@example.com"],
+        "distinct_sample_values": ["ana@example.com", "marko@example.com"],
+        "detected_patterns": ["email"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["contact", "email"]
+      }
+    ],
+    "target_columns": [
+      {
+        "name": "phone_number",
+        "sample_values": ["0641234567", "0659998888"],
+        "distinct_sample_values": ["0641234567", "0659998888"],
+        "detected_patterns": ["phone"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["phone", "number"]
+      },
+      {
+        "name": "email_address",
+        "sample_values": ["ana@example.com", "marko@example.com"],
+        "distinct_sample_values": ["ana@example.com", "marko@example.com"],
+        "detected_patterns": ["email"],
+        "unique_ratio": 1.0,
+        "tokenized_name": ["email", "address"]
+      }
+    ],
+    "ground_truth": {
+      "primary_phone": "phone_number",
+      "contact_email": "email_address"
+    }
+  }
+]
