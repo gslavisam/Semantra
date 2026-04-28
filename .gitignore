@@ -29,7 +29,6 @@ Thumbs.db
 # Uploads / user files
 uploads/
 uploaded_files/
-ai_ba_screenshots/
 
 # Jupyter
 .ipynb_checkpoints
