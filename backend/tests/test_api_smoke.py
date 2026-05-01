@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 from io import BytesIO
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +12,7 @@ from app.core.config import settings
 from app.main import app
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
+from app.services.llm_service import StaticLLMProvider
 from app.services.persistence_service import persistence_service
 from app.services.upload_store import dataset_store
 
@@ -454,6 +457,87 @@ def test_preview_projects_rows_from_mapping_decisions() -> None:
     assert payload["unresolved_targets"] == []
 
 
+def test_preview_applies_transformation_code_to_rows() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "source.csv",
+                csv_bytes("email\nana.markovic@example.com\nmarko.petrovic@example.com\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_name\nAna Markovic\nMarko Petrovic\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+    preview_response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": payload["source"]["dataset_id"],
+            "mapping_decisions": [
+                {
+                    "source": "email",
+                    "target": "customer_name",
+                    "status": "accepted",
+                    "transformation_code": 'df_target["customer_name"] = df_source["email"].str.split("@").str[0].str.replace(".", " ", regex=False).str.title()',
+                }
+            ],
+        },
+    )
+
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert preview_payload["preview"][0]["values"]["customer_name"] == "Ana Markovic"
+    assert preview_payload["preview"][1]["values"]["customer_name"] == "Marko Petrovic"
+    assert preview_payload["preview"][0]["warnings"] == []
+
+
+def test_preview_falls_back_to_direct_mapping_when_transformation_fails() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "source.csv",
+                csv_bytes("email\nana.markovic@example.com\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_name\nAna Markovic\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+    preview_response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": payload["source"]["dataset_id"],
+            "mapping_decisions": [
+                {
+                    "source": "email",
+                    "target": "customer_name",
+                    "status": "accepted",
+                    "transformation_code": 'df_target["customer_name"] = df_source["email"].str.not_a_real_method()',
+                }
+            ],
+        },
+    )
+
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert preview_payload["preview"][0]["values"]["customer_name"] == "ana.markovic@example.com"
+    assert any("Transformation failed for email -> customer_name" in warning for warning in preview_payload["preview"][0]["warnings"])
+
+
 def test_codegen_returns_pandas_snippet_for_mapping_decisions() -> None:
     response = client.post(
         "/mapping/codegen",
@@ -470,6 +554,72 @@ def test_codegen_returns_pandas_snippet_for_mapping_decisions() -> None:
     assert payload["language"] == "python-pandas"
     assert 'df_target["customer_id"] = df_source["cust_id"]' in payload["code"]
     assert 'df_target["phone_number"] = df_source["phone"]' in payload["code"]
+
+
+def test_codegen_uses_transformation_code_when_present() -> None:
+    response = client.post(
+        "/mapping/codegen",
+        json={
+            "mapping_decisions": [
+                {
+                    "source": "email",
+                    "target": "customer_name",
+                    "status": "accepted",
+                    "transformation_code": 'df_target["customer_name"] = df_source["email"].str.split("@").str[0].str.replace(".", " ", regex=False).str.title()',
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert 'df_target["customer_name"] = df_source["email"].str.split("@").str[0].str.replace(".", " ", regex=False).str.title()' in payload["code"]
+
+
+def test_transformation_generation_endpoint_returns_llm_generated_code() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "source.csv",
+                csv_bytes("email\nana.markovic@example.com\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_name\nAna Markovic\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+    provider = StaticLLMProvider(
+        json.dumps(
+            {
+                "transformation_code": 'df_source["email"].str.split("@").str[0].str.replace(".", " ", regex=False).str.title()',
+                "reasoning": ["Extract the local part of the email", "Replace dots with spaces"],
+            }
+        )
+    )
+
+    with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+        response = client.post(
+            "/mapping/transformation/generate",
+            json={
+                "source_dataset_id": payload["source"]["dataset_id"],
+                "target_dataset_id": payload["target"]["dataset_id"],
+                "source_column": "email",
+                "target_column": "customer_name",
+                "instruction": "Extract the person's name from the email address.",
+            },
+        )
+
+    assert response.status_code == 200
+    generated = response.json()
+    assert 'df_source["email"]' in generated["transformation_code"]
+    assert generated["reasoning"]
 
 
 def test_decision_logs_endpoint_returns_mapping_run_logs() -> None:

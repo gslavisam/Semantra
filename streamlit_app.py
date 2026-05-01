@@ -22,6 +22,208 @@ STATUS_STYLES = {
 
 ALL_FILTER_OPTION = "All"
 
+def suggested_mapping_by_source(mapping_response: dict) -> dict[str, dict]:
+    return {item["source"]: item for item in mapping_response.get("mappings", [])}
+
+
+def resolve_suggested_transformation_code(entry: dict | None, fallback_code: str | None = None) -> str:
+    current_entry = entry or {}
+    current_target = str(current_entry.get("target") or "").strip()
+    suggested_target = str(current_entry.get("suggested_target") or "").strip()
+    if suggested_target and current_target and suggested_target != current_target:
+        return ""
+    return str(current_entry.get("suggested_transformation_code") or fallback_code or "").strip()
+
+
+def effective_transformation_code(source: str, fallback_code: str | None = None) -> str | None:
+    manual_code = st.session_state.get(f"manual_transform_{source}", "").strip()
+    if manual_code and st.session_state.get(f"manual_apply_{source}", False):
+        return manual_code
+
+    suggested_code = (fallback_code or "").strip()
+    if suggested_code and st.session_state.get(f"transform_{source}", False):
+        return suggested_code
+    return None
+
+
+def transformation_mode(source: str, fallback_code: str | None = None) -> str:
+    manual_code = st.session_state.get(f"manual_transform_{source}", "").strip()
+    if manual_code and st.session_state.get(f"manual_apply_{source}", False):
+        return "custom"
+
+    suggested_code = (fallback_code or "").strip()
+    if suggested_code and st.session_state.get(f"transform_{source}", False):
+        return "suggested"
+    return "direct"
+
+
+def transformation_mode_label(mode: str) -> str:
+    labels = {
+        "custom": "Transformation: custom",
+        "suggested": "Transformation: suggested",
+        "direct": "Transformation: direct",
+    }
+    return labels.get(mode, "Transformation: direct")
+
+
+def trust_layer_rows(mapping_response: dict) -> list[dict]:
+    selected_by_source = suggested_mapping_by_source(mapping_response)
+    rows: list[dict] = []
+    for ranked in mapping_response.get("ranked_mappings", []):
+        source = ranked["source"]
+        selected_row = selected_by_source.get(source, {})
+        current_state = st.session_state.get("mapping_editor_state", {}).get(source, {})
+        current_target = current_state.get("target", selected_row.get("target"))
+        selected_candidate = next(
+            (candidate for candidate in ranked["candidates"] if candidate["target"] == current_target),
+            None,
+        )
+        fallback_code = resolve_suggested_transformation_code(current_state, selected_row.get("transformation_code"))
+        rows.append(
+            {
+                "source": source,
+                "target": current_target,
+                "confidence": selected_candidate["confidence"] if selected_candidate else selected_row.get("confidence", 0.0),
+                "explanation": selected_candidate["explanation"] if selected_candidate else selected_row.get("explanation", []),
+                "suggested_transformation_code": fallback_code,
+                "active_transformation_code": effective_transformation_code(source, fallback_code),
+                "transformation_mode": transformation_mode(source, fallback_code),
+            }
+        )
+    return rows
+
+
+def display_trust_layer(mapping_response: dict) -> None:
+    st.subheader("\U0001F3AF Mapping Trust Layer")
+    editor_state = st.session_state.setdefault("mapping_editor_state", {})
+    for m in trust_layer_rows(mapping_response):
+        source = m["source"]
+        entry = editor_state.setdefault(source, {})
+        suggested_code = m.get("suggested_transformation_code") or ""
+        if suggested_code and f"transform_{source}" not in st.session_state:
+            st.session_state[f"transform_{source}"] = bool(entry.get("apply_transformation", False))
+        if f"llm_transform_prompt_{source}" not in st.session_state:
+            st.session_state[f"llm_transform_prompt_{source}"] = entry.get("llm_transformation_instruction", "")
+        if f"manual_transform_{source}" not in st.session_state:
+            st.session_state[f"manual_transform_{source}"] = entry.get("manual_transformation_code", "")
+        if f"manual_apply_{source}" not in st.session_state:
+            st.session_state[f"manual_apply_{source}"] = bool(entry.get("manual_apply_transformation", False))
+
+        col1, col2, col3 = st.columns([3, 3, 2])
+        with col1:
+            st.info(f"Source: **{source}**")
+        with col2:
+            st.success(f"Target: **{m.get('target') or '—'}**")
+            st.caption(transformation_mode_label(m["transformation_mode"]))
+        with col3:
+            score = m.get('confidence', 0.0)
+            st.metric("Confidence", f"{int(score * 100)}%")
+            st.progress(score)
+        with st.expander(f"⚙️ Details and Transformation for {source}"):
+            st.caption(transformation_mode_label(m["transformation_mode"]))
+            reason = m.get('explanation', []) or m.get('reason', [])
+            if isinstance(reason, str):
+                st.write(f"**Reasoning:** {reason}")
+            elif reason:
+                st.write("**Reasoning:**")
+                for r in reason:
+                    st.write(f"- {r}")
+            else:
+                st.write("No explanation provided.")
+
+            transformation = suggested_code.strip()
+            if transformation:
+                st.markdown("🛠️ **Transformation code (Pandas):**")
+                st.code(transformation, language="python")
+                entry["apply_transformation"] = st.checkbox(
+                    "Apply this transformation to data",
+                    key=f"transform_{source}",
+                )
+            else:
+                st.write("✅ No transformation needed (direct mapping).")
+
+            st.caption(
+                "Expected format: pandas-oriented Python using `df_source`, `df_target`, and `pd`. "
+                "You can enter either a full statement such as `df_target[\"target_col\"] = ...` "
+                "or only the right-hand expression; if you omit the assignment, Semantra wraps it "
+                f"as `df_target[\"{m.get('target') or 'target_col'}\"] = <your code>`."
+            )
+            llm_instruction = st.text_area(
+                f"Describe desired transformation for {source}",
+                key=f"llm_transform_prompt_{source}",
+                help="Describe the business intent in natural language and let the active LLM propose pandas code.",
+                placeholder="Example: Extract the person's full name from the email address and title-case it.",
+            )
+            entry["llm_transformation_instruction"] = llm_instruction
+            if st.button(
+                "Generate with LLM",
+                key=f"generate_transform_{source}",
+                disabled=(not llm_runtime_enabled()) or (not m.get("target")),
+                help="Uses the active runtime LLM to propose pandas transformation code for the currently selected target.",
+            ):
+                try:
+                    generated = request_llm_transformation_suggestion(source, m.get("target") or "", llm_instruction)
+                    entry["manual_transformation_code"] = generated["transformation_code"]
+                    entry["generated_transformation_reasoning"] = generated.get("reasoning", [])
+                    entry["generated_transformation_warnings"] = generated.get("warnings", [])
+                    st.session_state[f"manual_transform_{source}"] = generated["transformation_code"]
+                    st.session_state[f"manual_apply_{source}"] = False
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Generated an LLM transformation suggestion for {source} -> {m.get('target') or 'target'}.",
+                    }
+                    st.rerun()
+                except ValueError as error:
+                    st.session_state["last_action"] = {"level": "warning", "message": str(error)}
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"LLM transformation generation failed: {error}",
+                    }
+                    st.rerun()
+
+            if not llm_runtime_enabled():
+                st.caption("LLM generation is disabled. Enable a runtime provider in backend config to use this helper.")
+            manual_code = st.text_area(
+                f"Define pandas/Python transformation for {source} (optional)",
+                key=f"manual_transform_{source}",
+                help=(
+                    "Use pandas-style Python over df_source/df_target. Example: "
+                    "df_source[\"email\"].str.split(\"@\").str[0].str.title()"
+                ),
+                placeholder=(
+                    "Example:\n"
+                    f"df_source[\"{source}\"].astype(str).str.strip()"
+                ),
+            )
+            entry["manual_transformation_code"] = manual_code
+            if manual_code.strip():
+                if entry.get("generated_transformation_reasoning") or entry.get("generated_transformation_warnings"):
+                    st.info(
+                        "LLM generated a transformation suggestion. Review it below, then check Apply generated/custom transformation to activate it."
+                    )
+                    reasoning = entry.get("generated_transformation_reasoning", [])
+                    if reasoning:
+                        st.caption("LLM reasoning: " + " | ".join(reasoning))
+                    warnings = entry.get("generated_transformation_warnings", [])
+                    if warnings:
+                        st.caption("Warnings: " + " | ".join(warnings))
+                st.markdown("You entered a custom transformation:")
+                st.code(manual_code, language="python")
+                entry["manual_apply_transformation"] = st.checkbox(
+                    "Apply generated/custom transformation",
+                    key=f"manual_apply_{source}",
+                )
+            else:
+                entry["manual_apply_transformation"] = False
+
+            if score < 0.7:
+                st.warning("⚠️ Low confidence. Please review this mapping manually.")
+            else:
+                st.write("✅ High confidence based on signals.")
+
+    st.session_state["mapping_editor_state"] = editor_state
 
 def reset_flow_state() -> None:
     for key in (
@@ -116,15 +318,18 @@ def refresh_admin_requirement() -> None:
             response = client.get(f"{base_url}/observability/config", headers=headers)
         if response.status_code == 403:
             st.session_state["admin_requirement"] = {"requires_token": True, "reachable": True}
+            st.session_state.pop("runtime_config_snapshot", None)
             return
         response.raise_for_status()
         payload = response.json()
+        st.session_state["runtime_config_snapshot"] = payload
         st.session_state["admin_requirement"] = {
             "requires_token": bool(payload.get("admin_api_token_configured", False)),
             "reachable": True,
         }
     except httpx.HTTPError:
         st.session_state["admin_requirement"] = {"requires_token": True, "reachable": False}
+        st.session_state.pop("runtime_config_snapshot", None)
 
 
 def admin_token_required() -> bool:
@@ -144,6 +349,64 @@ def backend_is_reachable() -> bool:
     admin_token_required()
     requirement = st.session_state.get("admin_requirement", {"reachable": False})
     return bool(requirement.get("reachable", False))
+
+
+def render_llm_runtime_status() -> None:
+    admin_token_required()
+    config = st.session_state.get("runtime_config_snapshot")
+    requirement = st.session_state.get("admin_requirement", {"reachable": False, "requires_token": True})
+
+    st.subheader("Runtime")
+    if not requirement.get("reachable", False):
+        st.warning("LLM status unavailable because the backend is not reachable.")
+        return
+
+    if config is None:
+        if requirement.get("requires_token", True):
+            st.info("LLM status is hidden until a valid admin token is provided.")
+        else:
+            st.info("LLM status is not available yet.")
+        return
+
+    llm_provider = str(config.get("llm_provider", "none")).strip() or "none"
+    llm_model = str(config.get("llm_model", "")).strip() or "n/a"
+    gate_min = config.get("llm_gate_min_score", "?")
+    gate_max = config.get("llm_gate_max_score", "?")
+
+    if llm_provider.lower() == "none":
+        st.warning("LLM is currently disabled.")
+    else:
+        st.success(f"LLM active: {llm_provider} / {llm_model}")
+    st.caption(f"Ambiguity gate: {gate_min} - {gate_max}")
+
+
+def llm_runtime_enabled() -> bool:
+    config = st.session_state.get("runtime_config_snapshot")
+    if not config:
+        return False
+    return str(config.get("llm_provider", "none")).strip().lower() != "none"
+
+
+def request_llm_transformation_suggestion(source: str, target: str, instruction: str) -> dict:
+    upload_response = st.session_state.get("upload_response")
+    if not upload_response:
+        raise ValueError("Upload source and target datasets before generating a transformation.")
+    if not target:
+        raise ValueError("Select a target column before generating a transformation.")
+    if not instruction.strip():
+        raise ValueError("Describe the desired transformation before generating code.")
+
+    return api_request(
+        "POST",
+        "/mapping/transformation/generate",
+        json={
+            "source_dataset_id": upload_response["source"]["dataset_id"],
+            "target_dataset_id": upload_response["target"]["dataset_id"],
+            "source_column": source,
+            "target_column": target,
+            "instruction": instruction.strip(),
+        },
+    )
 
 
 def status_banner(level: str, message: str) -> None:
@@ -194,7 +457,7 @@ def render_dataset_summary(label: str, handle: dict) -> None:
             }
             for column in schema["columns"]
         ],
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
     )
 
@@ -226,6 +489,15 @@ def render_last_action_status() -> None:
         status_banner("warning", "Backend observability check failed. Verify API Base URL or backend availability.")
 
 
+def validator_badge(method: str) -> str:
+    labels = {
+        "llm_validated": "LLM validator",
+        "multi_signal_heuristic": "Heuristic",
+        "manual_review": "Manual",
+    }
+    return labels.get(method, method.replace("_", " ").title())
+
+
 def render_mapping_review(mapping_response: dict) -> None:
     selected_rows = current_mapping_rows(mapping_response)
     filter_columns = st.columns(3)
@@ -250,7 +522,7 @@ def render_mapping_review(mapping_response: dict) -> None:
     ]
 
     st.subheader("Selected Mapping")
-    st.dataframe(filtered_rows, use_container_width=True, hide_index=True)
+    st.dataframe(filtered_rows, width='stretch', hide_index=True)
 
     st.subheader("Ranked Candidates")
     for ranked in mapping_response["ranked_mappings"]:
@@ -263,12 +535,12 @@ def render_mapping_review(mapping_response: dict) -> None:
                         "target": candidate["target"],
                         "confidence": candidate["confidence"],
                         "label": candidate["confidence_label"],
-                        "method": candidate["method"],
+                        "validator": validator_badge(candidate["method"]),
                     }
                     for candidate in ranked["candidates"]
                     if selected_confidence == ALL_FILTER_OPTION or candidate["confidence_label"] == selected_confidence
                 ],
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
             )
             for candidate in ranked["candidates"]:
@@ -279,7 +551,7 @@ def render_mapping_review(mapping_response: dict) -> None:
 
 
 def current_mapping_rows(mapping_response: dict) -> list[dict]:
-    selected_by_source = {item["source"]: item for item in mapping_response["mappings"]}
+    selected_by_source = suggested_mapping_by_source(mapping_response)
     rows: list[dict] = []
     for ranked in mapping_response["ranked_mappings"]:
         source = ranked["source"]
@@ -299,7 +571,9 @@ def current_mapping_rows(mapping_response: dict) -> list[dict]:
                     selected_candidate["confidence_label"] if selected_candidate else selected_row.get("confidence_label", "low_confidence")
                 ),
                 "status": current_state.get("status", selected_row.get("status", "needs_review")),
-                "method": selected_candidate["method"] if selected_candidate else selected_row.get("method", "manual_review"),
+                "validator": validator_badge(
+                    selected_candidate["method"] if selected_candidate else selected_row.get("method", "manual_review")
+                ),
             }
         )
     return rows
@@ -308,7 +582,8 @@ def current_mapping_rows(mapping_response: dict) -> list[dict]:
 def initialize_mapping_editor_state(mapping_response: dict) -> None:
     editor_state: dict[str, dict[str, str]] = {}
     for ranked in mapping_response["ranked_mappings"]:
-        editor_state[ranked["source"]] = default_editor_entry(ranked)
+        selected_mapping = suggested_mapping_by_source(mapping_response).get(ranked["source"], {})
+        editor_state[ranked["source"]] = default_editor_entry(ranked, selected_mapping)
     st.session_state["mapping_editor_state"] = editor_state
 
 
@@ -386,7 +661,8 @@ def upsert_manual_mapping(source: str, target: str, status: str) -> None:
     st.session_state["mapping_editor_state"] = editor_state
 
 
-def default_editor_entry(ranked: dict) -> dict[str, str | bool]:
+def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> dict[str, str | bool]:
+    selected_mapping = selected_mapping or {}
     selected_target = None
     selected_status = "rejected"
     if ranked["selected"] and ranked["selected"].get("target"):
@@ -399,6 +675,13 @@ def default_editor_entry(ranked: dict) -> dict[str, str | bool]:
         "target": selected_target or "",
         "status": selected_status,
         "suggested_target": selected_target or "",
+        "suggested_transformation_code": selected_mapping.get("transformation_code") or "",
+        "manual_transformation_code": "",
+        "llm_transformation_instruction": "",
+        "generated_transformation_reasoning": [],
+        "generated_transformation_warnings": [],
+        "apply_transformation": False,
+        "manual_apply_transformation": False,
         "manual": False,
     }
 
@@ -407,7 +690,8 @@ def remove_manual_mapping(source: str, mapping_response: dict) -> None:
     editor_state = st.session_state.setdefault("mapping_editor_state", {})
     ranked_by_source = {ranked["source"]: ranked for ranked in mapping_response["ranked_mappings"]}
     if source in ranked_by_source:
-        editor_state[source] = default_editor_entry(ranked_by_source[source])
+        selected_mapping = suggested_mapping_by_source(mapping_response).get(source, {})
+        editor_state[source] = default_editor_entry(ranked_by_source[source], selected_mapping)
     else:
         editor_state.pop(source, None)
     st.session_state["mapping_editor_state"] = editor_state
@@ -466,7 +750,7 @@ def render_manual_mapping_panel(mapping_response: dict) -> None:
         ["accepted", "needs_review"],
         key="manual_mapping_status",
     )
-    if form_columns[3].button("Add mapping", use_container_width=True, key="manual_mapping_add"):
+    if form_columns[3].button("Add mapping", width='stretch', key="manual_mapping_add"):
         upsert_manual_mapping(selected_source, selected_target, selected_status)
         st.session_state["last_action"] = {
             "level": "success",
@@ -477,7 +761,7 @@ def render_manual_mapping_panel(mapping_response: dict) -> None:
     manual_rows = manual_mapping_rows(mapping_response)
     if manual_rows:
         st.caption("Manual additions and overrides")
-        st.dataframe(manual_rows, use_container_width=True, hide_index=True)
+        st.dataframe(manual_rows, width='stretch', hide_index=True)
         removable_sources = [row["source"] for row in manual_rows]
         remove_columns = st.columns([3, 1])
         source_to_remove = remove_columns[0].selectbox(
@@ -485,7 +769,7 @@ def render_manual_mapping_panel(mapping_response: dict) -> None:
             removable_sources,
             key="manual_mapping_remove_source",
         )
-        if remove_columns[1].button("Remove", use_container_width=True, key="manual_mapping_remove"):
+        if remove_columns[1].button("Remove", width='stretch', key="manual_mapping_remove"):
             remove_manual_mapping(source_to_remove, mapping_response)
             st.session_state["last_action"] = {
                 "level": "info",
@@ -503,7 +787,11 @@ def build_mapping_decisions() -> list[dict]:
         status = entry.get("status", "needs_review")
         if not target or status == "rejected":
             continue
-        decisions.append({"source": source, "target": target, "status": status})
+        transformation_code = effective_transformation_code(source, resolve_suggested_transformation_code(entry))
+        decision = {"source": source, "target": target, "status": status}
+        if transformation_code:
+            decision["transformation_code"] = transformation_code
+        decisions.append(decision)
     return decisions
 
 
@@ -544,8 +832,17 @@ def apply_imported_mapping_payload(raw_payload: bytes) -> None:
             "target": decision["target"],
             "status": decision.get("status", "accepted"),
             "suggested_target": current_entry.get("suggested_target", ""),
+            "suggested_transformation_code": current_entry.get("suggested_transformation_code", ""),
+            "manual_transformation_code": decision.get("transformation_code", ""),
+            "llm_transformation_instruction": current_entry.get("llm_transformation_instruction", ""),
+            "generated_transformation_reasoning": current_entry.get("generated_transformation_reasoning", []),
+            "generated_transformation_warnings": current_entry.get("generated_transformation_warnings", []),
+            "apply_transformation": False,
+            "manual_apply_transformation": bool(decision.get("transformation_code")),
             "manual": source not in editor_state or current_entry.get("manual", False),
         }
+        st.session_state[f"manual_transform_{source}"] = decision.get("transformation_code", "")
+        st.session_state[f"manual_apply_{source}"] = bool(decision.get("transformation_code"))
     st.session_state["mapping_editor_state"] = editor_state
 
 
@@ -593,7 +890,7 @@ def render_mapping_decision_summary() -> None:
         st.warning("No active mapping decisions. Accept or mark at least one candidate as needs review.")
         return
     st.subheader("Active Decisions")
-    st.dataframe(decisions, use_container_width=True, hide_index=True)
+    st.dataframe(decisions, width='stretch', hide_index=True)
 
 
 def render_mapping_io_panel() -> None:
@@ -614,7 +911,7 @@ def render_mapping_io_panel() -> None:
         key="mapping_import_file",
         help="Imports mapping_decisions and applies them to the current review state.",
     )
-    if imported_file is not None and st.button("Apply imported mapping", use_container_width=True):
+    if imported_file is not None and st.button("Apply imported mapping", width='stretch'):
         try:
             apply_imported_mapping_payload(imported_file.getvalue())
             st.session_state["last_action"] = {
@@ -634,7 +931,7 @@ def render_correction_panel() -> None:
     pending_corrections = build_pending_corrections()
     st.subheader("Save Corrections")
     if pending_corrections:
-        st.dataframe(pending_corrections, use_container_width=True, hide_index=True)
+        st.dataframe(pending_corrections, width='stretch', hide_index=True)
     else:
         st.info("No changed target selections to save as corrections yet.")
 
@@ -672,7 +969,7 @@ def render_correction_panel() -> None:
     saved_corrections = st.session_state.get("saved_corrections")
     if saved_corrections:
         st.caption("Last saved corrections")
-        st.dataframe(saved_corrections, use_container_width=True, hide_index=True)
+        st.dataframe(saved_corrections, width='stretch', hide_index=True)
 
 
 def render_admin_debug_tab() -> None:
@@ -686,7 +983,7 @@ def render_admin_debug_tab() -> None:
         st.info("Backend currently exposes these admin/debug endpoints without an admin token.")
 
     action_columns = st.columns(4)
-    if action_columns[0].button("Load runtime config", use_container_width=True, key="debug_load_runtime_config"):
+    if action_columns[0].button("Load runtime config", width='stretch', key="debug_load_runtime_config"):
         try:
             st.session_state["debug_runtime_config"] = api_request("GET", "/observability/config")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded runtime config snapshot."}
@@ -694,7 +991,7 @@ def render_admin_debug_tab() -> None:
             st.session_state["last_action"] = {"level": "error", "message": f"Loading runtime config failed: {error}"}
         st.rerun()
 
-    if action_columns[1].button("Load decision logs", use_container_width=True, key="debug_load_decision_logs"):
+    if action_columns[1].button("Load decision logs", width='stretch', key="debug_load_decision_logs"):
         try:
             st.session_state["debug_decision_logs"] = api_request("GET", "/observability/decision-logs")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded decision logs."}
@@ -702,7 +999,7 @@ def render_admin_debug_tab() -> None:
             st.session_state["last_action"] = {"level": "error", "message": f"Loading decision logs failed: {error}"}
         st.rerun()
 
-    if action_columns[2].button("Load saved corrections", use_container_width=True, key="debug_load_corrections"):
+    if action_columns[2].button("Load saved corrections", width='stretch', key="debug_load_corrections"):
         try:
             st.session_state["debug_corrections"] = api_request("GET", "/observability/corrections")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded saved corrections."}
@@ -710,7 +1007,7 @@ def render_admin_debug_tab() -> None:
             st.session_state["last_action"] = {"level": "error", "message": f"Loading corrections failed: {error}"}
         st.rerun()
 
-    if action_columns[3].button("Load benchmark runs", use_container_width=True, key="debug_load_benchmark_runs"):
+    if action_columns[3].button("Load benchmark runs", width='stretch', key="debug_load_benchmark_runs"):
         try:
             st.session_state["debug_runs"] = api_request("GET", "/evaluation/runs")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded evaluation runs."}
@@ -726,17 +1023,17 @@ def render_admin_debug_tab() -> None:
     decision_logs = st.session_state.get("debug_decision_logs")
     if decision_logs:
         st.subheader("Decision Logs")
-        st.dataframe(decision_logs, use_container_width=True, hide_index=True)
+        st.dataframe(decision_logs, width='stretch', hide_index=True)
 
     corrections = st.session_state.get("debug_corrections")
     if corrections:
         st.subheader("Saved Corrections")
-        st.dataframe(corrections, use_container_width=True, hide_index=True)
+        st.dataframe(corrections, width='stretch', hide_index=True)
 
     runs = st.session_state.get("debug_runs")
     if runs:
         st.subheader("Evaluation Runs")
-        st.dataframe(runs, use_container_width=True, hide_index=True)
+        st.dataframe(runs, width='stretch', hide_index=True)
 
 
 def benchmark_dataset_options() -> list[tuple[str, int]]:
@@ -798,14 +1095,14 @@ def render_benchmark_tab() -> None:
 
     st.subheader("Saved Benchmark Datasets")
     list_columns = st.columns(2)
-    if list_columns[0].button("Load saved benchmark datasets", use_container_width=True, key="benchmark_load_datasets"):
+    if list_columns[0].button("Load saved benchmark datasets", width='stretch', key="benchmark_load_datasets"):
         try:
             st.session_state["benchmark_datasets"] = api_request("GET", "/evaluation/datasets")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded saved benchmark datasets."}
         except httpx.HTTPError as error:
             st.session_state["last_action"] = {"level": "error", "message": f"Loading benchmark datasets failed: {error}"}
         st.rerun()
-    if list_columns[1].button("Load benchmark runs", use_container_width=True, key="benchmark_load_runs"):
+    if list_columns[1].button("Load benchmark runs", width='stretch', key="benchmark_load_runs"):
         try:
             st.session_state["benchmark_runs"] = api_request("GET", "/evaluation/runs")
             st.session_state["last_action"] = {"level": "success", "message": "Loaded benchmark run history."}
@@ -822,7 +1119,7 @@ def render_benchmark_tab() -> None:
         )
         selected_dataset_id = next(dataset_id for label, dataset_id in dataset_options if label == selected_label)
         with_llm = st.checkbox("Run selected benchmark with configured LLM", key="benchmark_with_llm")
-        if st.button("Run selected benchmark", use_container_width=True, key="benchmark_run_selected"):
+        if st.button("Run selected benchmark", width='stretch', key="benchmark_run_selected"):
             try:
                 result = api_request(
                     "POST",
@@ -841,7 +1138,7 @@ def render_benchmark_tab() -> None:
 
     datasets = st.session_state.get("benchmark_datasets")
     if datasets:
-        st.dataframe(datasets, use_container_width=True, hide_index=True)
+        st.dataframe(datasets, width='stretch', hide_index=True)
 
     benchmark_result = st.session_state.get("last_benchmark_result")
     if benchmark_result:
@@ -851,7 +1148,7 @@ def render_benchmark_tab() -> None:
     benchmark_runs = st.session_state.get("benchmark_runs")
     if benchmark_runs:
         st.subheader("Benchmark Run History")
-        st.dataframe(benchmark_runs, use_container_width=True, hide_index=True)
+        st.dataframe(benchmark_runs, width='stretch', hide_index=True)
 
 
 def main() -> None:
@@ -865,6 +1162,7 @@ def main() -> None:
         st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url")
         st.text_input("Admin Token", value="", key="admin_token", type="password")
         st.markdown("This UI is a thin client above the existing FastAPI backend.")
+        render_llm_runtime_status()
         if st.button("Reset flow"):
             reset_flow_state()
             st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
@@ -974,6 +1272,8 @@ def main() -> None:
 
         mapping_response = st.session_state.get("mapping_response")
         if mapping_response:
+            # Trust Layer visualization
+            display_trust_layer(mapping_response)
             render_mapping_review(mapping_response)
             render_mapping_editor(mapping_response)
             render_manual_mapping_panel(mapping_response)
@@ -1042,7 +1342,7 @@ def main() -> None:
             st.subheader("Preview")
             preview_rows = [row["values"] for row in preview_response["preview"]]
             if preview_rows:
-                st.dataframe(preview_rows, use_container_width=True, hide_index=True)
+                st.dataframe(preview_rows, width='stretch', hide_index=True)
             else:
                 st.info("Preview is empty. This is expected for schema-only SQL uploads.")
             if preview_response.get("unresolved_targets"):

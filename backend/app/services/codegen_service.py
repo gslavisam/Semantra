@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.models.mapping import GeneratedArtifact, MappingDecision
+from app.services.transformation_service import build_transformation_statement
 
 
 def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
@@ -15,6 +16,6 @@ def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedA
         if decision.status == "rejected":
             warnings.append(f"Skipped rejected mapping: {decision.source} -> {decision.target}")
             continue
-        lines.append(f'df_target["{decision.target}"] = df_source["{decision.source}"]')
+        lines.extend(build_transformation_statement(decision).splitlines())
 
     return GeneratedArtifact(code="\n".join(lines), warnings=warnings)

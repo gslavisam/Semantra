@@ -9,10 +9,12 @@ Current scope:
 - Multi-signal auto-mapping heuristics
 - Top-k ranked mapping candidates per source field
 - Optional constrained LLM validator for ambiguous cases
+- Prompt-driven LLM transformation suggestion generation for selected source-to-target pairs
+- Transformation-aware preview and Pandas code generation from accepted mapping decisions
 - API observability for decision logs and benchmark metrics
 - SQLite-backed decision logs and user corrections
- - Streamlit manual mapping editor: add/override/remove manual mappings (persisted as corrections)
- - Automated any-to-any 4x4 row-format regression tests covering CSV, JSON, XML, and XLSX
+- Streamlit trust-layer review UI with manual mapping edits and generated/custom transformations
+- Automated any-to-any 4x4 row-format regression tests covering CSV, JSON, XML, and XLSX
 - `.env`-driven provider and runtime configuration
 - Correction-aware score boost from historical user feedback
 - Evaluation harness for mapping benchmark cases
@@ -30,7 +32,7 @@ Current scope:
 uvicorn app.main:app --reload --app-dir backend
 ```
 
-5. Optionally start the Streamlit UI skeleton:
+5. Optionally start the Streamlit internal-alpha UI:
 
 ```bash
 streamlit run streamlit_app.py
@@ -42,6 +44,9 @@ The Streamlit alpha UI currently covers:
 - upload source and target files
 - inspect `.sql` snapshots and choose `source_table` / `target_table`
 - run auto-mapping and review ranked candidates
+- inspect the trust-layer view for source, target, confidence, and transformation mode
+- prompt the active runtime LLM for a pandas transformation suggestion for the currently selected target field
+- review and apply suggested or custom transformation code before preview/codegen
 - manually adjust accepted / needs review / rejected mapping decisions per source column
 - filter mapping review by source column, status, and confidence label
 - export active mapping decisions as JSON and import them back into the current review state
@@ -55,6 +60,13 @@ The Streamlit alpha UI currently covers:
 - detect at runtime whether backend admin actions actually require an admin token, instead of blocking those flows unconditionally
 
 If you want protected admin flows enabled, set `SEMANTRA_ADMIN_API_TOKEN` in `backend/.env`, then restart the API or call `POST /observability/config/reload` with the same token in the `X-Admin-Token` header.
+
+For LM Studio or another OpenAI-compatible local runtime, configure these in `backend/.env`:
+- `SEMANTRA_LLM_PROVIDER=lmstudio`
+- `SEMANTRA_LLM_MODEL=<model-identifier>`
+- `SEMANTRA_LMSTUDIO_BASE_URL=http://<host>:1234/v1/responses`
+
+The transformation helper in the Streamlit trust layer has been browser-validated against an OpenAI-compatible LM Studio `responses` endpoint and now fills the pandas code field directly from a natural-language instruction.
 
 To run a saved benchmark from the terminal and immediately inspect recent regression history:
 
@@ -85,9 +97,11 @@ There is also an optional GitHub Actions workflow in `.github/workflows/semantra
 ## Current API
 
 - `POST /upload`
+- `POST /upload/sql/tables`
 - `POST /mapping/auto`
 - `POST /mapping/preview`
 - `POST /mapping/codegen`
+- `POST /mapping/transformation/generate`
 - `GET /observability/decision-logs`
 - `GET /observability/corrections`
 - `POST /observability/corrections`
@@ -112,11 +126,13 @@ There is also an optional GitHub Actions workflow in `.github/workflows/semantra
 - Datasets are stored in memory for development.
 - Schema-only uploads map normally, but preview rows stay empty because no source row data exists.
 - Embeddings are optional, and constrained LLM validation is available only for ambiguity-band cases through an injected provider.
+- Prompt-driven transformation generation is separate from ambiguity-band validation and is invoked explicitly through `POST /mapping/transformation/generate` from the Streamlit trust layer.
+- Preview and Pandas code generation both consume `transformation_code` when the reviewed mapping decisions include it.
 - Settings now support `SEMANTRA_*` environment variables and `backend/.env` loading without adding native dependencies.
 - Sensitive observability and saved benchmark endpoints can be protected with `SEMANTRA_ADMIN_API_TOKEN`.
 - Optional embedding scoring is available through the built-in `hash` provider by setting `settings.embedding_provider = "hash"`.
 - Decision logs and user corrections are persisted in SQLite via `app/services/persistence_service.py`.
 - Saved benchmark datasets are persisted with versions, can be re-run through the evaluation API, and produce persisted evaluation run history.
-- `llm_service.py` now includes provider adapters for OpenAI Responses API and Ollama, both behind the same validator interface.
+- `llm_service.py` now includes provider adapters for OpenAI Responses API, OpenAI-compatible LM Studio endpoints, and Ollama behind the same validator/generation interface.
 - Historical user corrections now both boost corrected targets and penalize previously wrong suggested targets for the same source field, with versioned correction history metadata.
 - Runtime configuration can be inspected and reloaded from `backend/.env` through the observability API.

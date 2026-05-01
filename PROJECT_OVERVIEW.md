@@ -9,9 +9,10 @@ The project focuses on a controlled mapping workflow:
 - profile both schemas
 - rank candidate field mappings with multiple signals
 - optionally use a constrained LLM validator for ambiguous cases
+- optionally ask the active LLM runtime to generate pandas transformation code from a natural-language instruction
 - return final mapping decisions plus top-k alternatives
-- preview transformed rows
-- generate starter Pandas transformation code
+- preview transformed rows, including reviewed transformations
+- generate starter Pandas transformation code from accepted mapping decisions
 - log decisions, capture user corrections, and evaluate mapping quality
 
 Semantra is not a full ETL platform yet. It is currently the semantic mapping and quality-control engine that can later sit behind a UI, a workflow runner, or a larger migration product.
@@ -37,14 +38,15 @@ Current MVP scope includes:
 - top-k candidate ranking per source field
 - global one-to-one target assignment
 - optional constrained LLM validation in ambiguity-band cases
-- preview of projected target rows
- - manual mapping editor in the Streamlit review UI (add / override / remove manual mappings, persisted as corrections)
-- Pandas code generation for selected mappings
+- prompt-driven transformation generation for reviewed source-to-target pairs
+- preview of projected target rows with transformation execution
+- manual mapping editor in the Streamlit review UI (add / override / remove manual mappings, persisted as corrections)
+- Pandas code generation for selected mappings, including reviewed transformation statements
 - observability endpoints for decision logs and runtime config
 - persisted user corrections and benchmark datasets in SQLite
 - persisted evaluation run history in SQLite
 - benchmark evaluation endpoints and internal test fixtures
-- Streamlit internal-alpha UI for upload, review, corrections, benchmarks, and admin/debug flows
+- Streamlit internal-alpha UI for upload, trust-layer review, transformations, corrections, benchmarks, and admin/debug flows
 
 Out of scope for the current slice:
 - authentication and role-based access control
@@ -140,6 +142,7 @@ Current design:
 
 Provider support currently exists for:
 - OpenAI Responses API
+- OpenAI-compatible LM Studio responses endpoints
 - Ollama
 - static/mock provider for tests
 
@@ -153,14 +156,32 @@ Purpose:
 - provide a deterministic transformation artifact
 
 Outputs:
-- projected preview rows for accepted mappings
-- generated Pandas code for building a target dataframe from source columns
+- projected preview rows for accepted mappings, including reviewed transformation code when present
+- generated Pandas code for building a target dataframe from source columns and transformation statements
 
 Implementation anchors:
 - `backend/app/services/preview_service.py`
 - `backend/app/services/codegen_service.py`
 
-### 6. Observability and Feedback
+### 6. Prompt-Driven Transformation Generation
+
+Purpose:
+- let an operator describe a desired field-level transformation in natural language
+- convert that instruction into pandas-oriented Python scoped to the chosen source and target columns
+
+Current design:
+- generation is explicit and user-invoked from the Streamlit trust layer
+- the backend inspects the selected source and target column profiles before building the prompt
+- the LLM must return strict JSON containing `transformation_code`
+- generated code is shown in the UI first and is only used for preview/codegen after the operator applies it
+- if the target changes, stale suggested transformation code is not reused automatically
+
+Implementation anchors:
+- `backend/app/api/routes/mapping.py`
+- `backend/app/services/llm_service.py`
+- `streamlit_app.py`
+
+### 7. Observability and Feedback
 
 Purpose:
 - make mapping decisions inspectable
@@ -179,7 +200,7 @@ Implementation anchors:
 - `backend/app/services/decision_log_service.py`
 - `backend/app/services/correction_service.py`
 
-### 7. Evaluation and Benchmarking
+### 8. Evaluation and Benchmarking
 
 Purpose:
 - measure mapping quality objectively
@@ -261,7 +282,9 @@ Input:
 
 Process:
 - project source rows into target-shaped preview rows
+- execute reviewed `transformation_code` when present
 - attach warnings for missing fields or unresolved cases
+- fall back to direct mapping if a transformation fails at preview time
 
 Result:
 - preview rows
@@ -270,13 +293,35 @@ Result:
 Endpoint:
 - `POST /mapping/preview`
 
-### Workflow 4. Generate Pandas Code
+### Workflow 4. Generate Transformation from Prompt
+
+Input:
+- source dataset ID
+- target dataset ID
+- source column
+- target column
+- natural-language instruction
+
+Process:
+- build a prompt from source and target field profiles plus the user's intent
+- call the configured runtime LLM provider
+- validate and sanitize returned JSON
+- surface the resulting pandas code back to the review UI
+
+Result:
+- generated transformation code
+- LLM reasoning and warnings
+
+Endpoint:
+- `POST /mapping/transformation/generate`
+
+### Workflow 5. Generate Pandas Code
 
 Input:
 - explicit mapping decisions
 
 Process:
-- emit starter Pandas assignments
+- emit starter Pandas assignments or reviewed transformation statements
 
 Result:
 - generated Python artifact
@@ -285,7 +330,7 @@ Result:
 Endpoint:
 - `POST /mapping/codegen`
 
-### Workflow 5. Observe, Correct, and Evaluate
+### Workflow 6. Observe, Correct, and Evaluate
 
 Input:
 - decision logs, correction entries, benchmark cases, saved benchmark datasets
@@ -316,7 +361,7 @@ Endpoints:
 - `POST /evaluation/datasets/{dataset_id}/run`
 - `GET /evaluation/runs`
 
-### Workflow 6. Review in Streamlit UI
+### Workflow 7. Review in Streamlit UI
 
 Input:
 - uploaded source and target files
@@ -327,6 +372,8 @@ Process:
 - upload source and target datasets through the UI
 - inspect schema summaries and SQL table selections
 - generate and review mapping suggestions
+- inspect transformation mode and prompt the active LLM runtime for pandas transformation code
+- apply generated/custom transformation code before preview/codegen
 - edit decisions manually
 - save corrections
 - save and run benchmark datasets
@@ -442,6 +489,7 @@ Semantra currently exposes these endpoints:
 - `POST /mapping/auto`
 - `POST /mapping/preview`
 - `POST /mapping/codegen`
+- `POST /mapping/transformation/generate`
 - `GET /observability/decision-logs`
 - `GET /observability/corrections`
 - `POST /observability/corrections`
@@ -464,6 +512,7 @@ The project currently produces the following categories of output:
 - confidence labels
 - signal breakdowns
 - explanations
+- generated transformation suggestions and transformation mode
 
 ### Execution Outputs
 - projected target preview rows
@@ -487,10 +536,11 @@ It now includes:
 - row-based uploads across CSV, JSON, XML, and XLSX
 - SQL schema snapshot support with multi-table discovery and explicit table selection
 - persisted corrections, benchmark datasets, and evaluation run history
-- Streamlit review UI for upload, mapping review, corrections, benchmarks, and admin/debug inspection
+- Streamlit review UI for upload, mapping review, transformation prompting, corrections, benchmarks, and admin/debug inspection
 - real browser validation across CSV, JSON, XML, and XLSX review flows
- - Add Manual Mapping UI with add/override/remove behavior and persisted corrections
- - full any-to-any row-format regression test coverage across CSV, JSON, XML, and XLSX (4x4 matrix)
+- prompt-driven transformation generation validated end-to-end against an OpenAI-compatible LM Studio runtime
+- Add Manual Mapping UI with add/override/remove behavior and persisted corrections
+- full any-to-any row-format regression test coverage across CSV, JSON, XML, and XLSX (4x4 matrix)
 
 There is no urgent blocker at this point.
 

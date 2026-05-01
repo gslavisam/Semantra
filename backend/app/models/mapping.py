@@ -33,6 +33,7 @@ class LLMValidationResult(BaseModel):
     selected_target: str
     confidence: float
     reasoning: list[str] = Field(default_factory=list)
+    transformation_code: str | None = None
     raw_response: str | None = None
 
 
@@ -46,6 +47,7 @@ class MappingCandidate(BaseModel):
     signals: ScoringSignals
     explanation: list[str] = Field(default_factory=list)
     alternatives: list[str] = Field(default_factory=list)
+    transformation_code: str | None = None
 
 
 class SourceMappingResult(BaseModel):
@@ -58,6 +60,7 @@ class MappingDecision(BaseModel):
     source: str
     target: str
     status: DecisionStatus = "accepted"
+    transformation_code: str | None = None
 
 
 class AutoMappingRequest(BaseModel):
@@ -163,4 +166,18 @@ class CodegenRequest(BaseModel):
 class GeneratedArtifact(BaseModel):
     language: Literal["python-pandas"] = "python-pandas"
     code: str
+    warnings: list[str] = Field(default_factory=list)
+
+
+class TransformationGenerationRequest(BaseModel):
+    source_dataset_id: str
+    target_dataset_id: str
+    source_column: str
+    target_column: str
+    instruction: str = Field(min_length=1)
+
+
+class TransformationGenerationResponse(BaseModel):
+    transformation_code: str
+    reasoning: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

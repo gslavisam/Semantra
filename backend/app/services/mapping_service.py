@@ -61,10 +61,14 @@ def generate_mapping_candidates(
     selected_mappings: list[MappingCandidate] = []
     ranked_results: list[SourceMappingResult] = []
 
+
     for source_column in source_schema.columns:
         rankings = per_source_scores[source_column.name]
         selected_score = assigned_scores.get(source_column.name)
         candidate_options = [build_candidate_option(score) for score in rankings[: settings.top_k_candidates]]
+
+        llm_result = llm_decisions.get(source_column.name)
+        transformation_code = llm_result.transformation_code if llm_result and hasattr(llm_result, 'transformation_code') else None
 
         if not rankings:
             ranked_results.append(
@@ -85,11 +89,11 @@ def generate_mapping_candidates(
                     signals=ScoringSignals(),
                     explanation=["No compatible target fields were found."],
                     alternatives=[],
+                    # transformation_code intentionally omitted
                 )
             )
             continue
 
-        llm_result = llm_decisions.get(source_column.name)
         if llm_result and llm_result.selected_target == "no_match":
             selected = MappingCandidate(
                 source=source_column.name,
@@ -104,6 +108,7 @@ def generate_mapping_candidates(
                     *[f"LLM: {reason}" for reason in llm_result.reasoning],
                 ],
                 alternatives=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
+                transformation_code=transformation_code,
             )
             ranked_results.append(
                 SourceMappingResult(
@@ -142,6 +147,9 @@ def generate_mapping_candidates(
                     if candidate.target.name != selected_score.target.name
                 ],
             )
+        # Attach transformation_code if present
+        if transformation_code:
+            selected.transformation_code = transformation_code
 
         if write_decision_log:
             log_decision(source_column.name, rankings[: settings.top_k_candidates], llm_result, selected)

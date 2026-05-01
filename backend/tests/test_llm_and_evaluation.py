@@ -6,7 +6,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import evaluate_cases
-from app.services.llm_service import StaticLLMProvider, call_validator
+from app.services.llm_service import StaticLLMProvider, call_transformation_generator, call_validator
 from app.services.mapping_service import generate_mapping_candidates
 from app.models.schema import ColumnProfile, SchemaProfile
 
@@ -100,6 +100,28 @@ def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -
         assert logs[0].llm_result is not None
     finally:
         settings.llm_gate_min_score, settings.llm_gate_max_score = previous_bounds
+
+
+def test_llm_can_generate_transformation_code_from_user_instruction() -> None:
+    provider = StaticLLMProvider(
+        json.dumps(
+            {
+                "transformation_code": 'df_source["email"].str.split("@").str[0].str.replace(".", " ", regex=False).str.title()',
+                "reasoning": ["Extract local part", "Replace dots with spaces", "Title-case the result"],
+            }
+        )
+    )
+
+    result = call_transformation_generator(
+        source_field={"name": "email", "sample_values": ["ana.markovic@example.com"], "pattern": ["email"]},
+        target_field={"name": "customer_name", "sample_values": ["Ana Markovic"], "pattern": ["text"]},
+        user_instruction="Extract the person's full name from the email address.",
+        provider=provider,
+    )
+
+    assert result is not None
+    assert 'df_source["email"]' in result.transformation_code
+    assert result.reasoning == ["Extract local part", "Replace dots with spaces", "Title-case the result"]
 
 
 def test_evaluation_harness_reports_accuracy_and_bucket_metrics() -> None:

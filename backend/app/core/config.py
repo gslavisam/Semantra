@@ -34,6 +34,7 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1/responses"
     openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434/api/generate"
+    lmstudio_base_url: str = "http://127.0.0.1:1234/v1/responses"
 
 
 def load_settings(dotenv_path: str | Path | None = None) -> Settings:

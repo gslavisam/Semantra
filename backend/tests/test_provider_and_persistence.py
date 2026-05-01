@@ -26,6 +26,23 @@ class FakeHTTPResponse:
         return None
 
 
+class RequestCaptureResponse(FakeHTTPResponse):
+    def __init__(self, payload: dict, sink: list[dict]) -> None:
+        super().__init__(payload)
+        self._sink = sink
+
+    def __call__(self, http_request, timeout=None):
+        self._sink.append(
+            {
+                "full_url": http_request.full_url,
+                "headers": dict(http_request.header_items()),
+                "body": http_request.data.decode("utf-8") if http_request.data else "",
+                "timeout": timeout,
+            }
+        )
+        return self
+
+
 def setup_function() -> None:
     decision_log_store.clear()
     correction_store.clear()
@@ -60,6 +77,37 @@ def test_provider_factory_builds_expected_provider() -> None:
         assert isinstance(provider, OllamaProvider)
     finally:
         settings.llm_provider, settings.openai_api_key, settings.llm_model = previous
+
+
+def test_provider_factory_builds_lmstudio_openai_compatible_provider() -> None:
+    previous = (settings.llm_provider, settings.llm_model, settings.lmstudio_base_url, settings.openai_api_key)
+    settings.llm_provider = "lmstudio"
+    settings.llm_model = "local-model"
+    settings.lmstudio_base_url = "http://127.0.0.1:1234/v1/responses"
+    settings.openai_api_key = "should-not-be-used"
+    try:
+        provider = build_provider_from_settings()
+
+        assert isinstance(provider, OpenAIResponsesProvider)
+        assert provider.base_url == "http://127.0.0.1:1234/v1/responses"
+        assert provider.api_key == ""
+    finally:
+        settings.llm_provider, settings.llm_model, settings.lmstudio_base_url, settings.openai_api_key = previous
+
+
+def test_openai_compatible_provider_omits_authorization_when_api_key_is_empty() -> None:
+    captured_requests: list[dict] = []
+    provider = OpenAIResponsesProvider(api_key="", model="local-model", base_url="http://example.test")
+
+    with patch(
+        "app.services.llm_service.request.urlopen",
+        new=RequestCaptureResponse({"output": [{"content": [{"text": '{"selected_target":"phone_number","confidence":0.8,"reasoning":["ok"]}'}]}]}, captured_requests),
+    ):
+        result = provider.generate("prompt", timeout_seconds=1.0)
+
+    assert "selected_target" in result
+    assert captured_requests
+    assert "Authorization" not in captured_requests[0]["headers"]
 
 
 def test_decision_logs_and_corrections_roundtrip_through_persistence() -> None:
