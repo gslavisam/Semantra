@@ -100,3 +100,63 @@ def test_build_mapping_decisions_keeps_suggested_transformation_for_original_tar
             "transformation_code": 'df_source["email"].str.split("@").str[0].str.title()',
         }
     ]
+
+
+def test_trust_layer_rows_preserves_selected_candidate_signals() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "suggested_mapping_by_source",
+        "resolve_suggested_transformation_code",
+        "effective_transformation_code",
+        "transformation_mode",
+        "trust_layer_rows",
+    )
+    trust_layer_rows = functions[-1]
+
+    fake_streamlit.session_state.update({"mapping_editor_state": {}})
+
+    mapping_response = {
+        "mappings": [
+            {
+                "source": "KUNNR",
+                "target": "customer_id",
+                "confidence": 0.94,
+                "explanation": ["Internal metadata dictionary aligns both fields to concept 'Customer ID'."],
+                "signals": {"knowledge": 1.0, "pattern": 1.0, "semantic": 0.9},
+            }
+        ],
+        "ranked_mappings": [
+            {
+                "source": "KUNNR",
+                "candidates": [
+                    {
+                        "target": "customer_id",
+                        "confidence": 0.94,
+                        "explanation": ["Internal metadata dictionary aligns both fields to concept 'Customer ID'."],
+                        "signals": {"knowledge": 1.0, "pattern": 1.0, "semantic": 0.9},
+                    }
+                ],
+            }
+        ],
+    }
+
+    rows = trust_layer_rows(mapping_response)
+
+    assert rows[0]["signals"]["knowledge"] == 1.0
+    assert rows[0]["signals"]["pattern"] == 1.0
+
+
+def test_has_knowledge_match_uses_signal_when_present() -> None:
+    _, [has_knowledge_match] = load_streamlit_functions("has_knowledge_match")
+
+    assert has_knowledge_match({"knowledge": 1.0}, None) is True
+    assert has_knowledge_match({"knowledge": 0.0}, None) is False
+
+
+def test_has_knowledge_match_falls_back_to_explanation_text() -> None:
+    _, [has_knowledge_match] = load_streamlit_functions("has_knowledge_match")
+
+    assert has_knowledge_match(
+        {},
+        ["Context prior: source SAP KNA1.KUNNR aligns with target Workday Customer.Customer_ID."],
+    ) is True
+    assert has_knowledge_match({}, ["Pattern similarity is strong."]) is False

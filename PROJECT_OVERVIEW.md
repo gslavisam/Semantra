@@ -46,7 +46,7 @@ Current MVP scope includes:
 - persisted user corrections and benchmark datasets in SQLite
 - persisted evaluation run history in SQLite
 - benchmark evaluation endpoints and internal test fixtures
-- Streamlit internal-alpha UI for upload, trust-layer review, transformations, corrections, benchmarks, and admin/debug flows
+- Streamlit internal-alpha UI for upload, trust-layer review, transformations, corrections, benchmarks, and admin/debug flows, including knowledge-match inspection for the active mapping response
 
 Out of scope for the current slice:
 - authentication and role-based access control
@@ -63,6 +63,7 @@ Semantra treats data mapping as a multi-signal inference problem.
 Each source field is compared against target fields using several signals:
 - lexical similarity
 - semantic similarity after normalization and synonym expansion
+- internal metadata knowledge and vendor context priors
 - data pattern similarity
 - statistical similarity
 - sample value overlap
@@ -125,6 +126,34 @@ Current engine behavior:
 - apply a global one-to-one assignment step to reduce conflicting target reuse
 - return selected mappings plus ranked alternatives
 
+Current scoring model:
+- each source-target pair is scored independently first
+- the final heuristic score is a weighted sum of nine signals
+- current weights are: name `0.20`, semantic `0.12`, knowledge `0.10`, pattern `0.20`, statistical `0.15`, overlap `0.10`, embedding `0.12`, correction `0.10`, LLM `0.05`
+- because those weights currently sum to `1.04`, the score is best understood as a ranking signal rather than a calibrated probability
+
+Current signal implementation:
+- name similarity blends `0.6 * fuzzy_similarity(normalized_name)` and `0.4 * jaccard_similarity(tokenized_name)`
+- semantic similarity compares normalized semantic token sets after synonym expansion and metadata-driven alias enrichment
+- knowledge similarity uses curated internal business concepts plus SAP/QAD/Workday field and object context from the local metadata assets under `metadata_dict/`
+- pattern similarity compares detected pattern tags such as `email`, `phone`, or `date`
+- statistical similarity averages distance-based similarity across `unique_ratio`, `null_ratio`, and capped normalized `avg_length`
+- overlap similarity measures shared distinct sample values
+- embedding similarity is cosine similarity over normalized field-name embeddings when an embedding provider is enabled, otherwise `0`
+- correction feedback comes from persisted user corrections and can both boost corrected targets and penalize previously wrong suggestions
+- the LLM signal starts at `0` and is populated only if the ambiguity-band validator is invoked and accepts a candidate
+
+Current knowledge sources:
+- `metadata_dict/metadata_dict.csv` provides multilingual canonical concepts, aliases, naming conventions, and vendor-style column names
+- `metadata_dict/metadata_dictionary.xlsx` adds curated SAP/QAD/Workday field mappings and business notes
+- `metadata_dict/sap_tables_mostUsed.xlsx`, `metadata_dict/qad_tables_mostUsed.xlsx`, and `metadata_dict/WD_entities_mostUsed.xlsx` contribute object-level descriptions that are used as context priors
+
+Assignment and labeling behavior:
+- after per-source ranking, Semantra performs a greedy global one-to-one assignment across all source-target edges
+- the global sort order prefers higher final score first, then pattern, semantic, and embedding signal values as tie-breakers
+- the API still returns top-k ranked alternatives per source field for review, even when the selected target comes from the global assignment step
+- default confidence thresholds are `>= 0.85` for `high_confidence`, `>= 0.65` for `medium_confidence`, otherwise `low_confidence`
+
 Implementation anchor:
 - `backend/app/services/mapping_service.py`
 
@@ -139,6 +168,8 @@ Current design:
 - it must return strict JSON
 - it can choose one of the provided targets or `no_match`
 - invalid or hallucinated outputs are discarded
+- by default it is only called when the best heuristic score is strictly between `0.40` and `0.75`
+- when it selects one of the provided candidates, its confidence is written into the dedicated `llm` signal and the candidate is re-scored and re-ranked inside that closed candidate set
 
 Provider support currently exists for:
 - OpenAI Responses API

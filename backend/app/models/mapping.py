@@ -12,6 +12,7 @@ DecisionStatus = Literal["accepted", "needs_review", "rejected"]
 class ScoringSignals(BaseModel):
     name: float = 0.0
     semantic: float = 0.0
+    knowledge: float = 0.0
     pattern: float = 0.0
     statistical: float = 0.0
     overlap: float = 0.0

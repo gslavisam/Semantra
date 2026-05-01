@@ -17,13 +17,15 @@ from app.services.decision_log_service import decision_log_store
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.llm_service import LLMProvider, call_validator
 from app.services.embedding_service import cosine_similarity, get_embedding, is_enabled as embedding_enabled
+from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.utils.normalization import semantic_token_set
 from app.utils.similarity import clamp_score, fuzzy_similarity, jaccard_similarity, score_distance
 
 
 WEIGHTS = {
     "name": 0.20,
-    "semantic": 0.18,
+    "semantic": 0.12,
+    "knowledge": 0.10,
     "pattern": 0.20,
     "statistical": 0.15,
     "overlap": 0.10,
@@ -239,8 +241,8 @@ def apply_llm_validation(
 def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSignals:
     source_tokens = set(source.tokenized_name)
     target_tokens = set(target.tokenized_name)
-    source_semantic = semantic_token_set(source.name)
-    target_semantic = semantic_token_set(target.name)
+    source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(source)
+    target_semantic = semantic_token_set(target.name) | metadata_knowledge_service.expand_semantic_tokens(target)
     source_patterns = set(source.detected_patterns)
     target_patterns = set(target.detected_patterns)
     source_values = set(source.distinct_sample_values)
@@ -250,6 +252,7 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
         0.4 * jaccard_similarity(source_tokens, target_tokens)
     )
     semantic_signal = jaccard_similarity(source_semantic, target_semantic)
+    knowledge_signal = metadata_knowledge_service.knowledge_alignment(source, target)
     pattern_signal = jaccard_similarity(source_patterns, target_patterns)
     stat_signal = (
         score_distance(source.unique_ratio, target.unique_ratio)
@@ -263,6 +266,7 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
     return ScoringSignals(
         name=round(clamp_score(name_signal), 4),
         semantic=round(clamp_score(semantic_signal), 4),
+        knowledge=round(clamp_score(knowledge_signal), 4),
         pattern=round(clamp_score(pattern_signal), 4),
         statistical=round(clamp_score(stat_signal), 4),
         overlap=round(clamp_score(overlap_signal), 4),
@@ -276,6 +280,7 @@ def compute_final_score(signals: ScoringSignals) -> float:
     return round(
         (signals.name * WEIGHTS["name"])
         + (signals.semantic * WEIGHTS["semantic"])
+        + (signals.knowledge * WEIGHTS["knowledge"])
         + (signals.pattern * WEIGHTS["pattern"])
         + (signals.statistical * WEIGHTS["statistical"])
         + (signals.overlap * WEIGHTS["overlap"])
@@ -389,6 +394,8 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
         )
     if signals.semantic >= 0.6:
         explanation.append("Semantic tokens align after abbreviation expansion and synonym enrichment.")
+    if signals.knowledge > 0:
+        explanation.extend(metadata_knowledge_service.explain_alignment(source, target))
     if signals.name >= 0.75:
         explanation.append("Field names are lexically very similar.")
     if signals.overlap > 0:
@@ -408,7 +415,7 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
 
     explanation.append(
         "Signal breakdown: "
-        f"name={signals.name:.2f}, semantic={signals.semantic:.2f}, pattern={signals.pattern:.2f}, "
+        f"name={signals.name:.2f}, semantic={signals.semantic:.2f}, knowledge={signals.knowledge:.2f}, pattern={signals.pattern:.2f}, "
         f"stat={signals.statistical:.2f}, overlap={signals.overlap:.2f}, embedding={signals.embedding:.2f}, correction={signals.correction:.2f}."
     )
     explanation.append(f"Candidate target: {target.name}.")

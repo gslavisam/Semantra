@@ -66,6 +66,42 @@ def transformation_mode_label(mode: str) -> str:
     return labels.get(mode, "Transformation: direct")
 
 
+def knowledge_explanation_lines(explanation: list[str] | None) -> list[str]:
+    lines = explanation or []
+    return [
+        line for line in lines
+        if line.startswith("Internal metadata dictionary") or line.startswith("Context prior:")
+    ]
+
+
+def knowledge_debug_rows(mapping_response: dict) -> list[dict]:
+    rows: list[dict] = []
+    selected_by_source = suggested_mapping_by_source(mapping_response)
+    for ranked in mapping_response.get("ranked_mappings", []):
+        source = ranked["source"]
+        selected_row = selected_by_source.get(source, {})
+        target = selected_row.get("target")
+        if not target:
+            continue
+        selected_candidate = next((candidate for candidate in ranked.get("candidates", []) if candidate.get("target") == target), None)
+        selected_payload = selected_candidate or ranked.get("selected") or selected_row
+        signals = selected_payload.get("signals", {}) if isinstance(selected_payload, dict) else {}
+        knowledge_lines = knowledge_explanation_lines(selected_payload.get("explanation", []) if isinstance(selected_payload, dict) else [])
+        if not knowledge_lines and float(signals.get("knowledge", 0.0) or 0.0) <= 0:
+            continue
+        rows.append(
+            {
+                "source": source,
+                "target": target,
+                "knowledge_signal": float(signals.get("knowledge", 0.0) or 0.0),
+                "confidence": float(selected_payload.get("confidence", 0.0) or 0.0) if isinstance(selected_payload, dict) else 0.0,
+                "validator": validator_badge(selected_payload.get("method", "manual_review")) if isinstance(selected_payload, dict) else "Manual",
+                "knowledge_explanations": knowledge_lines,
+            }
+        )
+    return rows
+
+
 def trust_layer_rows(mapping_response: dict) -> list[dict]:
     selected_by_source = suggested_mapping_by_source(mapping_response)
     rows: list[dict] = []
@@ -85,6 +121,7 @@ def trust_layer_rows(mapping_response: dict) -> list[dict]:
                 "target": current_target,
                 "confidence": selected_candidate["confidence"] if selected_candidate else selected_row.get("confidence", 0.0),
                 "explanation": selected_candidate["explanation"] if selected_candidate else selected_row.get("explanation", []),
+                "signals": selected_candidate["signals"] if selected_candidate else selected_row.get("signals", {}),
                 "suggested_transformation_code": fallback_code,
                 "active_transformation_code": effective_transformation_code(source, fallback_code),
                 "transformation_mode": transformation_mode(source, fallback_code),
@@ -114,6 +151,8 @@ def display_trust_layer(mapping_response: dict) -> None:
             st.info(f"Source: **{source}**")
         with col2:
             st.success(f"Target: **{m.get('target') or '—'}**")
+            if has_knowledge_match(m.get("signals"), m.get("explanation")):
+                st.caption("Knowledge-backed match")
             st.caption(transformation_mode_label(m["transformation_mode"]))
         with col3:
             score = m.get('confidence', 0.0)
@@ -224,6 +263,33 @@ def display_trust_layer(mapping_response: dict) -> None:
                 st.write("✅ High confidence based on signals.")
 
     st.session_state["mapping_editor_state"] = editor_state
+
+
+def has_knowledge_match(signals: dict | None, explanation: list[str] | str | None = None) -> bool:
+    if isinstance(signals, dict):
+        try:
+            if float(signals.get("knowledge", 0.0) or 0.0) > 0.0:
+                return True
+        except (TypeError, ValueError):
+            pass
+
+    if isinstance(explanation, str):
+        explanation_text = explanation.lower()
+        return (
+            "knowledge" in explanation_text
+            or "metadata" in explanation_text
+            or "context prior" in explanation_text
+        )
+
+    if isinstance(explanation, list):
+        for item in explanation:
+            if not isinstance(item, str):
+                continue
+            item_text = item.lower()
+            if "knowledge" in item_text or "metadata" in item_text or "context prior" in item_text:
+                return True
+
+    return False
 
 def reset_flow_state() -> None:
     for key in (
@@ -1019,6 +1085,30 @@ def render_admin_debug_tab() -> None:
     if runtime_config:
         st.subheader("Runtime Config")
         st.json(runtime_config)
+
+    mapping_response = st.session_state.get("mapping_response")
+    if mapping_response:
+        knowledge_rows = knowledge_debug_rows(mapping_response)
+        if knowledge_rows:
+            st.subheader("Knowledge Match Insights")
+            st.dataframe(
+                [
+                    {
+                        "source": row["source"],
+                        "target": row["target"],
+                        "knowledge_signal": row["knowledge_signal"],
+                        "confidence": row["confidence"],
+                        "validator": row["validator"],
+                    }
+                    for row in knowledge_rows
+                ],
+                width='stretch',
+                hide_index=True,
+            )
+            for row in knowledge_rows:
+                with st.expander(f"Knowledge details: {row['source']} -> {row['target']}"):
+                    for line in row["knowledge_explanations"]:
+                        st.caption(line)
 
     decision_logs = st.session_state.get("debug_decision_logs")
     if decision_logs:

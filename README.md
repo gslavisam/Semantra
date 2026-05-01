@@ -54,6 +54,7 @@ The Streamlit alpha UI currently covers:
 - request preview rows and generated Pandas code
 - save the current mapping context as a benchmark dataset and run saved benchmark datasets from the UI
 - view runtime config, decision logs, saved corrections, and evaluation runs in an admin/debug tab
+- inspect metadata-driven knowledge match explanations for the current mapping response in the admin/debug tab
 - inspect saved benchmark datasets and benchmark run history in a dedicated benchmark tab
 - reset the current flow state from the sidebar when starting a new run
 - track the current step and last action result through the UI status banners
@@ -118,6 +119,41 @@ There is also an optional GitHub Actions workflow in `.github/workflows/semantra
 - `mappings`: selected one-to-one mapping decisions after global assignment
 - `ranked_mappings`: top-k candidate lists per source field for review UIs
 
+## Scoring Mechanism
+
+At the moment, Semantra scores every source-target field pair with a weighted multi-signal heuristic and then ranks the candidates per source field.
+
+The current signal mix is:
+- name similarity: `0.20`
+- semantic similarity after normalization/synonym expansion: `0.12`
+- internal metadata knowledge and vendor context prior: `0.10`
+- detected pattern similarity: `0.20`
+- statistical similarity: `0.15`
+- sample-value overlap: `0.10`
+- optional embedding similarity: `0.12`
+- correction feedback adjustment: `0.10`
+- optional constrained LLM signal: `0.05`
+
+Implementation details:
+- the name signal blends fuzzy similarity on normalized column names and Jaccard overlap on tokenized names
+- the semantic layer is enriched by the internal metadata dictionary and vendor-style aliases loaded from `metadata_dict/metadata_dict.csv`
+- the knowledge signal uses curated business concepts plus cross-system context from `metadata_dict/metadata_dictionary.xlsx`, `metadata_dict/sap_tables_mostUsed.xlsx`, `metadata_dict/qad_tables_mostUsed.xlsx`, and `metadata_dict/WD_entities_mostUsed.xlsx`
+- workbook context is used as a prior when a field matches curated SAP/QAD/Workday aliases and object metadata
+- the statistical signal averages distance-based similarity across `unique_ratio`, `null_ratio`, and normalized `avg_length`
+- sample overlap compares distinct sample values from source and target profiles
+- embedding similarity is `0` unless an embedding provider is enabled
+- correction feedback can boost a previously confirmed mapping and penalize a previously wrong suggestion
+
+After scoring all pairs, Semantra:
+- sorts candidates per source field
+- returns the top `3` candidates by default
+- applies a greedy global one-to-one assignment step so the same target is not reused across multiple selected mappings
+- maps confidence labels from score thresholds: `>= 0.85` is high, `>= 0.65` is medium, otherwise low
+
+The LLM validator is not part of the first-pass scoring path. It is only invoked when the best heuristic score falls strictly inside the ambiguity gate, which defaults to `0.40 < score < 0.75`. In that case the LLM can re-rank only the closed top-k candidate set or return `no_match`.
+
+The weighted score is a ranking heuristic, not a calibrated probability. In the current implementation the configured weights sum to `1.04`, so downstream confidence labels should be read as review guidance, not as probabilistic guarantees.
+
 ## Notes
 
 - Milestone B alpha now supports CSV, JSON, XML, and XLSX row data, plus `.sql` schema snapshots on both source and target sides.
@@ -131,6 +167,7 @@ There is also an optional GitHub Actions workflow in `.github/workflows/semantra
 - Settings now support `SEMANTRA_*` environment variables and `backend/.env` loading without adding native dependencies.
 - Sensitive observability and saved benchmark endpoints can be protected with `SEMANTRA_ADMIN_API_TOKEN`.
 - Optional embedding scoring is available through the built-in `hash` provider by setting `settings.embedding_provider = "hash"`.
+- Internal metadata knowledge is loaded from the local `metadata_dict` assets and now contributes both semantic enrichment and a dedicated `knowledge` signal during mapping.
 - Decision logs and user corrections are persisted in SQLite via `app/services/persistence_service.py`.
 - Saved benchmark datasets are persisted with versions, can be re-run through the evaluation API, and produce persisted evaluation run history.
 - `llm_service.py` now includes provider adapters for OpenAI Responses API, OpenAI-compatible LM Studio endpoints, and Ollama behind the same validator/generation interface.
