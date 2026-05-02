@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from io import BytesIO
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -436,9 +437,16 @@ def test_auto_map_returns_selected_mapping_and_ranked_candidates() -> None:
     payload = response.json()
     assert len(payload["mappings"]) == 2
     assert len(payload["ranked_mappings"]) == 2
+    assert payload["canonical_coverage"]["source"]["total_columns"] == 2
+    assert payload["canonical_coverage"]["target"]["total_columns"] == 2
+    assert payload["canonical_coverage"]["project"]["total_columns"] == 4
+    assert payload["canonical_coverage"]["project"]["matched_columns"] == 4
+    assert payload["canonical_coverage"]["project"]["shared_concept_count"] >= 1
     first_ranked = payload["ranked_mappings"][0]
     assert first_ranked["selected"] is not None
     assert first_ranked["candidates"]
+    assert "canonical_details" in payload["mappings"][0]
+    assert "shared_concepts" in payload["mappings"][0]["canonical_details"]
     assert payload["mappings"][0]["target"] in {"customer_id", "phone_number"}
 
 
@@ -532,6 +540,66 @@ def test_knowledge_overlay_validate_create_activate_and_reload_flow() -> None:
     archive_response = client.post(f"/knowledge/overlays/{overlay_id}/archive")
     assert archive_response.status_code == 200
     assert archive_response.json()["status"] == "archived"
+
+
+def test_canonical_glossary_export_and_import_flow() -> None:
+    glossary_path = Path(metadata_knowledge_service.canonical_glossary_path)
+    original_payload = glossary_path.read_text(encoding="utf-8")
+    try:
+        export_response = client.get("/knowledge/canonical-glossary/export")
+        assert export_response.status_code == 200
+        assert "concept_id,entity,attribute,display_name,description,data_type,aliases" in export_response.text
+        assert "customer.id" in export_response.text
+
+        import_payload = csv_bytes(
+            "concept_id,entity,attribute,display_name,description,data_type,aliases\n"
+            'loyalty.id,loyalty,id,Loyalty ID,Identifier for a loyalty profile,string,"loyalty id, loyalty identifier"\n'
+        )
+        import_response = client.post(
+            "/knowledge/canonical-glossary/import",
+            files={"file": ("canonical_glossary.csv", import_payload, "text/csv")},
+        )
+        assert import_response.status_code == 200
+        assert import_response.json()["imported_row_count"] == 1
+        assert import_response.json()["canonical_concept_count"] == 1
+
+        reexport_response = client.get("/knowledge/canonical-glossary/export")
+        assert reexport_response.status_code == 200
+        assert "loyalty.id" in reexport_response.text
+
+        reload_response = client.post("/knowledge/reload")
+        assert reload_response.status_code == 200
+        assert reload_response.json()["canonical_concept_count"] == 1
+    finally:
+        glossary_path.write_text(original_payload, encoding="utf-8")
+        metadata_knowledge_service.refresh()
+
+
+def test_canonical_glossary_export_excludes_active_overlay_aliases() -> None:
+    overlay_response = client.post(
+        "/knowledge/overlays",
+        data={"name": "overlay-canonical-export"},
+        files={
+            "file": (
+                "knowledge_overlay.csv",
+                csv_bytes(
+                    "entry_type,canonical_term,alias,domain,source_system,note\n"
+                    "concept_alias,Customer ID,legacy_customer_identifier,master_data,LegacyERP,Canonical alias\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+    assert overlay_response.status_code == 200
+    overlay_id = overlay_response.json()["version"]["overlay_id"]
+
+    activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+    assert activate_response.status_code == 200
+
+    export_response = client.get("/knowledge/canonical-glossary/export")
+    assert export_response.status_code == 200
+    assert "legacy customer identifier" not in export_response.text
+    assert "customer.id" in export_response.text
 
 
 def test_preview_projects_rows_from_mapping_decisions() -> None:

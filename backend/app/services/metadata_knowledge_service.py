@@ -8,7 +8,15 @@ from typing import Iterable
 
 from openpyxl import load_workbook
 
-from app.models.schema import ColumnProfile
+from app.models.knowledge import CanonicalGlossaryEntry, CanonicalGlossaryImportResponse
+from app.models.mapping import (
+    CanonicalConceptMatchDetail,
+    CanonicalCoverageColumnMatch,
+    CanonicalCoverageProjectSummary,
+    CanonicalCoverageSummary,
+    CanonicalMappingDetails,
+)
+from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.persistence_service import persistence_service
 from app.utils.normalization import clear_normalization_overrides, configure_normalization_overrides
 
@@ -16,10 +24,12 @@ from app.utils.normalization import clear_normalization_overrides, configure_nor
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_METADATA_DICT_PATH = PROJECT_ROOT / "metadata_dict" / "metadata_dict.csv"
 DEFAULT_METADATA_WORKBOOK_PATH = PROJECT_ROOT / "metadata_dict" / "metadata_dictionary.xlsx"
+DEFAULT_CANONICAL_GLOSSARY_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_glossary.csv"
 DEFAULT_SAP_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "sap_tables_mostUsed.xlsx"
 DEFAULT_QAD_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "qad_tables_mostUsed.xlsx"
 DEFAULT_WORKDAY_ENTITIES_PATH = PROJECT_ROOT / "metadata_dict" / "WD_entities_mostUsed.xlsx"
 MULTI_VALUE_FIELDS = ("Skracenice", "Alternativni nazivi")
+CANONICAL_GLOSSARY_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
 ALIAS_FIELDS = (
     "Naziv (Engleski)",
     "Naziv (Srpski)",
@@ -75,18 +85,40 @@ class ConceptMatch:
     contexts: tuple[KnowledgeFieldContext, ...] = ()
 
 
+@dataclass(frozen=True)
+class CanonicalBusinessConcept:
+    concept_id: str
+    entity: str
+    attribute: str
+    display_name: str
+    description: str = ""
+    data_type: str = ""
+    aliases: frozenset[str] = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True)
+class CanonicalConceptMatch:
+    concept_id: str
+    strength: float
+    matched_aliases: tuple[str, ...] = ()
+
+
 class MetadataKnowledgeService:
     def __init__(self, csv_path: Path | None = None) -> None:
         self.csv_path = csv_path or DEFAULT_METADATA_DICT_PATH
         self.metadata_workbook_path = DEFAULT_METADATA_WORKBOOK_PATH
+        self.canonical_glossary_path = DEFAULT_CANONICAL_GLOSSARY_PATH
         self.sap_tables_path = DEFAULT_SAP_TABLES_PATH
         self.qad_tables_path = DEFAULT_QAD_TABLES_PATH
         self.workday_entities_path = DEFAULT_WORKDAY_ENTITIES_PATH
         self._concepts_by_id: dict[str, KnowledgeConcept] = {}
         self._alias_to_concepts: dict[str, set[str]] = {}
         self._field_alias_to_contexts: dict[str, list[tuple[str, KnowledgeFieldContext]]] = {}
+        self._canonical_concepts_by_id: dict[str, CanonicalBusinessConcept] = {}
+        self._canonical_alias_to_concepts: dict[str, set[str]] = {}
         self._active_overlay_name: str | None = None
         self._overlay_aliases_by_concept: dict[str, set[str]] = {}
+        self._overlay_canonical_aliases_by_concept: dict[str, set[str]] = {}
         self.refresh()
 
     @property
@@ -97,19 +129,102 @@ class MetadataKnowledgeService:
     def concept_count(self) -> int:
         return len(self._concepts_by_id)
 
+    @property
+    def canonical_concept_count(self) -> int:
+        return len(self._canonical_concepts_by_id)
+
     def concepts_for_alias(self, alias: str) -> list[str]:
         normalized_alias = _normalize_alias(alias)
         if not normalized_alias:
             return []
         return sorted(self._alias_to_concepts.get(normalized_alias, set()))
 
+    def resolve_canonical_concept_id(self, term: str) -> str | None:
+        normalized_term = _normalize_alias(term)
+        if not normalized_term:
+            return None
+
+        exact_term = term.strip()
+        if exact_term in self._canonical_concepts_by_id:
+            return exact_term
+
+        for concept_id, concept in self._canonical_concepts_by_id.items():
+            if normalized_term == _normalize_alias(concept_id.replace(".", " ")):
+                return concept_id
+            if normalized_term == _normalize_alias(concept.display_name):
+                return concept_id
+            if normalized_term in concept.aliases:
+                return concept_id
+        return None
+
+    def export_canonical_glossary_csv(self) -> str:
+        if not self.canonical_glossary_path.exists():
+            return ",".join(CANONICAL_GLOSSARY_HEADERS) + "\n"
+
+        payload = self.canonical_glossary_path.read_text(encoding="utf-8-sig")
+        return payload if payload.endswith("\n") else payload + "\n"
+
+    def list_canonical_glossary_entries(self) -> list[CanonicalGlossaryEntry]:
+        return [
+            CanonicalGlossaryEntry(
+                concept_id=concept.concept_id,
+                entity=concept.entity,
+                attribute=concept.attribute,
+                display_name=concept.display_name,
+                description=concept.description,
+                data_type=concept.data_type,
+                aliases=sorted(concept.aliases),
+            )
+            for concept in sorted(self._canonical_concepts_by_id.values(), key=lambda item: item.concept_id)
+        ]
+
+    def import_canonical_glossary_csv(
+        self,
+        payload: bytes,
+        filename: str | None = None,
+    ) -> CanonicalGlossaryImportResponse:
+        if filename and not filename.lower().endswith(".csv"):
+            raise ValueError("Canonical glossary import currently supports CSV files only.")
+
+        decoded = self._decode_csv_payload(payload)
+        reader = csv.DictReader(decoded.splitlines())
+        if not reader.fieldnames:
+            raise ValueError("Canonical glossary CSV must include a header row.")
+
+        missing_headers = [header for header in CANONICAL_GLOSSARY_HEADERS if header not in reader.fieldnames]
+        if missing_headers:
+            missing_label = ", ".join(missing_headers)
+            raise ValueError(f"Canonical glossary CSV is missing required columns: {missing_label}.")
+
+        parsed_rows: list[dict[str, str]] = []
+        for row_number, row in enumerate(reader, start=2):
+            concept_id = str(row.get("concept_id") or "").strip()
+            display_name = str(row.get("display_name") or "").strip()
+            if not concept_id:
+                raise ValueError(f"Canonical glossary row {row_number} is missing concept_id.")
+            if not display_name:
+                raise ValueError(f"Canonical glossary row {row_number} is missing display_name.")
+            parsed_rows.append({header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS})
+
+        self.canonical_glossary_path.write_text(decoded, encoding="utf-8", newline="")
+        self.refresh()
+        return CanonicalGlossaryImportResponse(
+            imported_row_count=len(parsed_rows),
+            canonical_concept_count=self.canonical_concept_count,
+            source_filename=filename,
+        )
+
     def refresh(self) -> None:
         self._concepts_by_id.clear()
         self._alias_to_concepts.clear()
         self._field_alias_to_contexts.clear()
+        self._canonical_concepts_by_id.clear()
+        self._canonical_alias_to_concepts.clear()
         self._active_overlay_name = None
         self._overlay_aliases_by_concept.clear()
+        self._overlay_canonical_aliases_by_concept.clear()
         clear_normalization_overrides()
+        self._load_canonical_glossary()
         self._load()
         self._apply_active_overlay()
 
@@ -144,6 +259,95 @@ class MetadataKnowledgeService:
             candidate_scores.append(base_score)
         return round(max(candidate_scores), 4)
 
+    def canonical_alignment(self, source: ColumnProfile, target: ColumnProfile) -> float:
+        source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source)}
+        target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target)}
+        shared = set(source_matches) & set(target_matches)
+        if not shared:
+            return 0.0
+
+        return round(max(min(source_matches[concept_id].strength, target_matches[concept_id].strength) for concept_id in shared), 4)
+
+    def canonical_mapping_details(self, source: ColumnProfile, target: ColumnProfile) -> CanonicalMappingDetails:
+        source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source)}
+        target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target)}
+        shared = set(source_matches) & set(target_matches)
+
+        return CanonicalMappingDetails(
+            source_concepts=self._canonical_match_details(source_matches),
+            target_concepts=self._canonical_match_details(target_matches),
+            shared_concepts=self._canonical_match_details(
+                {
+                    concept_id: CanonicalConceptMatch(
+                        concept_id=concept_id,
+                        strength=min(source_matches[concept_id].strength, target_matches[concept_id].strength),
+                    )
+                    for concept_id in shared
+                }
+            ),
+        )
+
+    def canonical_coverage(self, schema: SchemaProfile) -> CanonicalCoverageSummary:
+        matched_columns_detail: list[CanonicalCoverageColumnMatch] = []
+        unmatched_columns: list[str] = []
+
+        for column in schema.columns:
+            matches = self.match_canonical_concepts(column)
+            if matches:
+                matched_columns_detail.append(
+                    CanonicalCoverageColumnMatch(
+                        column=column.name,
+                        concept_ids=[match.concept_id for match in matches],
+                    )
+                )
+            else:
+                unmatched_columns.append(column.name)
+
+        total_columns = len(schema.columns)
+        matched_columns = len(matched_columns_detail)
+        coverage_ratio = round((matched_columns / total_columns), 4) if total_columns else 0.0
+        return CanonicalCoverageSummary(
+            total_columns=total_columns,
+            matched_columns=matched_columns,
+            coverage_ratio=coverage_ratio,
+            unmatched_columns=unmatched_columns,
+            matched_columns_detail=matched_columns_detail,
+        )
+
+    def canonical_project_coverage(
+        self,
+        source_coverage: CanonicalCoverageSummary,
+        target_coverage: CanonicalCoverageSummary,
+    ) -> CanonicalCoverageProjectSummary:
+        source_concepts = {
+            concept_id
+            for detail in source_coverage.matched_columns_detail
+            for concept_id in detail.concept_ids
+        }
+        target_concepts = {
+            concept_id
+            for detail in target_coverage.matched_columns_detail
+            for concept_id in detail.concept_ids
+        }
+        all_concepts = sorted(source_concepts | target_concepts)
+        shared_concepts = sorted(source_concepts & target_concepts)
+        source_only_concepts = sorted(source_concepts - target_concepts)
+        target_only_concepts = sorted(target_concepts - source_concepts)
+        total_columns = source_coverage.total_columns + target_coverage.total_columns
+        matched_columns = source_coverage.matched_columns + target_coverage.matched_columns
+
+        return CanonicalCoverageProjectSummary(
+            total_columns=total_columns,
+            matched_columns=matched_columns,
+            coverage_ratio=round((matched_columns / total_columns), 4) if total_columns else 0.0,
+            concept_count=len(all_concepts),
+            shared_concept_count=len(shared_concepts),
+            concepts=all_concepts,
+            shared_concepts=shared_concepts,
+            source_only_concepts=source_only_concepts,
+            target_only_concepts=target_only_concepts,
+        )
+
     def explain_alignment(self, source: ColumnProfile, target: ColumnProfile) -> list[str]:
         source_matches = {match.concept_id: match for match in self.match_concepts(source)}
         target_matches = {match.concept_id: match for match in self.match_concepts(target)}
@@ -171,6 +375,29 @@ class MetadataKnowledgeService:
                 source_label = ", ".join(self._format_context(context) for context in source_contexts[:2]) or "no explicit source context"
                 target_label = ", ".join(self._format_context(context) for context in target_contexts[:2]) or "no explicit target context"
                 explanations.append(f"Context prior: source {source_label}; target {target_label}.")
+        return explanations
+
+    def explain_canonical_alignment(self, source: ColumnProfile, target: ColumnProfile) -> list[str]:
+        source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source)}
+        target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target)}
+        shared = set(source_matches) & set(target_matches)
+        explanations: list[str] = []
+        for concept_id in sorted(shared):
+            concept = self._canonical_concepts_by_id.get(concept_id)
+            if concept is None:
+                continue
+            explanations.append(
+                f"Canonical glossary aligns both fields to business concept '{concept.display_name}' ({concept.concept_id})."
+            )
+            overlay_aliases = self._overlay_canonical_aliases_by_concept.get(concept_id, set())
+            matched_overlay_aliases = sorted(
+                overlay_aliases.intersection(source_matches[concept_id].matched_aliases)
+                | overlay_aliases.intersection(target_matches[concept_id].matched_aliases)
+            )
+            if matched_overlay_aliases and self._active_overlay_name:
+                explanations.append(
+                    f"Custom knowledge overlay '{self._active_overlay_name}' extended canonical concept '{concept.display_name}' with alias(es): {', '.join(matched_overlay_aliases)}."
+                )
         return explanations
 
     def describe_profile(self, profile: ColumnProfile) -> list[str]:
@@ -223,6 +450,86 @@ class MetadataKnowledgeService:
             for concept_id, strength in sorted(strengths.items())
         ]
 
+    def match_canonical_concepts(self, profile: ColumnProfile) -> list[CanonicalConceptMatch]:
+        normalized_name = _normalize_alias(profile.name)
+        normalized_profile_name = _normalize_alias(profile.normalized_name)
+        profile_tokens = {token for token in normalized_profile_name.split() if token}
+
+        strengths: dict[str, float] = {}
+        matched_aliases: dict[str, set[str]] = {}
+
+        for candidate_name in {normalized_name, normalized_profile_name}:
+            for concept_id in self._canonical_alias_to_concepts.get(candidate_name, set()):
+                strengths[concept_id] = max(strengths.get(concept_id, 0.0), 1.0)
+                matched_aliases.setdefault(concept_id, set()).add(candidate_name)
+
+        for alias, concept_ids in self._canonical_alias_to_concepts.items():
+            alias_tokens = set(alias.split())
+            if len(alias_tokens) < 2:
+                continue
+            if alias_tokens.issubset(profile_tokens):
+                for concept_id in concept_ids:
+                    strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.75)
+                    matched_aliases.setdefault(concept_id, set()).add(alias)
+
+        return [
+            CanonicalConceptMatch(
+                concept_id=concept_id,
+                strength=strength,
+                matched_aliases=tuple(sorted(matched_aliases.get(concept_id, set()))),
+            )
+            for concept_id, strength in sorted(strengths.items())
+        ]
+
+    def _canonical_match_details(
+        self,
+        matches_by_id: dict[str, CanonicalConceptMatch],
+    ) -> list[CanonicalConceptMatchDetail]:
+        details: list[CanonicalConceptMatchDetail] = []
+        for concept_id, match in sorted(
+            matches_by_id.items(),
+            key=lambda item: (-item[1].strength, item[0]),
+        ):
+            concept = self._canonical_concepts_by_id.get(concept_id)
+            details.append(
+                CanonicalConceptMatchDetail(
+                    concept_id=concept_id,
+                    display_name=concept.display_name if concept is not None else concept_id,
+                    strength=round(match.strength, 4),
+                )
+            )
+        return details
+
+    def _load_canonical_glossary(self) -> None:
+        if not self.canonical_glossary_path.exists():
+            return
+
+        with self.canonical_glossary_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                concept_id = str(row.get("concept_id") or "").strip()
+                if not concept_id:
+                    continue
+                display_name = str(row.get("display_name") or concept_id).strip()
+                aliases = {
+                    normalized
+                    for normalized in (
+                        _normalize_alias(display_name),
+                        _normalize_alias(concept_id.replace(".", " ")),
+                        *(_normalize_alias(value) for value in _split_values(str(row.get("aliases") or ""))),
+                    )
+                    if normalized
+                }
+                self._register_canonical_concept(
+                    concept_id=concept_id,
+                    entity=str(row.get("entity") or "general").strip() or "general",
+                    attribute=str(row.get("attribute") or concept_id.split(".")[-1]).strip() or concept_id.split(".")[-1],
+                    display_name=display_name,
+                    description=str(row.get("description") or "").strip(),
+                    data_type=str(row.get("data_type") or "").strip(),
+                    aliases=aliases,
+                )
+
     def _load(self) -> None:
         if not self.csv_path.exists():
             return
@@ -265,7 +572,7 @@ class MetadataKnowledgeService:
             if not canonical_term or not alias:
                 continue
 
-            if entry.entry_type in {"field_alias", "concept_alias"}:
+            if entry.entry_type == "field_alias":
                 self._register_concept(
                     canonical_term,
                     entry.domain or "overlay",
@@ -273,6 +580,20 @@ class MetadataKnowledgeService:
                     aliases={alias},
                 )
                 self._overlay_aliases_by_concept.setdefault(canonical_term, set()).add(alias)
+            elif entry.entry_type == "concept_alias":
+                canonical_concept_id = entry.canonical_concept_id or self.resolve_canonical_concept_id(entry.canonical_term)
+                if canonical_concept_id is None:
+                    continue
+                self._register_canonical_concept(
+                    concept_id=canonical_concept_id,
+                    entity=self._canonical_concepts_by_id.get(canonical_concept_id).entity if canonical_concept_id in self._canonical_concepts_by_id else "general",
+                    attribute=self._canonical_concepts_by_id.get(canonical_concept_id).attribute if canonical_concept_id in self._canonical_concepts_by_id else canonical_concept_id.split(".")[-1],
+                    display_name=self._canonical_concepts_by_id.get(canonical_concept_id).display_name if canonical_concept_id in self._canonical_concepts_by_id else entry.canonical_term,
+                    description=self._canonical_concepts_by_id.get(canonical_concept_id).description if canonical_concept_id in self._canonical_concepts_by_id else "",
+                    data_type=self._canonical_concepts_by_id.get(canonical_concept_id).data_type if canonical_concept_id in self._canonical_concepts_by_id else "",
+                    aliases={alias},
+                )
+                self._overlay_canonical_aliases_by_concept.setdefault(canonical_concept_id, set()).add(alias)
             elif entry.entry_type == "abbreviation":
                 overlay_abbreviations[alias] = canonical_term
             elif entry.entry_type == "synonym":
@@ -498,6 +819,40 @@ class MetadataKnowledgeService:
         self._concepts_by_id[concept_id] = concept
         for alias in concept.aliases:
             self._alias_to_concepts.setdefault(alias, set()).add(concept_id)
+
+    def _register_canonical_concept(
+        self,
+        concept_id: str,
+        entity: str,
+        attribute: str,
+        display_name: str,
+        description: str = "",
+        data_type: str = "",
+        aliases: Iterable[str] = (),
+    ) -> None:
+        existing = self._canonical_concepts_by_id.get(concept_id)
+        merged_aliases = set(existing.aliases if existing else ())
+        merged_aliases.update(alias for alias in aliases if alias)
+        concept = CanonicalBusinessConcept(
+            concept_id=concept_id,
+            entity=existing.entity if existing else entity,
+            attribute=existing.attribute if existing else attribute,
+            display_name=existing.display_name if existing else display_name,
+            description=existing.description if existing else description,
+            data_type=existing.data_type if existing else data_type,
+            aliases=frozenset(merged_aliases),
+        )
+        self._canonical_concepts_by_id[concept_id] = concept
+        for alias in concept.aliases:
+            self._canonical_alias_to_concepts.setdefault(alias, set()).add(concept_id)
+
+    def _decode_csv_payload(self, payload: bytes) -> str:
+        for encoding in ("utf-8-sig", "utf-8", "cp1250", "cp1252", "latin-1"):
+            try:
+                return payload.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        raise ValueError("CSV payload could not be decoded with supported encodings.")
 
     def _context_terms(self, contexts: Iterable[KnowledgeFieldContext]) -> set[str]:
         tokens: set[str] = set()

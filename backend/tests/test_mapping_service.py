@@ -335,3 +335,205 @@ def test_active_overlay_synonym_enriches_semantic_tokens() -> None:
 
     assert "purchaser" in tokens
     assert "customer" in tokens
+
+
+def test_canonical_glossary_influences_mapping_for_business_concepts() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("sold_to_party", ["numeric_id"], ["C001", "C002"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["C001", "C002"]),
+            make_column("vendor_id", ["numeric_id"], ["V001", "V002"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    assert metadata_knowledge_service.canonical_concept_count > 0
+    assert result.mappings[0].target == "customer_id"
+    assert result.mappings[0].signals.canonical > 0
+    assert result.mappings[0].canonical_details.shared_concepts[0].concept_id == "customer.id"
+    assert result.mappings[0].canonical_details.shared_concepts[0].display_name == "Customer ID"
+    assert any("Canonical glossary aligns both fields to business concept 'Customer ID'" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_coverage_reports_matched_and_unmatched_columns() -> None:
+    schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[
+            make_column("sold_to_party", ["numeric_id"], ["C001", "C002"]),
+            make_column("mystery_field", ["text"], ["foo", "bar"]),
+        ],
+    )
+
+    coverage = metadata_knowledge_service.canonical_coverage(schema)
+
+    assert coverage.total_columns == 2
+    assert coverage.matched_columns == 1
+    assert coverage.coverage_ratio == 0.5
+    assert coverage.unmatched_columns == ["mystery_field"]
+    assert coverage.matched_columns_detail[0].column == "sold_to_party"
+    assert "customer.id" in coverage.matched_columns_detail[0].concept_ids
+
+
+def test_canonical_coverage_matches_common_contact_aliases() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[
+            make_column("cust_id", ["numeric_id"], ["1", "2"]),
+            make_column("client_mail", ["email"], ["ana@example.com", "marko@example.com"]),
+            make_column("primary_phone", ["phone"], ["0641234567", "0659998888"]),
+        ],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1", "2"]),
+            make_column("customer_email", ["email"], ["ana@example.com", "marko@example.com"]),
+            make_column("phone_number", ["phone"], ["0641234567", "0659998888"]),
+        ],
+    )
+
+    source_coverage = metadata_knowledge_service.canonical_coverage(source_schema)
+    target_coverage = metadata_knowledge_service.canonical_coverage(target_schema)
+
+    assert source_coverage.matched_columns == 3
+    assert source_coverage.coverage_ratio == 1.0
+    assert source_coverage.unmatched_columns == []
+    assert target_coverage.matched_columns == 3
+    assert target_coverage.coverage_ratio == 1.0
+    assert target_coverage.unmatched_columns == []
+    source_matches = {detail.column: detail.concept_ids for detail in source_coverage.matched_columns_detail}
+    target_matches = {detail.column: detail.concept_ids for detail in target_coverage.matched_columns_detail}
+    assert "customer.email" in source_matches["client_mail"]
+    assert "customer.phone" in source_matches["primary_phone"]
+    assert "customer.phone" in target_matches["phone_number"]
+
+
+def test_canonical_project_coverage_reports_shared_and_dataset_specific_concepts() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[
+            make_column("sold_to_party", ["numeric_id"], ["1", "2"]),
+            make_column("client_mail", ["email"], ["ana@example.com", "marko@example.com"]),
+        ],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1", "2"]),
+            make_column("customer_email", ["email"], ["ana@example.com", "marko@example.com"]),
+            make_column("vendor_id", ["numeric_id"], ["V1", "V2"]),
+        ],
+    )
+
+    source_coverage = metadata_knowledge_service.canonical_coverage(source_schema)
+    target_coverage = metadata_knowledge_service.canonical_coverage(target_schema)
+    project_coverage = metadata_knowledge_service.canonical_project_coverage(source_coverage, target_coverage)
+
+    assert project_coverage.total_columns == 5
+    assert project_coverage.matched_columns == 5
+    assert project_coverage.coverage_ratio == 1.0
+    assert project_coverage.shared_concept_count == 2
+    assert "customer.id" in project_coverage.shared_concepts
+    assert "customer.email" in project_coverage.shared_concepts
+    assert "vendor.id" in project_coverage.target_only_concepts
+
+
+def test_canonical_coverage_matches_curated_erp_aliases() -> None:
+    schema = SchemaProfile(
+        dataset_id="erp",
+        dataset_name="erp_extract.csv",
+        row_count=5,
+        columns=[
+            make_column("EBELN", ["text"], ["4500000010", "4500000011"]),
+            make_column("EBELP", ["numeric_id"], ["00010", "00020"]),
+            make_column("LGORT", ["text"], ["0001", "0002"]),
+            make_column("LABST", ["numeric_id"], ["120", "75"]),
+            make_column("CHARG", ["text"], ["BATCH01", "BATCH02"]),
+            make_column("HKONT", ["numeric_id"], ["400000", "500000"]),
+            make_column("KOSTL", ["text"], ["CC100", "CC200"]),
+            make_column("PRCTR", ["text"], ["PC100", "PC200"]),
+            make_column("MEINS", ["text"], ["EA", "KG"]),
+            make_column("WAERS", ["text"], ["EUR", "USD"]),
+            make_column("ZTERM", ["text"], ["N30", "N45"]),
+            make_column("INCO1", ["text"], ["EXW", "FOB"]),
+            make_column("PRUEFLOS", ["text"], ["1000001", "1000002"]),
+            make_column("ANLN1", ["text"], ["ASSET01", "ASSET02"]),
+            make_column("EQUNR", ["text"], ["EQ100", "EQ200"]),
+            make_column("MATKL", ["text"], ["FG01", "RM01"]),
+        ],
+    )
+
+    coverage = metadata_knowledge_service.canonical_coverage(schema)
+
+    assert coverage.total_columns == 16
+    assert coverage.matched_columns == 16
+    assert coverage.coverage_ratio == 1.0
+    assert coverage.unmatched_columns == []
+
+    matches = {detail.column: detail.concept_ids for detail in coverage.matched_columns_detail}
+    assert "purchase_order.id" in matches["EBELN"]
+    assert "purchase_order.line_item" in matches["EBELP"]
+    assert "stock.location" in matches["LGORT"]
+    assert "stock.quantity" in matches["LABST"]
+    assert "batch.id" in matches["CHARG"]
+    assert "gl_account.id" in matches["HKONT"]
+    assert "cost_center.id" in matches["KOSTL"]
+    assert "profit_center.id" in matches["PRCTR"]
+    assert "uom.code" in matches["MEINS"]
+    assert "currency.code" in matches["WAERS"]
+    assert "payment_term.id" in matches["ZTERM"]
+    assert "incoterm.code" in matches["INCO1"]
+    assert "quality_inspection.id" in matches["PRUEFLOS"]
+    assert "asset.id" in matches["ANLN1"]
+    assert "equipment.id" in matches["EQUNR"]
+    assert "material_group.id" in matches["MATKL"]
+
+
+def test_canonical_coverage_matches_sd_mm_document_aliases() -> None:
+    schema = SchemaProfile(
+        dataset_id="sdmm",
+        dataset_name="sdmm_extract.csv",
+        row_count=5,
+        columns=[
+            make_column("VBELN", ["text"], ["500001", "500002"]),
+            make_column("AUDAT", ["date"], ["2025-01-01", "2025-01-02"]),
+            make_column("EBELN", ["text"], ["450001", "450002"]),
+            make_column("BEDAT", ["date"], ["2025-01-03", "2025-01-04"]),
+            make_column("VSTEL", ["text"], ["SP01", "SP02"]),
+            make_column("VBELN_VL", ["text"], ["800001", "800002"]),
+        ],
+    )
+
+    coverage = metadata_knowledge_service.canonical_coverage(schema)
+
+    assert coverage.total_columns == 6
+    assert coverage.matched_columns == 6
+    assert coverage.coverage_ratio == 1.0
+    assert coverage.unmatched_columns == []
+
+    matches = {detail.column: detail.concept_ids for detail in coverage.matched_columns_detail}
+    assert "sales_order.id" in matches["VBELN"]
+    assert "sales_order.date" in matches["AUDAT"]
+    assert "purchase_order.id" in matches["EBELN"]
+    assert "purchase_order.date" in matches["BEDAT"]
+    assert "shipping_point.id" in matches["VSTEL"]
+    assert "delivery.id" in matches["VBELN_VL"]

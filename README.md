@@ -5,7 +5,8 @@ Semantra is an explainable semantic mapping workbench for source-to-target schem
 In short, the project combines deterministic profiling and ranking with controlled AI assistance so a team can:
 - upload source and target datasets or SQL schema snapshots
 - rank mapping candidates with explainable multi-signal scoring
-- enrich matching with metadata knowledge, custom knowledge overlays, correction history, and promoted reusable rules
+- enrich matching with metadata knowledge, a canonical business glossary, custom knowledge overlays, correction history, and promoted reusable rules
+- inspect explicit source -> concept -> target paths and project-level canonical coverage in the trust layer
 - generate and review field-level pandas transformations
 - preview mapped output and generate starter Pandas code
 - persist mapping sets, transformation test sets, benchmark datasets, and evaluation history
@@ -35,10 +36,12 @@ The current product slice covers:
 - source and target upload from CSV, JSON, XML, XLSX, or SQL schema snapshots
 - schema profiling with lexical, semantic, pattern, and statistical hints
 - explainable auto-mapping with top-k ranked candidates per source field
+- canonical business glossary matching with concept-aware explanations, explicit source -> concept -> target review tables, and project-level canonical coverage
 - optional constrained LLM validation for ambiguous matches
 - prompt-driven pandas transformation generation for reviewed mappings
 - transformation preview with syntax/runtime validation, before/after samples, and structured warnings
-- custom knowledge overlays on top of the built-in metadata dictionary
+- custom knowledge overlays on top of the built-in metadata dictionary, including concept aliases bound to canonical business concepts
+- canonical glossary CSV import/export from the admin/debug surface
 - persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
 - internal Streamlit review UI for trust-layer review, admin/debug flows, corrections, benchmarks, and saved mapping-set workflows
 
@@ -79,4 +82,4 @@ cd Semantra/backend
 Use these docs with different intent:
 - `README.md`: quick project summary, local run instructions, and high-level capability list
 - `PROJECT_OVERVIEW.md`: broader product and technical architecture overview
-- `epics.md`: roadmap, phase plan, and backlog direction
+- `epics.md`: roadmap, phase plan, backlog direction, and execution tracking notes for completed epic slices

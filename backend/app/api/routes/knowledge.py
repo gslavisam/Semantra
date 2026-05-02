@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from app.api.deps import require_admin
 from app.models.knowledge import (
+    CanonicalGlossaryImportResponse,
     KnowledgeAuditEntry,
     KnowledgeOverlayCreateResponse,
     KnowledgeOverlayVersion,
@@ -51,7 +52,32 @@ def build_runtime_status() -> KnowledgeRuntimeStatus:
         active_entry_count=len(active_entries),
         entry_type_counts=entry_type_counts,
         concept_count=metadata_knowledge_service.concept_count,
+        canonical_concept_count=metadata_knowledge_service.canonical_concept_count,
     )
+
+
+@router.get("/canonical-glossary/export", dependencies=[Depends(require_admin)])
+async def export_canonical_glossary() -> Response:
+    payload = metadata_knowledge_service.export_canonical_glossary_csv()
+    return Response(
+        content=payload,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="canonical_glossary.csv"'},
+    )
+
+
+@router.post("/canonical-glossary/import", response_model=CanonicalGlossaryImportResponse, dependencies=[Depends(require_admin)])
+async def import_canonical_glossary(file: UploadFile = File(...)) -> CanonicalGlossaryImportResponse:
+    payload = await file.read()
+    try:
+        result = metadata_knowledge_service.import_canonical_glossary_csv(payload, filename=file.filename)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    append_audit_entry(
+        "create",
+        f"Imported canonical glossary '{file.filename or 'canonical_glossary.csv'}' with {result.imported_row_count} rows.",
+    )
+    return result
 
 
 @router.post("/overlays/validate", response_model=KnowledgeOverlayValidationResult, dependencies=[Depends(require_admin)])

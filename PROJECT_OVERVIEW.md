@@ -31,13 +31,15 @@ Current MVP scope includes:
 - SQL schema snapshot upload plus table discovery and explicit table selection for multi-table snapshots
 - schema profiling with lexical, pattern, and statistical hints
 - multi-signal candidate ranking with top-k alternatives and one-to-one assignment
+- canonical business glossary matching with a file-backed glossary, canonical signal scoring, and source/target/project canonical coverage summaries
+- explicit source -> concept -> target review support through canonical path details and grouped review tables
 - optional constrained LLM validation in ambiguity-band cases
 - prompt-driven pandas transformation generation for reviewed field pairs
 - transformation preview with syntax checks, dry-run execution, before/after samples, structured warnings, and generated code output
-- custom knowledge overlays layered on top of built-in metadata knowledge
+- custom knowledge overlays layered on top of built-in metadata knowledge, including concept aliases that extend canonical concept matching
 - persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
 - mapping-set status workflow with `draft`, `review`, `approved`, and `archived`
-- internal Streamlit UI for upload, trust-layer review, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
+- internal Streamlit UI for upload, trust-layer review, canonical concept views, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
 
 Out of scope for the current slice:
 - authentication and role-based access control
@@ -46,7 +48,7 @@ Out of scope for the current slice:
 - distributed job orchestration
 - complex multi-table graph mapping
 - production writeback into destination systems
-- full canonical business concept layer
+- cross-project canonical governance and approval workflow
 
 ## Core Concept
 
@@ -56,6 +58,7 @@ Each source field is compared against target fields using a blend of lexical, se
 
 The product then layers controlled trust mechanisms on top of that ranking:
 - knowledge overlays that can refine semantic matching without editing base assets
+- canonical business concepts that let the review surface reason over source -> concept -> target paths instead of only source -> target guesses
 - corrections and promoted reusable rules that improve future ranking behavior
 - transformation preview and generated-code validation before the analyst commits to an execution artifact
 - saved mapping sets and transformation test sets that make review and replay more structured
@@ -87,15 +90,17 @@ Purpose:
 - generate explainable mapping candidates from source schema to target schema
 
 Current behavior:
-- compute source-target scores across lexical, semantic, knowledge, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
+- compute source-target scores across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
 - return top-k ranked candidates per source field
 - apply a greedy global one-to-one assignment step for selected mappings
-- attach signal breakdowns and explanation lines to both selected mappings and ranked candidates
+- attach signal breakdowns, canonical concept details, and explanation lines to both selected mappings and ranked candidates
+- return source, target, and project-level canonical coverage summaries alongside the mapping payload
 
 Important implementation notes:
 - the weighted score is still a ranking heuristic, not a calibrated probability
 - correction signal now includes both raw feedback history and promoted reusable rules
 - the knowledge signal can be influenced by both built-in metadata assets and active knowledge overlays
+- the canonical signal is currently glossary-driven and file-backed; it is not yet a governed enterprise semantic model
 
 Implementation anchor:
 - `backend/app/services/mapping_service.py`
@@ -134,14 +139,17 @@ Implementation anchors:
 - `backend/app/services/transformation_template_service.py`
 - `backend/app/services/transformation_test_service.py`
 
-### 5. Knowledge Overlay Runtime
+### 5. Knowledge Overlay and Canonical Glossary Runtime
 
 Purpose:
 - let a team add project-specific aliases, abbreviations, and synonyms without editing base metadata files
+- maintain a canonical business glossary that can participate directly in mapping and trust-layer explanation
 
 Current behavior:
 - CSV overlays can be validated, saved, listed, inspected, activated, deactivated, rolled back, archived, and reloaded at runtime
 - overlay entries are merged into metadata-driven semantic expansion and explanation generation
+- `concept_alias` overlay entries validate against the canonical glossary and extend canonical concept matching at runtime
+- canonical glossary CSV can be imported/exported through admin-protected API endpoints and the Streamlit admin/debug surface
 - overlay lifecycle changes are audit logged
 
 Implementation anchors:
@@ -205,8 +213,9 @@ Purpose:
 Current behavior:
 - upload source and target files
 - review ranked candidates and trust-layer explanations
+- inspect explicit `Source -> Concept` and `Concept -> Target` tables plus grouped canonical concept summaries
 - edit mappings manually and attach transformations
-- save corrections, promote reusable rules, manage knowledge overlays, save mapping sets, inspect benchmarks, and use admin/debug tools
+- save corrections, promote reusable rules, manage knowledge overlays, import/export canonical glossary data, save mapping sets, inspect benchmarks, and use admin/debug tools
 
 Implementation anchor:
 - `streamlit_app.py`
@@ -231,6 +240,7 @@ Result:
 - profiled datasets
 - selected mappings
 - ranked candidates with explanation and signal breakdowns
+- canonical concept details and project-level canonical coverage for the active source/target pair
 
 Endpoints:
 - `POST /upload`
@@ -287,15 +297,18 @@ Endpoints:
 
 Input:
 - overlay CSV files with aliases, abbreviations, and synonyms
+- optional canonical glossary CSV import/export actions
 
 Process:
 - validate uploaded rows
 - save a versioned overlay
 - inspect entries
 - activate, deactivate, rollback, archive, or reload runtime knowledge
+- import or export the canonical glossary CSV used by the canonical signal layer
 
 Result:
 - active project-specific knowledge layer on top of built-in metadata
+- active canonical glossary that can drive source -> concept -> target explanations and project-level coverage summaries
 - audit trail for knowledge lifecycle changes
 
 Endpoints:
@@ -308,6 +321,8 @@ Endpoints:
 - `POST /knowledge/overlays/{overlay_id}/archive`
 - `POST /knowledge/overlays/rollback`
 - `GET /knowledge/audit`
+- `GET /knowledge/canonical-glossary/export`
+- `POST /knowledge/canonical-glossary/import`
 - `POST /knowledge/reload`
 
 ### Workflow 5. Save and Version Mapping Sets
@@ -383,7 +398,7 @@ Input:
 
 Process:
 - run upload and review flows from a single operator surface
-- inspect explanations, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, and saved mapping sets
+- inspect explanations, canonical source/concept/target views, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, and saved mapping sets
 - apply saved mapping-set versions back into the current review state
 
 Result:
@@ -540,6 +555,8 @@ Knowledge overlays:
 - `POST /knowledge/overlays/{overlay_id}/archive`
 - `POST /knowledge/overlays/rollback`
 - `GET /knowledge/audit`
+- `GET /knowledge/canonical-glossary/export`
+- `POST /knowledge/canonical-glossary/import`
 - `POST /knowledge/reload`
 
 Evaluation:
@@ -561,6 +578,7 @@ The project currently produces the following categories of output:
 - confidence labels
 - signal breakdowns
 - explanations
+- canonical concept paths and source/target/project coverage summaries
 - generated transformation suggestions and transformation mode
 - versioned mapping sets with status metadata
 
@@ -591,6 +609,7 @@ The product now includes:
 - multi-format row-data upload plus SQL schema snapshots
 - explainable multi-signal mapping with constrained AI assistance
 - custom knowledge overlays with lifecycle actions and audit history
+- initial canonical semantic layer with a business glossary, canonical signal, concept-aware trust layer, explicit source -> concept -> target views, and project-level coverage metrics
 - correction learning with promoted reusable rules
 - transformation preview safety checks, templates, and transformation test sets
 - versioned mapping sets with lightweight status workflow and audit trail
@@ -601,12 +620,12 @@ This puts Semantra in a strong internal-alpha / pilot-ready state for controlled
 
 ## Next Recommended Milestone
 
-The next practical milestone is to start P1 work on top of the now-stable P0 surface.
+The next practical milestone is to deepen the P1 surface that now exists on top of the stable P0 core.
 
 Most natural next steps are:
-- introduce an initial canonical business concept model and glossary
 - expand trust-layer explainability with richer structured reasoning and "why not this target" views
-- deepen mapping-set governance beyond the current minimal version/status workflow
+- deepen mapping-set governance and canonical glossary governance beyond the current minimal workflow
+- broaden canonical coverage from the current glossary-driven MVP into stronger cross-project semantic reuse
 
 ## Result for the User
 
@@ -617,6 +636,7 @@ The result is a controlled semantic-mapping package made of:
 - candidate ranking
 - final mapping decisions
 - explanation of why decisions were made
+- canonical concept paths and project-level semantic coverage for the active mapping context
 - reusable organizational knowledge from overlays and promoted rules
 - preview of transformed data
 - starter implementation code
@@ -631,6 +651,7 @@ At the current stage, Semantra is no longer just a scaffold. It contains:
 - a real mapping engine with multiple explainable signals
 - constrained LLM validation and transformation generation hooks
 - runtime metadata enrichment with custom knowledge overlays
+- canonical business glossary-driven matching with explicit canonical path payloads and import/export support
 - persisted correction learning plus promoted reusable rules
 - persisted mapping sets and transformation test sets
 - benchmark and correction-impact evaluation tooling
@@ -638,12 +659,12 @@ At the current stage, Semantra is no longer just a scaffold. It contains:
 - focused automated tests around backend services, API flows, and key Streamlit helpers
 
 The biggest remaining growth areas are now mostly P1 and beyond:
-- canonical business concepts and glossary-driven mapping
 - richer trust-layer explanations and analyst tooling
-- deeper governance features beyond the current minimal mapping-set workflow
+- deeper governance features beyond the current minimal mapping-set and glossary workflow
+- broader canonical business concept governance and reuse beyond the current glossary-driven MVP
 - stronger connector story beyond flat files and SQL snapshots
 - eventual execution and operationalization beyond preview/codegen
 
 ## Short Summary
 
-Semantra is an explainable semantic mapping and review engine that profiles source and target schemas, ranks and validates mapping candidates, previews and tests reviewed transformations, learns from analyst feedback, and persists knowledge, reusable rules, mapping sets, and evaluation artifacts through a FastAPI backend and Streamlit review UI.
+Semantra is an explainable semantic mapping and review engine that profiles source and target schemas, ranks and validates mapping candidates, reasons over canonical business concepts, previews and tests reviewed transformations, learns from analyst feedback, and persists knowledge, reusable rules, mapping sets, and evaluation artifacts through a FastAPI backend and Streamlit review UI.

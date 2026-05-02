@@ -64,6 +64,7 @@ class KnowledgeOverlayValidationService:
 
         normalized_canonical_term = _normalize_alias(canonical_term)
         normalized_alias = _normalize_alias(alias)
+        canonical_concept_id = None
 
         issues: list[KnowledgeOverlayValidationIssue] = []
         if not entry_type:
@@ -90,6 +91,18 @@ class KnowledgeOverlayValidationService:
                     "canonical_term must contain at least one alphanumeric character.",
                 )
             )
+
+        if entry_type == "concept_alias" and canonical_term:
+            canonical_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(canonical_term)
+            if canonical_concept_id is None:
+                issues.append(
+                    self._issue(
+                        row_number,
+                        "error",
+                        "unknown_canonical_concept",
+                        f"canonical_term '{canonical_term}' does not match any canonical business concept.",
+                    )
+                )
 
         if not alias:
             issues.append(self._issue(row_number, "error", "missing_alias", "alias is required."))
@@ -152,6 +165,7 @@ class KnowledgeOverlayValidationService:
             status=status,
             entry_type=entry_type or None,
             canonical_term=canonical_term or None,
+            canonical_concept_id=canonical_concept_id,
             alias=alias or None,
             domain=domain,
             source_system=source_system,
@@ -168,6 +182,7 @@ class KnowledgeOverlayValidationService:
         return KnowledgeOverlayEntry(
             entry_type=preview_row.entry_type,
             canonical_term=preview_row.canonical_term,
+            canonical_concept_id=preview_row.canonical_concept_id,
             alias=preview_row.alias,
             domain=preview_row.domain,
             source_system=preview_row.source_system,

@@ -74,6 +74,173 @@ def knowledge_explanation_lines(explanation: list[str] | None) -> list[str]:
     ]
 
 
+def canonical_explanation_lines(explanation: list[str] | None) -> list[str]:
+    lines = explanation or []
+    return [
+        line for line in lines
+        if line.startswith("Canonical glossary aligns both fields")
+    ]
+
+
+def canonical_concept_labels(canonical_details: dict | None) -> list[str]:
+    details = canonical_details or {}
+    shared = details.get("shared_concepts") or []
+    source = details.get("source_concepts") or []
+    target = details.get("target_concepts") or []
+    selected = shared or source or target
+    labels: list[str] = []
+    for concept in selected:
+        concept_id = str(concept.get("concept_id") or "").strip()
+        display_name = str(concept.get("display_name") or concept_id).strip()
+        if not concept_id and not display_name:
+            continue
+        labels.append(f"{display_name} ({concept_id})" if concept_id else display_name)
+    return labels
+
+
+def canonical_path_label(source: str, target: str | None, canonical_details: dict | None) -> str:
+    concept_labels = canonical_concept_labels(canonical_details)
+    if not concept_labels:
+        return ""
+    target_label = str(target or "unmapped").strip() or "unmapped"
+    return f"{source} -> {', '.join(concept_labels)} -> {target_label}"
+
+
+def source_concept_rows(mapping_response: dict) -> list[dict]:
+    selected_by_source = suggested_mapping_by_source(mapping_response)
+    rows: list[dict] = []
+
+    for ranked in mapping_response.get("ranked_mappings", []):
+        source = ranked["source"]
+        selected_row = selected_by_source.get(source, {})
+        current_state = st.session_state.get("mapping_editor_state", {}).get(source, {})
+        current_target = current_state.get("target", selected_row.get("target"))
+        selected_candidate = next(
+            (candidate for candidate in ranked.get("candidates", []) if candidate.get("target") == current_target),
+            None,
+        )
+        canonical_details = selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {})
+        concepts = canonical_details.get("shared_concepts") or canonical_details.get("source_concepts") or []
+        for concept in concepts:
+            concept_id = str(concept.get("concept_id") or "").strip()
+            concept_name = str(concept.get("display_name") or concept_id).strip() or concept_id
+            if not concept_id:
+                continue
+            rows.append(
+                {
+                    "source": source,
+                    "concept": concept_name,
+                    "concept_id": concept_id,
+                    "target": current_target or "unmapped",
+                    "strength": float(concept.get("strength", 0.0) or 0.0),
+                }
+            )
+
+    return sorted(rows, key=lambda row: (row["source"], row["concept"], row["target"]))
+
+
+def concept_target_rows(mapping_response: dict) -> list[dict]:
+    selected_by_source = suggested_mapping_by_source(mapping_response)
+    grouped: dict[tuple[str, str], dict] = {}
+
+    for ranked in mapping_response.get("ranked_mappings", []):
+        source = ranked["source"]
+        selected_row = selected_by_source.get(source, {})
+        current_state = st.session_state.get("mapping_editor_state", {}).get(source, {})
+        current_target = current_state.get("target", selected_row.get("target"))
+        selected_candidate = next(
+            (candidate for candidate in ranked.get("candidates", []) if candidate.get("target") == current_target),
+            None,
+        )
+        canonical_details = selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {})
+        concepts = canonical_details.get("shared_concepts") or canonical_details.get("target_concepts") or []
+        for concept in concepts:
+            concept_id = str(concept.get("concept_id") or "").strip()
+            concept_name = str(concept.get("display_name") or concept_id).strip() or concept_id
+            target = str(current_target or "unmapped").strip() or "unmapped"
+            if not concept_id:
+                continue
+            key = (concept_id, target)
+            group = grouped.setdefault(
+                key,
+                {
+                    "concept": concept_name,
+                    "concept_id": concept_id,
+                    "target": target,
+                    "source_columns": set(),
+                    "mapping_count": 0,
+                },
+            )
+            group["mapping_count"] += 1
+            group["source_columns"].add(source)
+
+    return [
+        {
+            "concept": group["concept"],
+            "concept_id": group["concept_id"],
+            "target": group["target"],
+            "source_columns": " | ".join(sorted(group["source_columns"])),
+            "mapping_count": group["mapping_count"],
+        }
+        for _, group in sorted(grouped.items(), key=lambda item: (item[1]["concept"], item[1]["target"]))
+    ]
+
+
+def canonical_concept_groups(mapping_response: dict) -> list[dict]:
+    selected_by_source = suggested_mapping_by_source(mapping_response)
+    grouped: dict[str, dict] = {}
+
+    for ranked in mapping_response.get("ranked_mappings", []):
+        source = ranked["source"]
+        selected_row = selected_by_source.get(source, {})
+        current_state = st.session_state.get("mapping_editor_state", {}).get(source, {})
+        current_target = current_state.get("target", selected_row.get("target"))
+        selected_candidate = next(
+            (candidate for candidate in ranked.get("candidates", []) if candidate.get("target") == current_target),
+            None,
+        )
+        canonical_details = selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {})
+        shared_concepts = canonical_details.get("shared_concepts") or []
+        if not shared_concepts:
+            continue
+
+        for concept in shared_concepts:
+            concept_id = str(concept.get("concept_id") or "").strip()
+            if not concept_id:
+                continue
+            concept_name = str(concept.get("display_name") or concept_id).strip() or concept_id
+            group = grouped.setdefault(
+                concept_id,
+                {
+                    "concept": concept_name,
+                    "concept_id": concept_id,
+                    "mapping_count": 0,
+                    "source_columns": set(),
+                    "target_columns": set(),
+                    "canonical_paths": set(),
+                },
+            )
+            group["mapping_count"] += 1
+            group["source_columns"].add(source)
+            if current_target:
+                group["target_columns"].add(current_target)
+            canonical_path = canonical_path_label(source, current_target, {"shared_concepts": [concept]})
+            if canonical_path:
+                group["canonical_paths"].add(canonical_path)
+
+    return [
+        {
+            "concept": group["concept"],
+            "concept_id": group["concept_id"],
+            "mapping_count": group["mapping_count"],
+            "source_columns": " | ".join(sorted(group["source_columns"])),
+            "target_columns": " | ".join(sorted(group["target_columns"])),
+            "canonical_paths": " | ".join(sorted(group["canonical_paths"])),
+        }
+        for _, group in sorted(grouped.items(), key=lambda item: (item[1]["concept"], item[0]))
+    ]
+
+
 def knowledge_debug_rows(mapping_response: dict) -> list[dict]:
     rows: list[dict] = []
     selected_by_source = suggested_mapping_by_source(mapping_response)
@@ -86,17 +253,22 @@ def knowledge_debug_rows(mapping_response: dict) -> list[dict]:
         selected_candidate = next((candidate for candidate in ranked.get("candidates", []) if candidate.get("target") == target), None)
         selected_payload = selected_candidate or ranked.get("selected") or selected_row
         signals = selected_payload.get("signals", {}) if isinstance(selected_payload, dict) else {}
+        canonical_details = selected_payload.get("canonical_details", {}) if isinstance(selected_payload, dict) else {}
         knowledge_lines = knowledge_explanation_lines(selected_payload.get("explanation", []) if isinstance(selected_payload, dict) else [])
-        if not knowledge_lines and float(signals.get("knowledge", 0.0) or 0.0) <= 0:
+        canonical_lines = canonical_explanation_lines(selected_payload.get("explanation", []) if isinstance(selected_payload, dict) else [])
+        if not knowledge_lines and not canonical_lines and float(signals.get("knowledge", 0.0) or 0.0) <= 0 and float(signals.get("canonical", 0.0) or 0.0) <= 0:
             continue
         rows.append(
             {
                 "source": source,
                 "target": target,
                 "knowledge_signal": float(signals.get("knowledge", 0.0) or 0.0),
+                "canonical_signal": float(signals.get("canonical", 0.0) or 0.0),
                 "confidence": float(selected_payload.get("confidence", 0.0) or 0.0) if isinstance(selected_payload, dict) else 0.0,
                 "validator": validator_badge(selected_payload.get("method", "manual_review")) if isinstance(selected_payload, dict) else "Manual",
                 "knowledge_explanations": knowledge_lines,
+                "canonical_explanations": canonical_lines,
+                "canonical_concepts": canonical_concept_labels(canonical_details),
             }
         )
     return rows
@@ -122,6 +294,7 @@ def trust_layer_rows(mapping_response: dict) -> list[dict]:
                 "confidence": selected_candidate["confidence"] if selected_candidate else selected_row.get("confidence", 0.0),
                 "explanation": selected_candidate["explanation"] if selected_candidate else selected_row.get("explanation", []),
                 "signals": selected_candidate["signals"] if selected_candidate else selected_row.get("signals", {}),
+                "canonical_details": selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {}),
                 "suggested_transformation_code": fallback_code,
                 "active_transformation_code": effective_transformation_code(source, fallback_code),
                 "transformation_mode": transformation_mode(source, fallback_code),
@@ -132,6 +305,26 @@ def trust_layer_rows(mapping_response: dict) -> list[dict]:
 
 def display_trust_layer(mapping_response: dict) -> None:
     st.subheader("\U0001F3AF Mapping Trust Layer")
+    canonical_coverage = mapping_response.get("canonical_coverage") or {}
+    source_coverage = canonical_coverage.get("source") or {}
+    target_coverage = canonical_coverage.get("target") or {}
+    project_coverage = canonical_coverage.get("project") or {}
+    if source_coverage or target_coverage:
+        st.caption(
+            "Canonical coverage: "
+            f"source={int(float(source_coverage.get('coverage_ratio', 0.0) or 0.0) * 100)}% "
+            f"({source_coverage.get('matched_columns', 0)}/{source_coverage.get('total_columns', 0)}), "
+            f"target={int(float(target_coverage.get('coverage_ratio', 0.0) or 0.0) * 100)}% "
+            f"({target_coverage.get('matched_columns', 0)}/{target_coverage.get('total_columns', 0)}), "
+            f"project={int(float(project_coverage.get('coverage_ratio', 0.0) or 0.0) * 100)}% "
+            f"({project_coverage.get('matched_columns', 0)}/{project_coverage.get('total_columns', 0)})."
+        )
+        if project_coverage:
+            st.caption(
+                "Project concepts: "
+                f"{project_coverage.get('concept_count', 0)} total, "
+                f"{project_coverage.get('shared_concept_count', 0)} shared across source and target."
+            )
     editor_state = st.session_state.setdefault("mapping_editor_state", {})
     for m in trust_layer_rows(mapping_response):
         source = m["source"]
@@ -153,6 +346,11 @@ def display_trust_layer(mapping_response: dict) -> None:
             st.success(f"Target: **{m.get('target') or '—'}**")
             if has_knowledge_match(m.get("signals"), m.get("explanation")):
                 st.caption("Knowledge-backed match")
+            if has_canonical_match(m.get("signals"), m.get("explanation")):
+                st.caption("Canonical-backed match")
+                canonical_labels = canonical_concept_labels(m.get("canonical_details"))
+                if canonical_labels:
+                    st.caption("Canonical concept: " + ", ".join(canonical_labels))
             st.caption(transformation_mode_label(m["transformation_mode"]))
         with col3:
             score = m.get('confidence', 0.0)
@@ -169,6 +367,11 @@ def display_trust_layer(mapping_response: dict) -> None:
                     st.write(f"- {r}")
             else:
                 st.write("No explanation provided.")
+
+            canonical_labels = canonical_concept_labels(m.get("canonical_details"))
+            if canonical_labels:
+                st.write("**Canonical path:**")
+                st.write(f"- {source} -> {', '.join(canonical_labels)} -> {m.get('target') or 'unmapped'}")
 
             transformation = suggested_code.strip()
             if transformation:
@@ -317,6 +520,27 @@ def has_knowledge_match(signals: dict | None, explanation: list[str] | str | Non
 
     return False
 
+
+def has_canonical_match(signals: dict | None, explanation: list[str] | str | None = None) -> bool:
+    if isinstance(signals, dict):
+        try:
+            if float(signals.get("canonical", 0.0) or 0.0) > 0.0:
+                return True
+        except (TypeError, ValueError):
+            pass
+
+    if isinstance(explanation, str):
+        return "canonical glossary" in explanation.lower()
+
+    if isinstance(explanation, list):
+        for item in explanation:
+            if not isinstance(item, str):
+                continue
+            if "canonical glossary" in item.lower():
+                return True
+
+    return False
+
 def reset_flow_state() -> None:
     for key in (
         "upload_response",
@@ -410,6 +634,25 @@ def upload_file_to_request_files(uploaded_file) -> dict | None:
             uploaded_file.type or "text/csv",
         )
     }
+
+
+def api_request_content(method: str, path: str, files: dict | None = None, data: dict | None = None) -> bytes:
+    headers = {}
+    admin_token = st.session_state.get("admin_token", "").strip()
+    if admin_token:
+        headers["X-Admin-Token"] = admin_token
+
+    base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
+    with httpx.Client(timeout=60.0) as client:
+        response = client.request(
+            method,
+            f"{base_url}{path}",
+            headers=headers,
+            files=files,
+            data=data,
+        )
+    response.raise_for_status()
+    return response.content
 
 
 def refresh_admin_requirement() -> None:
@@ -623,6 +866,9 @@ def validator_badge(method: str) -> str:
 
 def render_mapping_review(mapping_response: dict) -> None:
     selected_rows = current_mapping_rows(mapping_response)
+    concept_rows = canonical_concept_groups(mapping_response)
+    source_concept_view_rows = source_concept_rows(mapping_response)
+    concept_target_view_rows = concept_target_rows(mapping_response)
     filter_columns = st.columns(3)
     status_options = [ALL_FILTER_OPTION, "accepted", "needs_review", "rejected"]
     confidence_options = [ALL_FILTER_OPTION, "high_confidence", "medium_confidence", "low_confidence"]
@@ -646,6 +892,18 @@ def render_mapping_review(mapping_response: dict) -> None:
 
     st.subheader("Selected Mapping")
     st.dataframe(filtered_rows, width='stretch', hide_index=True)
+
+    if source_concept_view_rows:
+        st.subheader("Source -> Concept View")
+        st.dataframe(source_concept_view_rows, width='stretch', hide_index=True)
+
+    if concept_target_view_rows:
+        st.subheader("Concept -> Target View")
+        st.dataframe(concept_target_view_rows, width='stretch', hide_index=True)
+
+    if concept_rows:
+        st.subheader("Canonical Concept Summary")
+        st.dataframe(concept_rows, width='stretch', hide_index=True)
 
     st.subheader("Ranked Candidates")
     for ranked in mapping_response["ranked_mappings"]:
@@ -671,6 +929,13 @@ def render_mapping_review(mapping_response: dict) -> None:
                     continue
                 if candidate["explanation"]:
                     st.caption(f"{candidate['target']}: {' | '.join(candidate['explanation'])}")
+                canonical_path = canonical_path_label(
+                    ranked["source"],
+                    candidate.get("target"),
+                    candidate.get("canonical_details"),
+                )
+                if canonical_path:
+                    st.caption(f"Canonical path: {canonical_path}")
 
 
 def current_mapping_rows(mapping_response: dict) -> list[dict]:
@@ -685,6 +950,7 @@ def current_mapping_rows(mapping_response: dict) -> list[dict]:
             (candidate for candidate in ranked["candidates"] if candidate["target"] == current_target),
             None,
         )
+        canonical_details = selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {})
         rows.append(
             {
                 "source": source,
@@ -697,6 +963,7 @@ def current_mapping_rows(mapping_response: dict) -> list[dict]:
                 "validator": validator_badge(
                     selected_candidate["method"] if selected_candidate else selected_row.get("method", "manual_review")
                 ),
+                "canonical_path": canonical_path_label(source, current_target, canonical_details),
             }
         )
     return rows
@@ -1544,6 +1811,62 @@ def render_admin_debug_tab() -> None:
             st.session_state["last_action"] = {"level": "error", "message": f"Saving knowledge overlay failed: {error}"}
         st.rerun()
 
+    st.subheader("Canonical Glossary")
+    canonical_glossary_upload = st.file_uploader(
+        "Canonical glossary CSV",
+        type=["csv"],
+        key="canonical_glossary_file",
+        help="Import or export the canonical business concept glossary as CSV.",
+    )
+    canonical_glossary_columns = st.columns(2)
+    if canonical_glossary_columns[0].button(
+        "Load canonical glossary export",
+        width='stretch',
+        key="debug_export_canonical_glossary",
+    ):
+        try:
+            st.session_state["canonical_glossary_export_bytes"] = api_request_content("GET", "/knowledge/canonical-glossary/export")
+            st.session_state["last_action"] = {"level": "success", "message": "Loaded canonical glossary export."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary export failed: {error}"}
+        st.rerun()
+
+    if canonical_glossary_columns[1].button(
+        "Import canonical glossary",
+        width='stretch',
+        key="debug_import_canonical_glossary",
+        disabled=canonical_glossary_upload is None,
+    ):
+        try:
+            st.session_state["debug_canonical_glossary_import"] = api_request(
+                "POST",
+                "/knowledge/canonical-glossary/import",
+                files=upload_file_to_request_files(canonical_glossary_upload),
+            )
+            st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+            st.session_state["last_action"] = {"level": "success", "message": "Imported canonical glossary CSV."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary import failed: {error}"}
+        st.rerun()
+
+    canonical_glossary_export_bytes = st.session_state.get("canonical_glossary_export_bytes")
+    if canonical_glossary_export_bytes:
+        st.download_button(
+            "Download canonical glossary CSV",
+            data=canonical_glossary_export_bytes,
+            file_name="canonical_glossary.csv",
+            mime="text/csv",
+            width='stretch',
+        )
+
+    canonical_glossary_import = st.session_state.get("debug_canonical_glossary_import")
+    if canonical_glossary_import:
+        st.caption(
+            "Canonical glossary import: "
+            f"rows={canonical_glossary_import.get('imported_row_count', 0)}, "
+            f"concepts={canonical_glossary_import.get('canonical_concept_count', 0)}."
+        )
+
     knowledge_runtime = st.session_state.get("debug_knowledge_runtime")
     if knowledge_runtime:
         st.caption(
@@ -1724,15 +2047,49 @@ def render_admin_debug_tab() -> None:
 
     mapping_response = st.session_state.get("mapping_response")
     if mapping_response:
+        canonical_coverage = mapping_response.get("canonical_coverage") or {}
+        source_coverage = canonical_coverage.get("source") or {}
+        target_coverage = canonical_coverage.get("target") or {}
+        project_coverage = canonical_coverage.get("project") or {}
+        if source_coverage or target_coverage or project_coverage:
+            st.subheader("Canonical Coverage")
+            st.dataframe(
+                [
+                    {
+                        "dataset": "source",
+                        "coverage_ratio": source_coverage.get("coverage_ratio", 0.0),
+                        "matched_columns": source_coverage.get("matched_columns", 0),
+                        "total_columns": source_coverage.get("total_columns", 0),
+                        "unmatched_columns": " | ".join(source_coverage.get("unmatched_columns", [])),
+                    },
+                    {
+                        "dataset": "target",
+                        "coverage_ratio": target_coverage.get("coverage_ratio", 0.0),
+                        "matched_columns": target_coverage.get("matched_columns", 0),
+                        "total_columns": target_coverage.get("total_columns", 0),
+                        "unmatched_columns": " | ".join(target_coverage.get("unmatched_columns", [])),
+                    },
+                    {
+                        "dataset": "project",
+                        "coverage_ratio": project_coverage.get("coverage_ratio", 0.0),
+                        "matched_columns": project_coverage.get("matched_columns", 0),
+                        "total_columns": project_coverage.get("total_columns", 0),
+                        "unmatched_columns": "shared=" + " | ".join(project_coverage.get("shared_concepts", [])),
+                    },
+                ],
+                width='stretch',
+                hide_index=True,
+            )
         knowledge_rows = knowledge_debug_rows(mapping_response)
         if knowledge_rows:
-            st.subheader("Knowledge Match Insights")
+            st.subheader("Knowledge and Canonical Match Insights")
             st.dataframe(
                 [
                     {
                         "source": row["source"],
                         "target": row["target"],
                         "knowledge_signal": row["knowledge_signal"],
+                        "canonical_signal": row["canonical_signal"],
                         "confidence": row["confidence"],
                         "validator": row["validator"],
                     }
@@ -1744,6 +2101,8 @@ def render_admin_debug_tab() -> None:
             for row in knowledge_rows:
                 with st.expander(f"Knowledge details: {row['source']} -> {row['target']}"):
                     for line in row["knowledge_explanations"]:
+                        st.caption(line)
+                    for line in row["canonical_explanations"]:
                         st.caption(line)
 
     decision_logs = st.session_state.get("debug_decision_logs")

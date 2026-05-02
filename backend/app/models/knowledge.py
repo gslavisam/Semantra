@@ -29,6 +29,7 @@ class KnowledgeOverlayEntry(BaseModel):
     version_id: int | None = None
     entry_type: KnowledgeOverlayEntryType
     canonical_term: str
+    canonical_concept_id: str | None = None
     alias: str
     domain: str | None = None
     source_system: str | None = None
@@ -49,6 +50,7 @@ class KnowledgeOverlayValidationPreviewRow(BaseModel):
     status: KnowledgeOverlayRowStatus = "valid"
     entry_type: str | None = None
     canonical_term: str | None = None
+    canonical_concept_id: str | None = None
     alias: str | None = None
     domain: str | None = None
     source_system: str | None = None
@@ -86,6 +88,23 @@ class KnowledgeRuntimeStatus(BaseModel):
     active_entry_count: int = 0
     entry_type_counts: dict[str, int] = Field(default_factory=dict)
     concept_count: int = 0
+    canonical_concept_count: int = 0
+
+
+class CanonicalGlossaryEntry(BaseModel):
+    concept_id: str
+    entity: str
+    attribute: str
+    display_name: str
+    description: str = ""
+    data_type: str = ""
+    aliases: list[str] = Field(default_factory=list)
+
+
+class CanonicalGlossaryImportResponse(BaseModel):
+    imported_row_count: int = 0
+    canonical_concept_count: int = 0
+    source_filename: str | None = None
 
 
 class KnowledgeAuditEntry(BaseModel):

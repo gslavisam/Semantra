@@ -5,7 +5,9 @@ from dataclasses import dataclass, field
 from app.core.config import settings
 from app.models.mapping import (
     AutoMappingResponse,
+    CanonicalCoverageReport,
     CandidateOption,
+    CanonicalMappingDetails,
     DecisionLogEntry,
     LLMValidationResult,
     MappingCandidate,
@@ -26,6 +28,7 @@ WEIGHTS = {
     "name": 0.20,
     "semantic": 0.12,
     "knowledge": 0.10,
+    "canonical": 0.05,
     "pattern": 0.20,
     "statistical": 0.15,
     "overlap": 0.10,
@@ -42,6 +45,7 @@ class CandidateScore:
     score: float
     signals: ScoringSignals
     explanation: list[str]
+    canonical_details: CanonicalMappingDetails = field(default_factory=CanonicalMappingDetails)
     llm_result: LLMValidationResult | None = None
     llm_selected: bool = False
 
@@ -165,7 +169,22 @@ def generate_mapping_candidates(
         )
         selected_mappings.append(selected)
 
-    return AutoMappingResponse(mappings=selected_mappings, ranked_mappings=ranked_results)
+    source_canonical_coverage = metadata_knowledge_service.canonical_coverage(source_schema)
+    target_canonical_coverage = metadata_knowledge_service.canonical_coverage(target_schema)
+    canonical_coverage = CanonicalCoverageReport(
+        source=source_canonical_coverage,
+        target=target_canonical_coverage,
+        project=metadata_knowledge_service.canonical_project_coverage(
+            source_canonical_coverage,
+            target_canonical_coverage,
+        ),
+    )
+
+    return AutoMappingResponse(
+        mappings=selected_mappings,
+        ranked_mappings=ranked_results,
+        canonical_coverage=canonical_coverage,
+    )
 
 
 def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile]) -> list[CandidateScore]:
@@ -174,7 +193,16 @@ def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile])
         signals = compute_signals(source, target)
         final_score = compute_final_score(signals)
         explanation = build_explanation(source, target, signals)
-        scored.append(CandidateScore(source=source, target=target, score=final_score, signals=signals, explanation=explanation))
+        scored.append(
+            CandidateScore(
+                source=source,
+                target=target,
+                score=final_score,
+                signals=signals,
+                explanation=explanation,
+                canonical_details=metadata_knowledge_service.canonical_mapping_details(source, target),
+            )
+        )
     return sorted(scored, key=lambda item: item.score, reverse=True)
 
 
@@ -253,6 +281,7 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
     )
     semantic_signal = jaccard_similarity(source_semantic, target_semantic)
     knowledge_signal = metadata_knowledge_service.knowledge_alignment(source, target)
+    canonical_signal = metadata_knowledge_service.canonical_alignment(source, target)
     pattern_signal = jaccard_similarity(source_patterns, target_patterns)
     stat_signal = (
         score_distance(source.unique_ratio, target.unique_ratio)
@@ -267,6 +296,7 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
         name=round(clamp_score(name_signal), 4),
         semantic=round(clamp_score(semantic_signal), 4),
         knowledge=round(clamp_score(knowledge_signal), 4),
+        canonical=round(clamp_score(canonical_signal), 4),
         pattern=round(clamp_score(pattern_signal), 4),
         statistical=round(clamp_score(stat_signal), 4),
         overlap=round(clamp_score(overlap_signal), 4),
@@ -281,6 +311,7 @@ def compute_final_score(signals: ScoringSignals) -> float:
         (signals.name * WEIGHTS["name"])
         + (signals.semantic * WEIGHTS["semantic"])
         + (signals.knowledge * WEIGHTS["knowledge"])
+        + (signals.canonical * WEIGHTS["canonical"])
         + (signals.pattern * WEIGHTS["pattern"])
         + (signals.statistical * WEIGHTS["statistical"])
         + (signals.overlap * WEIGHTS["overlap"])
@@ -318,6 +349,7 @@ def assign_unique_targets(per_source_scores: dict[str, list[CandidateScore]]) ->
         key=lambda item: (
             item[1].score,
             item[1].signals.pattern,
+            item[1].signals.canonical,
             item[1].signals.semantic,
             item[1].signals.embedding,
         ),
@@ -343,6 +375,7 @@ def build_candidate_option(score: CandidateScore) -> CandidateOption:
         method="multi_signal_heuristic",
         signals=score.signals,
         explanation=list(score.explanation),
+        canonical_details=score.canonical_details,
     )
 
 
@@ -362,6 +395,7 @@ def build_selected_mapping(
         method="llm_validated" if score.llm_selected else "multi_signal_heuristic",
         signals=score.signals,
         explanation=list(score.explanation) + extra_explanation,
+        canonical_details=score.canonical_details,
         alternatives=alternatives,
     )
 
@@ -397,6 +431,8 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
         explanation.append("Semantic tokens align after abbreviation expansion and synonym enrichment.")
     if signals.knowledge > 0:
         explanation.extend(metadata_knowledge_service.explain_alignment(source, target))
+    if signals.canonical > 0:
+        explanation.extend(metadata_knowledge_service.explain_canonical_alignment(source, target))
     if signals.name >= 0.75:
         explanation.append("Field names are lexically very similar.")
     if signals.overlap > 0:
@@ -438,7 +474,7 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
 
     explanation.append(
         "Signal breakdown: "
-        f"name={signals.name:.2f}, semantic={signals.semantic:.2f}, knowledge={signals.knowledge:.2f}, pattern={signals.pattern:.2f}, "
+        f"name={signals.name:.2f}, semantic={signals.semantic:.2f}, knowledge={signals.knowledge:.2f}, canonical={signals.canonical:.2f}, pattern={signals.pattern:.2f}, "
         f"stat={signals.statistical:.2f}, overlap={signals.overlap:.2f}, embedding={signals.embedding:.2f}, correction={signals.correction:.2f}."
     )
     explanation.append(f"Candidate target: {target.name}.")

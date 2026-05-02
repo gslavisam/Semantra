@@ -30,12 +30,25 @@ class ScoringSignals(BaseModel):
     name: float = 0.0
     semantic: float = 0.0
     knowledge: float = 0.0
+    canonical: float = 0.0
     pattern: float = 0.0
     statistical: float = 0.0
     overlap: float = 0.0
     embedding: float = 0.0
     correction: float = 0.0
     llm: float = 0.0
+
+
+class CanonicalConceptMatchDetail(BaseModel):
+    concept_id: str
+    display_name: str
+    strength: float = 0.0
+
+
+class CanonicalMappingDetails(BaseModel):
+    source_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
+    target_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
+    shared_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
 
 
 class CandidateOption(BaseModel):
@@ -45,6 +58,7 @@ class CandidateOption(BaseModel):
     method: str
     signals: ScoringSignals
     explanation: list[str] = Field(default_factory=list)
+    canonical_details: CanonicalMappingDetails = Field(default_factory=CanonicalMappingDetails)
 
 
 class LLMValidationResult(BaseModel):
@@ -64,6 +78,7 @@ class MappingCandidate(BaseModel):
     method: str
     signals: ScoringSignals
     explanation: list[str] = Field(default_factory=list)
+    canonical_details: CanonicalMappingDetails = Field(default_factory=CanonicalMappingDetails)
     alternatives: list[str] = Field(default_factory=list)
     transformation_code: str | None = None
 
@@ -86,9 +101,41 @@ class AutoMappingRequest(BaseModel):
     target_dataset_id: str
 
 
+class CanonicalCoverageColumnMatch(BaseModel):
+    column: str
+    concept_ids: list[str] = Field(default_factory=list)
+
+
+class CanonicalCoverageSummary(BaseModel):
+    total_columns: int = 0
+    matched_columns: int = 0
+    coverage_ratio: float = 0.0
+    unmatched_columns: list[str] = Field(default_factory=list)
+    matched_columns_detail: list[CanonicalCoverageColumnMatch] = Field(default_factory=list)
+
+
+class CanonicalCoverageProjectSummary(BaseModel):
+    total_columns: int = 0
+    matched_columns: int = 0
+    coverage_ratio: float = 0.0
+    concept_count: int = 0
+    shared_concept_count: int = 0
+    concepts: list[str] = Field(default_factory=list)
+    shared_concepts: list[str] = Field(default_factory=list)
+    source_only_concepts: list[str] = Field(default_factory=list)
+    target_only_concepts: list[str] = Field(default_factory=list)
+
+
+class CanonicalCoverageReport(BaseModel):
+    source: CanonicalCoverageSummary = Field(default_factory=CanonicalCoverageSummary)
+    target: CanonicalCoverageSummary = Field(default_factory=CanonicalCoverageSummary)
+    project: CanonicalCoverageProjectSummary = Field(default_factory=CanonicalCoverageProjectSummary)
+
+
 class AutoMappingResponse(BaseModel):
     mappings: list[MappingCandidate] = Field(default_factory=list)
     ranked_mappings: list[SourceMappingResult] = Field(default_factory=list)
+    canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
 
 
 class DecisionLogEntry(BaseModel):

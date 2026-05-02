@@ -60,3 +60,20 @@ def test_validate_csv_payload_reports_conflict_against_base_dictionary() -> None
     assert result.invalid_rows == 0
     assert result.conflicts == 1
     assert any(issue.code == "conflict_existing_alias" for issue in result.normalized_preview[0].issues)
+
+
+def test_validate_csv_payload_requires_known_canonical_concept_for_concept_alias() -> None:
+    result = knowledge_overlay_validation_service.validate_csv_payload(
+        csv_bytes(
+            "entry_type,canonical_term,alias,domain,source_system,note\n"
+            "concept_alias,Customer ID,legacy_customer_identifier,master_data,LegacyERP,Canonical alias\n"
+            "concept_alias,Unknown Concept,mystery_alias,master_data,LegacyERP,Invalid canonical alias\n"
+        ),
+        filename="knowledge_overlay.csv",
+    )
+
+    assert result.total_rows == 2
+    assert result.valid_rows == 1
+    assert result.invalid_rows == 1
+    assert result.normalized_preview[0].canonical_concept_id == "customer.id"
+    assert any(issue.code == "unknown_canonical_concept" for issue in result.normalized_preview[1].issues)
