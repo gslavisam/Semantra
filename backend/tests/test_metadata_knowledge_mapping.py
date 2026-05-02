@@ -1,6 +1,7 @@
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.metadata_knowledge_service import metadata_knowledge_service
+from app.services.persistence_service import persistence_service
 
 
 def make_column(name: str, patterns: list[str], sample_values: list[str], unique_ratio: float = 1.0) -> ColumnProfile:
@@ -17,6 +18,11 @@ def make_column(name: str, patterns: list[str], sample_values: list[str], unique
         detected_patterns=patterns,
         tokenized_name=name.replace("_", " ").split(),
     )
+
+
+def setup_function() -> None:
+    persistence_service.clear_knowledge_overlays()
+    metadata_knowledge_service.refresh()
 
 
 def test_metadata_dictionary_is_loaded() -> None:
@@ -102,3 +108,46 @@ def test_metadata_workbook_links_sap_material_to_workday_item_id() -> None:
     assert any("Context prior:" in line for line in result.mappings[0].explanation)
     assert any("SAP MARA.MATNR" in line for line in result.mappings[0].explanation)
     assert any("Workday Item.Item_ID" in line for line in result.mappings[0].explanation)
+
+
+def test_active_overlay_field_alias_changes_mapping_result() -> None:
+    overlay = persistence_service.save_knowledge_overlay_version("overlay-v1", status="validated")
+    persistence_service.save_knowledge_overlay_entries(
+        overlay.overlay_id,
+        [
+            {
+                "entry_type": "field_alias",
+                "canonical_term": "customer id",
+                "alias": "LEGACY_CUST",
+                "domain": "master_data",
+                "source_system": "LegacyERP",
+                "note": "Legacy customer identifier",
+                "normalized_canonical_term": "customer id",
+                "normalized_alias": "legacy cust",
+            }
+        ],
+    )
+    persistence_service.activate_knowledge_overlay_version(overlay.overlay_id)
+    metadata_knowledge_service.refresh()
+
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("LEGACY_CUST", ["numeric_id"], ["C0001", "C0002"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["C0001", "C0002"]),
+            make_column("vendor_id", ["numeric_id"], ["V0001", "V0002"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    assert result.mappings[0].target == "customer_id"
+    assert result.mappings[0].signals.knowledge > 0
+    assert any("Custom knowledge overlay 'overlay-v1' matched alias(es): legacy cust." in line for line in result.mappings[0].explanation)

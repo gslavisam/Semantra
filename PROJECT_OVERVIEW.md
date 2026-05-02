@@ -2,20 +2,17 @@
 
 ## What Semantra Is
 
-Semantra is a backend-first AI semantic bridge MVP for explainable data mapping between source and target tabular schemas.
+Semantra is an explainable semantic mapping product slice for aligning source and target schemas under analyst control.
 
-The project focuses on a controlled mapping workflow:
-- ingest source and target datasets
-- profile both schemas
-- rank candidate field mappings with multiple signals
-- optionally use a constrained LLM validator for ambiguous cases
-- optionally ask the active LLM runtime to generate pandas transformation code from a natural-language instruction
-- return final mapping decisions plus top-k alternatives
-- preview transformed rows, including reviewed transformations
-- generate starter Pandas transformation code from accepted mapping decisions
-- log decisions, capture user corrections, and evaluate mapping quality
+It is designed around a deterministic-first review loop:
+- ingest source and target structures
+- profile schemas and rank candidate mappings
+- enrich matching with metadata knowledge and custom overlays
+- use constrained AI only where it adds clear value
+- preview transformations before execution
+- persist feedback, reusable rules, mapping sets, and evaluation artifacts
 
-Semantra is not a full ETL platform yet. It is currently the semantic mapping and quality-control engine that can later sit behind a UI, a workflow runner, or a larger migration product.
+Semantra is already useful as a pilot-grade semantic mapping and review engine. It is not yet a full ETL platform, orchestration layer, or connector-heavy integration suite.
 
 ## Product Goal
 
@@ -25,28 +22,22 @@ The goal of Semantra is to make schema mapping:
 - reviewable
 - improvable over time
 
-Instead of relying on a free-form LLM to "map everything", Semantra uses a deterministic-first pipeline with tightly constrained AI assistance.
+Instead of asking a free-form LLM to "map everything", Semantra keeps the core workflow deterministic and uses AI only in bounded, inspectable steps such as ambiguity resolution and transformation generation.
 
 ## Current Scope
 
 Current MVP scope includes:
 - CSV, JSON, XML, and XLSX row-data upload for source and target datasets
-- SQL schema snapshot upload for source and target datasets
-- SQL table discovery and explicit table selection for multi-table schema snapshots
-- schema profiling
-- multi-signal mapping heuristics
-- top-k candidate ranking per source field
-- global one-to-one target assignment
+- SQL schema snapshot upload plus table discovery and explicit table selection for multi-table snapshots
+- schema profiling with lexical, pattern, and statistical hints
+- multi-signal candidate ranking with top-k alternatives and one-to-one assignment
 - optional constrained LLM validation in ambiguity-band cases
-- prompt-driven transformation generation for reviewed source-to-target pairs
-- preview of projected target rows with transformation execution
-- manual mapping editor in the Streamlit review UI (add / override / remove manual mappings, persisted as corrections)
-- Pandas code generation for selected mappings, including reviewed transformation statements
-- observability endpoints for decision logs and runtime config
-- persisted user corrections and benchmark datasets in SQLite
-- persisted evaluation run history in SQLite
-- benchmark evaluation endpoints and internal test fixtures
-- Streamlit internal-alpha UI for upload, trust-layer review, transformations, corrections, benchmarks, and admin/debug flows, including knowledge-match inspection for the active mapping response
+- prompt-driven pandas transformation generation for reviewed field pairs
+- transformation preview with syntax checks, dry-run execution, before/after samples, structured warnings, and generated code output
+- custom knowledge overlays layered on top of built-in metadata knowledge
+- persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
+- mapping-set status workflow with `draft`, `review`, `approved`, and `archived`
+- internal Streamlit UI for upload, trust-layer review, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
 
 Out of scope for the current slice:
 - authentication and role-based access control
@@ -55,364 +46,348 @@ Out of scope for the current slice:
 - distributed job orchestration
 - complex multi-table graph mapping
 - production writeback into destination systems
+- full canonical business concept layer
 
 ## Core Concept
 
-Semantra treats data mapping as a multi-signal inference problem.
+Semantra treats data mapping as a multi-signal inference problem with explicit review surfaces.
 
-Each source field is compared against target fields using several signals:
-- lexical similarity
-- semantic similarity after normalization and synonym expansion
-- internal metadata knowledge and vendor context priors
-- data pattern similarity
-- statistical similarity
-- sample value overlap
-- optional embedding similarity
-- historical correction feedback
-- optional constrained LLM validator signal
+Each source field is compared against target fields using a blend of lexical, semantic, metadata, pattern, statistical, overlap, optional embedding, and historical feedback signals. The result is a ranked candidate list with explanations, not a blind one-shot guess.
 
-This produces a ranked candidate list, not a blind single guess.
+The product then layers controlled trust mechanisms on top of that ranking:
+- knowledge overlays that can refine semantic matching without editing base assets
+- corrections and promoted reusable rules that improve future ranking behavior
+- transformation preview and generated-code validation before the analyst commits to an execution artifact
+- saved mapping sets and transformation test sets that make review and replay more structured
 
 ## Main Functional Areas
 
-### 1. Dataset Ingestion
+### 1. Dataset Ingestion and Profiling
 
 Purpose:
 - accept uploaded row-based files and schema snapshots
 - assign dataset identifiers
-- store raw rows in memory for active workflow use
+- build the schema profile used by the mapping engine and trust layer
 
-Key behavior:
+Current behavior:
 - source and target datasets are uploaded separately
-- row-based uploads currently support CSV, JSON, XML, and XLSX
+- row-based uploads support CSV, JSON, XML, and XLSX
 - SQL uploads remain schema-only and can require explicit table selection for multi-table snapshots
-- each upload produces a dataset handle and schema profile
-- preview rows are retained for fast downstream inspection
+- each upload produces a dataset handle, schema profile, and preview rows when row data exists
 
-Implementation anchor:
+Implementation anchors:
 - `backend/app/api/routes/upload.py`
 - `backend/app/services/tabular_upload_service.py`
+- `backend/app/services/profiling_service.py`
 - `backend/app/services/upload_store.py`
 
-### 2. Schema Profiling
-
-Purpose:
-- understand each field before attempting semantic mapping
-
-For each column, Semantra extracts:
-- name
-- normalized name
-- tokenized name
-- inferred dtype
-- null ratio
-- unique ratio
-- average value length
-- sample values
-- distinct sample values
-- detected patterns such as `phone`, `email`, `date`, `numeric_id`, `categorical`, or `text`
-
-Implementation anchor:
-- `backend/app/services/profiling_service.py`
-
-### 3. Mapping Engine
+### 2. Mapping Engine
 
 Purpose:
 - generate explainable mapping candidates from source schema to target schema
 
-Current engine behavior:
-- compute candidate scores across all source-target combinations
-- sort candidates per source field
-- return top-k alternatives
-- apply a global one-to-one assignment step to reduce conflicting target reuse
-- return selected mappings plus ranked alternatives
+Current behavior:
+- compute source-target scores across lexical, semantic, knowledge, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
+- return top-k ranked candidates per source field
+- apply a greedy global one-to-one assignment step for selected mappings
+- attach signal breakdowns and explanation lines to both selected mappings and ranked candidates
 
-Current scoring model:
-- each source-target pair is scored independently first
-- the final heuristic score is a weighted sum of nine signals
-- current weights are: name `0.20`, semantic `0.12`, knowledge `0.10`, pattern `0.20`, statistical `0.15`, overlap `0.10`, embedding `0.12`, correction `0.10`, LLM `0.05`
-- because those weights currently sum to `1.04`, the score is best understood as a ranking signal rather than a calibrated probability
-
-Current signal implementation:
-- name similarity blends `0.6 * fuzzy_similarity(normalized_name)` and `0.4 * jaccard_similarity(tokenized_name)`
-- semantic similarity compares normalized semantic token sets after synonym expansion and metadata-driven alias enrichment
-- knowledge similarity uses curated internal business concepts plus SAP/QAD/Workday field and object context from the local metadata assets under `metadata_dict/`
-- pattern similarity compares detected pattern tags such as `email`, `phone`, or `date`
-- statistical similarity averages distance-based similarity across `unique_ratio`, `null_ratio`, and capped normalized `avg_length`
-- overlap similarity measures shared distinct sample values
-- embedding similarity is cosine similarity over normalized field-name embeddings when an embedding provider is enabled, otherwise `0`
-- correction feedback comes from persisted user corrections and can both boost corrected targets and penalize previously wrong suggestions
-- the LLM signal starts at `0` and is populated only if the ambiguity-band validator is invoked and accepts a candidate
-
-Current knowledge sources:
-- `metadata_dict/metadata_dict.csv` provides multilingual canonical concepts, aliases, naming conventions, and vendor-style column names
-- `metadata_dict/metadata_dictionary.xlsx` adds curated SAP/QAD/Workday field mappings and business notes
-- `metadata_dict/sap_tables_mostUsed.xlsx`, `metadata_dict/qad_tables_mostUsed.xlsx`, and `metadata_dict/WD_entities_mostUsed.xlsx` contribute object-level descriptions that are used as context priors
-
-Assignment and labeling behavior:
-- after per-source ranking, Semantra performs a greedy global one-to-one assignment across all source-target edges
-- the global sort order prefers higher final score first, then pattern, semantic, and embedding signal values as tie-breakers
-- the API still returns top-k ranked alternatives per source field for review, even when the selected target comes from the global assignment step
-- default confidence thresholds are `>= 0.85` for `high_confidence`, `>= 0.65` for `medium_confidence`, otherwise `low_confidence`
+Important implementation notes:
+- the weighted score is still a ranking heuristic, not a calibrated probability
+- correction signal now includes both raw feedback history and promoted reusable rules
+- the knowledge signal can be influenced by both built-in metadata assets and active knowledge overlays
 
 Implementation anchor:
 - `backend/app/services/mapping_service.py`
 
-### 4. Constrained LLM Validation
+### 3. Constrained LLM Validation and Transformation Generation
 
 Purpose:
-- resolve uncertainty in borderline mapping cases without giving full control to a generative model
+- use AI in bounded, inspectable steps instead of handing over the full mapping workflow
 
-Current design:
-- LLM is only used inside a score gate defined by ambiguity thresholds
-- it receives only a closed set of candidates
-- it must return strict JSON
-- it can choose one of the provided targets or `no_match`
-- invalid or hallucinated outputs are discarded
-- by default it is only called when the best heuristic score is strictly between `0.40` and `0.75`
-- when it selects one of the provided candidates, its confidence is written into the dedicated `llm` signal and the candidate is re-scored and re-ranked inside that closed candidate set
-
-Provider support currently exists for:
-- OpenAI Responses API
-- OpenAI-compatible LM Studio responses endpoints
-- Ollama
-- static/mock provider for tests
-
-Implementation anchor:
-- `backend/app/services/llm_service.py`
-
-### 5. Preview and Code Generation
-
-Purpose:
-- show what the mapping will do before execution
-- provide a deterministic transformation artifact
-
-Outputs:
-- projected preview rows for accepted mappings, including reviewed transformation code when present
-- generated Pandas code for building a target dataframe from source columns and transformation statements
+Current behavior:
+- ambiguity-band validation can re-rank only the closed candidate set or return `no_match`
+- prompt-driven transformation generation produces pandas-oriented code for a selected source-target pair
+- provider adapters currently cover OpenAI Responses API, OpenAI-compatible LM Studio endpoints, and Ollama
 
 Implementation anchors:
-- `backend/app/services/preview_service.py`
-- `backend/app/services/codegen_service.py`
+- `backend/app/services/llm_service.py`
+- `backend/app/api/routes/mapping.py`
 
-### 6. Prompt-Driven Transformation Generation
+### 4. Transformation Safety, Preview, and Codegen
 
 Purpose:
-- let an operator describe a desired field-level transformation in natural language
-- convert that instruction into pandas-oriented Python scoped to the chosen source and target columns
+- make reviewed transformations inspectable before they become code artifacts
 
-Current design:
-- generation is explicit and user-invoked from the Streamlit trust layer
-- the backend inspects the selected source and target column profiles before building the prompt
-- the LLM must return strict JSON containing `transformation_code`
-- generated code is shown in the UI first and is only used for preview/codegen after the operator applies it
-- if the target changes, stale suggested transformation code is not reused automatically
+Current behavior:
+- preview executes reviewed `transformation_code` against sample rows
+- preview returns `before_samples`, `after_samples`, `status`, `classification`, and structured warnings
+- warnings cover syntax errors, runtime errors, missing source columns, null expansion, type coercion, and row-count mismatch
+- code generation emits Pandas starter code and now returns structured warning objects when it must skip or fall back
+- reusable transformation templates exist for common text cleanup and formatting patterns
+- transformation test sets can be saved and executed as lightweight regression cases
+
+Implementation anchors:
+- `backend/app/services/transformation_service.py`
+- `backend/app/services/preview_service.py`
+- `backend/app/services/codegen_service.py`
+- `backend/app/services/transformation_template_service.py`
+- `backend/app/services/transformation_test_service.py`
+
+### 5. Knowledge Overlay Runtime
+
+Purpose:
+- let a team add project-specific aliases, abbreviations, and synonyms without editing base metadata files
+
+Current behavior:
+- CSV overlays can be validated, saved, listed, inspected, activated, deactivated, rolled back, archived, and reloaded at runtime
+- overlay entries are merged into metadata-driven semantic expansion and explanation generation
+- overlay lifecycle changes are audit logged
+
+Implementation anchors:
+- `backend/app/services/knowledge_overlay_service.py`
+- `backend/app/services/metadata_knowledge_service.py`
+- `backend/app/api/routes/knowledge.py`
+
+### 6. Correction Learning and Reusable Rules
+
+Purpose:
+- turn explicit analyst feedback into durable ranking improvements
+
+Current behavior:
+- corrections distinguish `accepted`, `rejected`, and `overridden`
+- correction history can boost corrected targets and penalize previously wrong suggestions
+- repeated history can be surfaced as reusable rule candidates
+- candidates can now be promoted into persisted reusable rules
+- promoted rules are stronger than raw history and appear in mapping explanations as an explicit influence
+
+Implementation anchors:
+- `backend/app/services/correction_service.py`
+- `backend/app/api/routes/observability.py`
+
+### 7. Mapping Sets and Governance Slice
+
+Purpose:
+- make reviewed mapping decisions persistable, replayable, and status-aware
+
+Current behavior:
+- mapping sets can be saved with versioning by name
+- each saved version carries `draft`, `review`, `approved`, or `archived` status
+- status changes are audit logged
+- saved sets can be reloaded back into the current Streamlit review state
 
 Implementation anchors:
 - `backend/app/api/routes/mapping.py`
-- `backend/app/services/llm_service.py`
+- `backend/app/services/persistence_service.py`
 - `streamlit_app.py`
-
-### 7. Observability and Feedback
-
-Purpose:
-- make mapping decisions inspectable
-- allow the system to improve from explicit user corrections
-
-Current capabilities:
-- decision log listing
-- user correction creation and listing
-- runtime config inspection and reload
-- correction-aware scoring in future runs
-- correction boost for confirmed targets
-- correction penalty for previously wrong suggestions
-
-Implementation anchors:
-- `backend/app/api/routes/observability.py`
-- `backend/app/services/decision_log_service.py`
-- `backend/app/services/correction_service.py`
 
 ### 8. Evaluation and Benchmarking
 
 Purpose:
-- measure mapping quality objectively
+- measure mapping quality and learning effects with repeatable datasets
 
-Current capabilities:
-- run built-in benchmark fixture
-- run ad hoc benchmark payloads
-- save benchmark datasets in SQLite
-- list saved benchmark datasets
-- re-run saved benchmark datasets
-
-Returned metrics:
-- total cases
-- total fields
-- correct matches
-- accuracy
-- top-1 accuracy
-- confidence-bucket performance
+Current behavior:
+- run the built-in benchmark fixture or custom ad hoc payloads
+- save benchmark datasets in SQLite and re-run them later
+- compare baseline vs correction-aware performance through correction-impact evaluation
+- persist evaluation run history for later inspection
 
 Implementation anchors:
 - `backend/app/api/routes/evaluation.py`
 - `backend/app/services/evaluation_service.py`
-- `backend/app/tests/fixtures/mapping_gold.json`
+- `backend/tests/fixtures/mapping_gold.json`
+
+### 9. Streamlit Review UI
+
+Purpose:
+- provide a fast operator-facing surface for demo, pilot, and analyst review workflows
+
+Current behavior:
+- upload source and target files
+- review ranked candidates and trust-layer explanations
+- edit mappings manually and attach transformations
+- save corrections, promote reusable rules, manage knowledge overlays, save mapping sets, inspect benchmarks, and use admin/debug tools
+
+Implementation anchor:
+- `streamlit_app.py`
 
 ## Main Workflows
 
-Semantra currently supports six practical workflows.
+Semantra currently supports eight practical workflows.
 
-### Workflow 1. Upload and Profile
+### Workflow 1. Upload and Auto-Map
 
 Input:
-- source CSV, JSON, XML, XLSX, or SQL
-- target CSV, JSON, XML, XLSX, or SQL
+- source and target files or SQL schema snapshots
 
 Process:
-- parse files
-- create dataset IDs
+- parse uploads
 - build schema profiles
-- store preview rows
-- inspect SQL snapshots for available tables when needed
-
-Result:
-- dataset handles
-- profiled source schema
-- profiled target schema
-
-Endpoint:
-- `POST /upload`
-
-Related endpoint:
-- `POST /upload/sql/tables`
-
-### Workflow 2. Auto-Mapping
-
-Input:
-- source dataset ID
-- target dataset ID
-
-Process:
 - score all candidate mappings
-- rank top-k candidates per source field
-- optionally run constrained LLM validation on ambiguity-band cases
-- perform global one-to-one assignment
-- log final decisions
+- optionally invoke constrained LLM validation inside the ambiguity band
+- apply one-to-one assignment and return top-k ranked alternatives
 
 Result:
+- profiled datasets
 - selected mappings
-- ranked candidate lists
-- explanations and signal breakdowns
+- ranked candidates with explanation and signal breakdowns
 
-Endpoint:
+Endpoints:
+- `POST /upload`
+- `POST /upload/sql/tables`
 - `POST /mapping/auto`
 
-### Workflow 3. Preview Transformation
+### Workflow 2. Review, Transform, Preview, and Generate Code
 
 Input:
-- source dataset ID
-- explicit mapping decisions
+- reviewed mapping decisions
+- optional custom or generated transformation code
 
 Process:
-- project source rows into target-shaped preview rows
-- execute reviewed `transformation_code` when present
-- attach warnings for missing fields or unresolved cases
-- fall back to direct mapping if a transformation fails at preview time
+- preview transformed rows against sample source data
+- classify transformations as `direct`, `safe`, or `risky`
+- surface structured preview warnings
+- generate Pandas starter code for the reviewed mapping set
 
 Result:
 - preview rows
-- unresolved targets list
-
-Endpoint:
-- `POST /mapping/preview`
-
-### Workflow 4. Generate Transformation from Prompt
-
-Input:
-- source dataset ID
-- target dataset ID
-- source column
-- target column
-- natural-language instruction
-
-Process:
-- build a prompt from source and target field profiles plus the user's intent
-- call the configured runtime LLM provider
-- validate and sanitize returned JSON
-- surface the resulting pandas code back to the review UI
-
-Result:
-- generated transformation code
-- LLM reasoning and warnings
-
-Endpoint:
-- `POST /mapping/transformation/generate`
-
-### Workflow 5. Generate Pandas Code
-
-Input:
-- explicit mapping decisions
-
-Process:
-- emit starter Pandas assignments or reviewed transformation statements
-
-Result:
-- generated Python artifact
-- warnings for rejected mappings
-
-Endpoint:
-- `POST /mapping/codegen`
-
-### Workflow 6. Observe, Correct, and Evaluate
-
-Input:
-- decision logs, correction entries, benchmark cases, saved benchmark datasets
-
-Process:
-- inspect decisions
-- persist user feedback
-- reload runtime config
-- run default or custom evaluation sets
-- save and re-run benchmark datasets
-
-Result:
-- audit trail
-- reusable feedback memory
-- benchmark metrics
-- runtime settings visibility
+- transformation previews with warnings and samples
+- generated Pandas artifact
 
 Endpoints:
-- `GET /observability/decision-logs`
+- `POST /mapping/preview`
+- `POST /mapping/codegen`
+- `GET /mapping/transformation/templates`
+- `POST /mapping/transformation/generate`
+
+### Workflow 3. Learn From Corrections
+
+Input:
+- user-reviewed decisions and correction notes
+
+Process:
+- persist correction history
+- aggregate repeated corrections into reusable rule candidates
+- promote stable patterns into persisted reusable rules
+- apply both raw history and promoted rules back into future ranking
+
+Result:
+- correction memory
+- promoted reusable rules
+- stronger explainable feedback signal in future runs
+
+Endpoints:
 - `GET /observability/corrections`
 - `POST /observability/corrections`
-- `GET /observability/config`
-- `POST /observability/config/reload`
+- `GET /observability/corrections/reusable-rules`
+- `GET /observability/corrections/reusable-rules/active`
+- `POST /observability/corrections/reusable-rules/promote`
+
+### Workflow 4. Manage Knowledge Overlays
+
+Input:
+- overlay CSV files with aliases, abbreviations, and synonyms
+
+Process:
+- validate uploaded rows
+- save a versioned overlay
+- inspect entries
+- activate, deactivate, rollback, archive, or reload runtime knowledge
+
+Result:
+- active project-specific knowledge layer on top of built-in metadata
+- audit trail for knowledge lifecycle changes
+
+Endpoints:
+- `POST /knowledge/overlays/validate`
+- `POST /knowledge/overlays`
+- `GET /knowledge/overlays`
+- `GET /knowledge/overlays/{overlay_id}`
+- `POST /knowledge/overlays/{overlay_id}/activate`
+- `POST /knowledge/overlays/{overlay_id}/deactivate`
+- `POST /knowledge/overlays/{overlay_id}/archive`
+- `POST /knowledge/overlays/rollback`
+- `GET /knowledge/audit`
+- `POST /knowledge/reload`
+
+### Workflow 5. Save and Version Mapping Sets
+
+Input:
+- current reviewed mapping decisions
+- optional author and note metadata
+
+Process:
+- save a versioned mapping set by name
+- update status across `draft`, `review`, `approved`, and `archived`
+- inspect audit history
+- reload a saved version into the current review state
+
+Result:
+- reusable mapping-set artifacts instead of session-only JSON exports
+- lightweight governance trail around review status changes
+
+Endpoints:
+- `POST /mapping/sets`
+- `GET /mapping/sets`
+- `GET /mapping/sets/{mapping_set_id}`
+- `POST /mapping/sets/{mapping_set_id}/status`
+- `GET /mapping/sets/{mapping_set_id}/audit`
+
+### Workflow 6. Save and Run Transformation Test Sets
+
+Input:
+- reviewed mapping decisions
+- named transformation test cases with assertions
+
+Process:
+- persist named test sets
+- run them against preview logic
+- compare actual preview output and warning codes with expectations
+
+Result:
+- lightweight regression safety net for reviewed transformations
+
+Endpoints:
+- `POST /mapping/transformation/test-sets`
+- `GET /mapping/transformation/test-sets`
+- `GET /mapping/transformation/test-sets/{test_set_id}`
+- `POST /mapping/transformation/test-sets/{test_set_id}/run`
+
+### Workflow 7. Benchmark and Evaluate
+
+Input:
+- built-in fixtures, ad hoc evaluation cases, or saved benchmark datasets
+
+Process:
+- measure mapping accuracy
+- compare baseline vs correction-aware performance
+- persist evaluation runs for later inspection
+
+Result:
+- measurable quality outputs for heuristics and feedback loops
+
+Endpoints:
 - `GET /evaluation/benchmark`
 - `POST /evaluation/run`
 - `POST /evaluation/datasets`
 - `GET /evaluation/datasets`
 - `POST /evaluation/datasets/{dataset_id}/run`
+- `POST /evaluation/datasets/{dataset_id}/correction-impact`
 - `GET /evaluation/runs`
 
-### Workflow 7. Review in Streamlit UI
+### Workflow 8. Review in Streamlit UI
 
 Input:
 - uploaded source and target files
-- reviewed mapping decisions
-- optional correction notes and benchmark names
+- reviewed mappings, corrections, and optional benchmark or governance metadata
 
 Process:
-- upload source and target datasets through the UI
-- inspect schema summaries and SQL table selections
-- generate and review mapping suggestions
-- inspect transformation mode and prompt the active LLM runtime for pandas transformation code
-- apply generated/custom transformation code before preview/codegen
-- edit decisions manually
-- save corrections
-- save and run benchmark datasets
-- inspect runtime config and benchmark history
+- run upload and review flows from a single operator surface
+- inspect explanations, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, and saved mapping sets
+- apply saved mapping-set versions back into the current review state
 
 Result:
-- internal-alpha operator workflow over the existing backend
-- faster product validation for real scenarios
+- fast analyst-friendly validation layer on top of the backend APIs
 
 Implementation anchor:
 - `streamlit_app.py`
@@ -442,6 +417,7 @@ Main route groups:
 - `mapping`
 - `observability`
 - `evaluation`
+- `knowledge`
 - `upload`
 
 Location:
@@ -477,10 +453,13 @@ Responsible for the main product logic:
 - mapping
 - embedding
 - llm validation
+- knowledge overlay and metadata runtime enrichment
 - preview
 - code generation
+- transformation templates and transformation tests
 - decision logging
 - correction handling
+- mapping-set persistence and lightweight governance state
 - persistence
 - evaluation
 
@@ -508,29 +487,68 @@ Semantra currently uses two storage modes:
    Used for:
    - decision logs
    - user corrections
+   - reusable correction rules
+   - mapping sets
+   - mapping-set audit logs
    - saved benchmark datasets
    - saved evaluation runs
+   - transformation test sets
+   - knowledge overlay versions and entries
+   - knowledge audit logs
 
 ## Current API Surface
 
-Semantra currently exposes these endpoints:
+Semantra currently exposes these endpoint groups.
 
+Upload:
 - `POST /upload`
 - `POST /upload/sql/tables`
+
+Mapping and transformation:
 - `POST /mapping/auto`
 - `POST /mapping/preview`
 - `POST /mapping/codegen`
+- `GET /mapping/transformation/templates`
 - `POST /mapping/transformation/generate`
+- `POST /mapping/sets`
+- `GET /mapping/sets`
+- `GET /mapping/sets/{mapping_set_id}`
+- `POST /mapping/sets/{mapping_set_id}/status`
+- `GET /mapping/sets/{mapping_set_id}/audit`
+- `POST /mapping/transformation/test-sets`
+- `GET /mapping/transformation/test-sets`
+- `GET /mapping/transformation/test-sets/{test_set_id}`
+- `POST /mapping/transformation/test-sets/{test_set_id}/run`
+
+Observability and feedback:
 - `GET /observability/decision-logs`
 - `GET /observability/corrections`
 - `POST /observability/corrections`
+- `GET /observability/corrections/reusable-rules`
+- `GET /observability/corrections/reusable-rules/active`
+- `POST /observability/corrections/reusable-rules/promote`
 - `GET /observability/config`
 - `POST /observability/config/reload`
+
+Knowledge overlays:
+- `POST /knowledge/overlays/validate`
+- `POST /knowledge/overlays`
+- `GET /knowledge/overlays`
+- `GET /knowledge/overlays/{overlay_id}`
+- `POST /knowledge/overlays/{overlay_id}/activate`
+- `POST /knowledge/overlays/{overlay_id}/deactivate`
+- `POST /knowledge/overlays/{overlay_id}/archive`
+- `POST /knowledge/overlays/rollback`
+- `GET /knowledge/audit`
+- `POST /knowledge/reload`
+
+Evaluation:
 - `GET /evaluation/benchmark`
 - `POST /evaluation/run`
 - `POST /evaluation/datasets`
 - `GET /evaluation/datasets`
 - `POST /evaluation/datasets/{dataset_id}/run`
+- `POST /evaluation/datasets/{dataset_id}/correction-impact`
 - `GET /evaluation/runs`
 
 ## Outputs the Project Produces
@@ -544,14 +562,20 @@ The project currently produces the following categories of output:
 - signal breakdowns
 - explanations
 - generated transformation suggestions and transformation mode
+- versioned mapping sets with status metadata
 
 ### Execution Outputs
 - projected target preview rows
+- transformation previews with before/after samples and structured warnings
 - generated Pandas code
+- transformation test-set run results
 
 ### Observability Outputs
 - decision logs
 - correction records
+- reusable rule candidates and promoted reusable rules
+- mapping-set audit trail
+- knowledge overlay audit trail
 - runtime config snapshot
 
 ### Evaluation Outputs
@@ -561,29 +585,28 @@ The project currently produces the following categories of output:
 
 ## Current Milestone Status
 
-The current ingestion-and-review milestone is complete for internal alpha.
+The current P0 hardening slice is effectively complete.
 
-It now includes:
-- row-based uploads across CSV, JSON, XML, and XLSX
-- SQL schema snapshot support with multi-table discovery and explicit table selection
-- persisted corrections, benchmark datasets, and evaluation run history
-- Streamlit review UI for upload, mapping review, transformation prompting, corrections, benchmarks, and admin/debug inspection
-- real browser validation across CSV, JSON, XML, and XLSX review flows
-- prompt-driven transformation generation validated end-to-end against an OpenAI-compatible LM Studio runtime
-- Add Manual Mapping UI with add/override/remove behavior and persisted corrections
-- full any-to-any row-format regression test coverage across CSV, JSON, XML, and XLSX (4x4 matrix)
+The product now includes:
+- multi-format row-data upload plus SQL schema snapshots
+- explainable multi-signal mapping with constrained AI assistance
+- custom knowledge overlays with lifecycle actions and audit history
+- correction learning with promoted reusable rules
+- transformation preview safety checks, templates, and transformation test sets
+- versioned mapping sets with lightweight status workflow and audit trail
+- persisted benchmarks and correction-impact evaluation
+- internal Streamlit review UI spanning upload, trust layer, corrections, knowledge, benchmarks, and admin/debug surfaces
 
-There is no urgent blocker at this point.
+This puts Semantra in a strong internal-alpha / pilot-ready state for controlled schema-mapping workflows.
 
 ## Next Recommended Milestone
 
-The next practical milestone should focus on hardening and broadening the product surface rather than adding more core mapping logic.
+The next practical milestone is to start P1 work on top of the now-stable P0 surface.
 
-Recommended next steps:
-- expand real-scenario browser validation for mixed-format and multi-table SQL flows
-- add more benchmark cases that reflect messy enterprise data
-- refine review UX and import/export ergonomics in the Streamlit app
-- prepare the connector path beyond flat files when the ingestion scope needs to grow
+Most natural next steps are:
+- introduce an initial canonical business concept model and glossary
+- expand trust-layer explainability with richer structured reasoning and "why not this target" views
+- deepen mapping-set governance beyond the current minimal version/status workflow
 
 ## Result for the User
 
@@ -594,30 +617,33 @@ The result is a controlled semantic-mapping package made of:
 - candidate ranking
 - final mapping decisions
 - explanation of why decisions were made
+- reusable organizational knowledge from overlays and promoted rules
 - preview of transformed data
 - starter implementation code
-- audit trail of decisions
+- transformation validation and transformation regression cases
+- audit trail of knowledge and mapping-set changes
 - reusable correction memory
 - measurable quality metrics
 
 ## Current Technical Status
 
-At the current stage, Semantra is no longer just a scaffold. It already contains:
-- a real mapping engine
-- constrained LLM validation hooks
-- runtime observability
-- persisted feedback and benchmark storage
-- evaluation tooling
-- a working internal-alpha Streamlit UI
-- focused automated tests across core workflows
+At the current stage, Semantra is no longer just a scaffold. It contains:
+- a real mapping engine with multiple explainable signals
+- constrained LLM validation and transformation generation hooks
+- runtime metadata enrichment with custom knowledge overlays
+- persisted correction learning plus promoted reusable rules
+- persisted mapping sets and transformation test sets
+- benchmark and correction-impact evaluation tooling
+- a working internal-alpha Streamlit review UI
+- focused automated tests around backend services, API flows, and key Streamlit helpers
 
-The product is now in a strong internal-alpha state. The biggest remaining areas for future growth are:
-- access control around sensitive endpoints
-- richer connectors beyond the current flat-file set
-- stronger benchmark coverage
-- a more production-ready review UI layer
-- broader transformation support beyond direct column assignment
+The biggest remaining growth areas are now mostly P1 and beyond:
+- canonical business concepts and glossary-driven mapping
+- richer trust-layer explanations and analyst tooling
+- deeper governance features beyond the current minimal mapping-set workflow
+- stronger connector story beyond flat files and SQL snapshots
+- eventual execution and operationalization beyond preview/codegen
 
 ## Short Summary
 
-Semantra is an explainable semantic mapping product slice that profiles source and target schemas, ranks and validates mapping candidates, previews the result, generates starter transformation code, and improves through feedback, observability, and benchmark-driven evaluation, now with an internal-alpha review UI on top of the backend.
+Semantra is an explainable semantic mapping and review engine that profiles source and target schemas, ranks and validates mapping candidates, previews and tests reviewed transformations, learns from analyst feedback, and persists knowledge, reusable rules, mapping sets, and evaluation artifacts through a FastAPI backend and Streamlit review UI.

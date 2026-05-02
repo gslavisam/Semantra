@@ -43,3 +43,4 @@ dist/
 .mypy_cache/
 .Python
 metadata_dictionary.xlsx
+epics.md

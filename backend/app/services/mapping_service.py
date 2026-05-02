@@ -387,6 +387,7 @@ def log_decision(
 
 def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: ScoringSignals) -> list[str]:
     explanation: list[str] = []
+    correction_feedback = correction_store.describe_feedback(source.name, target.name)
 
     if signals.pattern >= 0.8 and source.detected_patterns:
         explanation.append(
@@ -406,10 +407,32 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
         explanation.append("Embedding similarity reinforces the candidate after semantic normalization.")
     elif embedding_enabled():
         explanation.append("Embedding signal was evaluated but remained weaker than the heuristic signals.")
+    if correction_feedback["promoted_preferred_rules"] > 0:
+        explanation.append(
+            "Reusable rule influenced this ranking "
+            f"(promoted rules={correction_feedback['promoted_preferred_rules']})."
+        )
+    elif (
+        correction_feedback["promoted_rejected_rules"] > 0
+        or correction_feedback["promoted_overridden_away_rules"] > 0
+    ):
+        explanation.append(
+            "Reusable rule penalized this candidate "
+            f"(rejected_rules={correction_feedback['promoted_rejected_rules']}, "
+            f"overridden_away_rules={correction_feedback['promoted_overridden_away_rules']})."
+        )
     if signals.correction > 0:
-        explanation.append("Historical user corrections boost this candidate for the same source field.")
+        explanation.append(
+            "Similar past decision influenced this ranking "
+            f"(historical confirmation strength {signals.correction:.2f}; "
+            f"accepted={correction_feedback['accepted_matches']}, overridden={correction_feedback['overridden_matches']})."
+        )
     elif signals.correction < 0:
-        explanation.append("Historical user corrections penalize this candidate because it was corrected away before.")
+        explanation.append(
+            "Historical review history penalized this candidate "
+            f"(historical confirmation strength {signals.correction:.2f}; "
+            f"rejected={correction_feedback['rejected_targets']}, overridden_away={correction_feedback['overridden_away']})."
+        )
     if not explanation:
         explanation.append("Weak heuristic match; review recommended.")
 

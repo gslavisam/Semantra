@@ -9,6 +9,8 @@ from typing import Iterable
 from openpyxl import load_workbook
 
 from app.models.schema import ColumnProfile
+from app.services.persistence_service import persistence_service
+from app.utils.normalization import clear_normalization_overrides, configure_normalization_overrides
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -83,7 +85,9 @@ class MetadataKnowledgeService:
         self._concepts_by_id: dict[str, KnowledgeConcept] = {}
         self._alias_to_concepts: dict[str, set[str]] = {}
         self._field_alias_to_contexts: dict[str, list[tuple[str, KnowledgeFieldContext]]] = {}
-        self._load()
+        self._active_overlay_name: str | None = None
+        self._overlay_aliases_by_concept: dict[str, set[str]] = {}
+        self.refresh()
 
     @property
     def is_available(self) -> bool:
@@ -92,6 +96,22 @@ class MetadataKnowledgeService:
     @property
     def concept_count(self) -> int:
         return len(self._concepts_by_id)
+
+    def concepts_for_alias(self, alias: str) -> list[str]:
+        normalized_alias = _normalize_alias(alias)
+        if not normalized_alias:
+            return []
+        return sorted(self._alias_to_concepts.get(normalized_alias, set()))
+
+    def refresh(self) -> None:
+        self._concepts_by_id.clear()
+        self._alias_to_concepts.clear()
+        self._field_alias_to_contexts.clear()
+        self._active_overlay_name = None
+        self._overlay_aliases_by_concept.clear()
+        clear_normalization_overrides()
+        self._load()
+        self._apply_active_overlay()
 
     def expand_semantic_tokens(self, profile: ColumnProfile) -> set[str]:
         tokens = set(profile.tokenized_name)
@@ -136,6 +156,15 @@ class MetadataKnowledgeService:
             explanations.append(
                 f"Internal metadata dictionary aligns both fields to concept '{concept.canonical_name}' in domain '{concept.domain}'."
             )
+            overlay_aliases = self._overlay_aliases_by_concept.get(concept_id, set())
+            matched_overlay_aliases = sorted(
+                overlay_aliases.intersection(source_matches[concept_id].matched_aliases)
+                | overlay_aliases.intersection(target_matches[concept_id].matched_aliases)
+            )
+            if matched_overlay_aliases and self._active_overlay_name:
+                explanations.append(
+                    f"Custom knowledge overlay '{self._active_overlay_name}' matched alias(es): {', '.join(matched_overlay_aliases)}."
+                )
             source_contexts = source_matches[concept_id].contexts
             target_contexts = target_matches[concept_id].contexts
             if source_contexts or target_contexts:
@@ -219,6 +248,37 @@ class MetadataKnowledgeService:
         canonical_name = str(row.get("Naziv (Engleski)") or concept_id).strip()
         aliases = self._extract_aliases(row, ALIAS_FIELDS, MULTI_VALUE_FIELDS)
         self._register_concept(concept_id, domain, canonical_name, aliases=aliases)
+
+    def _apply_active_overlay(self) -> None:
+        active_overlay = persistence_service.get_active_knowledge_overlay_version()
+        if active_overlay is None or active_overlay.overlay_id is None:
+            return
+
+        self._active_overlay_name = active_overlay.name
+        entries = persistence_service.get_knowledge_overlay_entries(active_overlay.overlay_id)
+        overlay_abbreviations: dict[str, str] = {}
+        overlay_synonyms: dict[str, set[str]] = {}
+
+        for entry in entries:
+            canonical_term = entry.normalized_canonical_term
+            alias = entry.normalized_alias
+            if not canonical_term or not alias:
+                continue
+
+            if entry.entry_type in {"field_alias", "concept_alias"}:
+                self._register_concept(
+                    canonical_term,
+                    entry.domain or "overlay",
+                    entry.canonical_term,
+                    aliases={alias},
+                )
+                self._overlay_aliases_by_concept.setdefault(canonical_term, set()).add(alias)
+            elif entry.entry_type == "abbreviation":
+                overlay_abbreviations[alias] = canonical_term
+            elif entry.entry_type == "synonym":
+                overlay_synonyms.setdefault(canonical_term, set()).add(alias)
+
+        configure_normalization_overrides(overlay_abbreviations, overlay_synonyms)
 
     def _load_workbook_contexts(self) -> None:
         sap_descriptions = self._load_sap_table_descriptions()

@@ -2,10 +2,16 @@ from app.core.config import settings
 from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
+from app.services.metadata_knowledge_service import metadata_knowledge_service
+from app.services.persistence_service import persistence_service
+from app.utils.normalization import semantic_token_set
 
 
 def setup_function() -> None:
     correction_store.clear()
+    correction_store.clear_reusable_rules()
+    persistence_service.clear_knowledge_overlays()
+    metadata_knowledge_service.refresh()
 
 
 def make_column(name: str, patterns: list[str], sample_values: list[str], unique_ratio: float = 1.0) -> ColumnProfile:
@@ -177,7 +183,7 @@ def test_mapping_uses_user_correction_history_as_score_boost() -> None:
 
     assert result.mappings[0].target == "phone_number"
     assert result.mappings[0].signals.correction > 0
-    assert any("Historical user corrections boost" in line for line in result.mappings[0].explanation)
+    assert any("Similar past decision influenced this ranking" in line for line in result.mappings[0].explanation)
 
 
 def test_mapping_penalizes_previously_wrong_suggested_target() -> None:
@@ -214,6 +220,118 @@ def test_mapping_penalizes_previously_wrong_suggested_target() -> None:
 
     assert customer_id_candidate.signals.correction < 0
     assert any(
-        "penalize this candidate" in line
+        "Historical review history penalized this candidate" in line
         for line in customer_id_candidate.explanation
     )
+
+
+def test_mapping_penalizes_explicitly_rejected_target() -> None:
+    correction_store.append(
+        {
+            "source": "cust_ref",
+            "suggested_target": "customer_id",
+            "corrected_target": None,
+            "status": "rejected",
+            "note": "no reliable customer id mapping",
+        }
+    )
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("cust_ref", ["numeric_id"], ["1", "2"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1", "2"]),
+            make_column("account_id", ["numeric_id"], ["1", "2"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    customer_id_candidate = next(
+        candidate
+        for candidate in result.ranked_mappings[0].candidates
+        if candidate.target == "customer_id"
+    )
+
+    assert customer_id_candidate.signals.correction < 0
+    assert any(
+        "Historical review history penalized this candidate" in line
+        for line in customer_id_candidate.explanation
+    )
+
+
+def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None:
+    for _ in range(3):
+        correction_store.append(
+            {
+                "source": "cust_ref",
+                "suggested_target": "customer_id",
+                "corrected_target": "account_id",
+                "status": "overridden",
+                "note": "Prefer account id",
+            }
+        )
+
+    correction_store.promote_reusable_rule(
+        {
+            "source": "cust_ref",
+            "suggested_target": "customer_id",
+            "corrected_target": "account_id",
+            "status": "overridden",
+            "occurrence_count": 3,
+        }
+    )
+    correction_store.clear()
+
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("cust_ref", ["numeric_id"], ["1", "2"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1", "2"]),
+            make_column("account_id", ["numeric_id"], ["1", "2"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    assert result.mappings[0].target == "account_id"
+    assert result.mappings[0].signals.correction > 0
+    assert any("Reusable rule influenced this ranking" in line for line in result.mappings[0].explanation)
+
+
+def test_active_overlay_synonym_enriches_semantic_tokens() -> None:
+    overlay = persistence_service.save_knowledge_overlay_version("overlay-v1", status="validated")
+    persistence_service.save_knowledge_overlay_entries(
+        overlay.overlay_id,
+        [
+            {
+                "entry_type": "synonym",
+                "canonical_term": "customer",
+                "alias": "purchaser",
+                "domain": "sales",
+                "source_system": None,
+                "note": "Overlay synonym",
+                "normalized_canonical_term": "customer",
+                "normalized_alias": "purchaser",
+            }
+        ],
+    )
+    persistence_service.activate_knowledge_overlay_version(overlay.overlay_id)
+    metadata_knowledge_service.refresh()
+
+    tokens = semantic_token_set("purchaser_email")
+
+    assert "purchaser" in tokens
+    assert "customer" in tokens

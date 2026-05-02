@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from app.models.mapping import EvaluationMetrics
+from app.models.mapping import CorrectionImpactMetrics, EvaluationMetrics
 from app.models.schema import ColumnProfile, SchemaProfile
+from app.services.correction_service import correction_store
 from app.services.mapping_service import generate_mapping_candidates
 
 
@@ -58,6 +59,21 @@ def evaluate_cases(cases: list[dict], llm_provider=None) -> EvaluationMetrics:
         top1_accuracy=top1_accuracy,
         accuracy=accuracy,
         confidence_by_bucket=confidence_by_bucket,
+    )
+
+
+def evaluate_correction_impact(cases: list[dict], llm_provider=None) -> CorrectionImpactMetrics:
+    with correction_store.feedback_disabled():
+        baseline = evaluate_cases(cases, llm_provider=llm_provider)
+
+    correction_aware = evaluate_cases(cases, llm_provider=llm_provider)
+
+    return CorrectionImpactMetrics(
+        baseline=baseline,
+        correction_aware=correction_aware,
+        accuracy_delta=round(correction_aware.accuracy - baseline.accuracy, 4),
+        top1_accuracy_delta=round(correction_aware.top1_accuracy - baseline.top1_accuracy, 4),
+        correct_matches_delta=correction_aware.correct_matches - baseline.correct_matches,
     )
 
 

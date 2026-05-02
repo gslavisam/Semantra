@@ -224,6 +224,32 @@ def display_trust_layer(mapping_response: dict) -> None:
 
             if not llm_runtime_enabled():
                 st.caption("LLM generation is disabled. Enable a runtime provider in backend config to use this helper.")
+            template_options = [{"template_id": "", "name": "Select reusable template", "description": "", "code_template": ""}]
+            try:
+                template_options.extend(request_transformation_templates())
+            except httpx.HTTPError:
+                pass
+            selected_template_name = st.selectbox(
+                f"Reusable template for {source}",
+                [item["name"] for item in template_options],
+                key=f"template_select_{source}",
+            )
+            selected_template = next(
+                (item for item in template_options if item["name"] == selected_template_name),
+                template_options[0],
+            )
+            if selected_template.get("template_id"):
+                st.caption(selected_template.get("description") or "")
+                if st.button("Apply template", key=f"apply_template_{source}", disabled=not m.get("target")):
+                    template_code = materialize_transformation_template(selected_template, source, m.get("target") or "target_col")
+                    entry["manual_transformation_code"] = template_code
+                    st.session_state[f"manual_transform_{source}"] = template_code
+                    st.session_state[f"manual_apply_{source}"] = False
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Applied reusable transformation template '{selected_template_name}' for {source}.",
+                    }
+                    st.rerun()
             manual_code = st.text_area(
                 f"Define pandas/Python transformation for {source} (optional)",
                 key=f"manual_transform_{source}",
@@ -299,6 +325,7 @@ def reset_flow_state() -> None:
         "codegen_response",
         "saved_corrections",
         "mapping_editor_state",
+        "transformation_templates",
         "source_signature",
         "source_tables",
         "target_signature",
@@ -371,6 +398,18 @@ def api_request(
         )
     response.raise_for_status()
     return response.json()
+
+
+def upload_file_to_request_files(uploaded_file) -> dict | None:
+    if uploaded_file is None:
+        return None
+    return {
+        "file": (
+            uploaded_file.name,
+            uploaded_file.getvalue(),
+            uploaded_file.type or "text/csv",
+        )
+    }
 
 
 def refresh_admin_requirement() -> None:
@@ -473,6 +512,24 @@ def request_llm_transformation_suggestion(source: str, target: str, instruction:
             "instruction": instruction.strip(),
         },
     )
+
+
+def request_transformation_templates() -> list[dict]:
+    cached = st.session_state.get("transformation_templates")
+    if cached is not None:
+        return cached
+    templates = api_request("GET", "/mapping/transformation/templates")
+    st.session_state["transformation_templates"] = templates
+    return templates
+
+
+def materialize_transformation_template(template: dict | None, source: str, target: str) -> str:
+    if not template:
+        return ""
+    code_template = str(template.get("code_template") or "")
+    if not code_template:
+        return ""
+    return code_template.replace("{source}", source).replace("{target}", target)
 
 
 def status_banner(level: str, message: str) -> None:
@@ -870,6 +927,17 @@ def export_mapping_payload() -> str:
     return json.dumps(payload, indent=2, ensure_ascii=True)
 
 
+def build_mapping_set_payload(name: str, created_by: str | None = None, note: str | None = None) -> dict:
+    return {
+        "name": name,
+        "source_dataset_id": st.session_state.get("upload_response", {}).get("source", {}).get("dataset_id"),
+        "target_dataset_id": st.session_state.get("upload_response", {}).get("target", {}).get("dataset_id"),
+        "mapping_decisions": build_mapping_decisions(),
+        "created_by": (created_by or "").strip() or None,
+        "note": (note or "").strip() or None,
+    }
+
+
 def build_current_benchmark_case() -> dict | None:
     upload_response = st.session_state.get("upload_response")
     mapping_decisions = build_mapping_decisions()
@@ -918,16 +986,30 @@ def build_pending_corrections() -> list[dict]:
         target = entry.get("target", "")
         suggested_target = entry.get("suggested_target", "")
         status = entry.get("status", "needs_review")
-        if not target or status == "rejected":
+        if status == "rejected":
+            rejected_target = suggested_target or target
+            if not rejected_target:
+                continue
+            pending.append(
+                {
+                    "source": source,
+                    "suggested_target": rejected_target,
+                    "corrected_target": None,
+                    "status": "rejected",
+                }
+            )
+            continue
+        if not target:
             continue
         if target == suggested_target:
             continue
+        correction_status = "accepted" if status == "accepted" else "overridden"
         pending.append(
             {
                 "source": source,
                 "suggested_target": suggested_target or None,
                 "corrected_target": target,
-                "status": status,
+                "status": correction_status,
             }
         )
     return pending
@@ -941,11 +1023,12 @@ def persist_corrections(note: str) -> list[dict]:
             "source": correction["source"],
             "suggested_target": correction["suggested_target"],
             "corrected_target": correction["corrected_target"],
+            "status": correction["status"],
             "note": note or f"Saved from Streamlit review with status={correction['status']}",
         }
         saved_entries.append(api_request("POST", "/observability/corrections", json=payload))
     for saved in saved_entries:
-        st.session_state["mapping_editor_state"][saved["source"]]["suggested_target"] = saved["corrected_target"]
+        st.session_state["mapping_editor_state"][saved["source"]]["suggested_target"] = saved.get("corrected_target") or ""
     st.session_state["saved_corrections"] = saved_entries
     return saved_entries
 
@@ -992,6 +1075,182 @@ def render_mapping_io_panel() -> None:
             }
             st.rerun()
 
+    st.caption("Save a versioned mapping set to the backend or reload a saved version into the current review state.")
+    mapping_set_columns = st.columns([2, 2])
+    mapping_set_name = mapping_set_columns[0].text_input(
+        "Mapping set name",
+        value="",
+        key="mapping_set_name",
+        placeholder="Example: customer-master-v1",
+    )
+    mapping_set_created_by = mapping_set_columns[1].text_input(
+        "Mapping set created by",
+        value="",
+        key="mapping_set_created_by",
+        placeholder="Example: ba-team",
+    )
+    mapping_set_note = st.text_input(
+        "Mapping set note",
+        value="",
+        key="mapping_set_note",
+        placeholder="Optional note for this saved version",
+    )
+    mapping_set_actions = st.columns(2)
+    if mapping_set_actions[0].button(
+        "Save mapping set version",
+        width='stretch',
+        key="save_mapping_set_version",
+        disabled=(not decisions) or (not mapping_set_name.strip()),
+    ):
+        try:
+            saved_mapping_set = api_request(
+                "POST",
+                "/mapping/sets",
+                json=build_mapping_set_payload(mapping_set_name, mapping_set_created_by, mapping_set_note),
+            )
+            st.session_state["saved_mapping_set_record"] = saved_mapping_set
+            st.session_state["saved_mapping_sets"] = api_request("GET", "/mapping/sets")
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": f"Saved mapping set '{saved_mapping_set['name']}' version {saved_mapping_set['version']}.",
+            }
+            st.rerun()
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {
+                "level": "error",
+                "message": f"Saving mapping set failed: {error}",
+            }
+            st.rerun()
+
+    if mapping_set_actions[1].button(
+        "Load saved mapping sets",
+        width='stretch',
+        key="load_saved_mapping_sets",
+    ):
+        try:
+            st.session_state["saved_mapping_sets"] = api_request("GET", "/mapping/sets")
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": "Loaded saved mapping set versions.",
+            }
+            st.rerun()
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {
+                "level": "error",
+                "message": f"Loading mapping sets failed: {error}",
+            }
+            st.rerun()
+
+    saved_mapping_sets = st.session_state.get("saved_mapping_sets")
+    if saved_mapping_sets:
+        st.caption("Saved mapping sets")
+        st.dataframe(saved_mapping_sets, width='stretch', hide_index=True)
+        mapping_set_labels = [
+            f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
+            for item in saved_mapping_sets
+        ]
+        selected_mapping_set_label = st.selectbox(
+            "Select saved mapping set",
+            mapping_set_labels,
+            key="selected_saved_mapping_set_label",
+        )
+        selected_mapping_set = saved_mapping_sets[mapping_set_labels.index(selected_mapping_set_label)]
+        selected_mapping_set_id = selected_mapping_set["mapping_set_id"]
+        saved_mapping_set_actions = st.columns([2, 2])
+        if saved_mapping_set_actions[0].button(
+            "Apply saved mapping set",
+            width='stretch',
+            key="apply_saved_mapping_set",
+        ):
+            try:
+                mapping_set_detail = api_request("GET", f"/mapping/sets/{selected_mapping_set_id}")
+                apply_imported_mapping_payload(
+                    json.dumps(
+                        {
+                            "source_dataset_id": mapping_set_detail.get("source_dataset_id"),
+                            "target_dataset_id": mapping_set_detail.get("target_dataset_id"),
+                            "mapping_decisions": mapping_set_detail.get("mapping_decisions", []),
+                        },
+                        ensure_ascii=True,
+                    ).encode("utf-8")
+                )
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Applied saved mapping set '{mapping_set_detail['name']}' version {mapping_set_detail['version']}.",
+                }
+                st.rerun()
+            except (httpx.HTTPError, json.JSONDecodeError, KeyError, UnicodeDecodeError) as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Applying saved mapping set failed: {error}",
+                }
+                st.rerun()
+
+        target_status = saved_mapping_set_actions[1].selectbox(
+            "Saved mapping set status",
+            ["draft", "review", "approved", "archived"],
+            index=["draft", "review", "approved", "archived"].index(selected_mapping_set.get("status", "draft")),
+            key="selected_saved_mapping_set_status",
+        )
+        if st.button(
+            "Update saved mapping set status",
+            width='stretch',
+            key="update_saved_mapping_set_status",
+        ):
+            try:
+                updated = api_request(
+                    "POST",
+                    f"/mapping/sets/{selected_mapping_set_id}/status",
+                    json={
+                        "status": target_status,
+                        "changed_by": (mapping_set_created_by or "").strip() or None,
+                        "note": (mapping_set_note or "").strip() or None,
+                    },
+                )
+                st.session_state["saved_mapping_sets"] = api_request("GET", "/mapping/sets")
+                st.session_state["selected_mapping_set_audit"] = api_request(
+                    "GET",
+                    f"/mapping/sets/{selected_mapping_set_id}/audit",
+                )
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Updated mapping set '{updated['name']}' to status {updated['status']}.",
+                }
+                st.rerun()
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Updating mapping set status failed: {error}",
+                }
+                st.rerun()
+
+        if st.button(
+            "Load selected mapping set audit",
+            width='stretch',
+            key="load_selected_mapping_set_audit",
+        ):
+            try:
+                st.session_state["selected_mapping_set_audit"] = api_request(
+                    "GET",
+                    f"/mapping/sets/{selected_mapping_set_id}/audit",
+                )
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Loaded audit for mapping set #{selected_mapping_set_id}.",
+                }
+                st.rerun()
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Loading mapping set audit failed: {error}",
+                }
+                st.rerun()
+
+    selected_mapping_set_audit = st.session_state.get("selected_mapping_set_audit")
+    if selected_mapping_set_audit:
+        st.caption("Selected mapping set audit")
+        st.dataframe(selected_mapping_set_audit, width='stretch', hide_index=True)
+
 
 def render_correction_panel() -> None:
     pending_corrections = build_pending_corrections()
@@ -1015,6 +1274,44 @@ def render_correction_panel() -> None:
         st.info("Backend currently allows correction saves without an admin token.")
 
     if st.button(
+        "Load reusable rule candidates",
+        disabled=(token_required and not admin_token),
+        key="load_reusable_rule_candidates",
+    ):
+        try:
+            st.session_state["reusable_rule_candidates"] = api_request("GET", "/observability/corrections/reusable-rules")
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": "Loaded reusable correction rule candidates.",
+            }
+            st.rerun()
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {
+                "level": "error",
+                "message": f"Loading reusable rule candidates failed: {error}",
+            }
+            st.rerun()
+
+    if st.button(
+        "Load promoted reusable rules",
+        disabled=(token_required and not admin_token),
+        key="load_promoted_reusable_rules",
+    ):
+        try:
+            st.session_state["promoted_reusable_rules"] = api_request("GET", "/observability/corrections/reusable-rules/active")
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": "Loaded promoted reusable correction rules.",
+            }
+            st.rerun()
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {
+                "level": "error",
+                "message": f"Loading promoted reusable rules failed: {error}",
+            }
+            st.rerun()
+
+    if st.button(
         "Save reviewed corrections",
         disabled=(not pending_corrections) or (token_required and not admin_token),
     ):
@@ -1036,6 +1333,70 @@ def render_correction_panel() -> None:
     if saved_corrections:
         st.caption("Last saved corrections")
         st.dataframe(saved_corrections, width='stretch', hide_index=True)
+
+    reusable_rule_candidates = st.session_state.get("reusable_rule_candidates")
+    if reusable_rule_candidates:
+        st.caption("Reusable rule candidates")
+        st.dataframe(reusable_rule_candidates, width='stretch', hide_index=True)
+        promotable_candidates = [item for item in reusable_rule_candidates if not item.get("already_promoted")]
+        if promotable_candidates:
+            candidate_labels = [
+                (
+                    f"{item.get('source')} | {item.get('status')} | "
+                    f"{item.get('suggested_target') or 'no_suggestion'} -> {item.get('corrected_target') or 'reject'} | "
+                    f"seen {item.get('occurrence_count', 0)}x"
+                )
+                for item in promotable_candidates
+            ]
+            selected_label = st.selectbox(
+                "Promote reusable rule candidate",
+                candidate_labels,
+                key="promote_reusable_rule_candidate",
+            )
+            selected_candidate = promotable_candidates[candidate_labels.index(selected_label)]
+            if st.button(
+                "Promote selected reusable rule",
+                disabled=(token_required and not admin_token),
+                key="promote_reusable_rule_button",
+            ):
+                try:
+                    promoted = api_request(
+                        "POST",
+                        "/observability/corrections/reusable-rules/promote",
+                        json={
+                            "source": selected_candidate.get("source"),
+                            "suggested_target": selected_candidate.get("suggested_target"),
+                            "corrected_target": selected_candidate.get("corrected_target"),
+                            "status": selected_candidate.get("status"),
+                            "occurrence_count": selected_candidate.get("occurrence_count", 0),
+                        },
+                    )
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": (
+                            f"Promoted reusable rule #{promoted.get('rule_id')} for {promoted.get('source')} "
+                            f"({promoted.get('status')})."
+                        ),
+                    }
+                    st.session_state["reusable_rule_candidates"] = api_request("GET", "/observability/corrections/reusable-rules")
+                    st.session_state["promoted_reusable_rules"] = api_request(
+                        "GET",
+                        "/observability/corrections/reusable-rules/active",
+                    )
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Promoting reusable rule failed: {error}",
+                    }
+                    st.rerun()
+        else:
+            st.caption("All currently suggested reusable rules are already promoted.")
+
+    promoted_reusable_rules = st.session_state.get("promoted_reusable_rules")
+    if promoted_reusable_rules:
+        st.caption("Promoted reusable rules")
+        st.dataframe(promoted_reusable_rules, width='stretch', hide_index=True)
 
 
 def render_admin_debug_tab() -> None:
@@ -1080,6 +1441,281 @@ def render_admin_debug_tab() -> None:
         except httpx.HTTPError as error:
             st.session_state["last_action"] = {"level": "error", "message": f"Loading evaluation runs failed: {error}"}
         st.rerun()
+
+    st.subheader("Knowledge Overlays")
+    knowledge_action_columns = st.columns(4)
+    if knowledge_action_columns[0].button("Load knowledge overlays", width='stretch', key="debug_load_knowledge_overlays"):
+        try:
+            st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+            st.session_state["last_action"] = {"level": "success", "message": "Loaded knowledge overlay versions."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Loading knowledge overlays failed: {error}"}
+        st.rerun()
+
+    if knowledge_action_columns[1].button("Reload knowledge", width='stretch', key="debug_reload_knowledge"):
+        try:
+            st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+            st.session_state["last_action"] = {"level": "success", "message": "Reloaded active knowledge overlay into runtime."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Knowledge reload failed: {error}"}
+        st.rerun()
+
+    if knowledge_action_columns[2].button("Load active knowledge status", width='stretch', key="debug_load_knowledge_runtime"):
+        try:
+            st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+            st.session_state["last_action"] = {"level": "success", "message": "Loaded active knowledge runtime status."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Loading knowledge runtime status failed: {error}"}
+        st.rerun()
+
+    if knowledge_action_columns[3].button("Load knowledge audit log", width='stretch', key="debug_load_knowledge_audit"):
+        try:
+            st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+            st.session_state["last_action"] = {"level": "success", "message": "Loaded knowledge audit log."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Loading knowledge audit log failed: {error}"}
+        st.rerun()
+
+    knowledge_upload = st.file_uploader(
+        "Knowledge overlay CSV",
+        type=["csv"],
+        key="knowledge_overlay_file",
+        help="Upload CSV entries for abbreviations, synonyms, field aliases, or concept aliases.",
+    )
+    knowledge_overlay_name = st.text_input(
+        "Overlay version name",
+        value="",
+        key="knowledge_overlay_name",
+        placeholder="Example: customer-domain-overlay-v1",
+    )
+    knowledge_overlay_created_by = st.text_input(
+        "Created by",
+        value="",
+        key="knowledge_overlay_created_by",
+        placeholder="Example: data-governance-team",
+    )
+    knowledge_upload_columns = st.columns(2)
+    if knowledge_upload_columns[0].button(
+        "Validate knowledge CSV",
+        width='stretch',
+        key="debug_validate_knowledge_overlay",
+        disabled=knowledge_upload is None,
+    ):
+        try:
+            st.session_state["debug_knowledge_validation"] = api_request(
+                "POST",
+                "/knowledge/overlays/validate",
+                files=upload_file_to_request_files(knowledge_upload),
+            )
+            st.session_state["last_action"] = {"level": "success", "message": "Validated knowledge overlay CSV."}
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Knowledge CSV validation failed: {error}"}
+        st.rerun()
+
+    if knowledge_upload_columns[1].button(
+        "Save overlay version",
+        width='stretch',
+        key="debug_save_knowledge_overlay",
+        disabled=knowledge_upload is None,
+    ):
+        try:
+            created = api_request(
+                "POST",
+                "/knowledge/overlays",
+                files=upload_file_to_request_files(knowledge_upload),
+                data={
+                    key: value
+                    for key, value in {
+                        "name": knowledge_overlay_name.strip(),
+                        "created_by": knowledge_overlay_created_by.strip(),
+                    }.items()
+                    if value
+                }
+                or None,
+            )
+            st.session_state["debug_knowledge_created"] = created
+            st.session_state["debug_knowledge_validation"] = created.get("validation")
+            st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": f"Saved knowledge overlay version '{created['version']['name']}' with {created['saved_entry_count']} entries.",
+            }
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {"level": "error", "message": f"Saving knowledge overlay failed: {error}"}
+        st.rerun()
+
+    knowledge_runtime = st.session_state.get("debug_knowledge_runtime")
+    if knowledge_runtime:
+        st.caption(
+            "Knowledge mode: "
+            + str(knowledge_runtime.get("mode") or "base_only")
+            + " | active overlay: "
+            + str(knowledge_runtime.get("active_overlay_name") or "none")
+            + f" | active_entry_count={knowledge_runtime.get('active_entry_count', 0)}"
+            + f" | concept_count={knowledge_runtime.get('concept_count', 0)}"
+        )
+        entry_type_counts = knowledge_runtime.get("entry_type_counts") or {}
+        if entry_type_counts:
+            st.caption(
+                "Active overlay breakdown: "
+                + " | ".join(f"{entry_type}={count}" for entry_type, count in sorted(entry_type_counts.items()))
+            )
+
+    knowledge_validation = st.session_state.get("debug_knowledge_validation")
+    if knowledge_validation:
+        validation_entry_type_counts: dict[str, int] = {}
+        for row in knowledge_validation.get("normalized_preview", []):
+            if row.get("status") != "valid":
+                continue
+            entry_type = str(row.get("entry_type") or "")
+            if not entry_type:
+                continue
+            validation_entry_type_counts[entry_type] = validation_entry_type_counts.get(entry_type, 0) + 1
+        st.caption(
+            f"Validation summary: total={knowledge_validation.get('total_rows', 0)} | "
+            f"valid={knowledge_validation.get('valid_rows', 0)} | invalid={knowledge_validation.get('invalid_rows', 0)} | "
+            f"duplicates={knowledge_validation.get('duplicate_rows', 0)} | conflicts={knowledge_validation.get('conflicts', 0)}"
+        )
+        if validation_entry_type_counts:
+            st.caption(
+                "Valid entry types: "
+                + " | ".join(f"{entry_type}={count}" for entry_type, count in sorted(validation_entry_type_counts.items()))
+            )
+        if knowledge_validation.get("normalized_preview"):
+            st.dataframe(
+                [
+                    {
+                        "row_number": row.get("row_number"),
+                        "status": row.get("status"),
+                        "entry_type": row.get("entry_type"),
+                        "canonical_term": row.get("canonical_term"),
+                        "alias": row.get("alias"),
+                        "normalized_canonical_term": row.get("normalized_canonical_term"),
+                        "normalized_alias": row.get("normalized_alias"),
+                        "issues": " | ".join(issue.get("message", "") for issue in row.get("issues", [])),
+                    }
+                    for row in knowledge_validation.get("normalized_preview", [])
+                ],
+                width='stretch',
+                hide_index=True,
+            )
+
+    knowledge_overlays = st.session_state.get("debug_knowledge_overlays")
+    if knowledge_overlays:
+        st.dataframe(knowledge_overlays, width='stretch', hide_index=True)
+        overlay_options = {
+            f"#{item['overlay_id']} | {item['name']} | {item['status']}": item["overlay_id"]
+            for item in knowledge_overlays
+        }
+        if overlay_options:
+            selected_overlay_label = st.selectbox(
+                "Overlay version",
+                list(overlay_options.keys()),
+                key="debug_selected_overlay_version",
+            )
+            selected_overlay_id = overlay_options[selected_overlay_label]
+            overlay_columns = st.columns(4)
+            if overlay_columns[0].button("Load details", width='stretch', key="debug_load_overlay_details"):
+                try:
+                    st.session_state["debug_selected_knowledge_overlay"] = api_request("GET", f"/knowledge/overlays/{selected_overlay_id}")
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Loaded knowledge overlay details for version #{selected_overlay_id}.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {"level": "error", "message": f"Loading overlay details failed: {error}"}
+                st.rerun()
+
+            if overlay_columns[1].button("Activate selected overlay", width='stretch', key="debug_activate_overlay"):
+                try:
+                    activated = api_request("POST", f"/knowledge/overlays/{selected_overlay_id}/activate")
+                    st.session_state["debug_selected_knowledge_overlay"] = api_request("GET", f"/knowledge/overlays/{selected_overlay_id}")
+                    st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+                    st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Activated knowledge overlay '{activated['name']}'.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {"level": "error", "message": f"Overlay activation failed: {error}"}
+                st.rerun()
+
+            if overlay_columns[2].button("Deactivate selected overlay", width='stretch', key="debug_deactivate_overlay"):
+                try:
+                    deactivated = api_request("POST", f"/knowledge/overlays/{selected_overlay_id}/deactivate")
+                    st.session_state["debug_selected_knowledge_overlay"] = api_request("GET", f"/knowledge/overlays/{selected_overlay_id}")
+                    st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+                    st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Deactivated knowledge overlay '{deactivated['name']}'.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {"level": "error", "message": f"Overlay deactivation failed: {error}"}
+                st.rerun()
+
+            if overlay_columns[3].button("Archive selected overlay", width='stretch', key="debug_archive_overlay"):
+                try:
+                    archived = api_request("POST", f"/knowledge/overlays/{selected_overlay_id}/archive")
+                    st.session_state["debug_selected_knowledge_overlay"] = api_request("GET", f"/knowledge/overlays/{selected_overlay_id}")
+                    st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+                    st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Archived knowledge overlay '{archived['name']}'.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {"level": "error", "message": f"Overlay archive failed: {error}"}
+                st.rerun()
+
+            if st.button("Rollback active overlay", width='stretch', key="debug_rollback_overlay"):
+                try:
+                    runtime = api_request("POST", "/knowledge/overlays/rollback")
+                    st.session_state["debug_knowledge_runtime"] = runtime
+                    st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                    active_overlay_id = runtime.get("active_overlay_id")
+                    st.session_state["debug_selected_knowledge_overlay"] = (
+                        api_request("GET", f"/knowledge/overlays/{active_overlay_id}") if active_overlay_id else None
+                    )
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": (
+                            f"Rolled back to knowledge overlay '{runtime['active_overlay_name']}'."
+                            if active_overlay_id
+                            else "Rolled back to base-only knowledge mode."
+                        ),
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {"level": "error", "message": f"Overlay rollback failed: {error}"}
+                st.rerun()
+
+    selected_overlay = st.session_state.get("debug_selected_knowledge_overlay")
+    if selected_overlay:
+        version = selected_overlay.get("version", {})
+        overlay_entry_counts: dict[str, int] = {}
+        for entry in selected_overlay.get("entries", []):
+            entry_type = str(entry.get("entry_type") or "")
+            if not entry_type:
+                continue
+            overlay_entry_counts[entry_type] = overlay_entry_counts.get(entry_type, 0) + 1
+        st.caption(
+            f"Overlay detail: #{version.get('overlay_id')} | {version.get('name')} | status={version.get('status')} | created_by={version.get('created_by') or 'n/a'} | source={version.get('source_filename') or 'n/a'}"
+        )
+        if overlay_entry_counts:
+            st.caption(
+                "Overlay entry summary: "
+                + " | ".join(f"{entry_type}={count}" for entry_type, count in sorted(overlay_entry_counts.items()))
+            )
+        entries = selected_overlay.get("entries", [])
+        if entries:
+            st.dataframe(entries, width='stretch', hide_index=True)
+        else:
+            st.info("This overlay version does not contain any saved entries.")
+
+    knowledge_audit_logs = st.session_state.get("debug_knowledge_audit_logs")
+    if knowledge_audit_logs:
+        st.subheader("Knowledge Audit Log")
+        st.dataframe(knowledge_audit_logs, width='stretch', hide_index=True)
 
     runtime_config = st.session_state.get("debug_runtime_config")
     if runtime_config:
@@ -1209,7 +1845,8 @@ def render_benchmark_tab() -> None:
         )
         selected_dataset_id = next(dataset_id for label, dataset_id in dataset_options if label == selected_label)
         with_llm = st.checkbox("Run selected benchmark with configured LLM", key="benchmark_with_llm")
-        if st.button("Run selected benchmark", width='stretch', key="benchmark_run_selected"):
+        benchmark_action_columns = st.columns(2)
+        if benchmark_action_columns[0].button("Run selected benchmark", width='stretch', key="benchmark_run_selected"):
             try:
                 result = api_request(
                     "POST",
@@ -1223,6 +1860,20 @@ def render_benchmark_tab() -> None:
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {"level": "error", "message": f"Running benchmark failed: {error}"}
             st.rerun()
+        if benchmark_action_columns[1].button("Measure correction impact", width='stretch', key="benchmark_correction_impact"):
+            try:
+                impact = api_request(
+                    "POST",
+                    f"/evaluation/datasets/{selected_dataset_id}/correction-impact?with_configured_llm={'true' if with_llm else 'false'}",
+                )
+                st.session_state["last_correction_impact"] = impact
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Measured correction impact for benchmark dataset #{selected_dataset_id}.",
+                }
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {"level": "error", "message": f"Measuring correction impact failed: {error}"}
+            st.rerun()
     else:
         st.info("No saved benchmark datasets loaded yet.")
 
@@ -1234,6 +1885,25 @@ def render_benchmark_tab() -> None:
     if benchmark_result:
         st.subheader("Last Benchmark Result")
         st.json(benchmark_result)
+
+    correction_impact = st.session_state.get("last_correction_impact")
+    if correction_impact:
+        st.subheader("Correction Impact")
+        st.dataframe(
+            [
+                {
+                    "baseline_accuracy": correction_impact["baseline"]["accuracy"],
+                    "correction_aware_accuracy": correction_impact["correction_aware"]["accuracy"],
+                    "accuracy_delta": correction_impact["accuracy_delta"],
+                    "baseline_top1_accuracy": correction_impact["baseline"]["top1_accuracy"],
+                    "correction_aware_top1_accuracy": correction_impact["correction_aware"]["top1_accuracy"],
+                    "top1_accuracy_delta": correction_impact["top1_accuracy_delta"],
+                    "correct_matches_delta": correction_impact["correct_matches_delta"],
+                }
+            ],
+            width='stretch',
+            hide_index=True,
+        )
 
     benchmark_runs = st.session_state.get("benchmark_runs")
     if benchmark_runs:
@@ -1437,6 +2107,36 @@ def main() -> None:
                 st.info("Preview is empty. This is expected for schema-only SQL uploads.")
             if preview_response.get("unresolved_targets"):
                 st.warning(f"Needs review: {', '.join(preview_response['unresolved_targets'])}")
+            transformation_previews = preview_response.get("transformation_previews") or []
+            if transformation_previews:
+                st.caption("Transformation validation")
+                st.dataframe(
+                    [
+                        {
+                            "source": item.get("source"),
+                            "target": item.get("target"),
+                            "classification": item.get("classification"),
+                            "mode": item.get("mode"),
+                            "status": item.get("status"),
+                            "warning_codes": " | ".join(warning.get("code", "") for warning in item.get("warnings", [])),
+                            "warning_count": len(item.get("warnings", [])),
+                        }
+                        for item in transformation_previews
+                    ],
+                    width='stretch',
+                    hide_index=True,
+                )
+                for item in transformation_previews:
+                    with st.expander(f"Transformation details: {item.get('source')} -> {item.get('target')}"):
+                        st.caption(
+                            f"Classification: {item.get('classification')} | Mode: {item.get('mode')} | Status: {item.get('status')}"
+                        )
+                        st.write("Before samples:", item.get("before_samples", []))
+                        st.write("After samples:", item.get("after_samples", []))
+                        warnings = item.get("warnings", [])
+                        if warnings:
+                            for warning in warnings:
+                                st.warning(f"{warning.get('code')}: {warning.get('message')}")
 
         codegen_response = st.session_state.get("codegen_response")
         if codegen_response is not None:
@@ -1444,7 +2144,15 @@ def main() -> None:
             st.code(codegen_response["code"], language="python")
             if codegen_response.get("warnings"):
                 for warning in codegen_response["warnings"]:
-                    st.warning(warning)
+                    if isinstance(warning, dict):
+                        prefix = warning.get("code") or "warning"
+                        details = warning.get("details") or {}
+                        suffix = ""
+                        if details.get("line") is not None and details.get("column") is not None:
+                            suffix = f" (line {details['line']}, col {details['column']})"
+                        st.warning(f"{prefix}: {warning.get('message', '')}{suffix}")
+                    else:
+                        st.warning(str(warning))
 
     with debug_tab:
         render_admin_debug_tab()

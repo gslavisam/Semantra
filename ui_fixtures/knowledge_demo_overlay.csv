@@ -1,0 +1,4 @@
+entry_type,canonical_term,alias,domain,source_system,note
+field_alias,customer id,LEGACY_CUST,master_data,LegacyERP,Legacy customer identifier
+synonym,customer,purchaser,sales,,Overlay synonym for customer
+abbreviation,customer,cst,general,,Project-specific abbreviation

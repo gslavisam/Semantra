@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
 from app.core.config import settings
-from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest
-from app.services.evaluation_service import evaluate_cases
+from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, CorrectionImpactMetrics, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest
+from app.services.evaluation_service import evaluate_cases, evaluate_correction_impact
 from app.services.llm_service import build_provider_from_settings
 from app.services.persistence_service import persistence_service
 
@@ -54,6 +54,19 @@ async def run_saved_benchmark(dataset_id: int, with_configured_llm: bool = Query
         metrics=metrics,
     )
     return metrics
+
+
+@router.post("/datasets/{dataset_id}/correction-impact", response_model=CorrectionImpactMetrics, dependencies=[Depends(require_admin)])
+async def run_saved_benchmark_correction_impact(
+    dataset_id: int,
+    with_configured_llm: bool = Query(default=False),
+) -> CorrectionImpactMetrics:
+    try:
+        cases = persistence_service.get_benchmark_dataset_cases(dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    llm_provider = build_provider_from_settings() if with_configured_llm else None
+    return evaluate_correction_impact(cases, llm_provider=llm_provider)
 
 
 @router.get("/runs", response_model=list[EvaluationRunRecord], dependencies=[Depends(require_admin)])

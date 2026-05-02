@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
 from app.core.config import reload_settings, settings_snapshot
-from app.models.mapping import DecisionLogEntry, RuntimeConfigSnapshot, UserCorrectionEntry
+from app.models.mapping import (
+    CorrectionRuleCandidate,
+    DecisionLogEntry,
+    ReusableCorrectionRule,
+    ReusableCorrectionRulePromotionRequest,
+    RuntimeConfigSnapshot,
+    UserCorrectionEntry,
+)
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.persistence_service import persistence_service
@@ -27,6 +34,26 @@ async def list_user_corrections() -> list[UserCorrectionEntry]:
 async def create_user_correction(entry: UserCorrectionEntry) -> UserCorrectionEntry:
     correction_store.append(entry)
     return correction_store.list_entries()[-1]
+
+
+@router.get("/corrections/reusable-rules", response_model=list[CorrectionRuleCandidate], dependencies=[Depends(require_admin)])
+async def list_reusable_correction_rules(min_occurrences: int = Query(default=2, ge=2, le=20)) -> list[CorrectionRuleCandidate]:
+    return correction_store.suggest_reusable_rules(min_occurrences=min_occurrences)
+
+
+@router.get("/corrections/reusable-rules/active", response_model=list[ReusableCorrectionRule], dependencies=[Depends(require_admin)])
+async def list_active_reusable_correction_rules() -> list[ReusableCorrectionRule]:
+    return correction_store.list_reusable_rules()
+
+
+@router.post("/corrections/reusable-rules/promote", response_model=ReusableCorrectionRule, dependencies=[Depends(require_admin)])
+async def promote_reusable_correction_rule(
+    request: ReusableCorrectionRulePromotionRequest,
+) -> ReusableCorrectionRule:
+    try:
+        return correction_store.promote_reusable_rule(request)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get("/config", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])

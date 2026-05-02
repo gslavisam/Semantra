@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.evaluation import router as evaluation_router
+from app.api.routes.knowledge import router as knowledge_router
 from app.api.routes.mapping import router as mapping_router
 from app.api.routes.observability import router as observability_router
 from app.api.routes.upload import router as upload_router
@@ -27,6 +28,7 @@ app.include_router(upload_router)
 app.include_router(mapping_router)
 app.include_router(observability_router)
 app.include_router(evaluation_router)
+app.include_router(knowledge_router)
 
 
 @app.get("/")

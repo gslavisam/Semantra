@@ -102,6 +102,45 @@ def test_build_mapping_decisions_keeps_suggested_transformation_for_original_tar
     ]
 
 
+def test_build_pending_corrections_includes_rejected_review_decision() -> None:
+    fake_streamlit, [build_pending_corrections] = load_streamlit_functions("build_pending_corrections")
+
+    fake_streamlit.session_state.update(
+        {
+            "mapping_editor_state": {
+                "cust_ref": {
+                    "target": "customer_id",
+                    "suggested_target": "customer_id",
+                    "status": "rejected",
+                }
+            }
+        }
+    )
+
+    assert build_pending_corrections() == [
+        {
+            "source": "cust_ref",
+            "suggested_target": "customer_id",
+            "corrected_target": None,
+            "status": "rejected",
+        }
+    ]
+
+
+def test_materialize_transformation_template_replaces_source_and_target_placeholders() -> None:
+    _, [materialize_transformation_template] = load_streamlit_functions("materialize_transformation_template")
+
+    rendered = materialize_transformation_template(
+        {
+            "code_template": 'df_target["{target}"] = df_source["{source}"].astype(str).str.strip()'
+        },
+        "legacy_name",
+        "customer_name",
+    )
+
+    assert rendered == 'df_target["customer_name"] = df_source["legacy_name"].astype(str).str.strip()'
+
+
 def test_trust_layer_rows_preserves_selected_candidate_signals() -> None:
     fake_streamlit, functions = load_streamlit_functions(
         "suggested_mapping_by_source",
@@ -160,3 +199,38 @@ def test_has_knowledge_match_falls_back_to_explanation_text() -> None:
         ["Context prior: source SAP KNA1.KUNNR aligns with target Workday Customer.Customer_ID."],
     ) is True
     assert has_knowledge_match({}, ["Pattern similarity is strong."]) is False
+
+
+def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "resolve_suggested_transformation_code",
+        "effective_transformation_code",
+        "build_mapping_decisions",
+        "build_mapping_set_payload",
+    )
+    build_mapping_set_payload = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "upload_response": {
+                "source": {"dataset_id": "source-1"},
+                "target": {"dataset_id": "target-1"},
+            },
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+            "manual_transform_cust_id": "",
+            "manual_apply_cust_id": False,
+        }
+    )
+
+    payload = build_mapping_set_payload("customer-master", "ba-user", "Initial draft")
+
+    assert payload == {
+        "name": "customer-master",
+        "source_dataset_id": "source-1",
+        "target_dataset_id": "target-1",
+        "mapping_decisions": [{"source": "cust_id", "target": "customer_id", "status": "accepted"}],
+        "created_by": "ba-user",
+        "note": "Initial draft",
+    }
