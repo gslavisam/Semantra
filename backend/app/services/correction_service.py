@@ -48,18 +48,15 @@ class UserCorrectionStore:
             self._entries.append(saved_entry)
 
     def list_entries(self) -> list[UserCorrectionEntry]:
-        with self._lock:
-            if self._entries:
-                return list(self._entries)
         persisted = persistence_service.list_user_corrections()
         with self._lock:
             self._entries = list(persisted)
             return list(self._entries)
 
     def clear(self) -> None:
+        persistence_service.clear_user_corrections()
         with self._lock:
             self._entries.clear()
-        persistence_service.clear_user_corrections()
 
     def list_reusable_rules(self) -> list[ReusableCorrectionRule]:
         return persistence_service.list_reusable_correction_rules()

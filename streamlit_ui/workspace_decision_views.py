@@ -87,6 +87,7 @@ def render_mapping_io_panel(
     *,
     build_mapping_decisions,
     export_mapping_payload,
+    export_mapping_excel_bytes,
     apply_imported_mapping_payload,
     api_request,
     build_mapping_set_payload,
@@ -94,11 +95,20 @@ def render_mapping_io_panel(
     st.subheader("Export / Import Decisions")
     decisions = build_mapping_decisions()
     export_disabled = not decisions
-    st.download_button(
+    export_columns = st.columns(2)
+    export_columns[0].download_button(
         "Download mapping JSON",
         data=export_mapping_payload(),
         file_name="semantra_mapping_decisions.json",
         mime="application/json",
+        disabled=export_disabled,
+        use_container_width=True,
+    )
+    export_columns[1].download_button(
+        "Download mapping Excel",
+        data=export_mapping_excel_bytes(),
+        file_name="semantra_mapping_decisions.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         disabled=export_disabled,
         use_container_width=True,
     )

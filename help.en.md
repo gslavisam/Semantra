@@ -139,6 +139,13 @@ What to expect after clicking:
 
 - the trust layer, review tables, manual review, corrections, and preview/code generation actions become available
 
+Confidence score note:
+
+- the score is a normalized multi-signal heuristic, not a probability
+- the final result stays in the `0..1` range
+- current thresholds are `high_confidence >= 0.85`, `medium_confidence >= 0.65`, otherwise `low_confidence`
+- use it to prioritize review and understand the initial recommendation, not as a guarantee that the mapping is correct
+
 ## Trust Layer and transformations
 
 For each source field you get a block with a target suggestion, a confidence display, and an expander section called `Details and Transformation`.

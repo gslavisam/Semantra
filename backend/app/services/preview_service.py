@@ -10,6 +10,11 @@ def build_preview(rows: list[dict[str, object]], mapping_decisions: list[Mapping
         return PreviewResponse(preview=[], unresolved_targets=[], transformation_previews=[])
 
     transformed_rows, transformation_previews = build_transformed_target_frame(rows[:10], accepted)
+    warnings_by_source: dict[str | None, list[str]] = {}
+    for transformation_preview in transformation_previews:
+        for warning in transformation_preview.warnings:
+            warnings_by_source.setdefault(warning.source, []).append(warning.message)
+
     preview_rows: list[PreviewRow] = []
 
     for index, row in enumerate(rows[:10]):
@@ -18,8 +23,9 @@ def build_preview(rows: list[dict[str, object]], mapping_decisions: list[Mapping
         for decision in accepted:
             if decision.source not in row:
                 warnings.append(f"Missing source column: {decision.source}")
-        for transformation_preview in transformation_previews:
-            warnings.extend(warning.message for warning in transformation_preview.warnings)
+        for source_name, source_warnings in warnings_by_source.items():
+            if source_name is None or source_name in row:
+                warnings.extend(source_warnings)
         preview_rows.append(PreviewRow(values=projected, warnings=warnings))
 
     unresolved_targets = [decision.target for decision in mapping_decisions if decision.status == "needs_review"]

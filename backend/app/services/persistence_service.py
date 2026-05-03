@@ -159,8 +159,16 @@ class SQLitePersistenceService:
 
     def list_user_corrections(self) -> list[UserCorrectionEntry]:
         with self.connection() as connection:
-            rows = connection.execute("SELECT payload FROM user_corrections ORDER BY id ASC").fetchall()
-        return [UserCorrectionEntry.model_validate(json.loads(row[0])) for row in rows]
+            rows = connection.execute("SELECT id, payload FROM user_corrections ORDER BY id ASC").fetchall()
+        return [
+            UserCorrectionEntry.model_validate(
+                {
+                    **json.loads(row[1]),
+                    "correction_id": int(row[0]),
+                }
+            )
+            for row in rows
+        ]
 
     def clear_all(self) -> None:
         with self.connection() as connection:

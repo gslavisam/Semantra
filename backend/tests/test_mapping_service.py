@@ -1,7 +1,8 @@
 from app.core.config import settings
+from app.models.mapping import ScoringSignals
 from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
-from app.services.mapping_service import generate_mapping_candidates
+from app.services.mapping_service import TOTAL_WEIGHT, compute_final_score, generate_mapping_candidates
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 from app.utils.normalization import semantic_token_set
@@ -263,6 +264,18 @@ def test_mapping_penalizes_explicitly_rejected_target() -> None:
         "Historical review history penalized this candidate" in line
         for line in customer_id_candidate.explanation
     )
+
+
+def test_compute_final_score_normalizes_weighted_average() -> None:
+    score = compute_final_score(ScoringSignals(name=1.0))
+
+    assert score == round(0.20 / TOTAL_WEIGHT, 4)
+
+
+def test_compute_final_score_clamps_negative_adjustments() -> None:
+    score = compute_final_score(ScoringSignals(correction=-1.0))
+
+    assert score == 0.0
 
 
 def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None:

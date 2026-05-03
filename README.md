@@ -24,7 +24,7 @@ The current product shape is a FastAPI backend plus an internal Streamlit review
 uvicorn app.main:app --reload --app-dir backend
 ```
 
-5. Optionally start the Streamlit internal-alpha UI:
+5. Optionally start the Streamlit internal-beta UI:
 
 ```bash
 streamlit run streamlit_app.py
@@ -56,7 +56,17 @@ The Streamlit side was recently decomposed so `streamlit_app.py` now acts mainly
 
 Current roadmap note: canonical semantic layer MVP, Phase 1 cleanup, and Phase 2 Streamlit decomposition are done; Epic 6 Governance MVP has started with mapping-set owner/assignee/review-note metadata plus version diff and apply-audit support, while the separate Phase 0 hardening package remains open.
 
-This is already a strong internal-alpha / pilot-grade mapping product slice. It is not yet a production orchestration platform, a connector-heavy ingestion platform, or a full semantic operating model.
+This is already a strong internal-beta / pilot-grade mapping product slice. It is not yet a production orchestration platform, a connector-heavy ingestion platform, or a full semantic operating model.
+
+## Scoring Note
+
+The mapping confidence score is a normalized multi-signal heuristic, not a calibrated probability.
+
+- individual signals such as lexical, semantic, knowledge, pattern, overlap, optional embedding, historical correction, and optional LLM validation are combined into a weighted average
+- the final score is normalized and clamped to the `0..1` range
+- current confidence labels are threshold-based over that normalized score: `high_confidence >= 0.85`, `medium_confidence >= 0.65`, otherwise `low_confidence`
+
+This makes the thresholds operationally easier to read, but they should still be treated as review heuristics rather than statistical confidence guarantees.
 
 ## Runtime Notes
 

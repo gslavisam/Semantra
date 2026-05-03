@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from io import BytesIO
+
+from openpyxl import Workbook
 
 
 def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> dict[str, str | bool]:
@@ -136,6 +139,27 @@ def export_mapping_payload(session_state: dict, *, build_mapping_decisions_func:
         "mapping_decisions": build_mapping_decisions_func(),
     }
     return json.dumps(payload, indent=2, ensure_ascii=True)
+
+
+def export_mapping_excel_bytes(session_state: dict, *, build_mapping_decisions_func: Callable[[], list[dict]]) -> bytes:
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "mapping_decisions"
+    worksheet.append(["source", "target", "status", "transformation_code"])
+
+    for decision in build_mapping_decisions_func():
+        worksheet.append(
+            [
+                decision.get("source", ""),
+                decision.get("target", ""),
+                decision.get("status", ""),
+                decision.get("transformation_code", "") or "",
+            ]
+        )
+
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
 
 
 def build_mapping_set_payload(

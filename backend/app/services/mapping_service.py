@@ -37,6 +37,8 @@ WEIGHTS = {
     "llm": 0.05,
 }
 
+TOTAL_WEIGHT = sum(WEIGHTS.values())
+
 
 @dataclass
 class CandidateScore:
@@ -307,7 +309,7 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
 
 
 def compute_final_score(signals: ScoringSignals) -> float:
-    return round(
+    raw_score = (
         (signals.name * WEIGHTS["name"])
         + (signals.semantic * WEIGHTS["semantic"])
         + (signals.knowledge * WEIGHTS["knowledge"])
@@ -317,9 +319,10 @@ def compute_final_score(signals: ScoringSignals) -> float:
         + (signals.overlap * WEIGHTS["overlap"])
         + (signals.embedding * WEIGHTS["embedding"])
         + (signals.correction * WEIGHTS["correction"])
-        + (signals.llm * WEIGHTS["llm"]),
-        4,
+        + (signals.llm * WEIGHTS["llm"])
     )
+    normalized_score = raw_score / TOTAL_WEIGHT if TOTAL_WEIGHT else 0.0
+    return round(clamp_score(normalized_score), 4)
 
 
 def sample_overlap_score(source_values: set[str], target_values: set[str]) -> float:

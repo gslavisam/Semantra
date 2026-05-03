@@ -139,6 +139,13 @@ Kada koristiti:
 
 - pojavljuju se trust layer, review tabele, manual review, corrections i akcije za preview/codegen
 
+Napomena o confidence score-u:
+
+- score je normalizovan heuristički zbir više signala, ne verovatnoća
+- finalni rezultat ostaje u opsegu `0..1`
+- trenutni pragovi su: `high_confidence >= 0.85`, `medium_confidence >= 0.65`, inače `low_confidence`
+- score služi za prioritet review-a i automatski prvi predlog, ne kao garancija da je mapping ispravan
+
 ## Trust Layer i transformacije
 
 Za svako source polje dobijaš blok sa target predlogom, confidence prikazom i expander sekcijom `Details and Transformation`.

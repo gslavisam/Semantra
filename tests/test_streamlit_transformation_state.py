@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import ast
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+
+from openpyxl import load_workbook
 
 
 STREAMLIT_APP_PATH = Path(__file__).resolve().parents[1] / "streamlit_app.py"
@@ -593,3 +596,49 @@ def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> N
         "assignee": "analyst-1",
         "review_note": "Ready for review",
     }
+
+
+def test_export_mapping_excel_bytes_creates_tabular_mapping_workbook() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "resolve_suggested_transformation_code",
+        "effective_transformation_code",
+        "build_mapping_decisions",
+        "export_mapping_excel_bytes",
+    )
+    export_mapping_excel_bytes = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "mapping_editor_state": {
+                "cust_id": {
+                    "target": "customer_id",
+                    "status": "accepted",
+                    "manual_transformation_code": 'df_source["cust_id"].astype(str)',
+                    "manual_apply_transformation": True,
+                },
+                "phone": {
+                    "target": "phone_number",
+                    "status": "needs_review",
+                },
+            },
+            "manual_transform_cust_id": 'df_source["cust_id"].astype(str)',
+            "manual_apply_cust_id": True,
+            "manual_transform_phone": "",
+            "manual_apply_phone": False,
+        }
+    )
+
+    payload = export_mapping_excel_bytes()
+    workbook = load_workbook(BytesIO(payload))
+    worksheet = workbook["mapping_decisions"]
+
+    assert worksheet.max_row == 3
+    assert worksheet.max_column == 4
+    assert [cell.value for cell in worksheet[1]] == ["source", "target", "status", "transformation_code"]
+    assert [cell.value for cell in worksheet[2]] == [
+        "cust_id",
+        "customer_id",
+        "accepted",
+        'df_source["cust_id"].astype(str)',
+    ]
+    assert [cell.value for cell in worksheet[3]] == ["phone", "phone_number", "needs_review", None]

@@ -377,6 +377,12 @@ def export_mapping_payload() -> str:
     return _impl(st.session_state, build_mapping_decisions_func=build_mapping_decisions)
 
 
+def export_mapping_excel_bytes() -> bytes:
+    from streamlit_ui.mapping_state import export_mapping_excel_bytes as _impl
+
+    return _impl(st.session_state, build_mapping_decisions_func=build_mapping_decisions)
+
+
 def build_mapping_set_payload(
     name: str,
     created_by: str | None = None,
@@ -446,6 +452,7 @@ def render_mapping_io_panel() -> None:
     return _impl(
         build_mapping_decisions=build_mapping_decisions,
         export_mapping_payload=export_mapping_payload,
+        export_mapping_excel_bytes=export_mapping_excel_bytes,
         apply_imported_mapping_payload=apply_imported_mapping_payload,
         api_request=api_request,
         build_mapping_set_payload=build_mapping_set_payload,

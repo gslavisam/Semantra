@@ -141,6 +141,32 @@ def test_decision_logs_and_corrections_roundtrip_through_persistence() -> None:
     assert correction_store.list_entries()[0].correction_id is not None
 
 
+def test_store_reads_refresh_from_persistence_even_when_memory_cache_is_stale() -> None:
+    decision_entry = DecisionLogEntry(
+        source="cust_ref",
+        candidate_targets=["customer_id"],
+        heuristic_scores={"customer_id": 0.42},
+        final_target="customer_id",
+        final_status="accepted",
+        used_llm=False,
+    )
+    correction_entry = UserCorrectionEntry(
+        source="cust_ref",
+        suggested_target="customer_id",
+        corrected_target="phone_number",
+        status="overridden",
+    )
+
+    decision_log_store.append(decision_entry)
+    correction_store.append(correction_entry)
+
+    decision_log_store._entries = []
+    correction_store._entries = []
+
+    assert decision_log_store.list_entries()[0].final_target == "customer_id"
+    assert correction_store.list_entries()[0].corrected_target == "phone_number"
+
+
 def test_reusable_correction_rules_roundtrip_through_persistence() -> None:
     first = persistence_service.save_reusable_correction_rule(
         ReusableCorrectionRule(

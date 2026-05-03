@@ -787,6 +787,53 @@ def test_preview_surfaces_transformation_syntax_errors_and_type_coercion() -> No
     assert coercion_payload["transformation_previews"][0]["warnings"][0]["details"]["result_semantic_dtype"] == "numeric"
 
 
+def test_preview_scopes_transformation_warnings_to_rows_with_relevant_source_columns() -> None:
+    from app.models.mapping import MappingDecision
+    from app.models.mapping import TransformationPreviewResult, TransformationPreviewWarning
+    from app.services.preview_service import build_preview
+
+    rows = [
+        {"email": "ana@example.com"},
+        {"phone": "0641234567"},
+    ]
+    mapping_decisions = [
+        MappingDecision(source="email", target="customer_name", status="accepted"),
+        MappingDecision(source="phone", target="phone_number", status="accepted"),
+    ]
+
+    with patch(
+        "app.services.preview_service.build_transformed_target_frame",
+        return_value=(
+            [
+                {"customer_name": "Ana"},
+                {"phone_number": "0641234567"},
+            ],
+            [
+                TransformationPreviewResult(
+                    source="email",
+                    target="customer_name",
+                    status="fallback",
+                    classification="risky",
+                    warnings=[
+                        TransformationPreviewWarning(
+                            code="runtime_error",
+                            message="Transformation failed for email -> customer_name",
+                            source="email",
+                            target="customer_name",
+                            severity="error",
+                            fallback_applied=True,
+                        )
+                    ],
+                )
+            ],
+        ),
+    ):
+        preview = build_preview(rows, mapping_decisions)
+
+    assert any("Transformation failed for email -> customer_name" in warning for warning in preview.preview[0].warnings)
+    assert not any("Transformation failed for email -> customer_name" in warning for warning in preview.preview[1].warnings)
+
+
 def test_codegen_returns_pandas_snippet_for_mapping_decisions() -> None:
     response = client.post(
         "/mapping/codegen",

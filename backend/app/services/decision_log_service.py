@@ -12,23 +12,20 @@ class InMemoryDecisionLogStore:
         self._lock = Lock()
 
     def append(self, entry: DecisionLogEntry) -> None:
+        persistence_service.append_decision_log(entry)
         with self._lock:
             self._entries.append(entry)
-        persistence_service.append_decision_log(entry)
 
     def list_entries(self) -> list[DecisionLogEntry]:
-        with self._lock:
-            if self._entries:
-                return list(self._entries)
         persisted = persistence_service.list_decision_logs()
         with self._lock:
             self._entries = list(persisted)
             return list(self._entries)
 
     def clear(self) -> None:
+        persistence_service.clear_decision_logs()
         with self._lock:
             self._entries.clear()
-        persistence_service.clear_decision_logs()
 
 
 decision_log_store = InMemoryDecisionLogStore()

@@ -97,7 +97,8 @@ Current behavior:
 - return source, target, and project-level canonical coverage summaries alongside the mapping payload
 
 Important implementation notes:
-- the weighted score is still a ranking heuristic, not a calibrated probability
+- the weighted score is now normalized and clamped into the `0..1` range, but it remains a ranking heuristic rather than a calibrated probability
+- current confidence labels use thresholding over that normalized score: `high >= 0.85`, `medium >= 0.65`, otherwise `low`
 - correction signal now includes both raw feedback history and promoted reusable rules
 - the knowledge signal can be influenced by both built-in metadata assets and active knowledge overlays
 - the canonical signal is currently glossary-driven and file-backed; it is not yet a governed enterprise semantic model
@@ -650,7 +651,7 @@ What is not closed yet:
 - the hardening/debt package described as Phase 0 is still open and was not part of the recent delivery slice
 - deeper governance remains intentionally narrow for now; the remaining Epic 6 work is mainly the export/run status gate
 
-This puts Semantra in a strong internal-alpha / pilot-ready state for controlled schema-mapping workflows.
+This puts Semantra in a strong internal-beta / pilot-ready state for controlled schema-mapping workflows.
 
 ## Next Recommended Milestone
 
@@ -690,7 +691,7 @@ At the current stage, Semantra is no longer just a scaffold. It contains:
 - persisted correction learning plus promoted reusable rules
 - persisted mapping sets and transformation test sets
 - benchmark and correction-impact evaluation tooling
-- a working internal-alpha Streamlit review UI with extracted `streamlit_ui/*` modules and `streamlit_app.py` reduced to composition/root orchestration
+- a working internal-beta Streamlit review UI with extracted `streamlit_ui/*` modules and `streamlit_app.py` reduced to composition/root orchestration
 - focused automated tests around backend services, API flows, and key Streamlit helpers
 
 The biggest remaining growth areas are now mostly P1 and beyond:
