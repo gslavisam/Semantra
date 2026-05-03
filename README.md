@@ -83,3 +83,5 @@ Use these docs with different intent:
 - `README.md`: quick project summary, local run instructions, and high-level capability list
 - `PROJECT_OVERVIEW.md`: broader product and technical architecture overview
 - `epics.md`: roadmap, phase plan, backlog direction, and execution tracking notes for completed epic slices
+- `REAL_LIFE_PILOT_TEST_PLAN.md`: concrete pilot-validation plan for realistic source/target datasets before wider rollout or refactor
+- `help.md`: practical usage guide for the Streamlit `Benchmarks` and `Admin / Debug` tabs
