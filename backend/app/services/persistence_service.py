@@ -13,6 +13,8 @@ from app.models.mapping import (
     EvaluationMetrics,
     EvaluationRunRecord,
     MappingSetAuditEntry,
+    MappingSetDecisionDiffEntry,
+    MappingSetDiffResponse,
     MappingSetDetail,
     MappingSetRecord,
     ReusableCorrectionRule,
@@ -192,6 +194,9 @@ class SQLitePersistenceService:
         status: str = "draft",
         created_by: str | None = None,
         note: str | None = None,
+        owner: str | None = None,
+        assignee: str | None = None,
+        review_note: str | None = None,
     ) -> MappingSetRecord:
         version = 1 + max(
             (record.version for record in self.list_mapping_sets() if record.name == name),
@@ -207,6 +212,9 @@ class SQLitePersistenceService:
                 "target_dataset_id": target_dataset_id,
                 "created_by": created_by,
                 "note": note,
+                "owner": owner,
+                "assignee": assignee,
+                "review_note": review_note,
                 "created_at": created_at,
                 "mapping_decisions": [
                     decision.model_dump(mode="json") if hasattr(decision, "model_dump") else decision
@@ -230,6 +238,9 @@ class SQLitePersistenceService:
             target_dataset_id=target_dataset_id,
             created_by=created_by,
             note=note,
+            owner=owner,
+            assignee=assignee,
+            review_note=review_note,
             created_at=created_at,
         )
 
@@ -252,6 +263,9 @@ class SQLitePersistenceService:
                     target_dataset_id=payload.get("target_dataset_id"),
                     created_by=payload.get("created_by"),
                     note=payload.get("note"),
+                    owner=payload.get("owner"),
+                    assignee=payload.get("assignee"),
+                    review_note=payload.get("review_note"),
                     created_at=payload.get("created_at"),
                 )
             )
@@ -276,21 +290,45 @@ class SQLitePersistenceService:
             target_dataset_id=payload.get("target_dataset_id"),
             created_by=payload.get("created_by"),
             note=payload.get("note"),
+            owner=payload.get("owner"),
+            assignee=payload.get("assignee"),
+            review_note=payload.get("review_note"),
             created_at=payload.get("created_at"),
             mapping_decisions=payload.get("mapping_decisions", []),
         )
 
-    def update_mapping_set_status(self, mapping_set_id: int, status: str) -> MappingSetRecord:
+    def update_mapping_set_status(
+        self,
+        mapping_set_id: int,
+        status: str,
+        *,
+        owner: str | None = None,
+        assignee: str | None = None,
+        review_note: str | None = None,
+    ) -> MappingSetRecord:
         existing = self.get_mapping_set(mapping_set_id)
         payload = existing.model_dump(mode="json")
         payload["status"] = status
+        if owner is not None:
+            payload["owner"] = owner
+        if assignee is not None:
+            payload["assignee"] = assignee
+        if review_note is not None:
+            payload["review_note"] = review_note
         payload.pop("mapping_set_id", None)
         with self.connection() as connection:
             connection.execute(
                 "UPDATE mapping_sets SET payload = ? WHERE id = ?",
                 (json.dumps(payload), mapping_set_id),
             )
-        return existing.model_copy(update={"status": status})
+        return existing.model_copy(
+            update={
+                "status": status,
+                "owner": payload.get("owner"),
+                "assignee": payload.get("assignee"),
+                "review_note": payload.get("review_note"),
+            }
+        )
 
     def append_mapping_set_audit_log(self, entry: MappingSetAuditEntry | dict[str, object]) -> MappingSetAuditEntry:
         payload_entry = entry if isinstance(entry, MappingSetAuditEntry) else MappingSetAuditEntry.model_validate(entry)
@@ -311,6 +349,79 @@ class SQLitePersistenceService:
         if mapping_set_id is None:
             return entries
         return [entry for entry in entries if entry.mapping_set_id == mapping_set_id]
+
+    def diff_mapping_sets(self, mapping_set_id: int, against_mapping_set_id: int) -> MappingSetDiffResponse:
+        current = self.get_mapping_set(mapping_set_id)
+        baseline = self.get_mapping_set(against_mapping_set_id)
+        if current.name != baseline.name:
+            raise ValueError("Mapping set diff requires two versions with the same name")
+
+        def as_dict(decision: object) -> dict[str, object]:
+            if hasattr(decision, "model_dump"):
+                return decision.model_dump(mode="json")
+            return dict(decision)
+
+        current_by_source = {item["source"]: item for item in (as_dict(decision) for decision in current.mapping_decisions)}
+        baseline_by_source = {item["source"]: item for item in (as_dict(decision) for decision in baseline.mapping_decisions)}
+        changes: list[MappingSetDecisionDiffEntry] = []
+
+        for source in sorted(set(current_by_source) | set(baseline_by_source)):
+            current_decision = current_by_source.get(source)
+            baseline_decision = baseline_by_source.get(source)
+            if baseline_decision is None and current_decision is not None:
+                changes.append(
+                    MappingSetDecisionDiffEntry(
+                        change_type="added",
+                        source=source,
+                        to_target=current_decision.get("target"),
+                        to_status=current_decision.get("status"),
+                        to_transformation_code=current_decision.get("transformation_code"),
+                    )
+                )
+                continue
+            if current_decision is None and baseline_decision is not None:
+                changes.append(
+                    MappingSetDecisionDiffEntry(
+                        change_type="removed",
+                        source=source,
+                        from_target=baseline_decision.get("target"),
+                        from_status=baseline_decision.get("status"),
+                        from_transformation_code=baseline_decision.get("transformation_code"),
+                    )
+                )
+                continue
+            if current_decision is None or baseline_decision is None:
+                continue
+            if (
+                current_decision.get("target") != baseline_decision.get("target")
+                or current_decision.get("status") != baseline_decision.get("status")
+                or current_decision.get("transformation_code") != baseline_decision.get("transformation_code")
+            ):
+                changes.append(
+                    MappingSetDecisionDiffEntry(
+                        change_type="changed",
+                        source=source,
+                        from_target=baseline_decision.get("target"),
+                        to_target=current_decision.get("target"),
+                        from_status=baseline_decision.get("status"),
+                        to_status=current_decision.get("status"),
+                        from_transformation_code=baseline_decision.get("transformation_code"),
+                        to_transformation_code=current_decision.get("transformation_code"),
+                    )
+                )
+
+        return MappingSetDiffResponse(
+            current_mapping_set_id=current.mapping_set_id,
+            current_name=current.name,
+            current_version=current.version,
+            against_mapping_set_id=baseline.mapping_set_id,
+            against_name=baseline.name,
+            against_version=baseline.version,
+            added_count=sum(1 for item in changes if item.change_type == "added"),
+            removed_count=sum(1 for item in changes if item.change_type == "removed"),
+            changed_count=sum(1 for item in changes if item.change_type == "changed"),
+            changes=changes,
+        )
 
     def clear_mapping_sets(self) -> None:
         with self.connection() as connection:

@@ -185,8 +185,17 @@ def test_mapping_sets_roundtrip_and_audit_through_persistence() -> None:
         target_dataset_id="target-1",
         created_by="qa-user",
         note="Initial draft",
+        owner="governance-team",
+        assignee="analyst-1",
+        review_note="Initial governance context",
     )
-    updated = persistence_service.update_mapping_set_status(saved.mapping_set_id, "review")
+    updated = persistence_service.update_mapping_set_status(
+        saved.mapping_set_id,
+        "review",
+        owner="governance-team",
+        assignee="analyst-2",
+        review_note="Ready for review",
+    )
     audit = persistence_service.append_mapping_set_audit_log(
         {
             "mapping_set_id": saved.mapping_set_id,
@@ -208,6 +217,9 @@ def test_mapping_sets_roundtrip_and_audit_through_persistence() -> None:
     assert updated.status == "review"
     assert listed[0].name == "customer-master"
     assert loaded.mapping_decisions[0].target == "customer_id"
+    assert loaded.owner == "governance-team"
+    assert loaded.assignee == "analyst-2"
+    assert loaded.review_note == "Ready for review"
     assert audit.audit_id is not None
     assert audits[0].action == "status_change"
 
@@ -218,6 +230,52 @@ def test_mapping_set_versions_increment_for_same_name() -> None:
 
     assert first.version == 1
     assert second.version == 2
+
+
+def test_mapping_set_diff_reports_added_removed_and_changed_decisions() -> None:
+    baseline = persistence_service.save_mapping_set(
+        "customer-master",
+        [
+            {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+            {"source": "phone", "target": "phone_number", "status": "needs_review"},
+            {
+                "source": "email",
+                "target": "email_address",
+                "status": "accepted",
+                "transformation_code": 'df_target["email_address"] = df_source["email"].str.lower()',
+            },
+        ],
+    )
+    current = persistence_service.save_mapping_set(
+        "customer-master",
+        [
+            {"source": "cust_id", "target": "customer_number", "status": "accepted"},
+            {
+                "source": "email",
+                "target": "email_address",
+                "status": "accepted",
+                "transformation_code": 'df_target["email_address"] = df_source["email"].astype(str).str.strip().str.lower()',
+            },
+            {"source": "city", "target": "city_name", "status": "accepted"},
+        ],
+    )
+
+    diff = persistence_service.diff_mapping_sets(current.mapping_set_id, baseline.mapping_set_id)
+
+    assert diff.current_version == 2
+    assert diff.against_version == 1
+    assert diff.added_count == 1
+    assert diff.removed_count == 1
+    assert diff.changed_count == 2
+    assert [change.change_type for change in diff.changes] == ["added", "changed", "changed", "removed"]
+    assert diff.changes[0].source == "city"
+    assert diff.changes[1].source == "cust_id"
+    assert diff.changes[1].from_target == "customer_id"
+    assert diff.changes[1].to_target == "customer_number"
+    assert diff.changes[2].source == "email"
+    assert diff.changes[2].from_transformation_code is not None
+    assert diff.changes[2].to_transformation_code is not None
+    assert diff.changes[3].source == "phone"
 
 
 def test_settings_can_be_loaded_from_dotenv_file() -> None:

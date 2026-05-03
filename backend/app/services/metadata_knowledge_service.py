@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import csv
 from pathlib import Path
-import re
 from typing import Iterable
 
 from openpyxl import load_workbook
@@ -18,6 +17,7 @@ from app.models.mapping import (
 )
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.persistence_service import persistence_service
+from app.utils.knowledge_text import normalize_alias_text, split_csv_values
 from app.utils.normalization import clear_normalization_overrides, configure_normalization_overrides
 
 
@@ -48,12 +48,11 @@ ALIAS_FIELDS = (
 
 
 def _normalize_alias(value: str) -> str:
-    cleaned = re.sub(r"[^a-zA-Z0-9]+", " ", value).strip().lower()
-    return " ".join(token for token in cleaned.split() if token)
+    return normalize_alias_text(value)
 
 
 def _split_values(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
+    return split_csv_values(value)
 
 
 @dataclass(frozen=True)

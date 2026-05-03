@@ -866,6 +866,9 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
             ],
             "created_by": "demo-user",
             "note": "Initial draft",
+            "owner": "governance-team",
+            "assignee": "analyst-1",
+            "review_note": "Prepared for governance review",
         },
         headers=admin_headers(),
     )
@@ -880,7 +883,19 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     detail_response = client.get(f"/mapping/sets/{mapping_set_id}", headers=admin_headers())
     status_response = client.post(
         f"/mapping/sets/{mapping_set_id}/status",
-        json={"status": "review", "changed_by": "demo-user", "note": "Ready for review"},
+        json={
+            "status": "review",
+            "changed_by": "demo-user",
+            "note": "Ready for review",
+            "owner": "governance-team",
+            "assignee": "analyst-2",
+            "review_note": "Waiting for approval",
+        },
+        headers=admin_headers(),
+    )
+    apply_response = client.post(
+        f"/mapping/sets/{mapping_set_id}/apply",
+        json={"changed_by": "demo-user", "note": "Applied to current review state"},
         headers=admin_headers(),
     )
     audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=admin_headers())
@@ -888,20 +903,74 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
     assert status_response.status_code == 200
+    assert apply_response.status_code == 200
     assert audit_response.status_code == 200
 
     listed = list_response.json()
     detail = detail_response.json()
     updated = status_response.json()
+    applied = apply_response.json()
     audits = audit_response.json()
 
     assert listed[0]["mapping_set_id"] == mapping_set_id
     assert detail["mapping_decisions"][0]["target"] == "customer_id"
     assert detail["decision_count"] == 2
+    assert detail["owner"] == "governance-team"
+    assert detail["assignee"] == "analyst-1"
+    assert detail["review_note"] == "Prepared for governance review"
     assert updated["status"] == "review"
-    assert audits[0]["action"] == "status_change"
+    assert updated["assignee"] == "analyst-2"
+    assert updated["review_note"] == "Waiting for approval"
+    assert applied["mapping_set_id"] == mapping_set_id
+    assert audits[0]["action"] == "apply"
     assert audits[0]["created_at"] is not None
+    assert audits[1]["action"] == "status_change"
     assert audits[-1]["action"] == "create"
+
+
+def test_mapping_set_diff_endpoint_returns_version_changes() -> None:
+    settings.admin_api_token = "secret-token"
+
+    baseline_response = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "phone", "target": "phone_number", "status": "needs_review"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+    current_response = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_number", "status": "accepted"},
+                {"source": "city", "target": "city_name", "status": "accepted"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+
+    baseline_id = baseline_response.json()["mapping_set_id"]
+    current_id = current_response.json()["mapping_set_id"]
+
+    diff_response = client.get(
+        f"/mapping/sets/{current_id}/diff",
+        params={"against_id": baseline_id},
+        headers=admin_headers(),
+    )
+
+    assert diff_response.status_code == 200
+    payload = diff_response.json()
+    assert payload["current_version"] == 2
+    assert payload["against_version"] == 1
+    assert payload["added_count"] == 1
+    assert payload["removed_count"] == 1
+    assert payload["changed_count"] == 1
+    assert [item["change_type"] for item in payload["changes"]] == ["added", "changed", "removed"]
 
 
 def test_transformation_templates_endpoint_returns_reusable_templates() -> None:

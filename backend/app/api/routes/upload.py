@@ -8,6 +8,7 @@ from app.models.schema import SqlTableDiscoveryResponse, UploadResponse
 from app.services.schema_snapshot_service import build_schema_profile_from_sql_snapshot, list_tables_from_sql_snapshot
 from app.services.tabular_upload_service import SUPPORTED_ROW_FORMATS, parse_tabular_payload
 from app.services.upload_store import dataset_store
+from app.utils.tabular import decode_text_payload
 
 
 router = APIRouter(tags=["upload"])
@@ -21,7 +22,7 @@ async def discover_sql_tables(file: UploadFile = File(...)) -> SqlTableDiscovery
 
     payload = await file.read()
     try:
-        decoded = payload.decode("utf-8-sig")
+        decoded = decode_text_payload(payload)
         return SqlTableDiscoveryResponse(tables=list_tables_from_sql_snapshot(decoded))
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"Failed to inspect SQL schema snapshot: {error}") from error
@@ -66,7 +67,7 @@ def read_tabular_payload(payload: bytes, filename: str) -> list[dict[str, object
 
 def read_sql_snapshot_payload(payload: bytes, dataset_name: str, selected_table: str | None = None):
     try:
-        decoded = payload.decode("utf-8-sig")
+        decoded = decode_text_payload(payload)
         return build_schema_profile_from_sql_snapshot(
             decoded,
             dataset_id=str(uuid4()),

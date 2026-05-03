@@ -9,7 +9,8 @@ from app.models.knowledge import (
     KnowledgeOverlayValidationPreviewRow,
     KnowledgeOverlayValidationResult,
 )
-from app.services.metadata_knowledge_service import _normalize_alias, metadata_knowledge_service
+from app.services.metadata_knowledge_service import metadata_knowledge_service
+from app.utils.knowledge_text import normalize_alias_text
 
 
 REQUIRED_HEADERS = ("entry_type", "canonical_term", "alias")
@@ -62,8 +63,8 @@ class KnowledgeOverlayValidationService:
         source_system = str(row.get("source_system") or "").strip() or None
         note = str(row.get("note") or "").strip() or None
 
-        normalized_canonical_term = _normalize_alias(canonical_term)
-        normalized_alias = _normalize_alias(alias)
+        normalized_canonical_term = normalize_alias_text(canonical_term)
+        normalized_alias = normalize_alias_text(alias)
         canonical_concept_id = None
 
         issues: list[KnowledgeOverlayValidationIssue] = []
@@ -130,8 +131,8 @@ class KnowledgeOverlayValidationService:
             entry_type,
             normalized_canonical_term,
             normalized_alias,
-            _normalize_alias(domain or ""),
-            _normalize_alias(source_system or ""),
+            normalize_alias_text(domain or ""),
+            normalize_alias_text(source_system or ""),
         )
         if all(dedupe_key[:3]):
             if dedupe_key in seen_entries:

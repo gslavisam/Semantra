@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from app.core.config import settings
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import evaluate_cases
@@ -64,6 +66,40 @@ def test_llm_validator_rejects_hallucinated_target() -> None:
     )
 
     assert result is None
+
+
+def test_llm_validator_logs_classified_failures(caplog: pytest.LogCaptureFixture) -> None:
+    provider = StaticLLMProvider("not-json")
+
+    with caplog.at_level("WARNING"):
+        result = call_validator(
+            source_field={"name": "cust_ref", "sample_values": ["0641234567"], "pattern": ["phone"], "unique_ratio": 1.0},
+            candidate_targets=[
+                {"name": "customer_id", "pattern": ["numeric_id"]},
+                {"name": "phone_number", "pattern": ["phone"]},
+            ],
+            provider=provider,
+            max_retries=1,
+        )
+
+    assert result is None
+    assert "invalid_json" in caplog.text
+
+
+def test_llm_transformation_logs_classified_failures(caplog: pytest.LogCaptureFixture) -> None:
+    provider = StaticLLMProvider("not-json")
+
+    with caplog.at_level("WARNING"):
+        result = call_transformation_generator(
+            source_field={"name": "email", "sample_values": ["ana.markovic@example.com"], "pattern": ["email"]},
+            target_field={"name": "customer_name", "sample_values": ["Ana Markovic"], "pattern": ["text"]},
+            user_instruction="Extract the person's full name from the email address.",
+            provider=provider,
+            max_retries=1,
+        )
+
+    assert result is None
+    assert "invalid_json" in caplog.text
 
 
 def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -> None:

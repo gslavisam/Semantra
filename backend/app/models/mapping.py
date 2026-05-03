@@ -200,6 +200,9 @@ class MappingSetCreateRequest(BaseModel):
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
     created_by: str | None = None
     note: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None
 
 
 class MappingSetRecord(BaseModel):
@@ -212,6 +215,9 @@ class MappingSetRecord(BaseModel):
     target_dataset_id: str | None = None
     created_by: str | None = None
     note: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None
     created_at: str | None = None
 
 
@@ -221,6 +227,14 @@ class MappingSetDetail(MappingSetRecord):
 
 class MappingSetStatusUpdateRequest(BaseModel):
     status: MappingSetStatus
+    changed_by: str | None = None
+    note: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None
+
+
+class MappingSetApplyRequest(BaseModel):
     changed_by: str | None = None
     note: str | None = None
 
@@ -235,6 +249,30 @@ class MappingSetAuditEntry(BaseModel):
     changed_by: str | None = None
     note: str | None = None
     created_at: str | None = None
+
+
+class MappingSetDecisionDiffEntry(BaseModel):
+    change_type: Literal["added", "removed", "changed"]
+    source: str
+    from_target: str | None = None
+    to_target: str | None = None
+    from_status: DecisionStatus | None = None
+    to_status: DecisionStatus | None = None
+    from_transformation_code: str | None = None
+    to_transformation_code: str | None = None
+
+
+class MappingSetDiffResponse(BaseModel):
+    current_mapping_set_id: int
+    current_name: str
+    current_version: int
+    against_mapping_set_id: int
+    against_name: str
+    against_version: int
+    added_count: int = 0
+    removed_count: int = 0
+    changed_count: int = 0
+    changes: list[MappingSetDecisionDiffEntry] = Field(default_factory=list)
 
 
 class RuntimeConfigSnapshot(BaseModel):

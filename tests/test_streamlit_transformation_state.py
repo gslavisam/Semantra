@@ -573,7 +573,14 @@ def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> N
         }
     )
 
-    payload = build_mapping_set_payload("customer-master", "ba-user", "Initial draft")
+    payload = build_mapping_set_payload(
+        "customer-master",
+        "ba-user",
+        "Initial draft",
+        "governance-team",
+        "analyst-1",
+        "Ready for review",
+    )
 
     assert payload == {
         "name": "customer-master",
@@ -582,4 +589,7 @@ def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> N
         "mapping_decisions": [{"source": "cust_id", "target": "customer_id", "status": "accepted"}],
         "created_by": "ba-user",
         "note": "Initial draft",
+        "owner": "governance-team",
+        "assignee": "analyst-1",
+        "review_note": "Ready for review",
     }

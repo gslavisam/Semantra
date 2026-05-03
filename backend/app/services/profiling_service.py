@@ -8,6 +8,7 @@ from typing import Any
 from app.core.config import settings
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.utils.normalization import normalize_name, tokenize_name
+from app.utils.tabular import is_nullish
 
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -143,10 +144,6 @@ def is_date_like(value: str) -> bool:
         except ValueError:
             continue
     return False
-
-
-def is_nullish(value: Any) -> bool:
-    return value is None or str(value).strip() == ""
 
 
 def match_ratio(values: list[str], predicate: callable) -> float:

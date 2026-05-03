@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
 from app.models.mapping import (
@@ -10,8 +10,10 @@ from app.models.mapping import (
     AutoMappingResponse,
     CodegenRequest,
     GeneratedArtifact,
+    MappingSetApplyRequest,
     MappingSetAuditEntry,
     MappingSetCreateRequest,
+    MappingSetDiffResponse,
     MappingSetDetail,
     MappingSetRecord,
     MappingSetStatusUpdateRequest,
@@ -94,6 +96,9 @@ async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetReco
         target_dataset_id=request.target_dataset_id,
         created_by=request.created_by,
         note=request.note,
+        owner=request.owner,
+        assignee=request.assignee,
+        review_note=request.review_note,
     )
     append_mapping_set_audit("create", saved, changed_by=request.created_by, note=request.note)
     return saved
@@ -118,16 +123,48 @@ async def update_mapping_set_status(
     request: MappingSetStatusUpdateRequest,
 ) -> MappingSetRecord:
     try:
-        updated = persistence_service.update_mapping_set_status(mapping_set_id, request.status)
+        updated = persistence_service.update_mapping_set_status(
+            mapping_set_id,
+            request.status,
+            owner=request.owner,
+            assignee=request.assignee,
+            review_note=request.review_note,
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     append_mapping_set_audit("status_change", updated, changed_by=request.changed_by, note=request.note)
     return updated
 
 
+@router.post("/sets/{mapping_set_id}/apply", response_model=MappingSetDetail, dependencies=[Depends(require_admin)])
+async def apply_mapping_set(
+    mapping_set_id: int,
+    request: MappingSetApplyRequest,
+) -> MappingSetDetail:
+    try:
+        mapping_set = persistence_service.get_mapping_set(mapping_set_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    append_mapping_set_audit("apply", mapping_set, changed_by=request.changed_by, note=request.note)
+    return mapping_set
+
+
 @router.get("/sets/{mapping_set_id}/audit", response_model=list[MappingSetAuditEntry], dependencies=[Depends(require_admin)])
 async def get_mapping_set_audit(mapping_set_id: int) -> list[MappingSetAuditEntry]:
     return persistence_service.list_mapping_set_audit_logs(mapping_set_id)
+
+
+@router.get("/sets/{mapping_set_id}/diff", response_model=MappingSetDiffResponse, dependencies=[Depends(require_admin)])
+async def get_mapping_set_diff(
+    mapping_set_id: int,
+    against_id: int = Query(...),
+) -> MappingSetDiffResponse:
+    try:
+        return persistence_service.diff_mapping_sets(mapping_set_id, against_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.get("/transformation/templates", response_model=list[TransformationTemplate])

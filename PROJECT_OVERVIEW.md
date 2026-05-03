@@ -38,7 +38,7 @@ Current MVP scope includes:
 - transformation preview with syntax checks, dry-run execution, before/after samples, structured warnings, and generated code output
 - custom knowledge overlays layered on top of built-in metadata knowledge, including concept aliases that extend canonical concept matching
 - persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
-- mapping-set status workflow with `draft`, `review`, `approved`, and `archived`
+- lightweight mapping-set status workflow with `draft`, `review`, `approved`, and `archived`, now extended by the first Epic 6 governance slice
 - internal Streamlit UI for upload, trust-layer review, canonical concept views, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
 
 Out of scope for the current slice:
@@ -173,7 +173,7 @@ Implementation anchors:
 - `backend/app/services/correction_service.py`
 - `backend/app/api/routes/observability.py`
 
-### 7. Mapping Sets and Governance Slice
+### 7. Mapping Sets and Lightweight Governance Slice
 
 Purpose:
 - make reviewed mapping decisions persistable, replayable, and status-aware
@@ -183,11 +183,17 @@ Current behavior:
 - each saved version carries `draft`, `review`, `approved`, or `archived` status
 - status changes are audit logged
 - saved sets can be reloaded back into the current Streamlit review state
+- mapping sets now also carry `owner`, `assignee`, and `review_note` metadata at the version level
+- applying a saved mapping set back into the active review state is audit logged
+- version diff views are available for comparing two versions of the same mapping set
+- stronger export/run gates are still planned under the remaining Epic 6 governance work
 
 Implementation anchors:
 - `backend/app/api/routes/mapping.py`
 - `backend/app/services/persistence_service.py`
 - `streamlit_app.py`
+- `streamlit_ui/workspace_views.py`
+- `streamlit_ui/workspace_decision_views.py`
 
 ### 8. Evaluation and Benchmarking
 
@@ -219,6 +225,11 @@ Current behavior:
 
 Implementation anchor:
 - `streamlit_app.py`
+- `streamlit_ui/workspace_views.py`
+- `streamlit_ui/workspace_review_views.py`
+- `streamlit_ui/workspace_decision_views.py`
+- `streamlit_ui/admin_views.py`
+- `streamlit_ui/benchmark_views.py`
 
 ## Main Workflows
 
@@ -339,14 +350,16 @@ Process:
 
 Result:
 - reusable mapping-set artifacts instead of session-only JSON exports
-- lightweight governance trail around review status changes
+- lightweight governance trail around create, status change, apply, and version diff review
 
 Endpoints:
 - `POST /mapping/sets`
 - `GET /mapping/sets`
 - `GET /mapping/sets/{mapping_set_id}`
+- `POST /mapping/sets/{mapping_set_id}/apply`
 - `POST /mapping/sets/{mapping_set_id}/status`
 - `GET /mapping/sets/{mapping_set_id}/audit`
+- `GET /mapping/sets/{mapping_set_id}/diff?against_id=<other_version_id>`
 
 ### Workflow 6. Save and Run Transformation Test Sets
 
@@ -406,10 +419,15 @@ Result:
 
 Implementation anchor:
 - `streamlit_app.py`
+- `streamlit_ui/workspace_views.py`
+- `streamlit_ui/workspace_review_views.py`
+- `streamlit_ui/workspace_decision_views.py`
+- `streamlit_ui/admin_views.py`
+- `streamlit_ui/benchmark_views.py`
 
 ## Architecture
 
-Semantra uses a layered backend architecture.
+Semantra uses a layered FastAPI backend plus a modular Streamlit review UI.
 
 ### Application Layer
 
@@ -480,6 +498,18 @@ Responsible for the main product logic:
 
 Location:
 - `backend/app/services/`
+
+### Streamlit UI Layer
+
+Responsible for:
+- composition of the operator-facing review app
+- API client helpers and runtime status widgets
+- mapping-state helpers and trust-layer presentation helpers
+- workspace, decision, admin/debug, and benchmark tab rendering
+
+Current shape:
+- `streamlit_app.py` acts as the composition root and compatibility wrapper surface for focused AST-based tests
+- extracted UI responsibilities live in `streamlit_ui/api.py`, `streamlit_ui/shared_views.py`, `streamlit_ui/mapping_state.py`, `streamlit_ui/mapping_helpers.py`, `streamlit_ui/workspace_views.py`, `streamlit_ui/workspace_review_views.py`, `streamlit_ui/workspace_decision_views.py`, `streamlit_ui/admin_views.py`, and `streamlit_ui/benchmark_views.py`
 
 ### Utility Layer
 
@@ -603,7 +633,7 @@ The project currently produces the following categories of output:
 
 ## Current Milestone Status
 
-The current P0 hardening slice is effectively complete.
+The current delivered baseline includes a completed canonical semantic layer MVP, completed Phase 1 cleanup, and completed Phase 2 Streamlit decomposition.
 
 The product now includes:
 - multi-format row-data upload plus SQL schema snapshots
@@ -614,18 +644,23 @@ The product now includes:
 - transformation preview safety checks, templates, and transformation test sets
 - versioned mapping sets with lightweight status workflow and audit trail
 - persisted benchmarks and correction-impact evaluation
-- internal Streamlit review UI spanning upload, trust layer, corrections, knowledge, benchmarks, and admin/debug surfaces
+- internal Streamlit review UI spanning upload, trust layer, corrections, knowledge, benchmarks, and admin/debug surfaces through a modular `streamlit_ui/*` layer
+
+What is not closed yet:
+- the hardening/debt package described as Phase 0 is still open and was not part of the recent delivery slice
+- deeper governance remains intentionally narrow for now; the remaining Epic 6 work is mainly the export/run status gate
 
 This puts Semantra in a strong internal-alpha / pilot-ready state for controlled schema-mapping workflows.
 
 ## Next Recommended Milestone
 
-The next practical milestone is to deepen the P1 surface that now exists on top of the stable P0 core.
+The next planned milestone is to finish the remaining status-gate part of Epic 6 on top of the already extended mapping-set workflow.
 
-Most natural next steps are:
-- expand trust-layer explainability with richer structured reasoning and "why not this target" views
-- deepen mapping-set governance and canonical glossary governance beyond the current minimal workflow
-- broaden canonical coverage from the current glossary-driven MVP into stronger cross-project semantic reuse
+Most natural next steps inside that remaining slice are:
+- enforce clearer status gates for export and run flows so non-approved versions are blocked or explicitly flagged
+- tighten any follow-up tests around that gate without widening the workflow unnecessarily
+
+After that, the next refactor-heavy move remains Phase 3 decomposition of the mapping engine.
 
 ## Result for the User
 
@@ -655,12 +690,12 @@ At the current stage, Semantra is no longer just a scaffold. It contains:
 - persisted correction learning plus promoted reusable rules
 - persisted mapping sets and transformation test sets
 - benchmark and correction-impact evaluation tooling
-- a working internal-alpha Streamlit review UI
+- a working internal-alpha Streamlit review UI with extracted `streamlit_ui/*` modules and `streamlit_app.py` reduced to composition/root orchestration
 - focused automated tests around backend services, API flows, and key Streamlit helpers
 
 The biggest remaining growth areas are now mostly P1 and beyond:
 - richer trust-layer explanations and analyst tooling
-- deeper governance features beyond the current minimal mapping-set and glossary workflow
+- deeper governance features beyond the current minimal mapping-set and glossary workflow, starting with Epic 6
 - broader canonical business concept governance and reuse beyond the current glossary-driven MVP
 - stronger connector story beyond flat files and SQL snapshots
 - eventual execution and operationalization beyond preview/codegen

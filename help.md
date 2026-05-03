@@ -341,7 +341,7 @@ Kada koristiti:
 
 ## Mapping Set Versioning
 
-Ova sekcija služi da trenutno review stanje sačuvaš kao verzionisani mapping set na backend-u.
+Ova sekcija služi da trenutno review stanje sačuvaš kao verzionisani mapping set na backend-u i da porediš verzije istog mapping seta kroz osnovni governance tok.
 
 ### `Mapping set name`
 
@@ -351,15 +351,41 @@ Naziv mapping seta koji čuvaš.
 
 Opcioni identifikator osobe ili tima koji čuva mapping set.
 
-### `Mapping set note`
+### `Mapping set owner`
+
+Opcioni vlasnik mapping seta na nivou cele verzije.
+
+Koristi kada:
+
+- želiš da označiš tim ili osobu koja formalno poseduje taj mapping set
+- želiš jasniji governance kontekst za kasniji review
+
+### `Mapping set assignee`
+
+Opcioni trenutni nosilac rada ili reviewer za tu verziju.
+
+Koristi kada:
+
+- želiš da znaš ko trenutno treba da pogleda ili dovrši verziju
+
+### `Version note`
 
 Opciona beleška vezana za tu verziju mapping seta.
+
+### `Review note`
+
+Opciona governance/review beleška za tu verziju.
+
+Koristi kada:
+
+- želiš da zabeležiš zašto verzija ide u review, šta još čeka, ili pod kojim uslovom može dalje
 
 ### `Save mapping set version`
 
 Šta radi:
 
 - čuva aktivne mapping odluke kao novu verziju mapping seta
+- čuva i `owner`, `assignee`, `version note` i `review note` metadata uz tu verziju
 
 Kada koristiti:
 
@@ -390,6 +416,7 @@ Dropdown za izbor konkretne sačuvane mapping set verzije.
 Šta radi:
 
 - učitava izabrani mapping set u trenutno review stanje
+- upisuje audit događaj za `apply` akciju na backend-u
 
 Kada koristiti:
 
@@ -404,6 +431,7 @@ Dropdown za izbor novog statusa izabrane mapping set verzije.
 Šta radi:
 
 - menja status izabrane mapping set verzije na backend-u
+- može istovremeno da osveži `owner`, `assignee` i `review note`
 
 Kada koristiti:
 
@@ -418,6 +446,31 @@ Kada koristiti:
 Kada koristiti:
 
 - kada želiš da vidiš lifecycle promene te verzije
+
+### `Compare against version`
+
+Dropdown za izbor starije verzije istog mapping seta sa kojom želiš poređenje.
+
+Pojavljuje se kada postoje najmanje dve verzije istog `mapping set name`.
+
+### `Load mapping set diff`
+
+Šta radi:
+
+- učitava diff između trenutno izabrane verzije i odabrane starije verzije
+- prikazuje summary sa `Added`, `Removed` i `Changed`
+- prikazuje tabelu promena po source koloni
+
+Šta se smatra promenom:
+
+- promena target kolone
+- promena decision statusa
+- promena transformation koda
+
+Kada koristiti:
+
+- kada želiš da vidiš šta se tačno promenilo između dve iteracije review-a
+- kada proveravaš da li nova verzija samo dodaje polja ili menja već potvrđene odluke
 
 ## Save Corrections sekcija
 

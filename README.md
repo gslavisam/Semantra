@@ -42,7 +42,7 @@ The current product slice covers:
 - transformation preview with syntax/runtime validation, before/after samples, and structured warnings
 - custom knowledge overlays on top of the built-in metadata dictionary, including concept aliases bound to canonical business concepts
 - canonical glossary CSV import/export from the admin/debug surface
-- persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
+- persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets with lightweight governance metadata and version diff support
 - internal Streamlit review UI for trust-layer review, admin/debug flows, corrections, benchmarks, and saved mapping-set workflows
 
 ## Project Shape
@@ -51,6 +51,10 @@ Semantra currently runs as:
 - a FastAPI backend for upload, mapping, observability, knowledge, and evaluation APIs
 - a Streamlit internal review UI for analysts and pilot/demo workflows
 - a SQLite persistence layer for durable review memory and governance artifacts
+
+The Streamlit side was recently decomposed so `streamlit_app.py` now acts mainly as a composition root over the extracted `streamlit_ui/*` modules.
+
+Current roadmap note: canonical semantic layer MVP, Phase 1 cleanup, and Phase 2 Streamlit decomposition are done; Epic 6 Governance MVP has started with mapping-set owner/assignee/review-note metadata plus version diff and apply-audit support, while the separate Phase 0 hardening package remains open.
 
 This is already a strong internal-alpha / pilot-grade mapping product slice. It is not yet a production orchestration platform, a connector-heavy ingestion platform, or a full semantic operating model.
 
@@ -84,4 +88,5 @@ Use these docs with different intent:
 - `PROJECT_OVERVIEW.md`: broader product and technical architecture overview
 - `epics.md`: roadmap, phase plan, backlog direction, and execution tracking notes for completed epic slices
 - `REAL_LIFE_PILOT_TEST_PLAN.md`: concrete pilot-validation plan for realistic source/target datasets before wider rollout or refactor
-- `help.md`: practical usage guide for the Streamlit `Benchmarks` and `Admin / Debug` tabs
+- `help.md`: practical usage guide in Serbian for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs
+- `help.en.md`: practical usage guide in English for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs

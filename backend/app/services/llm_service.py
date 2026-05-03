@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import dataclass
 from urllib import request
@@ -9,6 +10,9 @@ from typing import Callable, Protocol
 
 from app.core.config import settings
 from app.models.mapping import LLMValidationResult, TransformationGenerationResponse
+
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(Protocol):
@@ -92,6 +96,55 @@ def build_provider_from_settings() -> LLMProvider | None:
     return None
 
 
+def classify_llm_error(error: Exception) -> str:
+    if isinstance(error, URLError):
+        return "network_error"
+    if isinstance(error, json.JSONDecodeError):
+        return "invalid_json"
+    if isinstance(error, KeyError):
+        return "missing_key"
+    if isinstance(error, ValueError):
+        return "invalid_value"
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    return error.__class__.__name__.lower()
+
+
+def normalize_llm_list_field(value: object) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return []
+
+
+def request_llm_json(
+    provider: LLMProvider,
+    prompt: str,
+    timeout_seconds: float,
+    retries: int,
+    operation_name: str,
+) -> tuple[str, dict] | None:
+    for attempt in range(retries):
+        try:
+            raw_response = provider.generate(prompt, timeout_seconds)
+            return raw_response, json.loads(raw_response)
+        except Exception as error:
+            logger.warning(
+                "LLM %s attempt %s/%s failed (%s): %s",
+                operation_name,
+                attempt + 1,
+                retries,
+                classify_llm_error(error),
+                error,
+            )
+
+        if attempt < retries - 1:
+            time.sleep(0.05)
+
+    return None
+
+
 def call_validator(
     source_field: dict,
     candidate_targets: list[dict],
@@ -113,30 +166,26 @@ def call_validator(
         "\nIf no transformation is needed, set 'transformation_code' to null or empty."
     )
 
-    for attempt in range(retries):
-        try:
-            raw_response = provider.generate(prompt, timeout)
-            parsed = json.loads(raw_response)
-            # Accept both old and new keys for backward compatibility
-            confidence = float(parsed.get("confidence_score", parsed.get("confidence", 0.5)))
-            reasoning = parsed.get("reasoning") or parsed.get("explanation") or []
-            if isinstance(reasoning, str):
-                reasoning = [reasoning]
-            transformation_code = parsed.get("transformation_code")
-            result = LLMValidationResult(
-                selected_target=parsed["selected_target"],
-                confidence=confidence,
-                reasoning=list(reasoning),
-                transformation_code=transformation_code,
-                raw_response=raw_response,
-            )
-            if validate_result(result, candidate_targets):
-                return result
-        except (Exception, URLError):
-            pass
+    response = request_llm_json(provider, prompt, timeout, retries, "validator")
+    if response is None:
+        return None
 
-        if attempt < retries - 1:
-            time.sleep(0.05)
+    raw_response, parsed = response
+    try:
+        # Accept both old and new keys for backward compatibility
+        confidence = float(parsed.get("confidence_score", parsed.get("confidence", 0.5)))
+        transformation_code = parsed.get("transformation_code")
+        result = LLMValidationResult(
+            selected_target=parsed["selected_target"],
+            confidence=confidence,
+            reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
+            transformation_code=transformation_code,
+            raw_response=raw_response,
+        )
+        if validate_result(result, candidate_targets):
+            return result
+    except Exception as error:
+        logger.warning("LLM validator response rejected (%s): %s", classify_llm_error(error), error)
 
     return None
 
@@ -156,33 +205,25 @@ def call_transformation_generator(
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
     prompt = build_transformation_generator_prompt(source_field, target_field, user_instruction)
 
-    for attempt in range(retries):
-        try:
-            raw_response = provider.generate(prompt, timeout)
-            parsed = json.loads(raw_response)
-            transformation_code = sanitize_generated_code(
-                str(parsed.get("transformation_code") or parsed.get("code") or "").strip()
-            )
-            if not transformation_code:
-                continue
+    response = request_llm_json(provider, prompt, timeout, retries, "transformation")
+    if response is None:
+        return None
 
-            reasoning = parsed.get("reasoning") or parsed.get("explanation") or []
-            if isinstance(reasoning, str):
-                reasoning = [reasoning]
-            warnings = parsed.get("warnings") or []
-            if isinstance(warnings, str):
-                warnings = [warnings]
+    _raw_response, parsed = response
+    try:
+        transformation_code = sanitize_generated_code(
+            str(parsed.get("transformation_code") or parsed.get("code") or "").strip()
+        )
+        if not transformation_code:
+            return None
 
-            return TransformationGenerationResponse(
-                transformation_code=transformation_code,
-                reasoning=list(reasoning),
-                warnings=list(warnings),
-            )
-        except (Exception, URLError):
-            pass
-
-        if attempt < retries - 1:
-            time.sleep(0.05)
+        return TransformationGenerationResponse(
+            transformation_code=transformation_code,
+            reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
+            warnings=normalize_llm_list_field(parsed.get("warnings") or []),
+        )
+    except Exception as error:
+        logger.warning("LLM transformation response rejected (%s): %s", classify_llm_error(error), error)
 
     return None
 
