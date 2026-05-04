@@ -5,6 +5,7 @@ from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import TOTAL_WEIGHT, compute_final_score, generate_mapping_candidates
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.services.virtual_target_service import build_virtual_target_schema
 from app.utils.normalization import semantic_token_set
 
 
@@ -570,3 +571,35 @@ def test_canonical_coverage_matches_sd_mm_document_aliases() -> None:
     assert "purchase_order.date" in matches["BEDAT"]
     assert "shipping_point.id" in matches["VSTEL"]
     assert "delivery.id" in matches["VBELN_VL"]
+
+
+def test_canonical_virtual_target_keeps_strong_concept_lock_high_confidence() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source-spec",
+        dataset_name="source_schema_spec.csv",
+        row_count=0,
+        columns=[
+            ColumnProfile(
+                name="KUNNR",
+                normalized_name="Customer number",
+                dtype="integer",
+                null_ratio=0.0,
+                unique_ratio=0.0,
+                avg_length=0.0,
+                non_null_count=0,
+                sample_values=[],
+                distinct_sample_values=[],
+                detected_patterns=["integer"],
+                tokenized_name=["kunnr"],
+            )
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, build_virtual_target_schema("canonical"))
+
+    selected = result.mappings[0]
+    assert selected.target == "customer.id"
+    assert selected.confidence >= settings.high_confidence_threshold
+    assert selected.confidence_label == "high_confidence"
+    assert any("Internal metadata dictionary aligns both fields to concept 'Customer ID'" in line for line in selected.explanation)
+    assert any("Canonical glossary aligns both fields to business concept 'Customer ID'" in line for line in selected.explanation)

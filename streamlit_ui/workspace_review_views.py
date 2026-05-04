@@ -18,6 +18,7 @@ def display_trust_layer(
     materialize_transformation_template,
 ) -> None:
     st.subheader("🎯 Mapping Trust Layer")
+    canonical_only = (st.session_state.get("upload_response") or {}).get("mapping_mode") == "canonical"
     canonical_coverage = mapping_response.get("canonical_coverage") or {}
     source_coverage = canonical_coverage.get("source") or {}
     target_coverage = canonical_coverage.get("target") or {}
@@ -86,118 +87,123 @@ def display_trust_layer(
                 st.write("**Canonical path:**")
                 st.write(f"- {source} -> {', '.join(canonical_labels)} -> {mapping.get('target') or 'unmapped'}")
 
-            transformation = suggested_code.strip()
-            if transformation:
-                st.markdown("🛠️ **Transformation code (Pandas):**")
-                st.code(transformation, language="python")
-                entry["apply_transformation"] = st.checkbox(
-                    "Apply this transformation to data",
-                    key=f"transform_{source}",
+            if canonical_only:
+                st.info(
+                    "Canonical-only mode disables transformation authoring until a real target dataset exists in Standard mode."
                 )
             else:
-                st.write("✅ No transformation needed (direct mapping).")
-
-            st.caption(
-                "Expected format: pandas-oriented Python using `df_source`, `df_target`, and `pd`. "
-                "You can enter either a full statement such as `df_target[\"target_col\"] = ...` "
-                "or only the right-hand expression; if you omit the assignment, Semantra wraps it "
-                f"as `df_target[\"{mapping.get('target') or 'target_col'}\"] = <your code>`."
-            )
-            llm_instruction = st.text_area(
-                f"Describe desired transformation for {source}",
-                key=f"llm_transform_prompt_{source}",
-                help="Describe the business intent in natural language and let the active LLM propose pandas code.",
-                placeholder="Example: Extract the person's full name from the email address and title-case it.",
-            )
-            entry["llm_transformation_instruction"] = llm_instruction
-            if st.button(
-                "Generate with LLM",
-                key=f"generate_transform_{source}",
-                disabled=(not llm_runtime_enabled()) or (not mapping.get("target")),
-                help="Uses the active runtime LLM to propose pandas transformation code for the currently selected target.",
-            ):
-                try:
-                    generated = request_llm_transformation_suggestion(source, mapping.get("target") or "", llm_instruction)
-                    entry["manual_transformation_code"] = generated["transformation_code"]
-                    entry["generated_transformation_reasoning"] = generated.get("reasoning", [])
-                    entry["generated_transformation_warnings"] = generated.get("warnings", [])
-                    st.session_state[f"manual_transform_{source}"] = generated["transformation_code"]
-                    st.session_state[f"manual_apply_{source}"] = False
-                    st.session_state["last_action"] = {
-                        "level": "success",
-                        "message": f"Generated an LLM transformation suggestion for {source} -> {mapping.get('target') or 'target'}.",
-                    }
-                    st.rerun()
-                except ValueError as error:
-                    st.session_state["last_action"] = {"level": "warning", "message": str(error)}
-                    st.rerun()
-                except httpx.HTTPError as error:
-                    st.session_state["last_action"] = {
-                        "level": "error",
-                        "message": f"LLM transformation generation failed: {error}",
-                    }
-                    st.rerun()
-
-            if not llm_runtime_enabled():
-                st.caption("LLM generation is disabled. Enable a runtime provider in backend config to use this helper.")
-            template_options = [{"template_id": "", "name": "Select reusable template", "description": "", "code_template": ""}]
-            try:
-                template_options.extend(request_transformation_templates())
-            except httpx.HTTPError:
-                pass
-            selected_template_name = st.selectbox(
-                f"Reusable template for {source}",
-                [item["name"] for item in template_options],
-                key=f"template_select_{source}",
-            )
-            selected_template = next(
-                (item for item in template_options if item["name"] == selected_template_name),
-                template_options[0],
-            )
-            if selected_template.get("template_id"):
-                st.caption(selected_template.get("description") or "")
-                if st.button("Apply template", key=f"apply_template_{source}", disabled=not mapping.get("target")):
-                    template_code = materialize_transformation_template(selected_template, source, mapping.get("target") or "target_col")
-                    entry["manual_transformation_code"] = template_code
-                    st.session_state[f"manual_transform_{source}"] = template_code
-                    st.session_state[f"manual_apply_{source}"] = False
-                    st.session_state["last_action"] = {
-                        "level": "success",
-                        "message": f"Applied reusable transformation template '{selected_template_name}' for {source}.",
-                    }
-                    st.rerun()
-            manual_code = st.text_area(
-                f"Define pandas/Python transformation for {source} (optional)",
-                key=f"manual_transform_{source}",
-                help=(
-                    "Use pandas-style Python over df_source/df_target. Example: "
-                    "df_source[\"email\"].str.split(\"@\").str[0].str.title()"
-                ),
-                placeholder=(
-                    "Example:\n"
-                    f"df_source[\"{source}\"].astype(str).str.strip()"
-                ),
-            )
-            entry["manual_transformation_code"] = manual_code
-            if manual_code.strip():
-                if entry.get("generated_transformation_reasoning") or entry.get("generated_transformation_warnings"):
-                    st.info(
-                        "LLM generated a transformation suggestion. Review it below, then check Apply generated/custom transformation to activate it."
+                transformation = suggested_code.strip()
+                if transformation:
+                    st.markdown("🛠️ **Transformation code (Pandas):**")
+                    st.code(transformation, language="python")
+                    entry["apply_transformation"] = st.checkbox(
+                        "Apply this transformation to data",
+                        key=f"transform_{source}",
                     )
-                    reasoning = entry.get("generated_transformation_reasoning", [])
-                    if reasoning:
-                        st.caption("LLM reasoning: " + " | ".join(reasoning))
-                    warnings = entry.get("generated_transformation_warnings", [])
-                    if warnings:
-                        st.caption("Warnings: " + " | ".join(warnings))
-                st.markdown("You entered a custom transformation:")
-                st.code(manual_code, language="python")
-                entry["manual_apply_transformation"] = st.checkbox(
-                    "Apply generated/custom transformation",
-                    key=f"manual_apply_{source}",
+                else:
+                    st.write("✅ No transformation needed (direct mapping).")
+
+                st.caption(
+                    "Expected format: pandas-oriented Python using `df_source`, `df_target`, and `pd`. "
+                    "You can enter either a full statement such as `df_target[\"target_col\"] = ...` "
+                    "or only the right-hand expression; if you omit the assignment, Semantra wraps it "
+                    f"as `df_target[\"{mapping.get('target') or 'target_col'}\"] = <your code>`."
                 )
-            else:
-                entry["manual_apply_transformation"] = False
+                llm_instruction = st.text_area(
+                    f"Describe desired transformation for {source}",
+                    key=f"llm_transform_prompt_{source}",
+                    help="Describe the business intent in natural language and let the active LLM propose pandas code.",
+                    placeholder="Example: Extract the person's full name from the email address and title-case it.",
+                )
+                entry["llm_transformation_instruction"] = llm_instruction
+                if st.button(
+                    "Generate with LLM",
+                    key=f"generate_transform_{source}",
+                    disabled=(not llm_runtime_enabled()) or (not mapping.get("target")),
+                    help="Uses the active runtime LLM to propose pandas transformation code for the currently selected target.",
+                ):
+                    try:
+                        generated = request_llm_transformation_suggestion(source, mapping.get("target") or "", llm_instruction)
+                        entry["manual_transformation_code"] = generated["transformation_code"]
+                        entry["generated_transformation_reasoning"] = generated.get("reasoning", [])
+                        entry["generated_transformation_warnings"] = generated.get("warnings", [])
+                        st.session_state[f"manual_transform_{source}"] = generated["transformation_code"]
+                        st.session_state[f"manual_apply_{source}"] = False
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Generated an LLM transformation suggestion for {source} -> {mapping.get('target') or 'target'}.",
+                        }
+                        st.rerun()
+                    except ValueError as error:
+                        st.session_state["last_action"] = {"level": "warning", "message": str(error)}
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"LLM transformation generation failed: {error}",
+                        }
+                        st.rerun()
+
+                if not llm_runtime_enabled():
+                    st.caption("LLM generation is disabled. Enable a runtime provider in backend config to use this helper.")
+                template_options = [{"template_id": "", "name": "Select reusable template", "description": "", "code_template": ""}]
+                try:
+                    template_options.extend(request_transformation_templates())
+                except httpx.HTTPError:
+                    pass
+                selected_template_name = st.selectbox(
+                    f"Reusable template for {source}",
+                    [item["name"] for item in template_options],
+                    key=f"template_select_{source}",
+                )
+                selected_template = next(
+                    (item for item in template_options if item["name"] == selected_template_name),
+                    template_options[0],
+                )
+                if selected_template.get("template_id"):
+                    st.caption(selected_template.get("description") or "")
+                    if st.button("Apply template", key=f"apply_template_{source}", disabled=not mapping.get("target")):
+                        template_code = materialize_transformation_template(selected_template, source, mapping.get("target") or "target_col")
+                        entry["manual_transformation_code"] = template_code
+                        st.session_state[f"manual_transform_{source}"] = template_code
+                        st.session_state[f"manual_apply_{source}"] = False
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Applied reusable transformation template '{selected_template_name}' for {source}.",
+                        }
+                        st.rerun()
+                manual_code = st.text_area(
+                    f"Define pandas/Python transformation for {source} (optional)",
+                    key=f"manual_transform_{source}",
+                    help=(
+                        "Use pandas-style Python over df_source/df_target. Example: "
+                        "df_source[\"email\"].str.split(\"@\").str[0].str.title()"
+                    ),
+                    placeholder=(
+                        "Example:\n"
+                        f"df_source[\"{source}\"].astype(str).str.strip()"
+                    ),
+                )
+                entry["manual_transformation_code"] = manual_code
+                if manual_code.strip():
+                    if entry.get("generated_transformation_reasoning") or entry.get("generated_transformation_warnings"):
+                        st.info(
+                            "LLM generated a transformation suggestion. Review it below, then check Apply generated/custom transformation to activate it."
+                        )
+                        reasoning = entry.get("generated_transformation_reasoning", [])
+                        if reasoning:
+                            st.caption("LLM reasoning: " + " | ".join(reasoning))
+                        warnings = entry.get("generated_transformation_warnings", [])
+                        if warnings:
+                            st.caption("Warnings: " + " | ".join(warnings))
+                    st.markdown("You entered a custom transformation:")
+                    st.code(manual_code, language="python")
+                    entry["manual_apply_transformation"] = st.checkbox(
+                        "Apply generated/custom transformation",
+                        key=f"manual_apply_{source}",
+                    )
+                else:
+                    entry["manual_apply_transformation"] = False
 
             if score < 0.7:
                 st.warning("⚠️ Low confidence. Please review this mapping manually.")
@@ -313,6 +319,7 @@ def render_mapping_editor(mapping_response: dict, *, selected_target_options) ->
                         options,
                         index=selected_index,
                         key=f"target_choice_{source}",
+                        format_func=lambda option: option or "unmapped",
                         label_visibility="collapsed",
                     )
                 else:

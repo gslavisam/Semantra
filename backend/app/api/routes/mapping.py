@@ -8,6 +8,7 @@ from app.api.deps import require_admin
 from app.models.mapping import (
     AutoMappingRequest,
     AutoMappingResponse,
+    CanonicalMappingRequest,
     CodegenRequest,
     GeneratedArtifact,
     MappingSetApplyRequest,
@@ -35,6 +36,7 @@ from app.services.preview_service import build_preview
 from app.services.transformation_test_service import run_transformation_test_set
 from app.services.transformation_template_service import list_transformation_templates
 from app.services.upload_store import dataset_store
+from app.services.virtual_target_service import build_virtual_target_schema
 
 
 router = APIRouter(prefix="/mapping", tags=["mapping"])
@@ -69,7 +71,29 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    return generate_mapping_candidates(source.handle.schema_profile, target.handle.schema_profile)
+    return generate_mapping_candidates(
+        source.handle.schema_profile,
+        target.handle.schema_profile,
+        llm_provider=build_provider_from_settings(),
+    )
+
+
+@router.post("/canonical", response_model=AutoMappingResponse)
+async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse:
+    try:
+        source = dataset_store.get_dataset(request.source_dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    target_schema = build_virtual_target_schema(request.target_system)
+    if not target_schema.columns:
+        raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
+
+    return generate_mapping_candidates(
+        source.handle.schema_profile,
+        target_schema,
+        llm_provider=build_provider_from_settings(),
+    )
 
 
 @router.post("/preview", response_model=PreviewResponse)

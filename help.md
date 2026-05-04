@@ -68,6 +68,86 @@ Radi preglednosti, `Workspace` je organizovan u 4 unutrašnja pod-taba:
 - `Decisions` za manual overrides, import/export, mapping setove i corrections
 - `Output` za preview i generisanje Pandas koda
 
+## Schema spec upload mode
+
+Semantra sada podržava i fajlove koji nisu row-data tabele, već field-per-row specifikacije.
+
+Tipičan primer:
+
+- kolone u fajlu su `Column`, `Description`, `Type`, `Length`
+- svaki red opisuje jedno polje, a ne jedan poslovni zapis
+
+Ovo koristi kada:
+
+- source ili target još nema realne podatke, već samo data dictionary ili field catalog
+- dobiješ SAP, Workday ili interni spec fajl sa opisom polja
+- želiš da mapiraš šemu pre nego što dobiješ sample row data
+
+Šta očekivati u `Setup` tabu:
+
+- posle izbora fajla aplikacija može prikazati hint da fajl liči na schema specification
+- pojavljuje se `Source mode` ili `Target mode` sa izborom `Row data` ili `Schema spec`
+- ako ostaviš `Schema spec`, upload se parsira kao field-per-row šema umesto kao običan dataset
+
+Kako tumačiti rezultat:
+
+- `Columns` predstavlja broj detektovanih poslovnih polja iz specifikacije
+- `Rows` ostaje `0`, jer fajl ne sadrži poslovne redove za preview
+- preview uzorci nisu poenta ovog toka; cilj je dobijanje `SchemaProfile` objekta za mapping
+
+Važno:
+
+- `.sql` upload ostaje schema snapshot i ne koristi `Schema spec` radio izbor
+- `Schema spec` možeš koristiti i na source i na target strani u `Standard` modu
+- u `Canonical` modu koristi se samo source fajl, ali source i dalje može biti `Schema spec`
+
+## Canonical mapping mode
+
+`Canonical` mode je source-only tok za slučajeve kada još nemaš realan target dataset, već želiš da source polja prvo mapiraš na canonical business concepts.
+
+Koristi `Canonical` kada:
+
+- imaš source šemu ili source spec, ali nemaš target fajl
+- želiš brzu semantičku normalizaciju source polja pre konkretnog system-to-system mapping-a
+- želiš da proveriš da li source polja uopšte imaju dobar canonical pokrivač pre detaljnog target review-a
+
+Koristi `Standard` kada:
+
+- imaš i source i target dataset ili target spec
+- želiš preview redova i Pandas code generation
+- želiš konkretan source-to-target mapping umesto source-to-concept pripreme
+
+Šta se menja u `Setup` tabu:
+
+- `Target file` nestaje
+- pojavljuje se `Canonical target`
+- trenutno UI izlaže samo opciju `canonical`
+- `Upload and profile` čuva samo source handle i canonical target system
+- `Generate canonical mapping` poziva source-only canonical backend tok
+
+Kako čitati canonical rezultat u `Review` tabu:
+
+- `Source` ostaje originalno source polje
+- `Target` je virtualni canonical concept id, na primer `customer.id`
+- `Canonical concept` caption prikazuje business label tog koncepta
+- confidence i explanation i dalje ostaju heuristički signali, isto kao u standardnom flow-u
+- `Source -> Concept View` i `Concept -> Target View` su posebno korisni jer prikazuju canonical putanju, ne samo konačan izbor
+
+Ograničenja canonical-only toka u trenutnom UI-ju:
+
+- transformacije su namerno isključene dok ne postoji realan target dataset
+- `Output` tab ne radi preview i codegen, već samo objašnjava da je za to potreban `Standard` mode
+- ručno dodavanje target kolona i correction workflow su ograničeni na flow sa stvarnim target-om
+- benchmark case se ne gradi iz canonical-only sesije jer ne postoji realan target schema payload
+
+Kako koristiti canonical rezultat kao pripremu za kasniji `Standard` run:
+
+1. U `Canonical` modu uploaduj source data ili source spec.
+2. Pokreni `Generate canonical mapping` i pregledaj koje source kolone dobijaju smislene canonical koncepte.
+3. U `Review` i `Decisions` tabu potvrdi ili odbij konceptualne predloge i po potrebi eksportuj odluke kao JSON ili Excel checkpoint.
+4. Klikni `Reset flow`, vrati se na `Standard` mode i uploaduj source + realan target.
+5. Koristi ranije canonical zaključke kao vodič tokom standardnog review-a, posebno u trust layer i manual review sekcijama.
+
 ## 1. Upload
 
 ### `Source file`
@@ -76,11 +156,15 @@ File uploader za source dataset.
 
 Podržani su row-based formati kao što su CSV, JSON, XML i XLSX, kao i SQL schema snapshot kada koristiš schema-only tok.
 
+Ako izabrani fajl liči na field specification, u `Setup` tabu ćeš dobiti dodatni hint i `Source mode` izbor između `Row data` i `Schema spec`.
+
 ### `Target file`
 
 File uploader za target dataset.
 
 Koristi se isto kao i `Source file`, samo za odredišni model ili šemu prema kojoj mapiraš.
+
+U `Canonical` modu ovo polje se ne prikazuje.
 
 ## 2. Select Tables
 
@@ -121,6 +205,12 @@ Preuslovi:
 - pojavljuju se summary sekcije za `Source` i `Target`
 - aplikacija postaje spremna za `Generate mapping`
 
+U `Canonical` modu:
+
+- dovoljan je samo source fajl
+- source može biti `Row data` ili `Schema spec`
+- summary prikazuje samo `Source`, dok je canonical target virtualan i generiše se iz glossary sloja
+
 ## 3. Review Mapping
 
 ### `Generate mapping`
@@ -138,6 +228,8 @@ Kada koristiti:
 Šta očekivati posle klika:
 
 - pojavljuju se trust layer, review tabele, manual review, corrections i akcije za preview/codegen
+
+U `Canonical` modu dugme se zove `Generate canonical mapping` i rezultat predstavlja source-to-canonical pripremni mapping, bez preview/codegen artefakata.
 
 Napomena o confidence score-u:
 
@@ -580,6 +672,12 @@ Preuslovi:
 ## Benchmarks tab
 
 Svrha ovog taba je da sačuvaš realan mapping scenario kao benchmark, da ga ponovo pokrećeš kasnije i da meriš uticaj correction learning-a.
+
+Napomena za canonical-only sesije:
+
+- benchmark save trenutno traži realan source/target case
+- zato canonical-only session ne puni benchmark payload automatski
+- ako želiš benchmark, uradi follow-up `Standard` run sa stvarnim target-om
 
 ### Pomoćna polja i kontrole
 

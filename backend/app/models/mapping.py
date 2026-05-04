@@ -101,6 +101,14 @@ class AutoMappingRequest(BaseModel):
     target_dataset_id: str
 
 
+TargetSystem = Literal["canonical"]
+
+
+class CanonicalMappingRequest(BaseModel):
+    source_dataset_id: str
+    target_system: TargetSystem = "canonical"
+
+
 class CanonicalCoverageColumnMatch(BaseModel):
     column: str
     concept_ids: list[str] = Field(default_factory=list)

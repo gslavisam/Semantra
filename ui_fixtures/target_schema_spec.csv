@@ -1,0 +1,4 @@
+Column,Description,Type,Length
+customer_id,Customer ID,NUMC,10
+customer_email,Customer email,VARCHAR,255
+phone_number,Phone number,VARCHAR,32

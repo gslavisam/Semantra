@@ -222,8 +222,8 @@ def apply_llm_validation(
     for source_name, rankings in per_source_scores.items():
         if not rankings:
             continue
-        top_score = rankings[0].score
-        if top_score <= settings.llm_gate_min_score or top_score >= settings.llm_gate_max_score:
+        rescue_mode = should_run_canonical_semantic_rescue(rankings[0])
+        if not should_run_llm_validation(rankings[0]):
             continue
 
         candidate_scores = rankings[: settings.top_k_candidates]
@@ -244,6 +244,7 @@ def apply_llm_validation(
                 for candidate in candidate_scores
             ],
             provider=llm_provider,
+            low_confidence_fallback_to_no_match=rescue_mode,
         )
         if llm_result is None:
             continue
@@ -269,6 +270,29 @@ def apply_llm_validation(
         rankings.sort(key=lambda item: (item.llm_selected, item.score), reverse=True)
 
     return llm_decisions
+
+
+def should_run_llm_validation(top_candidate: CandidateScore) -> bool:
+    top_score = top_candidate.score
+    if settings.llm_gate_min_score < top_score < settings.llm_gate_max_score:
+        return True
+    return should_run_canonical_semantic_rescue(top_candidate)
+
+
+def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
+    if top_candidate.score >= settings.llm_gate_min_score or top_candidate.score < 0.2:
+        return False
+    if not is_canonical_target_name(top_candidate.target.name):
+        return False
+    if top_candidate.signals.semantic < 0.45:
+        return False
+    if top_candidate.signals.knowledge > 0 or top_candidate.signals.canonical > 0:
+        return False
+    return True
+
+
+def is_canonical_target_name(target_name: str) -> bool:
+    return metadata_knowledge_service.resolve_canonical_concept_id(target_name) == target_name
 
 
 def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[ScoringSignals, set[str]]:
@@ -324,6 +348,14 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[Scori
     ):
         active_signal_names.add("correction")
 
+    if is_strong_canonical_concept_match(target, knowledge_signal, canonical_signal):
+        # Virtual canonical targets represent normalized business concepts rather than
+        # physical field labels, so weak lexical/pattern alignment should not dilute
+        # a strong concept lock.
+        active_signal_names.discard("name")
+        if not target_patterns or source_patterns.isdisjoint(target_patterns):
+            active_signal_names.discard("pattern")
+
     return (
         ScoringSignals(
             name=round(clamp_score(name_signal), 4),
@@ -339,6 +371,13 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[Scori
         ),
         active_signal_names,
     )
+
+
+def is_strong_canonical_concept_match(target: ColumnProfile, knowledge_signal: float, canonical_signal: float) -> bool:
+    resolved_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(target.name)
+    if resolved_concept_id != target.name:
+        return False
+    return knowledge_signal >= 0.85 and canonical_signal >= 0.6
 
 
 def compute_final_score(signals: ScoringSignals, active_signal_names: set[str] | None = None) -> float:
@@ -467,6 +506,10 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
     explanation: list[str] = []
     correction_feedback = correction_store.describe_feedback(source.name, target.name)
 
+    if is_strong_canonical_concept_match(target, signals.knowledge, signals.canonical):
+        explanation.append(
+            "Strong canonical concept lock detected; concept evidence outweighs weak physical field-name similarity in this candidate."
+        )
     if signals.pattern >= 0.8 and source.detected_patterns:
         explanation.append(
             f"Strong pattern alignment: source {', '.join(source.detected_patterns)} matches target {', '.join(target.detected_patterns)}."

@@ -128,7 +128,7 @@ def request_llm_json(
     for attempt in range(retries):
         try:
             raw_response = provider.generate(prompt, timeout_seconds)
-            return raw_response, json.loads(raw_response)
+            return raw_response, parse_llm_json_payload(raw_response)
         except Exception as error:
             logger.warning(
                 "LLM %s attempt %s/%s failed (%s): %s",
@@ -145,10 +145,72 @@ def request_llm_json(
     return None
 
 
+def parse_llm_json_payload(raw_response: str) -> dict:
+    candidates = [raw_response, strip_markdown_code_fences(raw_response)]
+    for candidate in candidates:
+        normalized = candidate.strip()
+        if not normalized:
+            continue
+        try:
+            return json.loads(normalized)
+        except json.JSONDecodeError:
+            extracted = extract_first_json_object(normalized)
+            if extracted is None:
+                continue
+            return json.loads(extracted)
+    raise json.JSONDecodeError("Could not parse JSON from LLM response", raw_response, 0)
+
+
+def strip_markdown_code_fences(raw_response: str) -> str:
+    stripped = raw_response.strip()
+    if not stripped.startswith("```"):
+        return stripped
+
+    lines = stripped.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def extract_first_json_object(raw_response: str) -> str | None:
+    start = raw_response.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escaping = False
+    for index in range(start, len(raw_response)):
+        char = raw_response[index]
+        if in_string:
+            if escaping:
+                escaping = False
+            elif char == "\\":
+                escaping = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return raw_response[start : index + 1]
+
+    return None
+
+
 def call_validator(
     source_field: dict,
     candidate_targets: list[dict],
     provider: LLMProvider | None,
+    low_confidence_fallback_to_no_match: bool = False,
     max_retries: int | None = None,
     timeout_seconds: float | None = None,
 ) -> LLMValidationResult | None:
@@ -182,6 +244,21 @@ def call_validator(
             transformation_code=transformation_code,
             raw_response=raw_response,
         )
+        if (
+            low_confidence_fallback_to_no_match
+            and result.selected_target != "no_match"
+            and result.confidence < settings.llm_min_confidence
+        ):
+            result = LLMValidationResult(
+                selected_target="no_match",
+                confidence=0.0,
+                reasoning=list(result.reasoning)
+                + [
+                    "LLM selected a low-confidence candidate below the acceptance threshold; treated as no_match in rescue mode."
+                ],
+                transformation_code=None,
+                raw_response=raw_response,
+            )
         if validate_result(result, candidate_targets):
             return result
     except Exception as error:

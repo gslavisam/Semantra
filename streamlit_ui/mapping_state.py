@@ -11,9 +11,9 @@ def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> 
     selected_mapping = selected_mapping or {}
     selected_target = None
     selected_status = "rejected"
-    if ranked["selected"] and ranked["selected"].get("target"):
-        selected_target = ranked["selected"]["target"]
-        selected_status = ranked["selected"]["status"]
+    if ranked["selected"]:
+        selected_target = ranked["selected"].get("target")
+        selected_status = ranked["selected"].get("status", "needs_review")
     elif ranked["candidates"]:
         selected_target = ranked["candidates"][0]["target"]
         selected_status = "needs_review"
@@ -194,7 +194,7 @@ def build_current_benchmark_case(
 ) -> dict | None:
     upload_response = session_state.get("upload_response")
     mapping_decisions = build_mapping_decisions_func()
-    if not upload_response or not mapping_decisions:
+    if not upload_response or not mapping_decisions or not upload_response.get("target"):
         return None
     return {
         "source_columns": schema_columns_for_case(upload_response["source"]),

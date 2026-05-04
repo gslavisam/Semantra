@@ -4,8 +4,9 @@ from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.models.schema import SqlTableDiscoveryResponse, UploadResponse
+from app.models.schema import DatasetHandle, SpecDetectionResponse, SpecLayoutHint, SqlTableDiscoveryResponse, UploadResponse
 from app.services.schema_snapshot_service import build_schema_profile_from_sql_snapshot, list_tables_from_sql_snapshot
+from app.services.spec_upload_service import build_spec_layout_hint, parse_spec_payload
 from app.services.tabular_upload_service import SUPPORTED_ROW_FORMATS, parse_tabular_payload
 from app.services.upload_store import dataset_store
 from app.utils.tabular import decode_text_payload
@@ -26,6 +27,57 @@ async def discover_sql_tables(file: UploadFile = File(...)) -> SqlTableDiscovery
         return SqlTableDiscoveryResponse(tables=list_tables_from_sql_snapshot(decoded))
     except Exception as error:
         raise HTTPException(status_code=400, detail=f"Failed to inspect SQL schema snapshot: {error}") from error
+
+
+@router.post("/upload/spec/detect", response_model=SpecDetectionResponse)
+async def detect_spec_upload(file: UploadFile = File(...)) -> SpecDetectionResponse:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(SUPPORTED_ROW_FORMATS):
+        raise HTTPException(
+            status_code=400,
+            detail="Spec detection supports CSV, JSON, XML, and XLSX tabular uploads.",
+        )
+
+    payload = await file.read()
+    rows = read_tabular_payload(payload, file.filename or "spec.csv")
+    return SpecDetectionResponse(hint=build_spec_layout_hint(rows))
+
+
+@router.post("/upload/spec", response_model=DatasetHandle)
+async def upload_schema_spec(
+    file: UploadFile = File(...),
+    name_col: str | None = Form(default=None),
+    description_col: str | None = Form(default=None),
+    type_col: str | None = Form(default=None),
+) -> DatasetHandle:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(SUPPORTED_ROW_FORMATS):
+        raise HTTPException(
+            status_code=400,
+            detail="Spec upload supports CSV, JSON, XML, and XLSX tabular uploads.",
+        )
+
+    payload = await file.read()
+    upload_name = file.filename or "spec.csv"
+    try:
+        profile = parse_spec_payload(
+            payload,
+            upload_name,
+            name_col=name_col,
+            description_col=description_col,
+            type_col=type_col,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    return dataset_store.save_schema_profile(profile, dataset_name=upload_name, rows=[])
+
+
+@router.post("/upload/handle", response_model=DatasetHandle)
+async def upload_dataset_handle(
+    file: UploadFile = File(...),
+    selected_table: str | None = Form(default=None),
+) -> DatasetHandle:
+    return await parse_and_store_upload(file, fallback_name="dataset.csv", selected_table=selected_table)
 
 
 @router.post("/upload", response_model=UploadResponse)

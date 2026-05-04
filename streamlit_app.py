@@ -110,6 +110,18 @@ def canonical_concept_groups(mapping_response: dict) -> list[dict]:
     )
 
 
+def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
+    from streamlit_ui.api import detect_spec_hint_for_upload as _impl
+
+    return _impl(uploaded_file, cache_key)
+
+
+def upload_dataset_handle(uploaded_file, *, mode: str, selected_table: str | None = None) -> dict:
+    from streamlit_ui.api import upload_dataset_handle as _impl
+
+    return _impl(uploaded_file, mode=mode, selected_table=selected_table)
+
+
 # Local diagnostic helper
 
 def knowledge_debug_rows(mapping_response: dict) -> list[dict]:
@@ -201,11 +213,19 @@ def reset_flow_state() -> None:
         "mapping_editor_state",
         "transformation_templates",
         "source_signature",
+        "source_spec_signature",
+        "source_spec_hint",
         "source_tables",
         "target_signature",
+        "target_spec_signature",
+        "target_spec_hint",
         "target_tables",
         "source_table",
         "target_table",
+        "mapping_mode",
+        "canonical_target_system",
+        "source_upload_mode",
+        "target_upload_mode",
     ):
         st.session_state.pop(key, None)
 
@@ -499,8 +519,10 @@ def render_workspace_tab() -> None:
 
     return _impl(
         all_upload_types=ALL_UPLOAD_TYPES,
+        detect_spec_hint_for_upload=detect_spec_hint_for_upload,
         sql_tables_for_upload=sql_tables_for_upload,
         api_request=api_request,
+        upload_dataset_handle=upload_dataset_handle,
         uploaded_file_bytes=uploaded_file_bytes,
         render_dataset_summary=render_dataset_summary,
         initialize_mapping_editor_state=initialize_mapping_editor_state,

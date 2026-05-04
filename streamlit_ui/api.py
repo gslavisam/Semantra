@@ -46,6 +46,42 @@ def upload_file_to_request_files(uploaded_file) -> dict | None:
     }
 
 
+def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
+    if uploaded_file is None or uploaded_file.name.lower().endswith(".sql"):
+        return None
+
+    file_bytes = uploaded_file_bytes(uploaded_file)
+    signature = (uploaded_file.name, len(file_bytes), "spec-detect")
+    cached_signature = st.session_state.get(f"{cache_key}_spec_signature")
+    if cached_signature == signature:
+        return st.session_state.get(f"{cache_key}_spec_hint")
+
+    payload = api_request(
+        "POST",
+        "/upload/spec/detect",
+        files={"file": (uploaded_file.name, file_bytes, uploaded_file.type or "text/csv")},
+    )
+    hint = payload.get("hint")
+    st.session_state[f"{cache_key}_spec_signature"] = signature
+    st.session_state[f"{cache_key}_spec_hint"] = hint
+    return hint
+
+
+def upload_dataset_handle(uploaded_file, *, mode: str, selected_table: str | None = None) -> dict:
+    if uploaded_file is None:
+        raise ValueError("Select a file before uploading.")
+
+    request_files = upload_file_to_request_files(uploaded_file)
+    if mode == "spec":
+        return api_request("POST", "/upload/spec", files=request_files)
+    return api_request(
+        "POST",
+        "/upload/handle",
+        files=request_files,
+        data={"selected_table": selected_table or ""},
+    )
+
+
 def api_request_content(method: str, path: str, files: dict | None = None, data: dict | None = None) -> bytes:
     headers = {}
     admin_token = st.session_state.get("admin_token", "").strip()

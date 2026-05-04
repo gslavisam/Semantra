@@ -7,8 +7,10 @@ import streamlit as st
 def render_workspace_tab(
     *,
     all_upload_types,
+    detect_spec_hint_for_upload,
     sql_tables_for_upload,
     api_request,
+    upload_dataset_handle,
     uploaded_file_bytes,
     render_dataset_summary,
     initialize_mapping_editor_state,
@@ -23,17 +25,22 @@ def render_workspace_tab(
 ) -> None:
     setup_tab, review_tab, decisions_tab, output_tab = st.tabs(["Setup", "Review", "Decisions", "Output"])
 
+    active_mapping_mode = st.session_state.get("mapping_mode", "Standard")
     source_file = st.session_state.get("source_file")
-    target_file = st.session_state.get("target_file")
+    target_file = st.session_state.get("target_file") if active_mapping_mode == "Standard" else None
     source_tables: list[str] = []
     target_tables: list[str] = []
-    discovery_error = None
+    source_spec_hint = None
+    target_spec_hint = None
+    inspection_error = None
     if source_file is not None or target_file is not None:
         try:
             source_tables = sql_tables_for_upload(source_file, "source")
             target_tables = sql_tables_for_upload(target_file, "target")
+            source_spec_hint = detect_spec_hint_for_upload(source_file, "source")
+            target_spec_hint = detect_spec_hint_for_upload(target_file, "target")
         except httpx.HTTPError as error:
-            discovery_error = str(error)
+            inspection_error = str(error)
 
     upload_response = st.session_state.get("upload_response")
     mapping_response = st.session_state.get("mapping_response")
@@ -43,47 +50,114 @@ def render_workspace_tab(
     with setup_tab:
         st.subheader("1. Upload")
         st.caption("Any row-based format can map to any other row-based format across CSV, JSON, XML, and XLSX.")
+        mapping_mode = st.radio(
+            "Mapping mode",
+            options=["Standard", "Canonical"],
+            horizontal=True,
+            key="mapping_mode",
+        )
+        canonical_mode = mapping_mode == "Canonical"
+        if canonical_mode:
+            st.info(
+                "Canonical mode uploads only the source file and maps it to the canonical glossary without requiring a target upload."
+            )
         source_file = st.file_uploader("Source file", type=all_upload_types, key="source_file")
-        target_file = st.file_uploader("Target file", type=all_upload_types, key="target_file")
+        if canonical_mode:
+            st.selectbox(
+                "Canonical target",
+                options=["canonical"],
+                key="canonical_target_system",
+                help="Epic 12A is system-neutral and maps source fields only to canonical glossary concepts.",
+            )
+            target_file = None
+        else:
+            target_file = st.file_uploader("Target file", type=all_upload_types, key="target_file")
 
-        st.subheader("2. Select Tables")
-        if discovery_error:
-            st.error(f"SQL inspection failed: {discovery_error}")
+        st.subheader("2. Interpret Files")
+        source_is_sql = bool(source_file and source_file.name.lower().endswith(".sql"))
+        target_is_sql = bool(target_file and target_file.name.lower().endswith(".sql"))
+
+        source_mode = "data"
+        if source_file is not None:
+            if source_is_sql:
+                st.info("Source .sql upload is always treated as a schema snapshot.")
+            else:
+                source_mode = st.radio(
+                    "Source mode",
+                    options=["Row data", "Schema spec"],
+                    index=1 if source_spec_hint else 0,
+                    horizontal=True,
+                    key="source_upload_mode",
+                )
+                if source_spec_hint:
+                    st.caption(
+                        "Source file looks like a field specification: "
+                        f"name={source_spec_hint['name_col']}, "
+                        f"description={source_spec_hint.get('description_col') or '-'}, "
+                        f"type={source_spec_hint.get('type_col') or '-'}"
+                    )
+
+        target_mode = "data"
+        if target_file is not None:
+            if target_is_sql:
+                st.info("Target .sql upload is always treated as a schema snapshot.")
+            else:
+                target_mode = st.radio(
+                    "Target mode",
+                    options=["Row data", "Schema spec"],
+                    index=1 if target_spec_hint else 0,
+                    horizontal=True,
+                    key="target_upload_mode",
+                )
+                if target_spec_hint:
+                    st.caption(
+                        "Target file looks like a field specification: "
+                        f"name={target_spec_hint['name_col']}, "
+                        f"description={target_spec_hint.get('description_col') or '-'}, "
+                        f"type={target_spec_hint.get('type_col') or '-'}"
+                    )
+
+        st.subheader("3. Select Tables")
+        if inspection_error:
+            st.error(f"Upload inspection failed: {inspection_error}")
 
         source_table = None
-        if source_tables:
+        if source_tables and source_mode == "Row data":
             source_table = st.selectbox("Source table", source_tables, key="source_table")
+        elif source_mode == "Schema spec":
+            st.info("Source upload will be parsed as a field-per-row schema specification.")
         else:
             st.info("Source upload is row-based (CSV/JSON/XML/XLSX) or single-table SQL.")
 
         target_table = None
-        if target_tables:
+        if canonical_mode:
+            st.info("Canonical mode builds a virtual target from canonical_glossary.csv when you generate mapping.")
+        elif target_tables and target_mode == "Row data":
             target_table = st.selectbox("Target table", target_tables, key="target_table")
+        elif target_mode == "Schema spec":
+            st.info("Target upload will be parsed as a field-per-row schema specification.")
         else:
             st.info("Target upload is row-based (CSV/JSON/XML/XLSX) or single-table SQL.")
 
-        if st.button("Upload and profile", type="primary", disabled=source_file is None or target_file is None):
+        upload_disabled = source_file is None or (not canonical_mode and target_file is None)
+        if st.button("Upload and profile", type="primary", disabled=upload_disabled):
             try:
-                payload = api_request(
-                    "POST",
-                    "/upload",
-                    files={
-                        "source_file": (
-                            source_file.name,
-                            uploaded_file_bytes(source_file),
-                            source_file.type or "application/octet-stream",
-                        ),
-                        "target_file": (
-                            target_file.name,
-                            uploaded_file_bytes(target_file),
-                            target_file.type or "application/octet-stream",
-                        ),
-                    },
-                    data={
-                        "source_table": source_table or "",
-                        "target_table": target_table or "",
-                    },
-                )
+                payload = {
+                    "mapping_mode": "canonical" if canonical_mode else "standard",
+                    "source": upload_dataset_handle(
+                        source_file,
+                        mode="spec" if source_mode == "Schema spec" else "data",
+                        selected_table=source_table,
+                    ),
+                }
+                if canonical_mode:
+                    payload["target_system"] = st.session_state.get("canonical_target_system", "canonical")
+                else:
+                    payload["target"] = upload_dataset_handle(
+                        target_file,
+                        mode="spec" if target_mode == "Schema spec" else "data",
+                        selected_table=target_table,
+                    )
                 st.session_state["upload_response"] = payload
                 st.session_state.pop("mapping_response", None)
                 st.session_state.pop("preview_response", None)
@@ -91,7 +165,11 @@ def render_workspace_tab(
                 st.session_state.pop("mapping_editor_state", None)
                 st.session_state["last_action"] = {
                     "level": "success",
-                    "message": "Uploaded files and built source/target schema profiles.",
+                    "message": (
+                        "Uploaded source file and prepared canonical-only mapping context."
+                        if canonical_mode
+                        else "Uploaded files and built source/target schema profiles."
+                    ),
                 }
                 st.rerun()
             except httpx.HTTPError as error:
@@ -99,30 +177,51 @@ def render_workspace_tab(
                 st.rerun()
 
         if upload_response:
-            left, right = st.columns(2)
-            with left:
+            upload_mode = upload_response.get("mapping_mode", "standard")
+            if upload_mode == "canonical":
                 render_dataset_summary("Source", upload_response["source"])
-            with right:
-                render_dataset_summary("Target", upload_response["target"])
+                st.info("Canonical target is virtual and will be synthesized from canonical_glossary.csv during mapping generation.")
+            else:
+                left, right = st.columns(2)
+                with left:
+                    render_dataset_summary("Source", upload_response["source"])
+                with right:
+                    render_dataset_summary("Target", upload_response["target"])
 
             st.subheader("3. Review Mapping")
-            if st.button("Generate mapping", type="primary"):
+            button_label = "Generate canonical mapping" if upload_mode == "canonical" else "Generate mapping"
+            button_key = "generate_canonical_mapping" if upload_mode == "canonical" else "generate_mapping"
+            if st.button(button_label, type="primary", key=button_key):
                 try:
-                    mapping_response = api_request(
-                        "POST",
-                        "/mapping/auto",
-                        json={
-                            "source_dataset_id": upload_response["source"]["dataset_id"],
-                            "target_dataset_id": upload_response["target"]["dataset_id"],
-                        },
-                    )
+                    if upload_mode == "canonical":
+                        mapping_response = api_request(
+                            "POST",
+                            "/mapping/canonical",
+                            json={
+                                "source_dataset_id": upload_response["source"]["dataset_id"],
+                                "target_system": upload_response.get("target_system", "canonical"),
+                            },
+                        )
+                    else:
+                        mapping_response = api_request(
+                            "POST",
+                            "/mapping/auto",
+                            json={
+                                "source_dataset_id": upload_response["source"]["dataset_id"],
+                                "target_dataset_id": upload_response["target"]["dataset_id"],
+                            },
+                        )
                     st.session_state["mapping_response"] = mapping_response
                     initialize_mapping_editor_state(mapping_response)
                     st.session_state.pop("preview_response", None)
                     st.session_state.pop("codegen_response", None)
                     st.session_state["last_action"] = {
                         "level": "success",
-                        "message": "Generated ranked mapping candidates from the current datasets.",
+                        "message": (
+                            "Generated canonical mapping candidates from the current source dataset."
+                            if upload_mode == "canonical"
+                            else "Generated ranked mapping candidates from the current datasets."
+                        ),
                     }
                     st.rerun()
                 except httpx.HTTPError as error:
@@ -135,82 +234,101 @@ def render_workspace_tab(
                     "or Output for preview and Pandas code generation."
                 )
         else:
-            st.info("Upload and profile both datasets to unlock review, decision, and output sections.")
+            if canonical_mode:
+                st.info("Upload and profile the source dataset to unlock canonical review and decision export.")
+            else:
+                st.info("Upload and profile both datasets to unlock review, decision, and output sections.")
 
     with review_tab:
         if mapping_response:
+            if (upload_response or {}).get("mapping_mode") == "canonical":
+                st.caption("Canonical-only review treats canonical concept IDs as virtual targets built from the glossary.")
             display_trust_layer(mapping_response)
             render_mapping_review(mapping_response)
             render_mapping_editor(mapping_response)
         else:
-            st.info("Generate mapping in Setup to populate trust, candidate review, and manual review controls.")
+            if (upload_response or {}).get("mapping_mode") == "canonical":
+                st.info("Generate canonical mapping in Setup to populate trust, candidate review, and manual review controls.")
+            else:
+                st.info("Generate mapping in Setup to populate trust, candidate review, and manual review controls.")
 
     with decisions_tab:
         if mapping_response:
-            render_manual_mapping_panel(mapping_response)
+            if (upload_response or {}).get("mapping_mode") != "canonical":
+                render_manual_mapping_panel(mapping_response)
+            else:
+                st.info(
+                    "Canonical-only mode currently keeps manual target additions and correction workflows disabled until a real target dataset exists."
+                )
             render_mapping_decision_summary()
             render_mapping_io_panel()
-            render_correction_panel()
+            if (upload_response or {}).get("mapping_mode") != "canonical":
+                render_correction_panel()
         else:
             st.info("Generate mapping in Setup before managing manual overrides, imports, mapping sets, or corrections.")
 
     with output_tab:
         if mapping_response:
-            mapping_decisions = build_mapping_decisions()
-            actions_left, actions_right = st.columns(2)
-            with actions_left:
-                if st.button("Generate preview"):
-                    if not mapping_decisions:
-                        st.session_state["last_action"] = {
-                            "level": "warning",
-                            "message": "Add at least one accepted or needs-review mapping before generating preview.",
-                        }
-                        st.rerun()
-                    try:
-                        st.session_state["preview_response"] = api_request(
-                            "POST",
-                            "/mapping/preview",
-                            json={
-                                "source_dataset_id": st.session_state["upload_response"]["source"]["dataset_id"],
-                                "mapping_decisions": mapping_decisions,
-                            },
-                        )
-                        st.session_state["last_action"] = {
-                            "level": "success",
-                            "message": "Generated preview rows for the active mapping decisions.",
-                        }
-                        st.rerun()
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Preview failed: {error}",
-                        }
-                        st.rerun()
-            with actions_right:
-                if st.button("Generate Pandas code"):
-                    if not mapping_decisions:
-                        st.session_state["last_action"] = {
-                            "level": "warning",
-                            "message": "Add at least one accepted or needs-review mapping before generating code.",
-                        }
-                        st.rerun()
-                    try:
-                        st.session_state["codegen_response"] = api_request(
-                            "POST",
-                            "/mapping/codegen",
-                            json={"mapping_decisions": mapping_decisions},
-                        )
-                        st.session_state["last_action"] = {
-                            "level": "success",
-                            "message": "Generated Pandas code from the active mapping decisions.",
-                        }
-                        st.rerun()
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Code generation failed: {error}",
-                        }
-                        st.rerun()
+            if (upload_response or {}).get("mapping_mode") == "canonical":
+                st.info(
+                    "Canonical-only mode stops at review and decision export for now. Preview rows and Pandas code generation become available after you switch back to Standard mode with a real target dataset."
+                )
+            else:
+                mapping_decisions = build_mapping_decisions()
+                actions_left, actions_right = st.columns(2)
+                with actions_left:
+                    if st.button("Generate preview"):
+                        if not mapping_decisions:
+                            st.session_state["last_action"] = {
+                                "level": "warning",
+                                "message": "Add at least one accepted or needs-review mapping before generating preview.",
+                            }
+                            st.rerun()
+                        try:
+                            st.session_state["preview_response"] = api_request(
+                                "POST",
+                                "/mapping/preview",
+                                json={
+                                    "source_dataset_id": st.session_state["upload_response"]["source"]["dataset_id"],
+                                    "mapping_decisions": mapping_decisions,
+                                },
+                            )
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": "Generated preview rows for the active mapping decisions.",
+                            }
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Preview failed: {error}",
+                            }
+                            st.rerun()
+                with actions_right:
+                    if st.button("Generate Pandas code"):
+                        if not mapping_decisions:
+                            st.session_state["last_action"] = {
+                                "level": "warning",
+                                "message": "Add at least one accepted or needs-review mapping before generating code.",
+                            }
+                            st.rerun()
+                        try:
+                            st.session_state["codegen_response"] = api_request(
+                                "POST",
+                                "/mapping/codegen",
+                                json={"mapping_decisions": mapping_decisions},
+                            )
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": "Generated Pandas code from the active mapping decisions.",
+                            }
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Code generation failed: {error}",
+                            }
+                            st.rerun()
         else:
             st.info("Generate mapping in Setup before preview or code generation.")
 

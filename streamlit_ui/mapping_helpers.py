@@ -322,6 +322,8 @@ def current_mapping_rows(
 def selected_target_options(ranked: dict) -> list[str]:
     options = [candidate["target"] for candidate in ranked["candidates"]]
     selected = ranked["selected"]["target"] if ranked["selected"] and ranked["selected"].get("target") else None
+    if ranked.get("selected") and not selected:
+        options.insert(0, "")
     if selected and selected not in options:
         options.insert(0, selected)
     return options

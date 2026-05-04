@@ -68,6 +68,86 @@ For readability, `Workspace` is organized into 4 internal sub-tabs:
 - `Decisions` for manual overrides, import/export, mapping sets, and corrections
 - `Output` for preview and Pandas code generation
 
+## Schema spec upload mode
+
+Semantra now supports files that are not row-data tables, but field-per-row specifications.
+
+Typical example:
+
+- the file columns are `Column`, `Description`, `Type`, `Length`
+- each row describes one field instead of one business record
+
+Use this when:
+
+- the source or target does not yet have real data, only a data dictionary or field catalog
+- you receive a SAP, Workday, or internal specification file with field descriptions
+- you want to map the schema before sample row data exists
+
+What to expect in the `Setup` tab:
+
+- after selecting a file, the app may show a hint that the file looks like a schema specification
+- `Source mode` or `Target mode` appears with a choice between `Row data` and `Schema spec`
+- if you keep `Schema spec`, the upload is parsed as a field-per-row schema instead of a regular dataset
+
+How to interpret the result:
+
+- `Columns` means the number of business fields extracted from the specification
+- `Rows` stays `0`, because the file does not contain business rows for preview
+- preview samples are not the point of this path; the goal is to build a `SchemaProfile` for mapping
+
+Important:
+
+- `.sql` uploads remain schema snapshots and do not use the `Schema spec` radio choice
+- you can use `Schema spec` on both source and target sides in `Standard` mode
+- in `Canonical` mode only the source file is used, but that source can still be a `Schema spec`
+
+## Canonical mapping mode
+
+`Canonical` mode is a source-only path for cases where you do not yet have a real target dataset and want to map source fields to canonical business concepts first.
+
+Use `Canonical` when:
+
+- you have a source schema or source spec, but no target file yet
+- you want a fast semantic normalization pass before a concrete system-to-system mapping run
+- you want to test whether the source fields have useful canonical coverage before deeper target review
+
+Use `Standard` when:
+
+- you have both a source and a target dataset or target spec
+- you want preview rows and Pandas code generation
+- you want a concrete source-to-target mapping instead of source-to-concept preparation
+
+What changes in the `Setup` tab:
+
+- `Target file` disappears
+- `Canonical target` appears
+- the current UI only exposes the `canonical` option
+- `Upload and profile` stores only the source handle plus the canonical target system
+- `Generate canonical mapping` calls the source-only canonical backend flow
+
+How to read the canonical result in the `Review` tab:
+
+- `Source` remains the original source field
+- `Target` is the virtual canonical concept id, for example `customer.id`
+- the `Canonical concept` caption shows the business label of that concept
+- confidence and explanations remain heuristic signals, just like in the standard flow
+- `Source -> Concept View` and `Concept -> Target View` are especially useful because they show the canonical path, not just the final selected concept
+
+Current limitations of the canonical-only UI flow:
+
+- transformations are intentionally disabled until a real target dataset exists
+- the `Output` tab does not run preview or code generation and instead explains that `Standard` mode is required
+- manual target additions and correction workflows stay limited to flows with a real target
+- benchmark case creation is skipped for canonical-only sessions because there is no real target schema payload
+
+How to use the canonical result as preparation for a later `Standard` run:
+
+1. In `Canonical` mode, upload source data or a source spec.
+2. Run `Generate canonical mapping` and review which source fields get meaningful canonical concepts.
+3. In the `Review` and `Decisions` tabs, confirm or reject the concept-level proposals and optionally export them as a JSON or Excel checkpoint.
+4. Click `Reset flow`, switch back to `Standard` mode, and upload the source plus a real target.
+5. Use the earlier canonical conclusions as guidance during the standard review flow, especially in the trust layer and manual review sections.
+
 ## 1. Upload
 
 ### `Source file`
@@ -76,11 +156,15 @@ The file uploader for the source dataset.
 
 Supported row-based formats include CSV, JSON, XML, and XLSX, as well as SQL schema snapshots when you are using a schema-only flow.
 
+If the selected file looks like a field specification, the `Setup` tab shows an extra hint and a `Source mode` choice between `Row data` and `Schema spec`.
+
 ### `Target file`
 
 The file uploader for the target dataset.
 
 It works the same way as `Source file`, but for the destination model or schema you want to map into.
+
+In `Canonical` mode, this field is not shown.
 
 ## 2. Select Tables
 
@@ -121,6 +205,12 @@ What to expect after clicking:
 - summary sections for `Source` and `Target` appear
 - the app becomes ready for `Generate mapping`
 
+In `Canonical` mode:
+
+- only a source file is required
+- the source can be `Row data` or `Schema spec`
+- the summary shows only `Source`, while the canonical target stays virtual and is synthesized from the glossary layer
+
 ## 3. Review Mapping
 
 ### `Generate mapping`
@@ -138,6 +228,8 @@ When to use it:
 What to expect after clicking:
 
 - the trust layer, review tables, manual review, corrections, and preview/code generation actions become available
+
+In `Canonical` mode the button is called `Generate canonical mapping`, and the result is a source-to-canonical preparation flow without preview/code generation artifacts.
 
 Confidence score note:
 
@@ -580,6 +672,12 @@ What to expect after clicking:
 ## Benchmarks tab
 
 The purpose of this tab is to save a realistic mapping scenario as a benchmark, run it again later, and measure the impact of correction learning.
+
+Note for canonical-only sessions:
+
+- benchmark saving currently expects a real source/target case
+- because of that, a canonical-only session does not auto-build the benchmark payload
+- if you want a benchmark, run a follow-up `Standard` mapping flow with a real target
 
 ### Helper fields and controls
 

@@ -1,0 +1,5 @@
+Column,Description,Type,Length
+KUNNR,Customer number,NUMC,10
+NAME1,Customer name,VARCHAR,80
+LAND1,Country key,CHAR,3
+ERDAT,Created on,DATE,

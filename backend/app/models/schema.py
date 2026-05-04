@@ -48,6 +48,17 @@ class DatasetHandle(BaseModel):
     preview_rows: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class SpecLayoutHint(BaseModel):
+    name_col: str
+    description_col: str | None = None
+    type_col: str | None = None
+    confidence: float
+
+
+class SpecDetectionResponse(BaseModel):
+    hint: SpecLayoutHint | None = None
+
+
 class UploadResponse(BaseModel):
     source: DatasetHandle
     target: DatasetHandle

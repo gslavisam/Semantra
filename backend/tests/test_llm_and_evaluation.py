@@ -11,6 +11,8 @@ from app.services.evaluation_service import evaluate_cases
 from app.services.llm_service import StaticLLMProvider, call_transformation_generator, call_validator
 from app.services.mapping_service import generate_mapping_candidates
 from app.models.schema import ColumnProfile, SchemaProfile
+from app.services.spec_upload_service import parse_spec_payload
+from app.services.virtual_target_service import build_virtual_target_schema
 
 
 def make_column(name: str, patterns: list[str], sample_values: list[str], unique_ratio: float = 1.0) -> ColumnProfile:
@@ -49,6 +51,24 @@ def test_llm_validator_accepts_only_closed_candidate_set_json() -> None:
 
     assert result is not None
     assert result.selected_target == "phone_number"
+
+
+def test_llm_validator_accepts_markdown_fenced_json() -> None:
+    provider = StaticLLMProvider(
+        '```json\n{"selected_target":"no_match","confidence":0.0,"reasoning":["No good candidate in the closed set."]}\n```'
+    )
+
+    result = call_validator(
+        source_field={"name": "LAND1", "sample_values": [], "pattern": ["text"], "unique_ratio": 0.0},
+        candidate_targets=[
+            {"name": "customer.phone", "pattern": ["phone"]},
+            {"name": "address.postal_code", "pattern": []},
+        ],
+        provider=provider,
+    )
+
+    assert result is not None
+    assert result.selected_target == "no_match"
 
 
 def test_llm_validator_rejects_hallucinated_target() -> None:
@@ -136,6 +156,38 @@ def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -
         assert logs[0].llm_result is not None
     finally:
         settings.llm_gate_min_score, settings.llm_gate_max_score = previous_bounds
+
+
+def test_canonical_semantic_only_low_confidence_candidate_can_trigger_llm_no_match() -> None:
+    provider = StaticLLMProvider(
+        '{"selected_target":"no_match","confidence":0.92,"reasoning":["LAND1 is a country key and the closed candidate set does not contain a reliable country concept match."]}'
+    )
+    fixture_path = Path(__file__).parents[2] / "ui_fixtures" / "source_schema_spec.csv"
+    source_schema = parse_spec_payload(fixture_path.read_bytes(), fixture_path.name)
+
+    result = generate_mapping_candidates(source_schema, build_virtual_target_schema("canonical"), llm_provider=provider)
+    land1 = next(mapping for mapping in result.mappings if mapping.source == "LAND1")
+    logs = decision_log_store.list_entries()
+
+    assert land1.method == "llm_validator_no_match"
+    assert land1.target is None
+    assert any("LLM validator rejected the available candidates" in line for line in land1.explanation)
+    assert any(entry.source == "LAND1" and entry.used_llm for entry in logs)
+
+
+def test_canonical_rescue_turns_low_confidence_llm_pick_into_no_match() -> None:
+    provider = StaticLLMProvider(
+        '```json\n{"selected_target":"vendor.name","confidence":0.2632,"reasoning":["No strong target match exists in the closed set."]}\n```'
+    )
+    fixture_path = Path(__file__).parents[2] / "ui_fixtures" / "source_schema_spec.csv"
+    source_schema = parse_spec_payload(fixture_path.read_bytes(), fixture_path.name)
+
+    result = generate_mapping_candidates(source_schema, build_virtual_target_schema("canonical"), llm_provider=provider)
+    land1 = next(mapping for mapping in result.mappings if mapping.source == "LAND1")
+
+    assert land1.method == "llm_validator_no_match"
+    assert land1.target is None
+    assert any("treated as no_match in rescue mode" in line for line in land1.explanation)
 
 
 def test_llm_can_generate_transformation_code_from_user_instruction() -> None:

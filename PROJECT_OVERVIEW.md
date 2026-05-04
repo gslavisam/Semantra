@@ -28,10 +28,12 @@ Instead of asking a free-form LLM to "map everything", Semantra keeps the core w
 
 Current MVP scope includes:
 - CSV, JSON, XML, and XLSX row-data upload for source and target datasets
+- CSV/XLSX schema-spec upload for source and target cases where each row describes one field rather than one business record
 - SQL schema snapshot upload plus table discovery and explicit table selection for multi-table snapshots
 - schema profiling with lexical, pattern, and statistical hints
 - multi-signal candidate ranking with top-k alternatives and one-to-one assignment
 - canonical business glossary matching with a file-backed glossary, canonical signal scoring, and source/target/project canonical coverage summaries
+- source-only canonical mapping against a virtual target schema synthesized from `canonical_glossary.csv`
 - explicit source -> concept -> target review support through canonical path details and grouped review tables
 - optional constrained LLM validation in ambiguity-band cases
 - prompt-driven pandas transformation generation for reviewed field pairs
@@ -39,7 +41,7 @@ Current MVP scope includes:
 - custom knowledge overlays layered on top of built-in metadata knowledge, including concept aliases that extend canonical concept matching
 - persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
 - lightweight mapping-set status workflow with `draft`, `review`, `approved`, and `archived`, now extended by the first Epic 6 governance slice
-- internal Streamlit UI for upload, trust-layer review, canonical concept views, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
+- internal Streamlit UI for `Standard` and `Canonical` setup flows, row-data/schema-spec upload modes, trust-layer review, canonical concept views, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
 
 Out of scope for the current slice:
 - authentication and role-based access control
@@ -68,18 +70,21 @@ The product then layers controlled trust mechanisms on top of that ranking:
 ### 1. Dataset Ingestion and Profiling
 
 Purpose:
-- accept uploaded row-based files and schema snapshots
+- accept uploaded row-based files, field-per-row schema specifications, and schema snapshots
 - assign dataset identifiers
 - build the schema profile used by the mapping engine and trust layer
 
 Current behavior:
-- source and target datasets are uploaded separately
+- `Standard` mode uploads source and target datasets separately
+- `Canonical` mode uploads and profiles only the source side, while the target is synthesized later as a virtual canonical schema
 - row-based uploads support CSV, JSON, XML, and XLSX
+- spec uploads support field-per-row CSV/XLSX layouts through dedicated detection and parsing endpoints
 - SQL uploads remain schema-only and can require explicit table selection for multi-table snapshots
-- each upload produces a dataset handle, schema profile, and preview rows when row data exists
+- each upload produces a dataset handle and schema profile; preview rows exist only when row data is available
 
 Implementation anchors:
 - `backend/app/api/routes/upload.py`
+- `backend/app/services/spec_upload_service.py`
 - `backend/app/services/tabular_upload_service.py`
 - `backend/app/services/profiling_service.py`
 - `backend/app/services/upload_store.py`
@@ -87,14 +92,16 @@ Implementation anchors:
 ### 2. Mapping Engine
 
 Purpose:
-- generate explainable mapping candidates from source schema to target schema
+- generate explainable mapping candidates from a source schema to either a concrete target schema or a virtual canonical target
 
 Current behavior:
-- compute source-target scores across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
+- `POST /mapping/auto` computes source-target scores across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
+- `POST /mapping/canonical` reuses the same ranking stack against a virtual canonical target schema built from the glossary layer
 - return top-k ranked candidates per source field
 - apply a greedy global one-to-one assignment step for selected mappings
 - attach signal breakdowns, canonical concept details, and explanation lines to both selected mappings and ranked candidates
 - return source, target, and project-level canonical coverage summaries alongside the mapping payload
+- the canonical-only API is currently system-neutral and limited to `target_system="canonical"`; SAP, Workday, and QAD virtual targets remain future work
 
 Important implementation notes:
 - the weighted score is now normalized and clamped into the `0..1` range, but it remains a ranking heuristic rather than a calibrated probability
@@ -218,10 +225,13 @@ Purpose:
 - provide a fast operator-facing surface for demo, pilot, and analyst review workflows
 
 Current behavior:
-- upload source and target files
+- choose `Standard` or `Canonical` mapping mode in `Workspace > Setup`
+- upload source and target files in `Standard` mode, or source only in `Canonical` mode
+- choose `Row data` or `Schema spec` when the uploaded file looks like a field specification
 - review ranked candidates and trust-layer explanations
 - inspect explicit `Source -> Concept` and `Concept -> Target` tables plus grouped canonical concept summaries
-- edit mappings manually and attach transformations
+- edit mappings manually and attach transformations when a real target dataset exists
+- use canonical-only review and decision flows without preview/codegen until a later standard run supplies a real target
 - save corrections, promote reusable rules, manage knowledge overlays, import/export canonical glossary data, save mapping sets, inspect benchmarks, and use admin/debug tools
 
 Implementation anchor:
@@ -236,28 +246,33 @@ Implementation anchor:
 
 Semantra currently supports eight practical workflows.
 
-### Workflow 1. Upload and Auto-Map
+### Workflow 1. Upload, Detect Specs, and Generate Mapping
 
 Input:
-- source and target files or SQL schema snapshots
+- source and target files, schema specs, or SQL schema snapshots
+- optional source-only canonical input when no real target file exists yet
 
 Process:
-- parse uploads
+- optionally detect field-per-row spec layouts
+- parse uploads into schema profiles
 - build schema profiles
-- score all candidate mappings
+- score source-to-target or source-to-canonical candidate mappings
 - optionally invoke constrained LLM validation inside the ambiguity band
 - apply one-to-one assignment and return top-k ranked alternatives
 
 Result:
-- profiled datasets
-- selected mappings
+- profiled datasets or a source-only canonical-ready upload context
+- selected mappings or canonical concept suggestions
 - ranked candidates with explanation and signal breakdowns
-- canonical concept details and project-level canonical coverage for the active source/target pair
+- canonical concept details and canonical coverage for the active source/target or source/canonical pair
 
 Endpoints:
 - `POST /upload`
 - `POST /upload/sql/tables`
+- `POST /upload/spec/detect`
+- `POST /upload/spec`
 - `POST /mapping/auto`
+- `POST /mapping/canonical`
 
 ### Workflow 2. Review, Transform, Preview, and Generate Code
 
@@ -275,6 +290,9 @@ Result:
 - preview rows
 - transformation previews with warnings and samples
 - generated Pandas artifact
+
+Note:
+- preview and code generation are currently available only in `Standard` mode with a real target dataset
 
 Endpoints:
 - `POST /mapping/preview`

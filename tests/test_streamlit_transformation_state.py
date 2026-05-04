@@ -276,6 +276,107 @@ def test_current_mapping_rows_includes_canonical_path_for_selected_candidate() -
     assert rows[0]["canonical_path"] == "sold_to_party -> Customer ID (customer.id) -> customer_id"
 
 
+def test_default_editor_entry_preserves_unmapped_selected_result() -> None:
+    _, [default_editor_entry] = load_streamlit_functions("default_editor_entry")
+
+    entry = default_editor_entry(
+        {
+            "selected": {
+                "target": None,
+                "status": "needs_review",
+            },
+            "candidates": [
+                {
+                    "target": "customer.phone",
+                }
+            ],
+        }
+    )
+
+    assert entry["target"] == ""
+    assert entry["status"] == "needs_review"
+    assert entry["suggested_target"] == ""
+
+
+def test_selected_target_options_include_unmapped_for_no_match_selection() -> None:
+    _, [selected_target_options] = load_streamlit_functions("selected_target_options")
+
+    options = selected_target_options(
+        {
+            "selected": {
+                "target": None,
+                "status": "needs_review",
+            },
+            "candidates": [
+                {"target": "customer.phone"},
+                {"target": "address.postal_code"},
+            ],
+        }
+    )
+
+    assert options == ["", "customer.phone", "address.postal_code"]
+
+
+def test_current_mapping_rows_preserves_unmapped_no_match_selection() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "suggested_mapping_by_source",
+        "validator_badge",
+        "canonical_concept_labels",
+        "canonical_path_label",
+        "current_mapping_rows",
+    )
+    current_mapping_rows = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "mapping_editor_state": {
+                "LAND1": {
+                    "target": "",
+                    "status": "needs_review",
+                }
+            }
+        }
+    )
+
+    rows = current_mapping_rows(
+        {
+            "mappings": [
+                {
+                    "source": "LAND1",
+                    "target": None,
+                    "confidence": 0.0,
+                    "confidence_label": "low_confidence",
+                    "status": "needs_review",
+                    "method": "llm_validator_no_match",
+                    "canonical_details": {
+                        "shared_concepts": [],
+                    },
+                }
+            ],
+            "ranked_mappings": [
+                {
+                    "source": "LAND1",
+                    "candidates": [
+                        {
+                            "target": "customer.phone",
+                            "confidence": 0.29,
+                            "confidence_label": "low_confidence",
+                            "method": "multi_signal_heuristic",
+                            "canonical_details": {
+                                "shared_concepts": [],
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert rows[0]["target"] == ""
+    assert rows[0]["confidence"] == 0.0
+    assert rows[0]["validator"] == "Llm Validator No Match"
+
+
 def test_canonical_concept_groups_group_selected_mappings_by_shared_concept() -> None:
     fake_streamlit, functions = load_streamlit_functions(
         "suggested_mapping_by_source",
