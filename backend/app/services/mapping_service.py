@@ -47,6 +47,7 @@ class CandidateScore:
     score: float
     signals: ScoringSignals
     explanation: list[str]
+    active_signal_names: set[str] = field(default_factory=set)
     canonical_details: CanonicalMappingDetails = field(default_factory=CanonicalMappingDetails)
     llm_result: LLMValidationResult | None = None
     llm_selected: bool = False
@@ -192,8 +193,8 @@ def generate_mapping_candidates(
 def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile]) -> list[CandidateScore]:
     scored: list[CandidateScore] = []
     for target in targets:
-        signals = compute_signals(source, target)
-        final_score = compute_final_score(signals)
+        signals, active_signal_names = compute_signals(source, target)
+        final_score = compute_final_score(signals, active_signal_names)
         explanation = build_explanation(source, target, signals)
         scored.append(
             CandidateScore(
@@ -201,6 +202,7 @@ def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile])
                 target=target,
                 score=final_score,
                 signals=signals,
+                active_signal_names=active_signal_names,
                 explanation=explanation,
                 canonical_details=metadata_knowledge_service.canonical_mapping_details(source, target),
             )
@@ -254,7 +256,8 @@ def apply_llm_validation(
             if candidate.target.name != llm_result.selected_target:
                 continue
             candidate.signals.llm = round(llm_result.confidence, 4)
-            candidate.score = compute_final_score(candidate.signals)
+            candidate.active_signal_names.add("llm")
+            candidate.score = compute_final_score(candidate.signals, candidate.active_signal_names)
             candidate.llm_result = llm_result
             candidate.llm_selected = True
             candidate.explanation.extend(
@@ -268,7 +271,7 @@ def apply_llm_validation(
     return llm_decisions
 
 
-def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSignals:
+def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[ScoringSignals, set[str]]:
     source_tokens = set(source.tokenized_name)
     target_tokens = set(target.tokenized_name)
     source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(source)
@@ -292,36 +295,74 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> ScoringSign
     ) / 3
     overlap_signal = sample_overlap_score(source_values, target_values)
     embedding_signal = embedding_similarity(source, target)
-    correction_signal = correction_store.get_feedback_adjustment(source.name, target.name)
+    correction_feedback = correction_store.describe_feedback(source.name, target.name)
+    correction_signal = float(correction_feedback["strength"])
 
-    return ScoringSignals(
-        name=round(clamp_score(name_signal), 4),
-        semantic=round(clamp_score(semantic_signal), 4),
-        knowledge=round(clamp_score(knowledge_signal), 4),
-        canonical=round(clamp_score(canonical_signal), 4),
-        pattern=round(clamp_score(pattern_signal), 4),
-        statistical=round(clamp_score(stat_signal), 4),
-        overlap=round(clamp_score(overlap_signal), 4),
-        embedding=round(clamp_score(embedding_signal), 4),
-        correction=round(correction_signal, 4),
-        llm=0.0,
+    active_signal_names = {
+        "name",
+        "semantic",
+        "knowledge",
+        "canonical",
+        "pattern",
+        "statistical",
+    }
+    if source_values and target_values:
+        active_signal_names.add("overlap")
+    if embedding_enabled():
+        active_signal_names.add("embedding")
+    if any(
+        int(correction_feedback[key]) > 0
+        for key in (
+            "accepted_matches",
+            "overridden_matches",
+            "rejected_targets",
+            "overridden_away",
+            "promoted_preferred_rules",
+            "promoted_rejected_rules",
+            "promoted_overridden_away_rules",
+        )
+    ):
+        active_signal_names.add("correction")
+
+    return (
+        ScoringSignals(
+            name=round(clamp_score(name_signal), 4),
+            semantic=round(clamp_score(semantic_signal), 4),
+            knowledge=round(clamp_score(knowledge_signal), 4),
+            canonical=round(clamp_score(canonical_signal), 4),
+            pattern=round(clamp_score(pattern_signal), 4),
+            statistical=round(clamp_score(stat_signal), 4),
+            overlap=round(clamp_score(overlap_signal), 4),
+            embedding=round(clamp_score(embedding_signal), 4),
+            correction=round(correction_signal, 4),
+            llm=0.0,
+        ),
+        active_signal_names,
     )
 
 
-def compute_final_score(signals: ScoringSignals) -> float:
+def compute_final_score(signals: ScoringSignals, active_signal_names: set[str] | None = None) -> float:
+    if active_signal_names is None:
+        active_signal_names = {
+            signal_name
+            for signal_name in WEIGHTS
+            if float(getattr(signals, signal_name, 0.0) or 0.0) != 0.0
+        }
+
     raw_score = (
-        (signals.name * WEIGHTS["name"])
-        + (signals.semantic * WEIGHTS["semantic"])
-        + (signals.knowledge * WEIGHTS["knowledge"])
-        + (signals.canonical * WEIGHTS["canonical"])
-        + (signals.pattern * WEIGHTS["pattern"])
-        + (signals.statistical * WEIGHTS["statistical"])
-        + (signals.overlap * WEIGHTS["overlap"])
-        + (signals.embedding * WEIGHTS["embedding"])
-        + (signals.correction * WEIGHTS["correction"])
-        + (signals.llm * WEIGHTS["llm"])
+        (signals.name * WEIGHTS["name"] if "name" in active_signal_names else 0.0)
+        + (signals.semantic * WEIGHTS["semantic"] if "semantic" in active_signal_names else 0.0)
+        + (signals.knowledge * WEIGHTS["knowledge"] if "knowledge" in active_signal_names else 0.0)
+        + (signals.canonical * WEIGHTS["canonical"] if "canonical" in active_signal_names else 0.0)
+        + (signals.pattern * WEIGHTS["pattern"] if "pattern" in active_signal_names else 0.0)
+        + (signals.statistical * WEIGHTS["statistical"] if "statistical" in active_signal_names else 0.0)
+        + (signals.overlap * WEIGHTS["overlap"] if "overlap" in active_signal_names else 0.0)
+        + (signals.embedding * WEIGHTS["embedding"] if "embedding" in active_signal_names else 0.0)
+        + (signals.correction * WEIGHTS["correction"] if "correction" in active_signal_names else 0.0)
+        + (signals.llm * WEIGHTS["llm"] if "llm" in active_signal_names else 0.0)
     )
-    normalized_score = raw_score / TOTAL_WEIGHT if TOTAL_WEIGHT else 0.0
+    active_total_weight = sum(WEIGHTS[signal_name] for signal_name in active_signal_names)
+    normalized_score = raw_score / active_total_weight if active_total_weight else 0.0
     return round(clamp_score(normalized_score), 4)
 
 

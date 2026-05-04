@@ -96,7 +96,8 @@ def admin_token_required() -> bool:
         st.session_state.get("admin_token", ""),
     )
     cached_signature = st.session_state.get("admin_requirement_signature")
-    if cached_signature != current_signature:
+    requirement = st.session_state.get("admin_requirement", {"requires_token": True, "reachable": False})
+    if cached_signature != current_signature or not requirement.get("reachable", False):
         refresh_admin_requirement()
         st.session_state["admin_requirement_signature"] = current_signature
     requirement = st.session_state.get("admin_requirement", {"requires_token": True, "reachable": False})

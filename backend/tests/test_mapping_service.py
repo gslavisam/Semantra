@@ -266,16 +266,36 @@ def test_mapping_penalizes_explicitly_rejected_target() -> None:
     )
 
 
-def test_compute_final_score_normalizes_weighted_average() -> None:
+def test_compute_final_score_normalizes_over_active_weights() -> None:
     score = compute_final_score(ScoringSignals(name=1.0))
 
-    assert score == round(0.20 / TOTAL_WEIGHT, 4)
+    assert score == 1.0
 
 
 def test_compute_final_score_clamps_negative_adjustments() -> None:
     score = compute_final_score(ScoringSignals(correction=-1.0))
 
     assert score == 0.0
+
+
+def test_compute_final_score_keeps_evaluated_zero_signals_in_active_denominator() -> None:
+    score = compute_final_score(
+        ScoringSignals(
+            name=1.0,
+            semantic=1.0,
+            knowledge=0.0,
+            canonical=1.0,
+            pattern=1.0,
+            statistical=1.0,
+            overlap=1.0,
+            embedding=0.0,
+            correction=0.0,
+            llm=0.0,
+        ),
+        {"name", "semantic", "knowledge", "canonical", "pattern", "statistical", "overlap"},
+    )
+
+    assert score == round(0.82 / 0.92, 4)
 
 
 def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None:
