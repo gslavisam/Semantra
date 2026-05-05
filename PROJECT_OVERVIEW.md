@@ -203,6 +203,32 @@ Implementation anchors:
 - `streamlit_ui/workspace_views.py`
 - `streamlit_ui/workspace_decision_views.py`
 
+### 7A. Planned Enterprise Integration Catalog
+
+Purpose:
+- turn versioned mapping sets and canonical coverage into a searchable enterprise inventory of reviewed integrations
+
+Current gap:
+- mapping sets are already persistable, auditable, and diffable, but they are still surfaced mainly as saved review artifacts
+- canonical coverage is visible in-session, not yet reusable as an estate-level catalog of integration knowledge
+- there is no cross-project search by canonical concept, source system, target system, owner, or lifecycle
+
+Target model:
+- `IntegrationAsset` as the stable identity for one business integration or interface
+- `MappingSetVersion` as the reviewable version artifact already present in the current product
+- `CanonicalCoverageSnapshot` as the queryable semantic footprint of one saved version
+- `MappingActivityIndex` as searchable `source -> concept -> target` rows for reuse and audit
+- `ReuseLink` as an explicit or derived relation between similar integrations that share canonical paths
+
+Minimal MVP direction:
+- extend mapping-set metadata with `integration_name`, `source_system`, `target_system`, `business_domain`, and `interface_type`
+- persist a queryable summary of canonical concepts, unmatched fields, and artifact type (`standard` vs `canonical-only`)
+- add catalog discovery APIs and a Streamlit catalog view with search, filters, drilldown, and reuse hints
+- support canonical-only artifacts so source-to-concept work becomes catalogable before a concrete target exists
+
+Reference:
+- see `INTEGRATION_CATALOG_VISION.md` for the fuller target model and MVP shape
+
 ### 8. Evaluation and Benchmarking
 
 Purpose:
