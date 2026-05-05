@@ -514,6 +514,15 @@ def render_benchmark_tab() -> None:
     )
 
 
+def render_catalog_tab() -> None:
+    from streamlit_ui.catalog_views import render_catalog_tab as _impl
+
+    return _impl(
+        admin_token_required=admin_token_required,
+        api_request=api_request,
+    )
+
+
 def render_workspace_tab() -> None:
     from streamlit_ui.workspace_views import render_workspace_tab as _impl
 
@@ -556,10 +565,13 @@ def main() -> None:
             st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
             st.rerun()
 
-    workspace_tab, benchmark_tab, debug_tab = st.tabs(["Workspace", "Benchmarks", "Admin / Debug"])
+    workspace_tab, catalog_tab, benchmark_tab, debug_tab = st.tabs(["Workspace", "Catalog", "Benchmarks", "Admin / Debug"])
 
     with workspace_tab:
         render_workspace_tab()
+
+    with catalog_tab:
+        render_catalog_tab()
 
     with debug_tab:
         render_admin_debug_tab()

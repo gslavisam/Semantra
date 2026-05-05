@@ -203,15 +203,21 @@ Implementation anchors:
 - `streamlit_ui/workspace_views.py`
 - `streamlit_ui/workspace_decision_views.py`
 
-### 7A. Planned Enterprise Integration Catalog
+### 7A. Enterprise Integration Catalog
 
 Purpose:
 - turn versioned mapping sets and canonical coverage into a searchable enterprise inventory of reviewed integrations
 
-Current gap:
-- mapping sets are already persistable, auditable, and diffable, but they are still surfaced mainly as saved review artifacts
-- canonical coverage is visible in-session, not yet reusable as an estate-level catalog of integration knowledge
-- there is no cross-project search by canonical concept, source system, target system, owner, or lifecycle
+Current implemented slice:
+- saved mapping sets now also populate a queryable catalog summary keyed by `integration_name`, source system, target system, business domain, owner, artifact type, canonical concepts, and unmatched sources
+- catalog APIs now expose list, detail, search, and canonical concept lookup flows over saved mapping versions
+- catalog detail now exposes similar integration suggestions based on shared canonical footprint and metadata overlap
+- Streamlit now includes a dedicated Catalog tab with search, filters, integration detail, mapping-set drilldown, audit/diff access, similar integration navigation, and `Reuse in Workspace`
+
+Current remaining gap:
+- catalog identity is still grouped by `integration_name`, not yet by a separate long-lived `IntegrationAsset` entity
+- similarity is currently derived from shared canonical footprint and metadata overlap, not yet from explicit curated reuse links
+- catalog governance still reuses mapping-set lifecycle primitives instead of a separate catalog administration model
 
 Target model:
 - `IntegrationAsset` as the stable identity for one business integration or interface
@@ -220,11 +226,17 @@ Target model:
 - `MappingActivityIndex` as searchable `source -> concept -> target` rows for reuse and audit
 - `ReuseLink` as an explicit or derived relation between similar integrations that share canonical paths
 
-Minimal MVP direction:
+Minimal MVP delivered today:
 - extend mapping-set metadata with `integration_name`, `source_system`, `target_system`, `business_domain`, and `interface_type`
 - persist a queryable summary of canonical concepts, unmatched fields, and artifact type (`standard` vs `canonical-only`)
-- add catalog discovery APIs and a Streamlit catalog view with search, filters, drilldown, and reuse hints
+- add catalog discovery APIs and a Streamlit catalog view with search, filters, drilldown, similar integration discovery, and reuse into Workspace
 - support canonical-only artifacts so source-to-concept work becomes catalogable before a concrete target exists
+
+Current catalog endpoints:
+- `GET /catalog/integrations`
+- `GET /catalog/search?q=...`
+- `GET /catalog/integrations/{integration_name}`
+- `GET /catalog/concepts/{concept_id}`
 
 Reference:
 - see `INTEGRATION_CATALOG_VISION.md` for the fuller target model and MVP shape
@@ -456,17 +468,18 @@ Input:
 
 Process:
 - run upload and review flows from a single operator surface
-- inspect explanations, canonical source/concept/target views, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, and saved mapping sets
-- apply saved mapping-set versions back into the current review state
+- inspect explanations, canonical source/concept/target views, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, saved mapping sets, and the catalog view over saved integrations
+- apply saved mapping-set versions back into the current review state either from Decisions or directly from Catalog via `Reuse in Workspace`
 
 Result:
-- fast analyst-friendly validation layer on top of the backend APIs
+- fast analyst-friendly validation layer on top of the backend APIs, plus a reusable catalog surface for search, drilldown, and mapping-set reuse
 
 Implementation anchor:
 - `streamlit_app.py`
 - `streamlit_ui/workspace_views.py`
 - `streamlit_ui/workspace_review_views.py`
 - `streamlit_ui/workspace_decision_views.py`
+- `streamlit_ui/catalog_views.py`
 - `streamlit_ui/admin_views.py`
 - `streamlit_ui/benchmark_views.py`
 

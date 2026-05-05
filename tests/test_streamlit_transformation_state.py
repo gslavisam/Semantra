@@ -666,8 +666,15 @@ def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> N
     fake_streamlit.session_state.update(
         {
             "upload_response": {
+                "mapping_mode": "canonical",
                 "source": {"dataset_id": "source-1"},
-                "target": {"dataset_id": "target-1"},
+                "target_system": "canonical",
+            },
+            "mapping_response": {
+                "canonical_coverage": {
+                    "source": {"unmatched_columns": ["LAND1"]},
+                    "project": {"concepts": ["customer.id"]},
+                }
             },
             "mapping_editor_state": {
                 "cust_id": {"target": "customer_id", "status": "accepted"},
@@ -689,8 +696,13 @@ def test_build_mapping_set_payload_uses_current_dataset_ids_and_decisions() -> N
     assert payload == {
         "name": "customer-master",
         "source_dataset_id": "source-1",
-        "target_dataset_id": "target-1",
+        "target_dataset_id": None,
         "mapping_decisions": [{"source": "cust_id", "target": "customer_id", "status": "accepted"}],
+        "integration_name": "customer-master",
+        "target_system": "canonical",
+        "artifact_type": "canonical-only",
+        "canonical_concepts": ["customer.id"],
+        "unmatched_sources": ["LAND1"],
         "created_by": "ba-user",
         "note": "Initial draft",
         "owner": "governance-team",

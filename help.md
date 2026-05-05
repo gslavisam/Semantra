@@ -516,10 +516,124 @@ Dropdown za izbor konkretne sačuvane mapping set verzije.
 
 - učitava izabrani mapping set u trenutno review stanje
 - upisuje audit događaj za `apply` akciju na backend-u
+- isti apply tok koristi i `Catalog > Reuse in Workspace`
 
 Kada koristiti:
 
 - kada želiš da nastaviš raniji review ili testiraš staru verziju odluka
+
+## Catalog tab
+
+Ova sekcija služi za pretragu sačuvanih integracija, pregled postojećih mapping verzija, audit/diff drilldown i reuse iz kataloga nazad u aktivni Workspace review tok.
+
+### `Run catalog query`
+
+Šta radi:
+
+- pokreće tekstualnu pretragu kroz `integration_name`, source/target sistem, owner, business domain i canonical concept
+- primenjuje aktivne filtere nad catalog zapisima
+
+Kada koristiti:
+
+- kada želiš brzo da nađeš sličnu ili ranije obrađenu integraciju bez ručnog listanja svih mapping set verzija
+
+### `Load all integrations`
+
+Šta radi:
+
+- učitava sve sačuvane catalog integracije i njihove verzije
+
+Kada koristiti:
+
+- kada želiš browse pregled celog trenutnog kataloga bez tekstualne pretrage
+
+### `Load detail`
+
+Šta radi:
+
+- učitava grupisani detail za izabrani `integration_name`
+- prikazuje verzije, latest version, latest approved version, canonical concepts, unmatched sources i similar integrations
+
+Kada koristiti:
+
+- kada želiš da razumeš celu istoriju jedne integracije pre nego što je uporediš ili ponovo upotrebiš
+
+### `Catalog version drilldown`
+
+Dropdown za izbor konkretne mapping set verzije iz trenutno otvorenog integration detail prikaza.
+
+### `Open selected version`
+
+Šta radi:
+
+- učitava konkretan mapping set detail unutar Catalog taba
+
+Kada koristiti:
+
+- kada želiš da pregledaš tačnu verziju odluka pre audit/diff ili reuse koraka
+
+### `Load selected audit`
+
+Šta radi:
+
+- učitava audit istoriju za trenutno izabranu mapping set verziju iz Catalog detail prikaza
+
+Kada koristiti:
+
+- kada želiš lifecycle pregled bez prelaska u Decisions sekciju
+
+### `Reuse in Workspace`
+
+Šta radi:
+
+- poziva isti backend `apply` tok kao `Apply saved mapping set`
+- prebacuje izabranu mapping set verziju u aktivni Workspace review state
+- puni `Review` i `Decisions` tabove mapping sadržajem iz kataloga
+
+Kada koristiti:
+
+- kada želiš da kreneš od postojeće integracije iz kataloga umesto od novog auto-mapping prolaza
+
+### `Open approved version`
+
+Šta radi:
+
+- otvara latest approved mapping set verziju iz trenutno otvorene integracije
+
+Kada koristiti:
+
+- kada želiš da referentno pogledaš governance-approved baseline umesto najnovijeg draft-a
+
+### `Similar Integrations`
+
+Šta prikazuje:
+
+- integracije koje dele canonical footprint i deo metadata signala sa trenutno otvorenom integracijom
+- explainable similarity signal kroz shared concepts, source/target sistem, business domain i artifact type
+
+Kada koristiti:
+
+- kada tražiš reuse signal ili sličan prethodni rad pre nego što napraviš novu verziju mapiranja
+
+### `Open similar integration`
+
+Šta radi:
+
+- otvara detail izabrane srodne integracije direktno iz Similar Integrations panela
+
+Kada koristiti:
+
+- kada želiš brzo da prelaziš između srodnih integracija bez novog catalog search koraka
+
+### `Concept Lookup`
+
+Šta radi:
+
+- pronalazi gde se određeni canonical concept već pojavljuje kroz sačuvane integracije i verzije
+
+Kada koristiti:
+
+- kada želiš concept-centric reuse pregled, na primer za `customer.id` ili sličan poslovni pojam
 
 ### `Saved mapping set status`
 

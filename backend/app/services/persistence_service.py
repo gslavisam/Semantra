@@ -9,6 +9,11 @@ from app.core.config import settings
 from app.models.knowledge import KnowledgeAuditEntry, KnowledgeOverlayEntry, KnowledgeOverlayVersion
 from app.models.mapping import (
     BenchmarkDatasetRecord,
+    CatalogConceptDetail,
+    CatalogConceptUsageRecord,
+    CatalogIntegrationDetail,
+    CatalogIntegrationRecord,
+    CatalogSimilarIntegrationRecord,
     DecisionLogEntry,
     EvaluationMetrics,
     EvaluationRunRecord,
@@ -101,6 +106,68 @@ class SQLitePersistenceService:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS mapping_catalog_entries (
+                    mapping_set_id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    integration_name TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    artifact_type TEXT NOT NULL,
+                    decision_count INTEGER NOT NULL,
+                    source_dataset_id TEXT,
+                    target_dataset_id TEXT,
+                    source_system TEXT,
+                    target_system TEXT,
+                    business_domain TEXT,
+                    interface_type TEXT,
+                    description TEXT,
+                    canonical_concepts_json TEXT NOT NULL,
+                    unmatched_sources_json TEXT NOT NULL,
+                    created_by TEXT,
+                    owner TEXT,
+                    assignee TEXT,
+                    created_at TEXT,
+                    FOREIGN KEY(mapping_set_id) REFERENCES mapping_sets(id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_integration_name ON mapping_catalog_entries (integration_name)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_source_target ON mapping_catalog_entries (source_system, target_system)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_status_artifact ON mapping_catalog_entries (status, artifact_type)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mapping_catalog_concepts (
+                    mapping_set_id INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    integration_name TEXT NOT NULL,
+                    concept_id TEXT NOT NULL,
+                    version INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    artifact_type TEXT NOT NULL,
+                    source_system TEXT,
+                    target_system TEXT,
+                    business_domain TEXT,
+                    owner TEXT,
+                    created_at TEXT,
+                    PRIMARY KEY(mapping_set_id, concept_id),
+                    FOREIGN KEY(mapping_set_id) REFERENCES mapping_sets(id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_concepts_concept ON mapping_catalog_concepts (concept_id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_concepts_integration ON mapping_catalog_concepts (integration_name)"
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS transformation_test_sets (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -134,6 +201,8 @@ class SQLitePersistenceService:
                 )
                 """
             )
+        self._backfill_mapping_catalog_entries()
+        self._backfill_mapping_catalog_concepts()
 
     def reconfigure(self, db_path: str) -> None:
         self.db_path = db_path
@@ -176,6 +245,8 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM user_corrections")
             connection.execute("DELETE FROM reusable_correction_rules")
             connection.execute("DELETE FROM mapping_set_audit_logs")
+            connection.execute("DELETE FROM mapping_catalog_concepts")
+            connection.execute("DELETE FROM mapping_catalog_entries")
             connection.execute("DELETE FROM mapping_sets")
             connection.execute("DELETE FROM benchmark_datasets")
             connection.execute("DELETE FROM evaluation_runs")
@@ -200,6 +271,15 @@ class SQLitePersistenceService:
         source_dataset_id: str | None = None,
         target_dataset_id: str | None = None,
         status: str = "draft",
+        integration_name: str | None = None,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        business_domain: str | None = None,
+        interface_type: str | None = None,
+        description: str | None = None,
+        artifact_type: str | None = None,
+        canonical_concepts: list[str] | None = None,
+        unmatched_sources: list[str] | None = None,
         created_by: str | None = None,
         note: str | None = None,
         owner: str | None = None,
@@ -211,6 +291,24 @@ class SQLitePersistenceService:
             default=0,
         )
         created_at = datetime.now(UTC).isoformat()
+        serialized_decisions = [
+            decision.model_dump(mode="json") if hasattr(decision, "model_dump") else dict(decision)
+            for decision in mapping_decisions
+        ]
+        normalized_integration_name = (integration_name or name).strip() or name
+        normalized_artifact_type = self._infer_artifact_type(
+            artifact_type,
+            target_dataset_id=target_dataset_id,
+            target_system=target_system,
+        )
+        normalized_canonical_concepts = self._normalize_text_list(
+            canonical_concepts,
+            fallback=self._infer_canonical_concepts(serialized_decisions, normalized_artifact_type),
+        )
+        normalized_unmatched_sources = self._normalize_text_list(
+            unmatched_sources,
+            fallback=self._infer_unmatched_sources(serialized_decisions),
+        )
         payload = json.dumps(
             {
                 "status": status,
@@ -218,16 +316,22 @@ class SQLitePersistenceService:
                 "decision_count": len(mapping_decisions),
                 "source_dataset_id": source_dataset_id,
                 "target_dataset_id": target_dataset_id,
+                "integration_name": normalized_integration_name,
+                "source_system": source_system,
+                "target_system": target_system,
+                "business_domain": business_domain,
+                "interface_type": interface_type,
+                "description": description,
+                "artifact_type": normalized_artifact_type,
+                "canonical_concepts": normalized_canonical_concepts,
+                "unmatched_sources": normalized_unmatched_sources,
                 "created_by": created_by,
                 "note": note,
                 "owner": owner,
                 "assignee": assignee,
                 "review_note": review_note,
                 "created_at": created_at,
-                "mapping_decisions": [
-                    decision.model_dump(mode="json") if hasattr(decision, "model_dump") else decision
-                    for decision in mapping_decisions
-                ],
+                "mapping_decisions": serialized_decisions,
             }
         )
         with self.connection() as connection:
@@ -236,6 +340,69 @@ class SQLitePersistenceService:
                 (name, payload),
             )
             mapping_set_id = int(cursor.lastrowid)
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO mapping_catalog_entries (
+                    mapping_set_id,
+                    name,
+                    integration_name,
+                    version,
+                    status,
+                    artifact_type,
+                    decision_count,
+                    source_dataset_id,
+                    target_dataset_id,
+                    source_system,
+                    target_system,
+                    business_domain,
+                    interface_type,
+                    description,
+                    canonical_concepts_json,
+                    unmatched_sources_json,
+                    created_by,
+                    owner,
+                    assignee,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    mapping_set_id,
+                    name,
+                    normalized_integration_name,
+                    version,
+                    status,
+                    normalized_artifact_type,
+                    len(mapping_decisions),
+                    source_dataset_id,
+                    target_dataset_id,
+                    source_system,
+                    target_system,
+                    business_domain,
+                    interface_type,
+                    description,
+                    json.dumps(normalized_canonical_concepts),
+                    json.dumps(normalized_unmatched_sources),
+                    created_by,
+                    owner,
+                    assignee,
+                    created_at,
+                ),
+            )
+            self._replace_catalog_concepts(
+                connection,
+                mapping_set_id=mapping_set_id,
+                name=name,
+                integration_name=normalized_integration_name,
+                version=version,
+                status=status,
+                artifact_type=normalized_artifact_type,
+                source_system=source_system,
+                target_system=target_system,
+                business_domain=business_domain,
+                owner=owner,
+                created_at=created_at,
+                canonical_concepts=normalized_canonical_concepts,
+            )
         return MappingSetRecord(
             mapping_set_id=mapping_set_id,
             name=name,
@@ -244,6 +411,15 @@ class SQLitePersistenceService:
             decision_count=len(mapping_decisions),
             source_dataset_id=source_dataset_id,
             target_dataset_id=target_dataset_id,
+            integration_name=normalized_integration_name,
+            source_system=source_system,
+            target_system=target_system,
+            business_domain=business_domain,
+            interface_type=interface_type,
+            description=description,
+            artifact_type=normalized_artifact_type,
+            canonical_concepts=normalized_canonical_concepts,
+            unmatched_sources=normalized_unmatched_sources,
             created_by=created_by,
             note=note,
             owner=owner,
@@ -269,6 +445,25 @@ class SQLitePersistenceService:
                     decision_count=payload.get("decision_count", len(payload.get("mapping_decisions", []))),
                     source_dataset_id=payload.get("source_dataset_id"),
                     target_dataset_id=payload.get("target_dataset_id"),
+                    integration_name=payload.get("integration_name", row[1]),
+                    source_system=payload.get("source_system"),
+                    target_system=payload.get("target_system"),
+                    business_domain=payload.get("business_domain"),
+                    interface_type=payload.get("interface_type"),
+                    description=payload.get("description"),
+                    artifact_type=payload.get(
+                        "artifact_type",
+                        self._infer_artifact_type(
+                            None,
+                            target_dataset_id=payload.get("target_dataset_id"),
+                            target_system=payload.get("target_system"),
+                        ),
+                    ),
+                    canonical_concepts=self._normalize_text_list(payload.get("canonical_concepts")),
+                    unmatched_sources=self._normalize_text_list(
+                        payload.get("unmatched_sources"),
+                        fallback=self._infer_unmatched_sources(payload.get("mapping_decisions", [])),
+                    ),
                     created_by=payload.get("created_by"),
                     note=payload.get("note"),
                     owner=payload.get("owner"),
@@ -296,6 +491,25 @@ class SQLitePersistenceService:
             decision_count=payload.get("decision_count", len(payload.get("mapping_decisions", []))),
             source_dataset_id=payload.get("source_dataset_id"),
             target_dataset_id=payload.get("target_dataset_id"),
+            integration_name=payload.get("integration_name", row[1]),
+            source_system=payload.get("source_system"),
+            target_system=payload.get("target_system"),
+            business_domain=payload.get("business_domain"),
+            interface_type=payload.get("interface_type"),
+            description=payload.get("description"),
+            artifact_type=payload.get(
+                "artifact_type",
+                self._infer_artifact_type(
+                    None,
+                    target_dataset_id=payload.get("target_dataset_id"),
+                    target_system=payload.get("target_system"),
+                ),
+            ),
+            canonical_concepts=self._normalize_text_list(payload.get("canonical_concepts")),
+            unmatched_sources=self._normalize_text_list(
+                payload.get("unmatched_sources"),
+                fallback=self._infer_unmatched_sources(payload.get("mapping_decisions", [])),
+            ),
             created_by=payload.get("created_by"),
             note=payload.get("note"),
             owner=payload.get("owner"),
@@ -329,6 +543,23 @@ class SQLitePersistenceService:
                 "UPDATE mapping_sets SET payload = ? WHERE id = ?",
                 (json.dumps(payload), mapping_set_id),
             )
+            connection.execute(
+                "UPDATE mapping_catalog_entries SET status = ?, owner = ?, assignee = ? WHERE mapping_set_id = ?",
+                (
+                    status,
+                    payload.get("owner"),
+                    payload.get("assignee"),
+                    mapping_set_id,
+                ),
+            )
+            connection.execute(
+                "UPDATE mapping_catalog_concepts SET status = ?, owner = ? WHERE mapping_set_id = ?",
+                (
+                    status,
+                    payload.get("owner"),
+                    mapping_set_id,
+                ),
+            )
         return existing.model_copy(
             update={
                 "status": status,
@@ -336,6 +567,213 @@ class SQLitePersistenceService:
                 "assignee": payload.get("assignee"),
                 "review_note": payload.get("review_note"),
             }
+        )
+
+    def list_catalog_integrations(
+        self,
+        *,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        business_domain: str | None = None,
+        owner: str | None = None,
+        status: str | None = None,
+        artifact_type: str | None = None,
+        integration_name: str | None = None,
+    ) -> list[CatalogIntegrationRecord]:
+        query = (
+            "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, decision_count, "
+            "source_dataset_id, target_dataset_id, source_system, target_system, business_domain, interface_type, "
+            "description, canonical_concepts_json, unmatched_sources_json, created_by, owner, assignee, created_at "
+            "FROM mapping_catalog_entries"
+        )
+        clauses: list[str] = []
+        params: list[object] = []
+        if source_system:
+            clauses.append("source_system = ?")
+            params.append(source_system)
+        if target_system:
+            clauses.append("target_system = ?")
+            params.append(target_system)
+        if business_domain:
+            clauses.append("business_domain = ?")
+            params.append(business_domain)
+        if owner:
+            clauses.append("owner = ?")
+            params.append(owner)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        if artifact_type:
+            clauses.append("artifact_type = ?")
+            params.append(artifact_type)
+        if integration_name:
+            clauses.append("integration_name LIKE ?")
+            params.append(f"%{integration_name}%")
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY integration_name ASC, version DESC, mapping_set_id DESC"
+
+        with self.connection() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [
+            self._catalog_record_from_row(row)
+            for row in rows
+        ]
+
+    def search_catalog_integrations(
+        self,
+        query_text: str,
+        *,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        business_domain: str | None = None,
+        owner: str | None = None,
+        status: str | None = None,
+        artifact_type: str | None = None,
+    ) -> list[CatalogIntegrationRecord]:
+        normalized_query = str(query_text or "").strip()
+        if not normalized_query:
+            return self.list_catalog_integrations(
+                source_system=source_system,
+                target_system=target_system,
+                business_domain=business_domain,
+                owner=owner,
+                status=status,
+                artifact_type=artifact_type,
+            )
+
+        search_like = f"%{normalized_query}%"
+        query = (
+            "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, decision_count, "
+            "source_dataset_id, target_dataset_id, source_system, target_system, business_domain, interface_type, "
+            "description, canonical_concepts_json, unmatched_sources_json, created_by, owner, assignee, created_at "
+            "FROM mapping_catalog_entries WHERE ("
+            "integration_name LIKE ? OR name LIKE ? OR COALESCE(source_system, '') LIKE ? OR COALESCE(target_system, '') LIKE ? "
+            "OR COALESCE(business_domain, '') LIKE ? OR COALESCE(interface_type, '') LIKE ? OR COALESCE(owner, '') LIKE ? "
+            "OR mapping_set_id IN (SELECT mapping_set_id FROM mapping_catalog_concepts WHERE concept_id LIKE ?))"
+        )
+        params: list[object] = [
+            search_like,
+            search_like,
+            search_like,
+            search_like,
+            search_like,
+            search_like,
+            search_like,
+            search_like,
+        ]
+        if source_system:
+            query += " AND source_system = ?"
+            params.append(source_system)
+        if target_system:
+            query += " AND target_system = ?"
+            params.append(target_system)
+        if business_domain:
+            query += " AND business_domain = ?"
+            params.append(business_domain)
+        if owner:
+            query += " AND owner = ?"
+            params.append(owner)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if artifact_type:
+            query += " AND artifact_type = ?"
+            params.append(artifact_type)
+        query += " ORDER BY integration_name ASC, version DESC, mapping_set_id DESC"
+
+        with self.connection() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [self._catalog_record_from_row(row) for row in rows]
+
+    def get_catalog_integration_detail(self, integration_name: str) -> CatalogIntegrationDetail:
+        records = self.list_catalog_integrations(integration_name=integration_name)
+        exact_matches = [record for record in records if record.integration_name == integration_name]
+        if not exact_matches:
+            raise KeyError(f"Unknown catalog integration: {integration_name}")
+        latest_version = exact_matches[0]
+        latest_approved_version = next((record for record in exact_matches if record.status == "approved"), None)
+        canonical_concepts = self._normalize_text_list(
+            [concept for record in exact_matches for concept in record.canonical_concepts]
+        )
+        unmatched_sources = self._normalize_text_list(
+            [source for record in exact_matches for source in record.unmatched_sources]
+        )
+        similar_integrations = self._list_similar_catalog_integrations(
+            integration_name=integration_name,
+            latest_version=latest_version,
+            latest_approved_version=latest_approved_version,
+            canonical_concepts=canonical_concepts,
+        )
+        return CatalogIntegrationDetail(
+            integration_name=integration_name,
+            source_system=latest_version.source_system,
+            target_system=latest_version.target_system,
+            business_domain=latest_version.business_domain,
+            interface_type=latest_version.interface_type,
+            description=latest_version.description,
+            canonical_concepts=canonical_concepts,
+            unmatched_sources=unmatched_sources,
+            latest_version=latest_version,
+            latest_approved_version=latest_approved_version,
+            versions=exact_matches,
+            similar_integrations=similar_integrations,
+        )
+
+    def get_catalog_concept_detail(
+        self,
+        concept_id: str,
+        *,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        status: str | None = None,
+        artifact_type: str | None = None,
+    ) -> CatalogConceptDetail:
+        query = (
+            "SELECT concept_id, mapping_set_id, name, integration_name, version, status, artifact_type, "
+            "source_system, target_system, business_domain, owner, created_at "
+            "FROM mapping_catalog_concepts WHERE concept_id = ?"
+        )
+        params: list[object] = [concept_id]
+        if source_system:
+            query += " AND source_system = ?"
+            params.append(source_system)
+        if target_system:
+            query += " AND target_system = ?"
+            params.append(target_system)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if artifact_type:
+            query += " AND artifact_type = ?"
+            params.append(artifact_type)
+        query += " ORDER BY integration_name ASC, version DESC, mapping_set_id DESC"
+
+        with self.connection() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        if not rows:
+            raise KeyError(f"Unknown catalog concept: {concept_id}")
+        integrations = [
+            CatalogConceptUsageRecord(
+                concept_id=row[0],
+                mapping_set_id=int(row[1]),
+                name=row[2],
+                integration_name=row[3],
+                version=int(row[4]),
+                status=row[5],
+                artifact_type=row[6],
+                source_system=row[7],
+                target_system=row[8],
+                business_domain=row[9],
+                owner=row[10],
+                created_at=row[11],
+            )
+            for row in rows
+        ]
+        return CatalogConceptDetail(
+            concept_id=concept_id,
+            usage_count=len(integrations),
+            integrations=integrations,
         )
 
     def append_mapping_set_audit_log(self, entry: MappingSetAuditEntry | dict[str, object]) -> MappingSetAuditEntry:
@@ -434,7 +872,312 @@ class SQLitePersistenceService:
     def clear_mapping_sets(self) -> None:
         with self.connection() as connection:
             connection.execute("DELETE FROM mapping_set_audit_logs")
+            connection.execute("DELETE FROM mapping_catalog_concepts")
+            connection.execute("DELETE FROM mapping_catalog_entries")
             connection.execute("DELETE FROM mapping_sets")
+
+    def _catalog_record_from_row(self, row: sqlite3.Row | tuple[object, ...]) -> CatalogIntegrationRecord:
+        return CatalogIntegrationRecord(
+            mapping_set_id=int(row[0]),
+            name=row[1],
+            integration_name=row[2],
+            version=int(row[3]),
+            status=row[4],
+            artifact_type=row[5],
+            decision_count=int(row[6]),
+            source_dataset_id=row[7],
+            target_dataset_id=row[8],
+            source_system=row[9],
+            target_system=row[10],
+            business_domain=row[11],
+            interface_type=row[12],
+            description=row[13],
+            canonical_concepts=json.loads(row[14] or "[]"),
+            unmatched_sources=json.loads(row[15] or "[]"),
+            created_by=row[16],
+            owner=row[17],
+            assignee=row[18],
+            created_at=row[19],
+        )
+
+    def _list_similar_catalog_integrations(
+        self,
+        *,
+        integration_name: str,
+        latest_version: CatalogIntegrationRecord,
+        latest_approved_version: CatalogIntegrationRecord | None,
+        canonical_concepts: list[str],
+    ) -> list[CatalogSimilarIntegrationRecord]:
+        reference_concepts = set(self._normalize_text_list(canonical_concepts))
+        if not reference_concepts:
+            return []
+
+        grouped_records: dict[str, list[CatalogIntegrationRecord]] = {}
+        for record in self.list_catalog_integrations():
+            if record.integration_name == integration_name:
+                continue
+            grouped_records.setdefault(record.integration_name, []).append(record)
+
+        similarities: list[CatalogSimilarIntegrationRecord] = []
+        for candidate_name, candidate_records in grouped_records.items():
+            candidate_latest_version = candidate_records[0]
+            candidate_latest_approved = next(
+                (record for record in candidate_records if record.status == "approved"),
+                None,
+            )
+            candidate_concepts = self._normalize_text_list(
+                concept
+                for record in candidate_records
+                for concept in record.canonical_concepts
+                if concept in reference_concepts
+            )
+            if not candidate_concepts:
+                continue
+
+            same_source_system = bool(latest_version.source_system) and (
+                candidate_latest_version.source_system == latest_version.source_system
+            )
+            same_target_system = bool(latest_version.target_system) and (
+                candidate_latest_version.target_system == latest_version.target_system
+            )
+            same_business_domain = bool(latest_version.business_domain) and (
+                candidate_latest_version.business_domain == latest_version.business_domain
+            )
+            same_artifact_type = candidate_latest_version.artifact_type == latest_version.artifact_type
+
+            max_score = (len(reference_concepts) * 3) + 4
+            weighted_score = (len(candidate_concepts) * 3)
+            weighted_score += int(same_source_system)
+            weighted_score += int(same_target_system)
+            weighted_score += int(same_business_domain)
+            weighted_score += int(same_artifact_type)
+
+            similarities.append(
+                CatalogSimilarIntegrationRecord(
+                    integration_name=candidate_name,
+                    similarity_score=round(weighted_score / max_score, 3),
+                    shared_concepts=candidate_concepts,
+                    shared_concept_count=len(candidate_concepts),
+                    same_source_system=same_source_system,
+                    same_target_system=same_target_system,
+                    same_business_domain=same_business_domain,
+                    same_artifact_type=same_artifact_type,
+                    latest_version=candidate_latest_version,
+                    latest_approved_version=candidate_latest_approved,
+                )
+            )
+
+        similarities.sort(
+            key=lambda item: (
+                -item.similarity_score,
+                -item.shared_concept_count,
+                item.integration_name.lower(),
+            )
+        )
+        return similarities
+
+    def _replace_catalog_concepts(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        mapping_set_id: int,
+        name: str,
+        integration_name: str,
+        version: int,
+        status: str,
+        artifact_type: str,
+        source_system: str | None,
+        target_system: str | None,
+        business_domain: str | None,
+        owner: str | None,
+        created_at: str | None,
+        canonical_concepts: list[str],
+    ) -> None:
+        connection.execute("DELETE FROM mapping_catalog_concepts WHERE mapping_set_id = ?", (mapping_set_id,))
+        for concept_id in canonical_concepts:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO mapping_catalog_concepts (
+                    mapping_set_id,
+                    name,
+                    integration_name,
+                    concept_id,
+                    version,
+                    status,
+                    artifact_type,
+                    source_system,
+                    target_system,
+                    business_domain,
+                    owner,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    mapping_set_id,
+                    name,
+                    integration_name,
+                    concept_id,
+                    version,
+                    status,
+                    artifact_type,
+                    source_system,
+                    target_system,
+                    business_domain,
+                    owner,
+                    created_at,
+                ),
+            )
+
+    def _normalize_text_list(
+        self,
+        values: list[object] | tuple[object, ...] | None,
+        *,
+        fallback: list[str] | None = None,
+    ) -> list[str]:
+        source_values = values if values is not None else fallback or []
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for value in source_values:
+            text = str(value or "").strip()
+            if not text or text in seen:
+                continue
+            seen.add(text)
+            normalized.append(text)
+        return normalized
+
+    def _infer_artifact_type(
+        self,
+        artifact_type: str | None,
+        *,
+        target_dataset_id: str | None,
+        target_system: str | None,
+    ) -> str:
+        normalized = str(artifact_type or "").strip().lower()
+        normalized_target_system = str(target_system or "").strip().lower()
+        has_target_dataset = bool(str(target_dataset_id or "").strip())
+        points_to_canonical = not normalized_target_system or normalized_target_system.startswith("canonical")
+
+        if normalized in {"standard", "canonical-only"}:
+            return normalized
+        if has_target_dataset:
+            return "standard"
+        if normalized_target_system and not points_to_canonical:
+            return "standard"
+        if not target_dataset_id and points_to_canonical:
+            return "canonical-only"
+        return "standard"
+
+    def _infer_canonical_concepts(self, mapping_decisions: list[dict[str, object]], artifact_type: str) -> list[str]:
+        if artifact_type != "canonical-only":
+            return []
+        return self._normalize_text_list(decision.get("target") for decision in mapping_decisions)
+
+    def _infer_unmatched_sources(self, mapping_decisions: list[dict[str, object]] | list[object]) -> list[str]:
+        unmatched: list[str] = []
+        seen: set[str] = set()
+        for raw_decision in mapping_decisions:
+            decision = raw_decision if isinstance(raw_decision, dict) else dict(raw_decision)
+            source = str(decision.get("source") or "").strip()
+            target = str(decision.get("target") or "").strip()
+            if source and not target and source not in seen:
+                seen.add(source)
+                unmatched.append(source)
+        return unmatched
+
+    def _backfill_mapping_catalog_entries(self) -> None:
+        mapping_sets = self.list_mapping_sets()
+        if not mapping_sets:
+            return
+        with self.connection() as connection:
+            existing_ids = {
+                int(row[0])
+                for row in connection.execute("SELECT mapping_set_id FROM mapping_catalog_entries").fetchall()
+            }
+            for record in mapping_sets:
+                if record.mapping_set_id in existing_ids:
+                    continue
+                detail = self.get_mapping_set(record.mapping_set_id)
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO mapping_catalog_entries (
+                        mapping_set_id,
+                        name,
+                        integration_name,
+                        version,
+                        status,
+                        artifact_type,
+                        decision_count,
+                        source_dataset_id,
+                        target_dataset_id,
+                        source_system,
+                        target_system,
+                        business_domain,
+                        interface_type,
+                        description,
+                        canonical_concepts_json,
+                        unmatched_sources_json,
+                        created_by,
+                        owner,
+                        assignee,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        detail.mapping_set_id,
+                        detail.name,
+                        detail.integration_name or detail.name,
+                        detail.version,
+                        detail.status,
+                        detail.artifact_type,
+                        detail.decision_count,
+                        detail.source_dataset_id,
+                        detail.target_dataset_id,
+                        detail.source_system,
+                        detail.target_system,
+                        detail.business_domain,
+                        detail.interface_type,
+                        detail.description,
+                        json.dumps(detail.canonical_concepts),
+                        json.dumps(detail.unmatched_sources),
+                        detail.created_by,
+                        detail.owner,
+                        detail.assignee,
+                        detail.created_at,
+                    ),
+                )
+
+    def _backfill_mapping_catalog_concepts(self) -> None:
+        with self.connection() as connection:
+            concept_ids_by_mapping_set: dict[int, int] = {
+                int(row[0]): int(row[1])
+                for row in connection.execute(
+                    "SELECT mapping_set_id, COUNT(*) FROM mapping_catalog_concepts GROUP BY mapping_set_id"
+                ).fetchall()
+            }
+            rows = connection.execute(
+                "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, "
+                "source_system, target_system, business_domain, owner, created_at, canonical_concepts_json "
+                "FROM mapping_catalog_entries"
+            ).fetchall()
+            for row in rows:
+                mapping_set_id = int(row[0])
+                if concept_ids_by_mapping_set.get(mapping_set_id, 0) > 0:
+                    continue
+                self._replace_catalog_concepts(
+                    connection,
+                    mapping_set_id=mapping_set_id,
+                    name=row[1],
+                    integration_name=row[2],
+                    version=int(row[3]),
+                    status=row[4],
+                    artifact_type=row[5],
+                    source_system=row[6],
+                    target_system=row[7],
+                    business_domain=row[8],
+                    owner=row[9],
+                    created_at=row[10],
+                    canonical_concepts=self._normalize_text_list(json.loads(row[11] or "[]")),
+                )
 
     def save_reusable_correction_rule(self, rule: ReusableCorrectionRule | dict[str, object]) -> ReusableCorrectionRule:
         payload_model = rule if isinstance(rule, ReusableCorrectionRule) else ReusableCorrectionRule.model_validate(rule)

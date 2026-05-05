@@ -10,6 +10,7 @@ DecisionStatus = Literal["accepted", "needs_review", "rejected"]
 UserCorrectionStatus = Literal["accepted", "rejected", "overridden"]
 ReusableCorrectionRuleStatus = Literal["accepted", "rejected", "overridden"]
 MappingSetStatus = Literal["draft", "review", "approved", "archived"]
+CatalogArtifactType = Literal["standard", "canonical-only"]
 TransformationPreviewMode = Literal["direct", "custom"]
 TransformationPreviewStatus = Literal["direct", "validated", "fallback"]
 TransformationPreviewClassification = Literal["direct", "safe", "risky", "custom"]
@@ -206,6 +207,15 @@ class MappingSetCreateRequest(BaseModel):
     source_dataset_id: str | None = None
     target_dataset_id: str | None = None
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
+    integration_name: str | None = None
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    interface_type: str | None = None
+    description: str | None = None
+    artifact_type: CatalogArtifactType | None = None
+    canonical_concepts: list[str] = Field(default_factory=list)
+    unmatched_sources: list[str] = Field(default_factory=list)
     created_by: str | None = None
     note: str | None = None
     owner: str | None = None
@@ -221,6 +231,15 @@ class MappingSetRecord(BaseModel):
     decision_count: int = 0
     source_dataset_id: str | None = None
     target_dataset_id: str | None = None
+    integration_name: str | None = None
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    interface_type: str | None = None
+    description: str | None = None
+    artifact_type: CatalogArtifactType = "standard"
+    canonical_concepts: list[str] = Field(default_factory=list)
+    unmatched_sources: list[str] = Field(default_factory=list)
     created_by: str | None = None
     note: str | None = None
     owner: str | None = None
@@ -231,6 +250,78 @@ class MappingSetRecord(BaseModel):
 
 class MappingSetDetail(MappingSetRecord):
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
+
+
+class CatalogIntegrationRecord(BaseModel):
+    mapping_set_id: int
+    name: str
+    integration_name: str
+    version: int = 1
+    status: MappingSetStatus = "draft"
+    artifact_type: CatalogArtifactType = "standard"
+    decision_count: int = 0
+    source_dataset_id: str | None = None
+    target_dataset_id: str | None = None
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    interface_type: str | None = None
+    description: str | None = None
+    canonical_concepts: list[str] = Field(default_factory=list)
+    unmatched_sources: list[str] = Field(default_factory=list)
+    created_by: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    created_at: str | None = None
+
+
+class CatalogIntegrationDetail(BaseModel):
+    integration_name: str
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    interface_type: str | None = None
+    description: str | None = None
+    canonical_concepts: list[str] = Field(default_factory=list)
+    unmatched_sources: list[str] = Field(default_factory=list)
+    latest_version: CatalogIntegrationRecord
+    latest_approved_version: CatalogIntegrationRecord | None = None
+    versions: list[CatalogIntegrationRecord] = Field(default_factory=list)
+    similar_integrations: list["CatalogSimilarIntegrationRecord"] = Field(default_factory=list)
+
+
+class CatalogSimilarIntegrationRecord(BaseModel):
+    integration_name: str
+    similarity_score: float = 0.0
+    shared_concepts: list[str] = Field(default_factory=list)
+    shared_concept_count: int = 0
+    same_source_system: bool = False
+    same_target_system: bool = False
+    same_business_domain: bool = False
+    same_artifact_type: bool = False
+    latest_version: CatalogIntegrationRecord
+    latest_approved_version: CatalogIntegrationRecord | None = None
+
+
+class CatalogConceptUsageRecord(BaseModel):
+    concept_id: str
+    mapping_set_id: int
+    name: str
+    integration_name: str
+    version: int = 1
+    status: MappingSetStatus = "draft"
+    artifact_type: CatalogArtifactType = "standard"
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    owner: str | None = None
+    created_at: str | None = None
+
+
+class CatalogConceptDetail(BaseModel):
+    concept_id: str
+    usage_count: int = 0
+    integrations: list[CatalogConceptUsageRecord] = Field(default_factory=list)
 
 
 class MappingSetStatusUpdateRequest(BaseModel):

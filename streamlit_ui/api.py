@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import httpx
 import streamlit as st
+from typing import Any
 
 
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
@@ -14,7 +15,8 @@ def api_request(
     files: dict | None = None,
     data: dict | None = None,
     json: dict | None = None,
-) -> dict:
+    params: dict | None = None,
+) -> Any:
     headers = {"Accept": "application/json"}
     admin_token = st.session_state.get("admin_token", "").strip()
     if admin_token:
@@ -29,6 +31,7 @@ def api_request(
             files=files,
             data=data,
             json=json,
+            params=params,
         )
     response.raise_for_status()
     return response.json()

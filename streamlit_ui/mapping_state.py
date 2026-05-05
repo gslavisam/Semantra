@@ -173,11 +173,23 @@ def build_mapping_set_payload(
     assignee: str | None = None,
     review_note: str | None = None,
 ) -> dict:
+    upload_response = session_state.get("upload_response", {})
+    mapping_response = session_state.get("mapping_response", {})
+    canonical_coverage = mapping_response.get("canonical_coverage", {}) if isinstance(mapping_response, dict) else {}
+    source_coverage = canonical_coverage.get("source", {}) if isinstance(canonical_coverage, dict) else {}
+    project_coverage = canonical_coverage.get("project", {}) if isinstance(canonical_coverage, dict) else {}
+    mapping_mode = str(upload_response.get("mapping_mode", "standard") or "standard").strip().lower()
+    target_system = upload_response.get("target_system") if mapping_mode == "canonical" else None
     return {
         "name": name,
-        "source_dataset_id": session_state.get("upload_response", {}).get("source", {}).get("dataset_id"),
-        "target_dataset_id": session_state.get("upload_response", {}).get("target", {}).get("dataset_id"),
+        "source_dataset_id": upload_response.get("source", {}).get("dataset_id"),
+        "target_dataset_id": upload_response.get("target", {}).get("dataset_id"),
         "mapping_decisions": build_mapping_decisions_func(),
+        "integration_name": name,
+        "target_system": target_system,
+        "artifact_type": "canonical-only" if mapping_mode == "canonical" else "standard",
+        "canonical_concepts": project_coverage.get("concepts", []) or [],
+        "unmatched_sources": source_coverage.get("unmatched_columns", []) or [],
         "created_by": (created_by or "").strip() or None,
         "note": (note or "").strip() or None,
         "owner": (owner or "").strip() or None,

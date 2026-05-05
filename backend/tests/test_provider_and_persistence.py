@@ -209,6 +209,15 @@ def test_mapping_sets_roundtrip_and_audit_through_persistence() -> None:
         ],
         source_dataset_id="source-1",
         target_dataset_id="target-1",
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        interface_type="batch",
+        description="Nightly customer sync",
+        artifact_type="standard",
+        canonical_concepts=["customer.id", "customer.phone"],
+        unmatched_sources=["country_code"],
         created_by="qa-user",
         note="Initial draft",
         owner="governance-team",
@@ -238,16 +247,205 @@ def test_mapping_sets_roundtrip_and_audit_through_persistence() -> None:
     listed = persistence_service.list_mapping_sets()
     loaded = persistence_service.get_mapping_set(saved.mapping_set_id)
     audits = persistence_service.list_mapping_set_audit_logs(saved.mapping_set_id)
+    catalog = persistence_service.list_catalog_integrations()
 
     assert saved.version == 1
     assert updated.status == "review"
     assert listed[0].name == "customer-master"
     assert loaded.mapping_decisions[0].target == "customer_id"
+    assert loaded.integration_name == "Customer Master Sync"
+    assert loaded.artifact_type == "standard"
+    assert loaded.canonical_concepts == ["customer.id", "customer.phone"]
+    assert loaded.unmatched_sources == ["country_code"]
     assert loaded.owner == "governance-team"
     assert loaded.assignee == "analyst-2"
     assert loaded.review_note == "Ready for review"
     assert audit.audit_id is not None
     assert audits[0].action == "status_change"
+    assert catalog[0].integration_name == "Customer Master Sync"
+    assert catalog[0].status == "review"
+    assert catalog[0].source_system == "SAP"
+    assert catalog[0].target_system == "Salesforce"
+
+
+def test_catalog_entry_infers_canonical_only_artifact_from_saved_mapping_set() -> None:
+    saved = persistence_service.save_mapping_set(
+        "sap-country-concepts",
+        [
+            {"source": "KUNNR", "target": "customer.id", "status": "accepted"},
+            {"source": "LAND1", "target": "", "status": "needs_review"},
+        ],
+        integration_name="SAP Customer Canonical",
+        target_system="canonical",
+    )
+
+    catalog = persistence_service.list_catalog_integrations(
+        artifact_type="canonical-only",
+        integration_name="SAP Customer Canonical",
+    )
+
+    assert saved.artifact_type == "canonical-only"
+    assert catalog[0].canonical_concepts == ["customer.id"]
+    assert catalog[0].unmatched_sources == ["LAND1"]
+
+
+def test_catalog_entry_infers_standard_artifact_from_concrete_target_system() -> None:
+    saved = persistence_service.save_mapping_set(
+        "customer-master-no-target-dataset",
+        [
+            {"source": "KUNNR", "target": "customer.id", "status": "accepted"},
+        ],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+    )
+
+    catalog = persistence_service.list_catalog_integrations(integration_name="Customer Master Sync")
+
+    assert saved.artifact_type == "standard"
+    assert catalog[0].artifact_type == "standard"
+
+
+def test_catalog_detail_groups_versions_and_exposes_latest_approved() -> None:
+    first = persistence_service.save_mapping_set(
+        "customer-master",
+        [{"source": "cust_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        artifact_type="canonical-only",
+        canonical_concepts=["customer.id"],
+    )
+    persistence_service.update_mapping_set_status(first.mapping_set_id, "approved", owner="governance-team")
+    persistence_service.save_mapping_set(
+        "customer-master",
+        [{"source": "cust_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        artifact_type="canonical-only",
+        canonical_concepts=["customer.id", "customer.name"],
+        unmatched_sources=["LAND1"],
+    )
+
+    detail = persistence_service.get_catalog_integration_detail("Customer Master Sync")
+
+    assert detail.latest_version.version == 2
+    assert detail.latest_approved_version is not None
+    assert detail.latest_approved_version.version == 1
+    assert detail.canonical_concepts == ["customer.id", "customer.name"]
+    assert detail.unmatched_sources == ["LAND1"]
+    assert [version.version for version in detail.versions] == [2, 1]
+
+
+def test_catalog_detail_includes_ranked_similar_integrations() -> None:
+    persistence_service.save_mapping_set(
+        "customer-master",
+        [{"source": "cust_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        artifact_type="canonical-only",
+        canonical_concepts=["customer.id", "customer.name", "customer.country_code"],
+    )
+    persistence_service.save_mapping_set(
+        "lead-reuse",
+        [{"source": "lead_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Lead Reuse Sync",
+        source_system="CRM",
+        target_system="Salesforce",
+        business_domain="Customer",
+        artifact_type="canonical-only",
+        canonical_concepts=["customer.id", "customer.name"],
+    )
+    persistence_service.save_mapping_set(
+        "customer-finance",
+        [{"source": "cust_code", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Finance Snapshot",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Finance",
+        artifact_type="standard",
+        canonical_concepts=["customer.id"],
+    )
+
+    detail = persistence_service.get_catalog_integration_detail("Customer Master Sync")
+
+    assert [item.integration_name for item in detail.similar_integrations] == [
+        "Lead Reuse Sync",
+        "Customer Finance Snapshot",
+    ]
+    assert detail.similar_integrations[0].shared_concepts == ["customer.id", "customer.name"]
+    assert detail.similar_integrations[0].same_target_system is True
+    assert detail.similar_integrations[0].same_business_domain is True
+    assert detail.similar_integrations[1].same_source_system is True
+    assert detail.similar_integrations[1].same_artifact_type is False
+
+
+def test_catalog_concept_detail_lists_all_matching_integrations() -> None:
+    persistence_service.save_mapping_set(
+        "customer-master",
+        [{"source": "cust_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        canonical_concepts=["customer.id"],
+    )
+    persistence_service.save_mapping_set(
+        "lead-master",
+        [{"source": "lead_ref", "target": "customer.id", "status": "accepted"}],
+        integration_name="Lead Reuse Sync",
+        source_system="CRM",
+        target_system="Salesforce",
+        business_domain="Customer",
+        canonical_concepts=["customer.id"],
+    )
+
+    concept_detail = persistence_service.get_catalog_concept_detail("customer.id")
+
+    assert concept_detail.concept_id == "customer.id"
+    assert concept_detail.usage_count == 2
+    assert [item.integration_name for item in concept_detail.integrations] == [
+        "Customer Master Sync",
+        "Lead Reuse Sync",
+    ]
+
+
+def test_catalog_search_matches_metadata_and_concept_filters() -> None:
+    persistence_service.save_mapping_set(
+        "customer-master",
+        [{"source": "cust_id", "target": "customer.id", "status": "accepted"}],
+        integration_name="Customer Master Sync",
+        source_system="SAP",
+        target_system="Salesforce",
+        business_domain="Customer",
+        owner="governance-team",
+        canonical_concepts=["customer.id"],
+    )
+    persistence_service.save_mapping_set(
+        "vendor-master",
+        [{"source": "vendor_id", "target": "vendor.id", "status": "accepted"}],
+        integration_name="Vendor Master Sync",
+        source_system="SAP",
+        target_system="Coupa",
+        business_domain="Vendor",
+        owner="finance-team",
+        canonical_concepts=["vendor.id"],
+    )
+
+    concept_matches = persistence_service.search_catalog_integrations("customer.id")
+    filtered_matches = persistence_service.search_catalog_integrations(
+        "SAP",
+        business_domain="Customer",
+        owner="governance-team",
+    )
+
+    assert [item.integration_name for item in concept_matches] == ["Customer Master Sync"]
+    assert [item.integration_name for item in filtered_matches] == ["Customer Master Sync"]
 
 
 def test_mapping_set_versions_increment_for_same_name() -> None:

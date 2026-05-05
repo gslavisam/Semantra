@@ -516,10 +516,124 @@ What it does:
 
 - loads the selected mapping set into the current review state
 - writes an `apply` audit event on the backend
+- the same apply flow is also used by `Catalog > Reuse in Workspace`
 
 When to use it:
 
 - when you want to continue earlier review work or test an older decision set
+
+## Catalog tab
+
+This section is used to search saved integrations, inspect existing mapping versions, drill into audit/diff context, and reuse a catalog entry back into the active Workspace review flow.
+
+### `Run catalog query`
+
+What it does:
+
+- runs text search across `integration_name`, source/target system, owner, business domain, and canonical concept
+- applies the active filters to the catalog records
+
+When to use it:
+
+- when you want to quickly find a similar or previously reviewed integration without manually browsing all saved mapping set versions
+
+### `Load all integrations`
+
+What it does:
+
+- loads all saved catalog integrations and their versions
+
+When to use it:
+
+- when you want a browse view of the full current catalog without typing a search query
+
+### `Load detail`
+
+What it does:
+
+- loads the grouped detail for the selected `integration_name`
+- shows versions, latest version, latest approved version, canonical concepts, unmatched sources, and similar integrations
+
+When to use it:
+
+- when you want to understand the full history of one integration before comparing or reusing it
+
+### `Catalog version drilldown`
+
+Dropdown for choosing a concrete mapping set version from the currently open integration detail view.
+
+### `Open selected version`
+
+What it does:
+
+- loads the concrete mapping set detail inside the Catalog tab
+
+When to use it:
+
+- when you want to inspect the exact reviewed version before audit, diff, or reuse
+
+### `Load selected audit`
+
+What it does:
+
+- loads the audit trail for the currently selected mapping set version from the Catalog detail view
+
+When to use it:
+
+- when you want lifecycle context without moving back into the Decisions section
+
+### `Reuse in Workspace`
+
+What it does:
+
+- calls the same backend `apply` flow as `Apply saved mapping set`
+- moves the selected mapping set version into the active Workspace review state
+- populates the `Review` and `Decisions` tabs with the mapping content taken from the catalog entry
+
+When to use it:
+
+- when you want to start from an existing cataloged integration instead of from a new auto-mapping pass
+
+### `Open approved version`
+
+What it does:
+
+- opens the latest approved mapping set version from the currently open integration
+
+When to use it:
+
+- when you want to inspect the governance-approved baseline instead of the latest draft
+
+### `Similar Integrations`
+
+What it shows:
+
+- integrations that share canonical footprint and part of the metadata signal with the currently open integration
+- an explainable similarity signal through shared concepts, source/target system, business domain, and artifact type
+
+When to use it:
+
+- when you want a reuse signal or a comparable previous implementation before creating a new mapping version
+
+### `Open similar integration`
+
+What it does:
+
+- opens the detail of the selected related integration directly from the Similar Integrations panel
+
+When to use it:
+
+- when you want to move quickly between related integrations without running a new catalog search
+
+### `Concept Lookup`
+
+What it does:
+
+- finds where a specific canonical concept already appears across saved integrations and versions
+
+When to use it:
+
+- when you want a concept-centric reuse view, for example for `customer.id` or another business concept
 
 ### `Saved mapping set status`
 
