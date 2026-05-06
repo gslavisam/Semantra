@@ -593,7 +593,7 @@ def main() -> None:
 
     with benchmark_tab:
         render_benchmark_tab()
-
+# comment
 
 if __name__ == "__main__":
     main()
