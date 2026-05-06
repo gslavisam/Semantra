@@ -96,6 +96,27 @@ def render_workspace_tab(
                         f"description={source_spec_hint.get('description_col') or '-'}, "
                         f"type={source_spec_hint.get('type_col') or '-'}"
                     )
+                elif source_mode == "Schema spec":
+                    st.caption(
+                        "Auto-detection found no matching column headers. "
+                        "Enter the column names from your spec file manually."
+                    )
+                    _src_cols = st.columns(3)
+                    _src_cols[0].text_input(
+                        "Name column",
+                        key="source_spec_manual_name_col",
+                        placeholder="e.g. Column",
+                    )
+                    _src_cols[1].text_input(
+                        "Description column",
+                        key="source_spec_manual_desc_col",
+                        placeholder="e.g. Description",
+                    )
+                    _src_cols[2].text_input(
+                        "Type column",
+                        key="source_spec_manual_type_col",
+                        placeholder="e.g. Type",
+                    )
 
         target_mode = "data"
         if target_file is not None:
@@ -115,6 +136,27 @@ def render_workspace_tab(
                         f"name={target_spec_hint['name_col']}, "
                         f"description={target_spec_hint.get('description_col') or '-'}, "
                         f"type={target_spec_hint.get('type_col') or '-'}"
+                    )
+                elif target_mode == "Schema spec":
+                    st.caption(
+                        "Auto-detection found no matching column headers. "
+                        "Enter the column names from your spec file manually."
+                    )
+                    _tgt_cols = st.columns(3)
+                    _tgt_cols[0].text_input(
+                        "Name column",
+                        key="target_spec_manual_name_col",
+                        placeholder="e.g. Column",
+                    )
+                    _tgt_cols[1].text_input(
+                        "Description column",
+                        key="target_spec_manual_desc_col",
+                        placeholder="e.g. Description",
+                    )
+                    _tgt_cols[2].text_input(
+                        "Type column",
+                        key="target_spec_manual_type_col",
+                        placeholder="e.g. Type",
                     )
 
         st.subheader("3. Select Tables")
@@ -148,6 +190,9 @@ def render_workspace_tab(
                         source_file,
                         mode="spec" if source_mode == "Schema spec" else "data",
                         selected_table=source_table,
+                        name_col=source_spec_hint.get("name_col") if source_spec_hint else (st.session_state.get("source_spec_manual_name_col") or None),
+                        description_col=source_spec_hint.get("description_col") if source_spec_hint else (st.session_state.get("source_spec_manual_desc_col") or None),
+                        type_col=source_spec_hint.get("type_col") if source_spec_hint else (st.session_state.get("source_spec_manual_type_col") or None),
                     ),
                 }
                 if canonical_mode:
@@ -157,6 +202,9 @@ def render_workspace_tab(
                         target_file,
                         mode="spec" if target_mode == "Schema spec" else "data",
                         selected_table=target_table,
+                        name_col=target_spec_hint.get("name_col") if target_spec_hint else (st.session_state.get("target_spec_manual_name_col") or None),
+                        description_col=target_spec_hint.get("description_col") if target_spec_hint else (st.session_state.get("target_spec_manual_desc_col") or None),
+                        type_col=target_spec_hint.get("type_col") if target_spec_hint else (st.session_state.get("target_spec_manual_type_col") or None),
                     )
                 st.session_state["upload_response"] = payload
                 st.session_state.pop("mapping_response", None)
@@ -189,6 +237,15 @@ def render_workspace_tab(
                     render_dataset_summary("Target", upload_response["target"])
 
             st.subheader("3. Review Mapping")
+            use_llm = st.checkbox(
+                "Use LLM validation",
+                value=st.session_state.get("use_llm_validation", True),
+                key="use_llm_validation",
+                help=(
+                    "When enabled, Semantra calls the configured LLM provider for fields in the ambiguity band. "
+                    "Disable this if no LLM is running locally to avoid timeouts."
+                ),
+            )
             button_label = "Generate canonical mapping" if upload_mode == "canonical" else "Generate mapping"
             button_key = "generate_canonical_mapping" if upload_mode == "canonical" else "generate_mapping"
             if st.button(button_label, type="primary", key=button_key):
@@ -200,7 +257,9 @@ def render_workspace_tab(
                             json={
                                 "source_dataset_id": upload_response["source"]["dataset_id"],
                                 "target_system": upload_response.get("target_system", "canonical"),
+                                "use_llm": use_llm,
                             },
+                            timeout=600.0,
                         )
                     else:
                         mapping_response = api_request(
@@ -209,7 +268,9 @@ def render_workspace_tab(
                             json={
                                 "source_dataset_id": upload_response["source"]["dataset_id"],
                                 "target_dataset_id": upload_response["target"]["dataset_id"],
+                                "use_llm": use_llm,
                             },
+                            timeout=600.0,
                         )
                     st.session_state["mapping_response"] = mapping_response
                     initialize_mapping_editor_state(mapping_response)
@@ -230,8 +291,8 @@ def render_workspace_tab(
 
             if mapping_response:
                 st.success(
-                    "Mapping is ready. Continue in Review for trust-layer inspection, Decisions for overrides and mapping sets, "
-                    "or Output for preview and Pandas code generation."
+                    "\u2705 Mapping is ready \u2013 switch to the **Review** tab to inspect trust scores and candidates, "
+                    "or **Decisions** to manage overrides and export."
                 )
         else:
             if canonical_mode:

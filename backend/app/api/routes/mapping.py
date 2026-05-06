@@ -74,7 +74,7 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
     return generate_mapping_candidates(
         source.handle.schema_profile,
         target.handle.schema_profile,
-        llm_provider=build_provider_from_settings(),
+        llm_provider=build_provider_from_settings() if request.use_llm else None,
     )
 
 
@@ -92,7 +92,7 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
     return generate_mapping_candidates(
         source.handle.schema_profile,
         target_schema,
-        llm_provider=build_provider_from_settings(),
+        llm_provider=build_provider_from_settings() if request.use_llm else None,
     )
 
 

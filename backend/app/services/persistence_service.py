@@ -201,6 +201,79 @@ class SQLitePersistenceService:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_concepts (
+                    concept_id   TEXT PRIMARY KEY,
+                    domain       TEXT NOT NULL DEFAULT '',
+                    canonical_name TEXT NOT NULL,
+                    aliases_json TEXT NOT NULL DEFAULT '[]',
+                    context_terms_json TEXT NOT NULL DEFAULT '[]'
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_field_contexts (
+                    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                    concept_id         TEXT NOT NULL,
+                    system             TEXT NOT NULL DEFAULT '',
+                    object_name        TEXT NOT NULL DEFAULT '',
+                    field_name         TEXT NOT NULL DEFAULT '',
+                    category           TEXT NOT NULL DEFAULT '',
+                    object_description TEXT NOT NULL DEFAULT '',
+                    field_description  TEXT NOT NULL DEFAULT '',
+                    note               TEXT NOT NULL DEFAULT '',
+                    FOREIGN KEY(concept_id) REFERENCES knowledge_concepts(concept_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_kfc_concept ON knowledge_field_contexts(concept_id)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS canonical_concepts (
+                    concept_id   TEXT PRIMARY KEY,
+                    entity       TEXT NOT NULL DEFAULT '',
+                    attribute    TEXT NOT NULL DEFAULT '',
+                    display_name TEXT NOT NULL,
+                    description  TEXT NOT NULL DEFAULT '',
+                    data_type    TEXT NOT NULL DEFAULT '',
+                    aliases_json TEXT NOT NULL DEFAULT '[]'
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS canonical_field_contexts (
+                    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                    concept_id         TEXT NOT NULL,
+                    system             TEXT NOT NULL DEFAULT '',
+                    object_name        TEXT NOT NULL DEFAULT '',
+                    field_name         TEXT NOT NULL DEFAULT '',
+                    category           TEXT NOT NULL DEFAULT '',
+                    object_description TEXT NOT NULL DEFAULT '',
+                    field_description  TEXT NOT NULL DEFAULT '',
+                    note               TEXT NOT NULL DEFAULT '',
+                    FOREIGN KEY(concept_id) REFERENCES canonical_concepts(concept_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_cfc_concept ON canonical_field_contexts(concept_id)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS knowledge_seed_meta (
+                    id              INTEGER PRIMARY KEY CHECK(id = 1),
+                    seeded_at       TEXT NOT NULL,
+                    source_hash     TEXT NOT NULL,
+                    concept_count   INTEGER NOT NULL DEFAULT 0,
+                    canonical_count INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
         self._backfill_mapping_catalog_entries()
         self._backfill_mapping_catalog_concepts()
 
@@ -1580,6 +1653,205 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM knowledge_overlay_entries")
             connection.execute("DELETE FROM knowledge_overlay_versions")
             connection.execute("DELETE FROM knowledge_audit_logs")
+
+    # ------------------------------------------------------------------
+    # Knowledge base persistence (canonical concepts + knowledge concepts)
+    # ------------------------------------------------------------------
+
+    def get_knowledge_seed_meta(self) -> dict | None:
+        """Return the seed metadata row, or None if the DB has never been seeded."""
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT seeded_at, source_hash, concept_count, canonical_count FROM knowledge_seed_meta WHERE id = 1"
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "seeded_at":       row[0],
+            "source_hash":     row[1],
+            "concept_count":   row[2],
+            "canonical_count": row[3],
+        }
+
+    def save_knowledge_seed_meta(
+        self,
+        source_hash: str,
+        concept_count: int,
+        canonical_count: int,
+        seeded_at: str | None = None,
+    ) -> None:
+        from datetime import UTC, datetime
+        ts = seeded_at or datetime.now(UTC).isoformat()
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO knowledge_seed_meta (id, seeded_at, source_hash, concept_count, canonical_count)
+                VALUES (1, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    seeded_at       = excluded.seeded_at,
+                    source_hash     = excluded.source_hash,
+                    concept_count   = excluded.concept_count,
+                    canonical_count = excluded.canonical_count
+                """,
+                (ts, source_hash, concept_count, canonical_count),
+            )
+
+    def seed_knowledge_concepts(
+        self,
+        concepts: list,   # list[KnowledgeConcept] — typed in caller
+        canonical_concepts: list,  # list[CanonicalBusinessConcept]
+        canonical_field_contexts: list[tuple[str, object]],
+    ) -> None:
+        """Replace the entire knowledge base in the DB atomically."""
+        with self.connection() as connection:
+            connection.execute("DELETE FROM canonical_field_contexts")
+            connection.execute("DELETE FROM knowledge_field_contexts")
+            connection.execute("DELETE FROM knowledge_concepts")
+            connection.execute("DELETE FROM canonical_concepts")
+
+            for c in concepts:
+                connection.execute(
+                    """
+                    INSERT INTO knowledge_concepts
+                        (concept_id, domain, canonical_name, aliases_json, context_terms_json)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        c.concept_id,
+                        c.domain,
+                        c.canonical_name,
+                        json.dumps(sorted(c.aliases)),
+                        json.dumps(sorted(c.context_terms)),
+                    ),
+                )
+                for ctx in c.contexts:
+                    connection.execute(
+                        """
+                        INSERT INTO knowledge_field_contexts
+                            (concept_id, system, object_name, field_name,
+                             category, object_description, field_description, note)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            c.concept_id,
+                            ctx.system,
+                            ctx.object_name,
+                            ctx.field_name,
+                            ctx.category,
+                            ctx.object_description,
+                            ctx.field_description,
+                            ctx.note,
+                        ),
+                    )
+
+            for cc in canonical_concepts:
+                connection.execute(
+                    """
+                    INSERT INTO canonical_concepts
+                        (concept_id, entity, attribute, display_name, description, data_type, aliases_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        cc.concept_id,
+                        cc.entity,
+                        cc.attribute,
+                        cc.display_name,
+                        cc.description,
+                        cc.data_type,
+                        json.dumps(sorted(cc.aliases)),
+                    ),
+                )
+
+            for concept_id, ctx in canonical_field_contexts:
+                connection.execute(
+                    """
+                    INSERT INTO canonical_field_contexts
+                        (concept_id, system, object_name, field_name,
+                         category, object_description, field_description, note)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        concept_id,
+                        ctx.system,
+                        ctx.object_name,
+                        ctx.field_name,
+                        ctx.category,
+                        ctx.object_description,
+                        ctx.field_description,
+                        ctx.note,
+                    ),
+                )
+
+    def load_knowledge_concepts(self) -> tuple[list, list, list]:
+        """Return persisted knowledge concepts, canonical concepts, and canonical field contexts."""
+        with self.connection() as connection:
+            kc_rows = connection.execute(
+                "SELECT concept_id, domain, canonical_name, aliases_json, context_terms_json FROM knowledge_concepts"
+            ).fetchall()
+            ctx_rows = connection.execute(
+                """
+                SELECT concept_id, system, object_name, field_name,
+                       category, object_description, field_description, note
+                FROM knowledge_field_contexts
+                """
+            ).fetchall()
+            cc_rows = connection.execute(
+                "SELECT concept_id, entity, attribute, display_name, description, data_type, aliases_json FROM canonical_concepts"
+            ).fetchall()
+            canonical_ctx_rows = connection.execute(
+                """
+                SELECT concept_id, system, object_name, field_name,
+                       category, object_description, field_description, note
+                FROM canonical_field_contexts
+                """
+            ).fetchall()
+
+        # Group contexts by concept_id
+        contexts_by_concept: dict[str, list[dict]] = {}
+        for row in ctx_rows:
+            contexts_by_concept.setdefault(row[0], []).append({
+                "system": row[1], "object_name": row[2], "field_name": row[3],
+                "category": row[4], "object_description": row[5],
+                "field_description": row[6], "note": row[7],
+            })
+
+        knowledge_dicts = [
+            {
+                "concept_id":    row[0],
+                "domain":        row[1],
+                "canonical_name": row[2],
+                "aliases":       json.loads(row[3]),
+                "context_terms": json.loads(row[4]),
+                "contexts":      contexts_by_concept.get(row[0], []),
+            }
+            for row in kc_rows
+        ]
+        canonical_dicts = [
+            {
+                "concept_id":   row[0],
+                "entity":       row[1],
+                "attribute":    row[2],
+                "display_name": row[3],
+                "description":  row[4],
+                "data_type":    row[5],
+                "aliases":      json.loads(row[6]),
+            }
+            for row in cc_rows
+        ]
+        canonical_context_dicts = [
+            {
+                "concept_id": row[0],
+                "system": row[1],
+                "object_name": row[2],
+                "field_name": row[3],
+                "category": row[4],
+                "object_description": row[5],
+                "field_description": row[6],
+                "note": row[7],
+            }
+            for row in canonical_ctx_rows
+        ]
+        return knowledge_dicts, canonical_dicts, canonical_context_dicts
 
 
 persistence_service = SQLitePersistenceService(settings.sqlite_path)

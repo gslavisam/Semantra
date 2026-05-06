@@ -6,10 +6,11 @@ from pathlib import Path
 import pytest
 
 from app.core.config import settings
+from app.models.mapping import ScoringSignals
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import evaluate_cases
 from app.services.llm_service import StaticLLMProvider, call_transformation_generator, call_validator
-from app.services.mapping_service import generate_mapping_candidates
+from app.services.mapping_service import CandidateScore, generate_mapping_candidates, should_run_canonical_semantic_rescue, should_run_llm_validation
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.spec_upload_service import parse_spec_payload
 from app.services.virtual_target_service import build_virtual_target_schema
@@ -158,36 +159,67 @@ def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -
         settings.llm_gate_min_score, settings.llm_gate_max_score = previous_bounds
 
 
-def test_canonical_semantic_only_low_confidence_candidate_can_trigger_llm_no_match() -> None:
+def test_erdat_now_resolves_to_generic_created_date_without_llm() -> None:
+    # Under the ERP glossary, ERDAT is modeled as a generic technical created date,
+    # so it now resolves directly to document.created_date and bypasses LLM rescue.
     provider = StaticLLMProvider(
-        '{"selected_target":"no_match","confidence":0.92,"reasoning":["LAND1 is a country key and the closed candidate set does not contain a reliable country concept match."]}'
+        '{"selected_target":"no_match","confidence":0.92,"reasoning":["ERDAT is a creation date field and no reliable date concept exists in the closed candidate set."]}'
     )
     fixture_path = Path(__file__).parents[2] / "ui_fixtures" / "source_schema_spec.csv"
     source_schema = parse_spec_payload(fixture_path.read_bytes(), fixture_path.name)
 
     result = generate_mapping_candidates(source_schema, build_virtual_target_schema("canonical"), llm_provider=provider)
-    land1 = next(mapping for mapping in result.mappings if mapping.source == "LAND1")
+    erdat = next(mapping for mapping in result.mappings if mapping.source == "ERDAT")
     logs = decision_log_store.list_entries()
 
-    assert land1.method == "llm_validator_no_match"
-    assert land1.target is None
-    assert any("LLM validator rejected the available candidates" in line for line in land1.explanation)
-    assert any(entry.source == "LAND1" and entry.used_llm for entry in logs)
+    assert erdat.method == "multi_signal_heuristic"
+    assert erdat.target == "document.created_date"
+    assert erdat.signals.canonical == 1.0
+    assert any(entry.source == "ERDAT" and entry.used_llm is False for entry in logs)
 
 
-def test_canonical_rescue_turns_low_confidence_llm_pick_into_no_match() -> None:
+def test_strong_canonical_near_tie_still_uses_llm_arbitration() -> None:
     provider = StaticLLMProvider(
-        '```json\n{"selected_target":"vendor.name","confidence":0.2632,"reasoning":["No strong target match exists in the closed set."]}\n```'
+        '{"selected_target":"vendor.name","confidence":0.81,"reasoning":["NAME1 is ambiguous between customer and vendor naming concepts in the closed set."]}'
     )
     fixture_path = Path(__file__).parents[2] / "ui_fixtures" / "source_schema_spec.csv"
     source_schema = parse_spec_payload(fixture_path.read_bytes(), fixture_path.name)
+    name1_column = next(column for column in source_schema.columns if column.name == "NAME1")
+    single_column_schema = SchemaProfile(
+        dataset_id="name1-only",
+        dataset_name="name1_only.csv",
+        row_count=source_schema.row_count,
+        columns=[name1_column],
+    )
 
-    result = generate_mapping_candidates(source_schema, build_virtual_target_schema("canonical"), llm_provider=provider)
-    land1 = next(mapping for mapping in result.mappings if mapping.source == "LAND1")
+    result = generate_mapping_candidates(single_column_schema, build_virtual_target_schema("canonical"), llm_provider=provider)
+    name1 = result.mappings[0]
+    logs = decision_log_store.list_entries()
 
-    assert land1.method == "llm_validator_no_match"
-    assert land1.target is None
-    assert any("treated as no_match in rescue mode" in line for line in land1.explanation)
+    assert name1.source == "NAME1"
+    assert name1.method == "llm_validated"
+    assert name1.target == "vendor.name"
+    assert any("LLM validator" in line for line in name1.explanation)
+    assert any(entry.source == "NAME1" and entry.used_llm for entry in logs)
+
+
+def test_canonical_rescue_gate_triggers_for_semantic_only_low_confidence_candidate() -> None:
+    candidate = CandidateScore(
+        source=make_column("supplier_label", ["text"], ["Supplier A", "Supplier B"]),
+        target=make_column("vendor.name", ["text"], ["Vendor A", "Vendor B"]),
+        score=0.34,
+        signals=ScoringSignals(
+            semantic=0.58,
+            knowledge=0.0,
+            canonical=0.0,
+            statistical=0.32,
+        ),
+        explanation=[],
+        active_signal_names={"semantic", "statistical"},
+    )
+
+    assert should_run_canonical_semantic_rescue(candidate) is True
+    assert should_run_llm_validation([candidate]) is True
 
 
 def test_llm_can_generate_transformation_code_from_user_instruction() -> None:

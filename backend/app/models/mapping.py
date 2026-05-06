@@ -100,6 +100,7 @@ class MappingDecision(BaseModel):
 class AutoMappingRequest(BaseModel):
     source_dataset_id: str
     target_dataset_id: str
+    use_llm: bool = True
 
 
 TargetSystem = Literal["canonical"]
@@ -108,6 +109,7 @@ TargetSystem = Literal["canonical"]
 class CanonicalMappingRequest(BaseModel):
     source_dataset_id: str
     target_system: TargetSystem = "canonical"
+    use_llm: bool = True
 
 
 class CanonicalCoverageColumnMatch(BaseModel):
@@ -377,6 +379,8 @@ class MappingSetDiffResponse(BaseModel):
 class RuntimeConfigSnapshot(BaseModel):
     llm_provider: str
     llm_model: str
+    llm_timeout_seconds: float
+    lmstudio_base_url: str
     embedding_provider: str
     cors_origins: list[str] = Field(default_factory=list)
     sqlite_path: str

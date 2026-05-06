@@ -62,7 +62,7 @@ async def export_canonical_glossary() -> Response:
     return Response(
         content=payload,
         media_type="text/csv",
-        headers={"Content-Disposition": 'attachment; filename="canonical_glossary.csv"'},
+        headers={"Content-Disposition": f'attachment; filename="{metadata_knowledge_service.canonical_glossary_path.name}"'},
     )
 
 
@@ -75,7 +75,7 @@ async def import_canonical_glossary(file: UploadFile = File(...)) -> CanonicalGl
         raise HTTPException(status_code=400, detail=str(error)) from error
     append_audit_entry(
         "create",
-        f"Imported canonical glossary '{file.filename or 'canonical_glossary.csv'}' with {result.imported_row_count} rows.",
+        f"Imported canonical glossary '{file.filename or metadata_knowledge_service.canonical_glossary_path.name}' with {result.imported_row_count} rows.",
     )
     return result
 
@@ -193,4 +193,25 @@ async def rollback_knowledge_overlay() -> KnowledgeRuntimeStatus:
 @router.post("/reload", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])
 async def reload_knowledge() -> KnowledgeRuntimeStatus:
     metadata_knowledge_service.refresh()
+    return build_runtime_status()
+
+
+@router.post("/reseed", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])
+async def reseed_knowledge() -> KnowledgeRuntimeStatus:
+    """Force reload of all knowledge from source files and re-persist to SQLite.
+
+    Use this after modifying any of the source CSV/XLSX/XML knowledge files.
+    After the reseed completes, subsequent restarts will load from the DB only
+    (unless source files change again).
+    """
+    stats = metadata_knowledge_service.reseed_from_files()
+    append_audit_entry(
+        "reseed",
+        (
+            f"Reseeded knowledge from source files: "
+            f"{stats['concept_count']} concepts, "
+            f"{stats['canonical_count']} canonical, "
+            f"{stats['alias_count']} aliases."
+        ),
+    )
     return build_runtime_status()

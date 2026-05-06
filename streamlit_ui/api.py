@@ -16,6 +16,7 @@ def api_request(
     data: dict | None = None,
     json: dict | None = None,
     params: dict | None = None,
+    timeout: float = 60.0,
 ) -> Any:
     headers = {"Accept": "application/json"}
     admin_token = st.session_state.get("admin_token", "").strip()
@@ -23,7 +24,7 @@ def api_request(
         headers["X-Admin-Token"] = admin_token
 
     base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
-    with httpx.Client(timeout=60.0) as client:
+    with httpx.Client(timeout=timeout) as client:
         response = client.request(
             method,
             f"{base_url}{path}",
@@ -33,8 +34,21 @@ def api_request(
             json=json,
             params=params,
         )
-    response.raise_for_status()
+    _raise_for_status(response)
     return response.json()
+
+
+def _raise_for_status(response: httpx.Response) -> None:
+    if response.is_error:
+        try:
+            detail = response.json().get("detail", response.text)
+        except Exception:
+            detail = response.text
+        raise httpx.HTTPStatusError(
+            f"HTTP {response.status_code}: {detail}",
+            request=response.request,
+            response=response,
+        )
 
 
 def upload_file_to_request_files(uploaded_file) -> dict | None:
@@ -70,13 +84,28 @@ def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
     return hint
 
 
-def upload_dataset_handle(uploaded_file, *, mode: str, selected_table: str | None = None) -> dict:
+def upload_dataset_handle(
+    uploaded_file,
+    *,
+    mode: str,
+    selected_table: str | None = None,
+    name_col: str | None = None,
+    description_col: str | None = None,
+    type_col: str | None = None,
+) -> dict:
     if uploaded_file is None:
         raise ValueError("Select a file before uploading.")
 
     request_files = upload_file_to_request_files(uploaded_file)
     if mode == "spec":
-        return api_request("POST", "/upload/spec", files=request_files)
+        form_data: dict[str, str] = {}
+        if name_col:
+            form_data["name_col"] = name_col
+        if description_col:
+            form_data["description_col"] = description_col
+        if type_col:
+            form_data["type_col"] = type_col
+        return api_request("POST", "/upload/spec", files=request_files, data=form_data or None)
     return api_request(
         "POST",
         "/upload/handle",

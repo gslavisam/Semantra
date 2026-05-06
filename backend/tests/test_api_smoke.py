@@ -575,6 +575,19 @@ def test_canonical_glossary_export_and_import_flow() -> None:
         metadata_knowledge_service.refresh()
 
 
+def test_knowledge_reseed_endpoint_refreshes_runtime_and_writes_audit_entry() -> None:
+    response = client.post("/knowledge/reseed")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["concept_count"] > 0
+    assert payload["canonical_concept_count"] > 0
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    assert any(entry["action"] == "reseed" for entry in audit_response.json())
+
+
 def test_canonical_glossary_export_excludes_active_overlay_aliases() -> None:
     overlay_response = client.post(
         "/knowledge/overlays",

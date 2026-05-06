@@ -55,7 +55,7 @@ def test_canonical_mapping_endpoint_returns_404_for_unknown_source_dataset() -> 
     assert response.json()["detail"] == "'Unknown dataset_id: missing-dataset-id'"
 
 
-def test_canonical_mapping_endpoint_can_use_llm_for_low_confidence_semantic_only_case() -> None:
+def test_canonical_mapping_endpoint_land1_resolves_correctly_via_knowledge_bridge() -> None:
     fixture_path = Path(__file__).parents[2] / "ui_fixtures" / "source_schema_spec.csv"
     upload_response = client.post(
         "/upload/spec",
@@ -69,8 +69,10 @@ def test_canonical_mapping_endpoint_can_use_llm_for_low_confidence_semantic_only
     )
     assert upload_response.status_code == 200
 
+    # LLM is present but LAND1 should now be resolved confidently via the KC→CC bridge
+    # (bridge maps KC "country" → CC "address.country"), so LLM validator is NOT needed.
     provider = StaticLLMProvider(
-        '{"selected_target":"no_match","confidence":0.92,"reasoning":["LAND1 is a country key and the closed candidate set does not contain a reliable country concept match."]}'
+        '{"selected_target":"no_match","confidence":0.92,"reasoning":["LLM says no_match for everything"]}'
     )
     with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
         response = client.post(
@@ -81,9 +83,10 @@ def test_canonical_mapping_endpoint_can_use_llm_for_low_confidence_semantic_only
     assert response.status_code == 200
     payload = response.json()
     land1 = next(item for item in payload["mappings"] if item["source"] == "LAND1")
-    assert land1["method"] == "llm_validator_no_match"
-    assert land1["target"] is None
-    assert any("LLM validator rejected the available candidates" in line for line in land1["explanation"])
+    # LAND1 now reaches an address canonical concept via the KC→CC alias bridge,
+    # so it should have a definitive match (not LLM-rejected null).
+    assert land1["target"] is not None
+    assert land1["method"] != "llm_validator_no_match"
 
 
 def csv_bytes(text: str) -> bytes:

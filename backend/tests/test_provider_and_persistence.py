@@ -9,7 +9,7 @@ from app.models.knowledge import KnowledgeAuditEntry, KnowledgeOverlayEntry
 from app.models.mapping import DecisionLogEntry, EvaluationMetrics, ReusableCorrectionRule, TransformationTestCase, UserCorrectionEntry
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
-from app.services.llm_service import OllamaProvider, OpenAIResponsesProvider, build_provider_from_settings
+from app.services.llm_service import LMStudioProvider, OllamaProvider, OpenAIResponsesProvider, build_provider_from_settings
 from app.services.persistence_service import persistence_service
 
 
@@ -88,14 +88,14 @@ def test_provider_factory_builds_lmstudio_openai_compatible_provider() -> None:
     previous = (settings.llm_provider, settings.llm_model, settings.lmstudio_base_url, settings.openai_api_key)
     settings.llm_provider = "lmstudio"
     settings.llm_model = "local-model"
-    settings.lmstudio_base_url = "http://127.0.0.1:1234/v1/responses"
+    settings.lmstudio_base_url = "http://127.0.0.1:1234/v1/chat/completions"
     settings.openai_api_key = "should-not-be-used"
     try:
         provider = build_provider_from_settings()
 
-        assert isinstance(provider, OpenAIResponsesProvider)
-        assert provider.base_url == "http://127.0.0.1:1234/v1/responses"
-        assert provider.api_key == ""
+        assert isinstance(provider, LMStudioProvider)
+        assert provider.base_url == "http://127.0.0.1:1234/v1/chat/completions"
+        assert provider.model == "local-model"
     finally:
         settings.llm_provider, settings.llm_model, settings.lmstudio_base_url, settings.openai_api_key = previous
 

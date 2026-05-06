@@ -1,0 +1,311 @@
+entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note
+concept_alias,Job Position,employee.position,Integration_ID_Data,Locations,Workday,"The unique location ID. The organization, position and hire tabs will reference location ID."
+concept_alias,Address Country,address.country,Default_Currency_Reference,Locations,Workday,The default currency for the location. This value is either derived from the currency of the location country (using the
+concept_alias,Company ID,company.id,Organization_Reference_ID,Organizations & Roles,Workday,"Organization Reference ID. To ensure backward compatibility, the Organization Reference ID element will not be populated"
+concept_alias,Manager ID,employee.manager_id,Include_Leader_In_Name,Organizations & Roles,Workday,Boolean attribute identifying whether to include the Manager/Leader Name within the name (Display ID in Workday). A new 
+concept_alias,Job Position,employee.position,Position_Management_Enabled,Organizations & Roles,Workday,Element containing boolean attribute identifying whether Position Management is enabled.
+concept_alias,Employee Department,employee.department,Primary_Business_Site_Reference,Organizations & Roles,Workday,Primary location (for supervisory organizations) is effective dated.
+concept_alias,Address Country,address.country,Country_ISO_Code,Human Capital Management,Workday,"Country ISO code. If the Country ISO code is specified, then this ISO code will be used to determine the Country Phone C"
+concept_alias,employee.phone,employee.phone,Phone_Number,Human Capital Management,Workday,Phone number.
+concept_alias,Address Country,address.country,Country_Of_Birth_Reference,Human Capital Management,Workday,ISO Code identifying the country where the naming rules for this name are defined. Workday enables you to specify an ISO
+concept_alias,Address City,address.city,Place_Of_Birth,Human Capital Management,Workday,City or Place of Birth.
+concept_alias,Date of Birth,employee.birth_date,Date_Of_Birth,Human Capital Management,Workday,Date of Birth.
+concept_alias,Address Country,address.country,Nationality_Reference,Human Capital Management,Workday,Reference for the person's Country of Nationality
+concept_alias,Address Country,address.country,Hukou_Region_Reference,Human Capital Management,Workday,Country Region on the Hukou of the person. This field is only available for the country China and the person with citize
+concept_alias,Address Country,address.country,Hukou_Subregion_Reference,Human Capital Management,Workday,Country Subregion on the Hukou of the person. This field is only available for the country China and the person with cit
+concept_alias,Address Country,address.country,Hukou_Locality,Human Capital Management,Workday,Locality on the Hukou of the person. This field is only available for the country China and the person with citizenship 
+concept_alias,Address Country,address.country,Hukou_Postal_Code,Human Capital Management,Workday,Hukou postal code for the person. This field is only available for the country China and the person with citizenship sta
+concept_alias,Address Country,address.country,Hukou_Type_Reference,Human Capital Management,Workday,Hukou type on the Hukou of the person. This field is only available for the country China and the person with citizenshi
+concept_alias,Address Country,address.country,Country_Reference,Human Capital Management,Workday,Reference element representing the country.
+concept_alias,Address Country,address.country,Locale_Reference,Human Capital Management,Workday,The local defines the user's language and country which will affect their experience in the Workday system.
+concept_alias,Employee ID,employee.id,Employee_ID,Human Capital Management,Workday,Text attribute identifying Employee ID.
+concept_alias,Employee ID,employee.id,Contingent_Worker_ID,Human Capital Management,Workday,Text attribute identifying Contingent Worker ID.
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_1,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_2,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_3,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_4,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_5,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_6,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_7,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_8,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_9,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Job Position,employee.position,Job_Previous_System_History_Text_10,Human Capital Management,Workday,Additional text field which can be added to the Job and Position History grid on the Maintain Worker History from Previo
+concept_alias,Employee Name,employee.name,First_Name,Human Capital Management,Workday,Person first name.This field will only have a value if mapped to a name component for the country (identified by the ISO
+concept_alias,Address Country,address.country,Middle_Name,Human Capital Management,Workday,Person middle name.This field will only have a value if mapped to a name component for the country (identified by the IS
+concept_alias,Employee Name,employee.name,Last_Name,Human Capital Management,Workday,
+concept_alias,Job Position,employee.position,Business_Title,Human Capital Management,Workday,The Business Title for the worker's primary position. This value cannot be updated in the Update Employee Personal Infor
+concept_alias,Job Position,employee.position,Position_ID,Human Capital Management,Workday,Text attribute identifying Position ID.
+concept_alias,Job Position,employee.position,Position_Title,Human Capital Management,Workday,Text attribute identifying Position Title.
+concept_alias,Job Position,employee.position,Job_Exempt,Human Capital Management,Workday,Boolean attribute identifying whether Position is Exempt.
+concept_alias,Job Position,employee.position,Scheduled_Weekly_Hours,Human Capital Management,Workday,Scheduled Weekly Hours for Position.
+concept_alias,Job Position,employee.position,Default_Weekly_Hours,Human Capital Management,Workday,Standard Weekly Hours for Position.
+concept_alias,Job Position,employee.position,Full_Time_Equivalent_Percentage,Human Capital Management,Workday,Full Time Equivalent Percentage for Position.
+concept_alias,Job Position,employee.position,Specify_Paid_FTE,Human Capital Management,Workday,True if Paid FTE Percentage is specified on the position.
+concept_alias,Job Position,employee.position,Paid_FTE,Human Capital Management,Workday,"The paid full time equivalent percentage for the position, entered as a decimal value. This overrides the calculated ful"
+concept_alias,Job Position,employee.position,Specify_Working_FTE,Human Capital Management,Workday,True if Working FTE Percentage is specified on the position.
+concept_alias,Job Position,employee.position,Working_FTE,Human Capital Management,Workday,"The working full time equivalent percentage for the position, entered as a decimal value. This overrides the calculated "
+concept_alias,Manager ID,employee.manager_id,Supervisor_Reference,Human Capital Management,Workday,Contains the reference to the manager of the worker. This will contain only one manager - even if there are actually mul
+concept_alias,Job Position,employee.position,Work_Shift_Reference,Human Capital Management,Workday,The work hour profile(s) for the position.
+concept_alias,Job Position,employee.position,Work_Hours_Profile_Reference,Human Capital Management,Workday,The work hour profile(s) for the position.
+concept_alias,Hire Date,employee.hire_date,Hire_Date,Human Capital Management,Workday,Most recent Hire Date for the Worker.
+concept_alias,Hire Date,employee.hire_date,Original_Hire_Date,Human Capital Management,Workday,Earliest Hire Date for the Worker.
+concept_alias,Hire Date,employee.hire_date,Seniority_Date,Human Capital Management,Workday,Seniority date for the worker. Defaults to hire date.
+concept_alias,Base Salary,compensation.base_salary,Total_Base_Pay,Compensation,Workday,Total Base Pay (as stated for Frequency).
+concept_alias,Job Position,employee.position,Pay_Rate_Type_Reference,Payroll,Workday,Reference to the pay rate type for the position.
+concept_alias,Job Position,employee.position,Pay_Group_Reference,Payroll,Workday,The external pay group for the position.
+concept_alias,Job Position,employee.position,Payroll_Entity_Reference,Payroll,Workday,The external payroll entity for the position.
+concept_alias,employee.termination_date,employee.termination_date,Termination_Date,Human Capital Management,Workday,Most recent Termination Date.
+concept_alias,Job Position,employee.position,Probation_Start_Date,Human Capital Management,Workday,Primary Position Probation Start Date
+concept_alias,Job Position,employee.position,Probation_End_Date,Human Capital Management,Workday,Primary Position Probation End Date
+concept_alias,Invoice Currency,invoice.currency,Currency_Code,Human Capital Management,Workday,The preferred Currency for the contract pay rate.
+concept_alias,Address Postal Code,address.postal_code,Postal_Code,Human Capital Management,Workday,Postal Code
+concept_alias,Warehouse ID,warehouse.id,Location_ID,Locations,Workday,"The unique location ID. The organization, position and hire tabs will reference location ID."
+concept_alias,Warehouse ID,warehouse.id,Superior_Location_Reference,Locations,Workday,"Superior Location Reference. Reference to another Location that is Superior. If left blank, existing values will be remo"
+concept_alias,Warehouse ID,warehouse.id,Location_Identifier,Locations,Workday,The location identifier of the location.
+concept_alias,Job Position,employee.position,Contract_Pay_Rate,Human Capital Management,Workday,The Contract Pay Rate for the position. Automatically calculated based on the Compensation and Frequency values.
+concept_alias,Invoice Currency,invoice.currency,Currency_Reference_Data,Human Capital Management,Workday,Reference element representing a unique instance of Currency Rate Type.
+concept_alias,Warehouse ID,warehouse.id,Location_Reference,Human Capital Management,Workday,Location Reference. Reference to a Country or Country Region.
+concept_alias,Address Country,address.country,Show_All_Personal_Information,Human Capital Management,Workday,Show All Personal Information by Country
+concept_alias,Employee Department,employee.department,Exclude_Supervisory_Organizations,Human Capital Management,Workday,Excludes the supervisory organizations from the Organization Data element response. This can only be selected when the I
+concept_alias,Manager ID,employee.manager_id,Include_Multiple_Managers_in_Management_Chain_Data,Human Capital Management,Workday,Set to true to return multiple managers in the management chain data section. Default selection is to return a single ma
+concept_alias,Employee ID,employee.id,Worker_ID,Human Capital Management,Workday,The ID for the employee or contingent worker.
+concept_alias,Job Position,employee.position,Employment_Data,Human Capital Management,Workday,"Contains the worker's employment information, such as their position and job information. Security Note: This element is"
+concept_alias,Job Position,employee.position,Succession_Profile_Data,Human Capital Management,Workday,Contains a list of positions for which the employee is a succession candidate. This is only valid for a worker than is a
+concept_alias,Employee Name,employee.name,Legal_Name_Data,Human Capital Management,Workday,Contains the legal name for a person. A person must name one and only one legal name.
+concept_alias,Employee Name,employee.name,Preferred_Name_Data,Human Capital Management,Workday,Contains the preferred name for a person. If no preferred name is returned then the legal name is assumed to be the pref
+concept_alias,Employee Name,employee.name,Full_Name_for_Singapore_and_Malaysia,Human Capital Management,Workday,Full Person Name is used by Malaysia and Singapore. It is designed for (eliminate space between these two words) Workers
+concept_alias,Address Country,address.country,Salutation_Reference,Human Capital Management,Workday,A reference to the Form of Address for a person. This is only valid for the country of Germany.
+concept_alias,Address Country,address.country,Academic_Suffix_Reference,Human Capital Management,Workday,A reference to the Academic Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Address Country,address.country,Hereditary_Suffix_Reference,Human Capital Management,Workday,A reference to the Hereditary Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Address Country,address.country,Honorary_Suffix_Reference,Human Capital Management,Workday,A reference to the Honorary Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Address Country,address.country,Professional_Suffix_Reference,Human Capital Management,Workday,A reference to the Professional Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Address Country,address.country,Religious_Suffix_Reference,Human Capital Management,Workday,A reference to the Religious Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Address Country,address.country,Royal_Suffix_Reference,Human Capital Management,Workday,A reference to the Royal Suffix for a person. This is only valid for the country of Australia.
+concept_alias,Employee ID,employee.id,Identification_Data,Human Capital Management,Workday,"The id information for the person (national ids, government ids, passport ids, visa ids, license ids, custom ids). Secur"
+concept_alias,National ID,employee.national_id,National_ID,Human Capital Management,Workday,Wrapper element for all National Identifier Data.
+concept_alias,Passport ID,employee.passport_id,Passport_ID,Human Capital Management,Workday,Wrapper element for all Passport Identifier Data.
+concept_alias,Address City,address.city,Municipality,Human Capital Management,Workday,City part of the address.
+concept_alias,Address Country,address.country,Country_City_Reference,Human Capital Management,Workday,Country city for the address.
+concept_alias,Address City,address.city,Municipality_Local,Human Capital Management,Workday,City in local script part of the address.
+concept_alias,National ID,employee.national_id,National_ID_Reference,Human Capital Management,Workday,The Reference ID for the National Identifier.
+concept_alias,National ID,employee.national_id,National_ID_Data,Human Capital Management,Workday,Wrapper element for the National Identifier Data
+concept_alias,National ID,employee.national_id,National_ID_Shared_Reference,Human Capital Management,Workday,Shared Reference ID for National Identifiers.
+concept_alias,National ID,employee.national_id,ID,Human Capital Management,Workday,National Identifier ID.
+concept_alias,National ID,employee.national_id,ID_Type_Reference,Human Capital Management,Workday,National Identifier Type.
+concept_alias,National ID,employee.national_id,Country_Reference,Human Capital Management,Workday,Country issuing National Identifier.
+concept_alias,National ID,employee.national_id,Issued_Date,Human Capital Management,Workday,Date the National Identifier was issued.
+concept_alias,National ID,employee.national_id,Expiration_Date,Human Capital Management,Workday,Expiration Date of the National Identifier.
+concept_alias,National ID,employee.national_id,Verification_Date,Human Capital Management,Workday,Date the National Identifier was verified.
+concept_alias,Address Country,address.country,Country_Region_Reference,Human Capital Management,Workday,"Country Region issuing the License Identifier. No more than one Country Reference, Country Region Reference, or Authorit"
+concept_alias,Address Country,address.country,Country_Region_Descriptor,Human Capital Management,Workday,"Country Region issuing the License Identifier. No more than one Country Reference, Country Region Reference, or Authorit"
+concept_alias,Address Country,address.country,Authority_Reference,Human Capital Management,Workday,"Authority issuing the License Identifier. No more than one Country Reference, Country Region Reference, or Authority Ref"
+concept_alias,Job Position,employee.position,Job_Title,Staffing,Workday,The Business Title for the job. Required unless the Job History is being removed.
+concept_alias,Company ID,company.id,Company,Staffing,Workday,The name of the company. Either this field or Job History Company Reference is required unless the Job History is being 
+concept_alias,employee.termination_date,employee.termination_date,End_Date,Staffing,Workday,The end date of employment.
+concept_alias,Manager ID,employee.manager_id,Job_Reference,Staffing,Workday,"References from colleagues, subordinates,managers, associates during the job tenure."
+concept_alias,Compensation Grade,compensation.grade,Compensation_Grade_Reference,Human Capital Management,Workday,Compensation grade to assign. Required if you select a compensation package. Doesn't default for Request Compensation Ch
+concept_alias,Compensation Grade,compensation.grade,Compensation_Grade_Profile_Reference,Human Capital Management,Workday,Profile within the Compensation Grade to assign. Does not default for Request Compensation Change.
+concept_alias,Compensation Grade,compensation.grade,Compensation_Step_Reference,Human Capital Management,Workday,Compensation Step within the Compensation Grade Profile.
+concept_alias,Invoice Currency,invoice.currency,Amount,Human Capital Management,Workday,Amount for the salary or hourly plan assignment. Required if the plan has no default amount. Decimal precision of the am
+concept_alias,Invoice Currency,invoice.currency,Currency_Reference,Human Capital Management,Workday,Currency of the plan assignment.
+concept_alias,Invoice Currency,invoice.currency,Per_Unit_Amount,Human Capital Management,Workday,Amount per unit of the unit salary plan. Decimal precision of the amount must match the currency. Required if there is n
+concept_alias,Manager ID,employee.manager_id,Manager_Reference,Human Capital Management,Workday,The manager for this review.
+concept_alias,Manager ID,employee.manager_id,Manager_Evaluation_Data,Human Capital Management,Workday,Contains the evaluation information that was filled out by the manager.
+concept_alias,Manager ID,employee.manager_id,Overall_Data,Human Capital Management,Workday,"The overall section evaluation information (rating, comments) from the manager."
+concept_alias,Date of Birth,employee.birth_date,Date_of_Birth,Human Capital Management,Workday,Person's Date of Birth.
+concept_alias,Address Country,address.country,Birth_Country_Reference,Human Capital Management,Workday,Country where the person was born.
+concept_alias,Address Country,address.country,Birth_Region_Reference,Human Capital Management,Workday,Country Region where the person was born.
+concept_alias,Address Country,address.country,Primary_Nationality_Reference,Human Capital Management,Workday,Reference for the person's Country of Nationality
+concept_alias,Address City,address.city,Race_Ethnicity_Details_Reference,Human Capital Management,Workday,Reference for the person's Ethnicity Details.
+concept_alias,Address Country,address.country,Native_Region_Reference,Human Capital Management,Workday,Native region on the Hukou of the person. This field is only available for the country China and the person with citizen
+concept_alias,Address City,address.city,City_of_Birth,Human Capital Management,Workday,Person's City of Birth (Text Only).
+concept_alias,Address City,address.city,City_of_Birth_Reference,Human Capital Management,Workday,Person's City of Birth (Prompt Value).
+concept_alias,Job Position,employee.position,Position_Reference,Staffing,Workday,Reference to the position.
+concept_alias,Job Position,employee.position,Headcount_Reference,Staffing,Workday,An unique identifier for the Headcount Group that the Position belongs to. This will return a value only if the Position
+concept_alias,Job Position,employee.position,Start_Date,Staffing,Workday,Date the Worker first started work in this Position. Will be the same value as the Hire Date in the Worker Status Sectio
+concept_alias,Job Position,employee.position,End_Employment_Date,Staffing,Workday,Expected end of employment for this position. Will be the same value as the End Employment Date in the Worker Status Sec
+concept_alias,Job Position,employee.position,Worker_Type_Reference,Staffing,Workday,The worker type for the position.
+concept_alias,Job Position,employee.position,Position_Time_Type_Reference,Staffing,Workday,Reference to the position time type.
+concept_alias,Job Position,employee.position,Exclude_from_Headcount,Staffing,Workday,"If Y, the position will be excluded from headcount reporting."
+concept_alias,Job Position,employee.position,Work_Hours_Profiles_Reference,Staffing,Workday,The work hour profile(s) for the position.
+concept_alias,Job Position,employee.position,Worker_Compensation_Code_Data,Staffing,Workday,The worker's compensation code for this position - based on the location and job profile.
+concept_alias,Job Position,employee.position,Job_Profile_Summary_Data,Staffing,Workday,Contains the job profile for the position.
+concept_alias,Job Position,employee.position,Work_Space__Reference,Staffing,Workday,The work space (worker's physical location) for the position.
+concept_alias,Job Position,employee.position,Academic_Pay_Setup_Data,Staffing,Workday,Wrapper element that contains position's academic pay setup information if it is configured.
+concept_alias,Manager ID,employee.manager_id,Manager_as_of_last_detected_manager_change_Reference,Staffing,Workday,Return the worker's new manager(s) during the most recent manager change event detected by manager compare background pr
+concept_alias,Job Position,employee.position,Payroll_File_Number,Staffing,Workday,The external payroll file number for the position.
+concept_alias,Invoice Currency,invoice.currency,Frequency_Reference,Benefits,Workday,The default currency of the benefit plan.
+concept_alias,Date of Birth,employee.birth_date,Loss_of_Coverage_Date,Human Capital Management,Workday,"The Qualifying Event Date is the date of the event that caused the worker to be eligible for COBRA. For example, in the "
+concept_alias,Address Country,address.country,Country_of_Nationality_Reference,Benefits,Workday,Reference to the primary country of which the dependent is a national.
+concept_alias,Address Country,address.country,Country_of_Birth_Reference,Benefits,Workday,Reference to the dependent's country of birth.
+concept_alias,Address Country,address.country,Region_of_Birth_Reference,Benefits,Workday,Reference to the dependent's country region of birth.
+concept_alias,Job Position,employee.position,Work_Shift_Required,Staffing,Workday,A boolean attribute that returns true if a work shift is required on the position where this job profile is used.
+concept_alias,Employee Department,employee.department,Manager_Reference,Human Capital Management,Workday,Returns the reference(s) to the supervisory organization's manager(s).
+concept_alias,Employee Department,employee.department,Manager,Human Capital Management,Workday,Returns the reference(s) to the supervisory organization's manager(s).
+concept_alias,Invoice Currency,invoice.currency,Total_Salary_and_Allowances,Human Capital Management,Workday,Amount representing the total salary and allowances for the worker in the currency and frequency specified.
+concept_alias,Invoice Currency,invoice.currency,Primary_Compensation_Basis,Human Capital Management,Workday,Amount representing the primary compensation basis for the worker in the currency and frequency specified.
+concept_alias,Base Salary,compensation.base_salary,Contract_Pay_Rate,Human Capital Management,Workday,Contract Pay Rate for the Worker.
+concept_alias,Hire Date,employee.hire_date,Contract_End_Date,Human Capital Management,Workday,The date the contingent worker's contract ends. The corresponding contract start date can be found in the Hire Date. Thi
+concept_alias,Manager ID,employee.manager_id,Include_Supervisory_Data,Organizations & Roles,Workday,Indicates whether the Supervisory Data element is included in the response (ONLY APPLIES TO SUPERVISORY TYPE ORGS).
+concept_alias,Employee Department,employee.department,Include_Staffing_Restrictions_Data,Organizations & Roles,Workday,Indicates whether the Staffing Restrictions Data element is included in the response (ONLY APPLIES TO SUPERVISORY ORGS).
+concept_alias,Manager ID,employee.manager_id,Include_Manager_in_Name,Organizations & Roles,Workday,Boolean choice to include the Manager/Leader Name in the Organization Name display.
+concept_alias,Job Position,employee.position,Leadership_Reference,Organizations & Roles,Workday,"Manager(s) of this organization. If there is a position restriction with an overlap, both are returned."
+concept_alias,Manager ID,employee.manager_id,Supervisory_Data,Organizations & Roles,Workday,"For Organizations of type Supervisory, contains staffing model and restrictions, location and other organizational assig"
+concept_alias,Employee Department,employee.department,Staffing_Restrictions_Data,Organizations & Roles,Workday,"For Supervisory Organizations, contain staffing restrictions."
+concept_alias,Address Country,address.country,Country___Country_Region_Reference,Human Capital Management,Workday,Reference to the Country/Country Region for the Holiday Calendar.
+concept_alias,Invoice Currency,invoice.currency,Individual_Target_Currency_Reference,Human Capital Management,Workday,Individual Target Currency Reference
+concept_alias,Job Position,employee.position,Contract_Status_Reference,Human Capital Management,Workday,"The status of the contract, based on the status types defined within your organization. The status values will be those "
+concept_alias,Invoice Currency,invoice.currency,Annualized_in_Reporting_Currency_Summary_Data,Human Capital Management,Workday,Annualized in Reporting Currency Summary Data
+concept_alias,Job Position,employee.position,Position_Element_Reference,Human Capital Management,Workday,The position or position restriction for which this employee is a succession plan candidate.
+concept_alias,Job Position,employee.position,Succession_Readiness_Reference,Human Capital Management,Workday,The readiness of the candidate to fill this position.
+concept_alias,Employee Department,employee.department,Supervisory_Organization_Reference,Organizations & Roles,Workday,Supervisory Organization Reference
+concept_alias,Job Position,employee.position,Position_Worker_Type_Reference,Staffing,Workday,"Reference(s) to the position worker types that the position is restricted by (e.g., Regular, Contractor, Temporary)."
+concept_alias,Address Country,address.country,Location_Context_Reference,Staffing,Workday,Contains the reference to the Country Reference or Country Region Reference for this Job Exempt value. Leave ISO 3166 1 
+concept_alias,Address Country,address.country,Job_Exempt,Staffing,Workday,Returns True if the Job Profile is Exempt for the given Country or Country Region.
+concept_alias,Address Country,address.country,Location_Reference,Human Capital Management,Workday,The country the Disability is for.
+concept_alias,Base Salary,compensation.base_salary,Pay_Rate_Type_Reference,Staffing,Workday,Reference element representing a unique instance of Pay Rate Type.
+concept_alias,Base Salary,compensation.base_salary,Include_Job_Profile_Pay_Rate_Data,Staffing,Workday,Indicates if the Job Profile Pay Rate Type element is included in the response.
+concept_alias,Address City,address.city,Ethnicity_Reference,Human Capital Management,Workday,A unique identifier used to reference an Ethnicity.
+concept_alias,Address City,address.city,Ethnicity_Data,Human Capital Management,Workday,Contains the detailed information about an Ethnicity.
+concept_alias,Address City,address.city,Ethnicity,Human Capital Management,Workday,Encapsulating element containing all Ethnicity data.
+concept_alias,Address City,address.city,ID,Human Capital Management,Workday,Reference ID (Ethnicity_ID)
+concept_alias,Address City,address.city,Name,Human Capital Management,Workday,The name of the Ethnicity.
+concept_alias,Address City,address.city,Code,Human Capital Management,Workday,The code for the Ethnicity.
+concept_alias,Address City,address.city,Description,Human Capital Management,Workday,The description of the Ethnicity.
+concept_alias,Address City,address.city,Ethnicity_Mapping_Reference,Human Capital Management,Workday,This is the Workday Owned Ethnicity mapping for this Ethnicity.
+concept_alias,Address City,address.city,Inactive,Human Capital Management,Workday,Flag indicating that the ethnicity is no longer used
+concept_alias,Job Position,employee.position,Include_Job_Code_in_Name,Staffing,Workday,Boolean attribute identifying whether Job Code should be included in Name (Display ID within Workday).
+concept_alias,Job Position,employee.position,Job_Profile_Private_Title,Staffing,Workday,Private Job Profile Title. This field is the same as Job Title Default in the online page.
+concept_alias,Address Country,address.country,Restrict_to_Country_Reference,Staffing,Workday,Restrict to Country Reference
+concept_alias,Address Country,address.country,School_Type_Reference,Human Capital Management,Workday,"A Reference of the of School Type. If a School Reference is submitted, or found by a matching Country Reference and Scho"
+concept_alias,Address Country,address.country,Location,Human Capital Management,Workday,"The text location of the education institution. If a School Reference is submitted, or found by a matching Country Refer"
+concept_alias,Address Country,address.country,First_Day_Attended,Human Capital Management,Workday,The first date of attendance using day month year precision. Note this can only be populated when the Education is for a
+concept_alias,Address Country,address.country,Last_Day_Attended,Human Capital Management,Workday,The last date of attendance using day month year precision. Note this can only be populated when the Education is for a 
+concept_alias,Job Position,employee.position,International_Assignment_Type_Reference,Human Capital Management,Workday,The International Assignment Type for the international assignment position.
+concept_alias,Job Position,employee.position,Start_International_Assignment_Reason_Reference,Human Capital Management,Workday,Contains the reason from this position's Start International Assignment business process.
+concept_alias,Address Country,address.country,Host_Country_Reference,Human Capital Management,Workday,Contains the host country for worker's international assignment
+concept_alias,Address Country,address.country,Home_Country_Reference,Human Capital Management,Workday,Contains the home country for worker.
+concept_alias,Address Country,address.country,Restricted_to_Countries_Reference,Human Capital Management,Workday,Creates or updates related person relationships for a specified country.
+concept_alias,Job Position,employee.position,Related_Position_Reference,Human Capital Management,Workday,Reference ID for the related position for the union membership. Can either be filled with a position or a position group
+concept_alias,Address City,address.city,City,Human Capital Management,Workday,Contains Address information.
+concept_alias,Job Position,employee.position,Annual_Work_Period_Work_Percent_of_Year,Human Capital Management,Workday,Work period percent of year from the annual work period assigned to position.
+concept_alias,Job Position,employee.position,Annual_Work_Period_Start_Date,Human Capital Management,Workday,Start date for annual work period assigned to the position based on the effective moment from the request.
+concept_alias,Job Position,employee.position,Annual_Work_Period_End_Date,Human Capital Management,Workday,End date for annual work period assigned to the position based on the effective moment from the request.
+concept_alias,Job Position,employee.position,Disbursement_Plan_Period_Start_Date,Human Capital Management,Workday,Start date for disbursement plan period assigned to the position based on the effective moment from the request.
+concept_alias,Job Position,employee.position,Disbursement_Plan_Period_End_Date,Human Capital Management,Workday,End date for disbursement plan period assigned to the position based on the effective moment from the request.
+concept_alias,Employee Department,employee.department,External_URL_Reference,Academic Foundation,Workday,One or more references to an external URL (e.g. home page for the department or school)
+concept_alias,Job Position,employee.position,Country_Reference,Human Capital Management,Workday,"Country Reference for the Country the Personal Information will be tied to. If none is passed, the primary position loca"
+concept_alias,Employee Name,employee.name,Universal_ID_Reference,Human Capital Management,Workday,Universal ID Reference for the Person that the Legal Name will be applied to.
+concept_alias,Employee Name,employee.name,Use_Legal_Name_As_Preferred_Name,Human Capital Management,Workday,"Flag indicating that the worker's legal name should be used as preferred. If this flag is set, Name Data is not allowed "
+concept_alias,employee.termination_date,employee.termination_date,Last_Termination_Date,Human Capital Management,Workday,Last Termination Date for the former worker. Required on the initial Add.
+concept_alias,Hire Date,employee.hire_date,Most_Recent_Hire_Date,Human Capital Management,Workday,Most Recent Hire Date (prior to the termination) for the former worker.
+concept_alias,Manager ID,employee.manager_id,Manager,Human Capital Management,Workday,Last Manager of the former worker. Free-form text entry.
+concept_alias,Base Salary,compensation.base_salary,Base_Pay,Human Capital Management,Workday,Last Base Pay for the former worker.
+concept_alias,Base Salary,compensation.base_salary,Currency_Reference,Human Capital Management,Workday,Currency Reference for the Base Pay.
+concept_alias,Base Salary,compensation.base_salary,Frequency_Reference,Human Capital Management,Workday,Frequency Reference for the Base Pay.
+concept_alias,Date of Birth,employee.birth_date,Birth_Date,Human Capital Management,Workday,A person's birth date.
+concept_alias,Address City,address.city,Hispanic_or_Latino,Human Capital Management,Workday,Returns a true if the person's ethnicity is Hispanic or Latino.
+concept_alias,National ID,employee.national_id,Person_Identification_Data,Human Capital Management,Workday,"Wrapper for Person Identification Data. Includes National Identifiers, Government Identifiers, Visa Identifiers, Passpor"
+concept_alias,Employee Name,employee.name,Location_Contexts_Reference,Human Capital Management,Workday,Reference to the location context for the Affiliate. Auto-populated from the country from the person's legal name.
+concept_alias,Date of Birth,employee.birth_date,Child_s_Birth_Date,Time & Attendance,Workday,Child's birth date
+concept_alias,Address Country,address.country,Date_Child_Entered_Country,Time & Attendance,Workday,Date child entered country
+concept_alias,Employee Department,employee.department,Include_Organization_ID_in_Name,Organizations & Roles,Workday,"This option is only allowed for Supervisory Organization at the moment. When set to true, Supervisory Organizations will"
+concept_alias,Job Position,employee.position,Employee_Probation_Period_Event_Reference,Human Capital Management,Workday,Probation Period Event Reference for the Worker's effective Position
+concept_alias,Job Position,employee.position,End_Date,Human Capital Management,Workday,Probation End Date of the Probation Period belonging to the effective Position
+concept_alias,Job Position,employee.position,Probation_Type_Reference,Human Capital Management,Workday,Probation Type of the Probation Period belonging to the effective Position
+concept_alias,Job Position,employee.position,Probation_Reason_Reference,Human Capital Management,Workday,Probation Reason of the Probation Period belonging to the effective Position
+concept_alias,Job Position,employee.position,Extended_End_Date,Human Capital Management,Workday,Probation Extended End Date of the Probation Period belonging to the effective Position
+concept_alias,Job Position,employee.position,Note,Human Capital Management,Workday,Note / Comments of the Probation Period belonging to the effective Position
+concept_alias,National ID,employee.national_id,URSSAF_Code_Text,Human Capital Management,Workday,Is the social security administration identification code in France.
+concept_alias,Job Position,employee.position,Effective_Date,Human Capital Management,Workday,The date upon which this establishment assignment becomes active for the specified worker position
+concept_alias,Job Position,employee.position,Establishment_Reference,Human Capital Management,Workday,The establishment we wish to assign to the specified worker position
+concept_alias,Job Position,employee.position,Position_Data,Human Capital Management,Workday,"Contains the worker's employment information, such as their position and job information. Security Note: This element is"
+concept_alias,Job Position,employee.position,Position_Organizations_Data,Human Capital Management,Workday,Contains the worker's organizations that they are a member of related to the position.
+concept_alias,Job Position,employee.position,Position_Management_Chains_Data,Human Capital Management,Workday,Contains the worker's management chains related to the position.
+concept_alias,Address City,address.city,Instructional_Site_Data_Capacity,Locations,Workday,Capacity
+concept_alias,Job Position,employee.position,Reorganization_Reference,Human Capital Management,Workday,Reorganization determines the effective date that positions are added as a member
+concept_alias,Job Position,employee.position,Positions_to_Add_Reference,Human Capital Management,Workday,"The position or position restriction you want to add to the custom organization. For position restrictions, Workday uses"
+concept_alias,Job Position,employee.position,Positions_to_Remove_Reference,Human Capital Management,Workday,Positions to be removed from the custom organization. Positions that are not members of the custom organization as of th
+concept_alias,Job Position,employee.position,Membership_Rules_Reference,Human Capital Management,Workday,Optional. The reference ID of an existing membership rule. For positions that match the rule criteria as of the reorgani
+concept_alias,Job Position,employee.position,Remove_All_Existing_Members,Human Capital Management,Workday,"If true, this operation removes all members as of the reorganization effective date, including positions that are not cu"
+concept_alias,Employee Name,employee.name,Worker_Descriptor,Human Capital Management,Workday,Worker name including person name and status and other information about the worker.
+concept_alias,Invoice Currency,invoice.currency,Annual_Income,Human Capital Management,Workday,Currency attribute specifying the dependent's annual income
+concept_alias,Manager ID,employee.manager_id,Include_Manager_Leader_in_Name,Organizations & Roles,Workday,Boolean attribute identifying whether to include the Manager/Leader Name within the name (Display ID in Workday).
+concept_alias,Job Position,employee.position,Job_Reference,Human Capital Management,Workday,The position of the worker you are changing the Business Title for. Required if the worker has more than one position.
+concept_alias,Job Position,employee.position,Work_Space_Reference,Human Capital Management,Workday,Work Space location for the Position.
+concept_alias,Company ID,company.id,Company_Reference,Human Capital Management,Workday,Company Reference
+concept_alias,employee.phone,employee.phone,Complete_Phone_Number,Human Capital Management,Workday,Full phone number.
+concept_alias,Address City,address.city,Employer_City,Human Capital Management,Workday,The Employer City to be assigned to the Form I-9.
+concept_alias,Address Postal Code,address.postal_code,Employer_ZIP_Code,Human Capital Management,Workday,The Employer ZIP Code to be assigned to the Form I-9.
+concept_alias,Address City,address.city,Employee_City,Human Capital Management,Workday,The Employee City to be assigned to the Worker.
+concept_alias,Address Postal Code,address.postal_code,Employee_Zip_Code,Human Capital Management,Workday,The Employee ZIP Code to be assigned to the Worker.
+concept_alias,Date of Birth,employee.birth_date,Employee_Date_of_Birth,Human Capital Management,Workday,The Employee Date of Birth to be assigned to the Worker.
+concept_alias,National ID,employee.national_id,Employee_Social_Security_Number,Human Capital Management,Workday,The Employee Social Security Number to be assigned to the Worker.
+concept_alias,Employee Email,employee.email,Employee_Email_Address,Human Capital Management,Workday,The Employee Email Address to be assigned to the Worker.
+concept_alias,employee.phone,employee.phone,Employee_Phone_Number,Human Capital Management,Workday,The Employee Phone Number to be assigned to the Worker.
+concept_alias,Address Country,address.country,Country_of_Issuance_Reference,Human Capital Management,Workday,The Country of Issuance to be assigned to the Worker.
+concept_alias,employee.phone,employee.phone,Involved_Party_Non-Worker_Phone_Number,Human Capital Management,Workday,The phone number of the involved party.
+concept_alias,Manager ID,employee.manager_id,Supervised_By_Worker_Reference,Human Capital Management,Workday,The worker that was the supervisor.
+concept_alias,Hire Date,employee.hire_date,Date_of_Rehire,Human Capital Management,Workday,The Rehire Date for the Worker to be assigned to the Form I-9 Section 3.
+concept_alias,Address Country,address.country,Country_Personal_Information_Data,Human Capital Management,Workday,Country Specific Personal Information
+concept_alias,Employee ID,employee.id,Worker_Reference,Human Capital Management,Workday,Worker ID. Can specify either the ID or WID.
+concept_alias,Address Country,address.country,Personal_Information_For_Country_Data,Human Capital Management,Workday,Country Specific Personal Information
+concept_alias,Address Country,address.country,Country_Region_of_Birth_Reference,Human Capital Management,Workday,Country Region of Birth
+concept_alias,Address Country,address.country,Region_of_Birth_Descriptor,Human Capital Management,Workday,Birth Country Region Name
+concept_alias,Address City,address.city,Ethnicity_Visual_Survey_Reference,Human Capital Management,Workday,Race/Ethnicity Visual Survey
+concept_alias,Address Postal Code,address.postal_code,Hukou_Postal_Code,Human Capital Management,Workday,Hukou Postal Code
+concept_alias,Job Position,employee.position,Assign_Establishment_Data,Human Capital Management,Workday,The request element containing all necessary information to manually assign an establishment to a worker position
+concept_alias,employee.phone,employee.phone,Video_Conference_Details,Locations,Workday,"The video conferencing details such as the meeting ID, URL, and telephone numbers."
+concept_alias,Address Postal Code,address.postal_code,Employer_Zip_Code,Human Capital Management,Workday,Form I-9 Business Address Employer Zip Code
+concept_alias,Address City,address.city,Preparer_or_Translator_City,Human Capital Management,Workday,The Form I-9 Preparer Translator City to be assigned to the Worker.
+concept_alias,Address Postal Code,address.postal_code,Preparer_or_Translator_ZIP_Code,Human Capital Management,Workday,The Form I-9 Preparer Translator ZIP Code to be assigned to the Worker.
+concept_alias,Address City,address.city,Remaining_Capacity,Human Capital Management,Workday,"If true, the disability Remaining Capacity field is enabled. If false, the Remaining Capacity field is disabled."
+concept_alias,Address City,address.city,Ethnicity_Details_Name,Human Capital Management,Workday,The name of the Ethnicity Details.
+concept_alias,Address City,address.city,Ethnicity_Details_Reference,Human Capital Management,Workday,A unique identifier used to reference an Ethnicity Details.
+concept_alias,Address City,address.city,Ethnicity_Details_Data,Human Capital Management,Workday,Contains the detailed information about Ethnicity Details.
+concept_alias,Address City,address.city,Ethnicity_Category_Reference,Human Capital Management,Workday,Contains the detailed information about an Ethnicity Category Data.
+concept_alias,Address City,address.city,Ethnicity_Category_Data,Human Capital Management,Workday,Contains the detailed information about an Ethnicity Category Data.
+concept_alias,Address City,address.city,Location_Context_Reference,Human Capital Management,Workday,The Location Context for this Ethnicity Category Configuration transaction.
+concept_alias,Address City,address.city,Ethnicity_Details_Configuration,Human Capital Management,Workday,Encapsulating element containing all Ethnicity Category data.
+concept_alias,Address City,address.city,Ethnicity_Category_Name,Human Capital Management,Workday,The name of the Ethnicity Category.
+concept_alias,Address City,address.city,Ethnicity_Details,Human Capital Management,Workday,Contains the detailed information about Ethnicity Details.
+concept_alias,National ID,employee.national_id,Cached,Human Capital Management,Workday,"If true, national IDs of this type will are cached."
+concept_alias,National ID,employee.national_id,National_ID_Type_Reference,Human Capital Management,Workday,A reference to the ID of the national ID type.
+concept_alias,Address City,address.city,External_US_Federal_Ethnicity_and_Race_Self-Identification_Record,Human Capital Management,Workday,Reference element representing a unique instance of External US Federal Ethnicity and Race Self-Identification Record
+concept_alias,Address City,address.city,External_US_Federal_Ethnicity_and_Race_Self-Identification_Record_Reference,Human Capital Management,Workday,A unique identifier used to reference an External US Federal Ethnicity and Race Self-Identification Record
+concept_alias,Address Country,address.country,Maintain_Non-Country_Nationality_Reference,Human Capital Management,Workday,Reference to the Non-Country Nationality of the person.
+concept_alias,Address Country,address.country,Maintain_Non-Country_Nationality_Data,Human Capital Management,Workday,The Non-Country Nationality data.
+concept_alias,Address Country,address.country,Include_Reference,Human Capital Management,Workday,Response Group used to control whether the Non-Country Nationality Reference is included in the Response.
+concept_alias,Address Country,address.country,Non_Country_Name,Human Capital Management,Workday,The name for the Non-Country Nationality.
+concept_alias,Address Country,address.country,Allow_for_Country_Reference,Human Capital Management,Workday,The Countries allowed to use the Non-Country Nationality.
+concept_alias,Address Country,address.country,Active_Consent_by_Country_Data,Human Capital Management,Workday,Active Consent by Country Data
+concept_alias,Address Country,address.country,Active_Consent_by_Country,Human Capital Management,Workday,Active Consent by Country
+concept_alias,Employee ID,employee.id,Personnel_ID,Human Capital Management,Workday,Manual hint: Personnel_ID
+concept_alias,Employee ID,employee.id,Employee_Number,Human Capital Management,Workday,Manual hint: Employee_Number
+concept_alias,Employee ID,employee.id,Worker_Reference_ID,Human Capital Management,Workday,Manual hint: Worker_Reference_ID
+concept_alias,Employee Name,employee.name,Full_Name,Human Capital Management,Workday,Manual hint: Full_Name
+concept_alias,Employee Name,employee.name,Legal_Name,Human Capital Management,Workday,Manual hint: Legal_Name
+concept_alias,Employee Name,employee.name,Preferred_Name,Human Capital Management,Workday,Manual hint: Preferred_Name
+concept_alias,Employee Email,employee.email,Employee_Email,Human Capital Management,Workday,Manual hint: Employee_Email
+concept_alias,Employee Email,employee.email,Work_Email,Human Capital Management,Workday,Manual hint: Work_Email
+concept_alias,Employee Email,employee.email,Primary_Work_Email,Human Capital Management,Workday,Manual hint: Primary_Work_Email
+concept_alias,employee.phone,employee.phone,Home_Phone,Human Capital Management,Workday,Manual hint: Home_Phone
+concept_alias,employee.phone,employee.phone,Work_Phone,Human Capital Management,Workday,Manual hint: Work_Phone
+concept_alias,employee.phone,employee.phone,Mobile_Phone,Human Capital Management,Workday,Manual hint: Mobile_Phone
+concept_alias,Employee Department,employee.department,Department,Human Capital Management,Workday,Manual hint: Department
+concept_alias,Cost Center,cost_center.id,Cost_Center_ID,Human Capital Management,Workday,Manual hint: Cost_Center_ID
+concept_alias,Cost Center,cost_center.id,Cost_Center_Reference_ID,Human Capital Management,Workday,Manual hint: Cost_Center_Reference_ID
+concept_alias,Employee Department,employee.department,Supervisory_Organization,Human Capital Management,Workday,Manual hint: Supervisory_Organization
+concept_alias,Company ID,company.id,Company_Reference_ID,Human Capital Management,Workday,Manual hint: Company_Reference_ID
+concept_alias,Company ID,company.id,Legal_Entity_ID,Human Capital Management,Workday,Manual hint: Legal_Entity_ID
+concept_alias,Job Position,employee.position,Position_Reference_ID,Human Capital Management,Workday,Manual hint: Position_Reference_ID
+concept_alias,Manager ID,employee.manager_id,Manager_Reference_ID,Human Capital Management,Workday,Manual hint: Manager_Reference_ID
+concept_alias,Manager ID,employee.manager_id,Reports_To_Reference_ID,Human Capital Management,Workday,Manual hint: Reports_To_Reference_ID
+concept_alias,Warehouse ID,warehouse.id,Location_Reference_ID,Human Capital Management,Workday,Manual hint: Location_Reference_ID
+concept_alias,Address Country,address.country,Country_Code,Human Capital Management,Workday,Manual hint: Country_Code
+concept_alias,Address Postal Code,address.postal_code,Zip_Code,Human Capital Management,Workday,Manual hint: Zip_Code
+concept_alias,Compensation Grade,compensation.grade,Compensation_Grade,Human Capital Management,Workday,Manual hint: Compensation_Grade
+concept_alias,Base Salary,compensation.base_salary,Annual_Salary,Human Capital Management,Workday,Manual hint: Annual_Salary
+concept_alias,Base Salary,compensation.base_salary,Pay_Rate,Human Capital Management,Workday,Manual hint: Pay_Rate
+concept_alias,Tax ID,tax.id,Tax_ID,Human Capital Management,Workday,Manual hint: Tax_ID
+concept_alias,National ID,employee.national_id,Social_Security_Number,Human Capital Management,Workday,Manual hint: Social_Security_Number

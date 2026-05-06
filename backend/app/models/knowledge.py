@@ -10,7 +10,7 @@ KnowledgeOverlayEntryType = Literal["abbreviation", "synonym", "field_alias", "c
 KnowledgeOverlayIssueSeverity = Literal["error", "warning"]
 KnowledgeOverlayRowStatus = Literal["valid", "invalid"]
 KnowledgeOverlayMode = Literal["base_only", "overlay_active"]
-KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback"]
+KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed"]
 
 
 class KnowledgeOverlayVersion(BaseModel):

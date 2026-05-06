@@ -38,6 +38,7 @@ WEIGHTS = {
 }
 
 TOTAL_WEIGHT = sum(WEIGHTS.values())
+STRONG_CANONICAL_LLM_MARGIN = 0.05
 
 
 @dataclass
@@ -223,7 +224,7 @@ def apply_llm_validation(
         if not rankings:
             continue
         rescue_mode = should_run_canonical_semantic_rescue(rankings[0])
-        if not should_run_llm_validation(rankings[0]):
+        if not should_run_llm_validation(rankings):
             continue
 
         candidate_scores = rankings[: settings.top_k_candidates]
@@ -272,11 +273,39 @@ def apply_llm_validation(
     return llm_decisions
 
 
-def should_run_llm_validation(top_candidate: CandidateScore) -> bool:
+def should_run_llm_validation(rankings: list[CandidateScore]) -> bool:
+    if not rankings:
+        return False
+
+    top_candidate = rankings[0]
     top_score = top_candidate.score
+    # When a strong canonical concept lock is active (explicit KC→CC bridge evidence),
+    # the mapping is already well-grounded unless another strong canonical target
+    # is effectively tied and needs arbitration.
+    if is_strong_canonical_concept_match(top_candidate.target, top_candidate.signals.knowledge, top_candidate.signals.canonical):
+        if has_close_strong_canonical_competitor(rankings):
+            return True
+        return False
     if settings.llm_gate_min_score < top_score < settings.llm_gate_max_score:
         return True
     return should_run_canonical_semantic_rescue(top_candidate)
+
+
+def has_close_strong_canonical_competitor(rankings: list[CandidateScore]) -> bool:
+    if len(rankings) < 2:
+        return False
+
+    top_candidate = rankings[0]
+    for challenger in rankings[1:settings.top_k_candidates]:
+        if not is_strong_canonical_concept_match(
+            challenger.target,
+            challenger.signals.knowledge,
+            challenger.signals.canonical,
+        ):
+            continue
+        if (top_candidate.score - challenger.score) < STRONG_CANONICAL_LLM_MARGIN:
+            return True
+    return False
 
 
 def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
@@ -430,6 +459,7 @@ def assign_unique_targets(per_source_scores: dict[str, list[CandidateScore]]) ->
 
     all_edges.sort(
         key=lambda item: (
+            item[1].llm_selected,
             item[1].score,
             item[1].signals.pattern,
             item[1].signals.canonical,

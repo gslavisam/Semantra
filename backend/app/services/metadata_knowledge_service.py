@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import csv
+import hashlib
 from pathlib import Path
 from typing import Iterable
 
@@ -24,10 +25,12 @@ from app.utils.normalization import clear_normalization_overrides, configure_nor
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_METADATA_DICT_PATH = PROJECT_ROOT / "metadata_dict" / "metadata_dict.csv"
 DEFAULT_METADATA_WORKBOOK_PATH = PROJECT_ROOT / "metadata_dict" / "metadata_dictionary.xlsx"
-DEFAULT_CANONICAL_GLOSSARY_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_glossary.csv"
+DEFAULT_CANONICAL_GLOSSARY_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_glossary_erp.csv"
 DEFAULT_SAP_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "sap_tables_mostUsed.xlsx"
 DEFAULT_QAD_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "qad_tables_mostUsed.xlsx"
 DEFAULT_WORKDAY_ENTITIES_PATH = PROJECT_ROOT / "metadata_dict" / "WD_entities_mostUsed.xlsx"
+DEFAULT_WD_XSD_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "wd_hr_knowledge_overlay.csv"
+DEFAULT_HRDH_OVERLAY_PATH   = PROJECT_ROOT / "metadata_dict" / "hrdh_knowledge_overlay.csv"
 MULTI_VALUE_FIELDS = ("Skracenice", "Alternativni nazivi")
 CANONICAL_GLOSSARY_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
 ALIAS_FIELDS = (
@@ -118,6 +121,9 @@ class MetadataKnowledgeService:
         self._active_overlay_name: str | None = None
         self._overlay_aliases_by_concept: dict[str, set[str]] = {}
         self._overlay_canonical_aliases_by_concept: dict[str, set[str]] = {}
+        # Bridge: KC concept_id → set of CC concept_ids reachable via shared aliases.
+        # Built after every full load so match_canonical_concepts() can use KC signal.
+        self._kc_to_cc: dict[str, set[str]] = {}
         self.refresh()
 
     @property
@@ -223,9 +229,19 @@ class MetadataKnowledgeService:
         self._overlay_aliases_by_concept.clear()
         self._overlay_canonical_aliases_by_concept.clear()
         clear_normalization_overrides()
-        self._load_canonical_glossary()
-        self._load()
+
+        # --- DB-first loading (skip expensive file parsing when DB is current) ---
+        current_hash = self._compute_source_hash()
+        seed_meta = persistence_service.get_knowledge_seed_meta()
+        if seed_meta and seed_meta["source_hash"] == current_hash:
+            self._load_from_db()
+        else:
+            self._load_canonical_glossary()
+            self._load()
+            self._seed_to_db(current_hash)
+
         self._apply_active_overlay()
+        self._rebuild_kc_cc_bridge()
 
     def expand_semantic_tokens(self, profile: ColumnProfile) -> set[str]:
         tokens = set(profile.tokenized_name)
@@ -243,8 +259,6 @@ class MetadataKnowledgeService:
         source_matches = {match.concept_id: match for match in self.match_concepts(source)}
         target_matches = {match.concept_id: match for match in self.match_concepts(target)}
         shared = set(source_matches) & set(target_matches)
-        if not shared:
-            return 0.0
 
         candidate_scores: list[float] = []
         for concept_id in shared:
@@ -256,7 +270,18 @@ class MetadataKnowledgeService:
             elif source_match.contexts or target_match.contexts:
                 base_score = min(1.0, base_score + 0.05)
             candidate_scores.append(base_score)
-        return round(max(candidate_scores), 4)
+
+        # Bridge extension: when target is a canonical concept, check if any
+        # source KC concept bridges (via _kc_to_cc) directly to that CC target.
+        # This allows SAP/QAD fields with rich KC aliases to produce a strong
+        # knowledge signal even when the CC target has no KC representation.
+        target_cc_id = self.resolve_canonical_concept_id(target.name)
+        if target_cc_id == target.name:
+            for kc_id, source_match in source_matches.items():
+                if target_cc_id in self._kc_to_cc.get(kc_id, set()):
+                    candidate_scores.append(source_match.strength * 0.85)
+
+        return round(max(candidate_scores), 4) if candidate_scores else 0.0
 
     def canonical_alignment(self, source: ColumnProfile, target: ColumnProfile) -> float:
         source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source)}
@@ -457,11 +482,13 @@ class MetadataKnowledgeService:
         strengths: dict[str, float] = {}
         matched_aliases: dict[str, set[str]] = {}
 
+        # --- Phase 1a: exact direct CC match ---
         for candidate_name in {normalized_name, normalized_profile_name}:
             for concept_id in self._canonical_alias_to_concepts.get(candidate_name, set()):
                 strengths[concept_id] = max(strengths.get(concept_id, 0.0), 1.0)
                 matched_aliases.setdefault(concept_id, set()).add(candidate_name)
 
+        # --- Phase 1b: token-subset direct CC match ---
         for alias, concept_ids in self._canonical_alias_to_concepts.items():
             alias_tokens = set(alias.split())
             if len(alias_tokens) < 2:
@@ -470,6 +497,29 @@ class MetadataKnowledgeService:
                 for concept_id in concept_ids:
                     strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.75)
                     matched_aliases.setdefault(concept_id, set()).add(alias)
+
+        # --- Phase 2a: KC→CC bridge — exact alias match via KC space ---
+        # Reaches CC concepts whose aliases overlap with the rich KC alias set
+        # (multilingual names, SAP/QAD/WD field names from metadata_dict.csv).
+        for candidate_name in {normalized_name, normalized_profile_name}:
+            for kc_id in self._alias_to_concepts.get(candidate_name, set()):
+                for cc_id in self._kc_to_cc.get(kc_id, set()):
+                    if cc_id not in strengths:  # don't downgrade a direct Phase-1 match
+                        strengths[cc_id] = 0.8
+                        matched_aliases.setdefault(cc_id, set()).add(candidate_name)
+
+        # --- Phase 2b: KC→CC bridge — token-subset via KC aliases ---
+        if profile_tokens:
+            for alias, kc_ids in self._alias_to_concepts.items():
+                alias_tokens = set(alias.split())
+                if len(alias_tokens) < 2:
+                    continue
+                if alias_tokens.issubset(profile_tokens):
+                    for kc_id in kc_ids:
+                        for cc_id in self._kc_to_cc.get(kc_id, set()):
+                            if cc_id not in strengths:
+                                strengths[cc_id] = 0.6
+                                matched_aliases.setdefault(cc_id, set()).add(alias)
 
         return [
             CanonicalConceptMatch(
@@ -498,6 +548,189 @@ class MetadataKnowledgeService:
                 )
             )
         return details
+
+    @property
+    def kc_to_cc_bridge_size(self) -> int:
+        """Number of KC concepts that have at least one CC reachable via alias bridge."""
+        return len(self._kc_to_cc)
+
+    def _rebuild_kc_cc_bridge(self) -> None:
+        """Build (or rebuild) the alias-overlap bridge from KC concepts to CC concepts.
+
+        For every KC alias that is also a CC alias, we create a link
+        KC_concept_id → CC_concept_id.  This lets match_canonical_concepts()
+        use the rich KC alias space (SAP/QAD/WD field names, multilingual terms)
+        to reach CC concepts that would otherwise be unreachable.
+        """
+        self._kc_to_cc.clear()
+        for kc_concept_id, kc_concept in self._concepts_by_id.items():
+            for alias in kc_concept.aliases:
+                for cc_id in self._canonical_alias_to_concepts.get(alias, ()):
+                    self._kc_to_cc.setdefault(kc_concept_id, set()).add(cc_id)
+        # Also bridge through field_alias_to_contexts where the stored concept_id
+        # happens to be a CC concept_id (registered by _auto_register_sap_field_aliases).
+        for alias, entries in self._field_alias_to_contexts.items():
+            for stored_id, _ctx in entries:
+                if stored_id in self._canonical_concepts_by_id:
+                    # stored_id IS a CC concept_id — register a direct CC alias too
+                    # so Phase-1 direct lookup in match_canonical_concepts works.
+                    self._canonical_alias_to_concepts.setdefault(alias, set()).add(stored_id)
+
+    def reseed_from_files(self) -> dict:
+        """Force reload from all source files and re-persist to DB.
+
+        Returns stats about the newly seeded knowledge base.
+        """
+        self._concepts_by_id.clear()
+        self._alias_to_concepts.clear()
+        self._field_alias_to_contexts.clear()
+        self._canonical_concepts_by_id.clear()
+        self._canonical_alias_to_concepts.clear()
+        self._active_overlay_name = None
+        self._overlay_aliases_by_concept.clear()
+        self._overlay_canonical_aliases_by_concept.clear()
+        clear_normalization_overrides()
+        self._load_canonical_glossary()
+        self._load()
+        self._seed_to_db(self._compute_source_hash())
+        self._apply_active_overlay()
+        self._rebuild_kc_cc_bridge()
+        return {
+            "concept_count":         len(self._concepts_by_id),
+            "canonical_count":       len(self._canonical_concepts_by_id),
+            "alias_count":           len(self._alias_to_concepts),
+            "canonical_alias_count": len(self._canonical_alias_to_concepts),
+        }
+
+    # ------------------------------------------------------------------
+    # Internal DB-persistence helpers
+    # ------------------------------------------------------------------
+
+    _SOURCE_PATHS: tuple[str, ...] = (
+        "DEFAULT_METADATA_DICT_PATH",
+        "DEFAULT_METADATA_WORKBOOK_PATH",
+        "DEFAULT_CANONICAL_GLOSSARY_PATH",
+        "DEFAULT_SAP_TABLES_PATH",
+        "DEFAULT_QAD_TABLES_PATH",
+        "DEFAULT_WORKDAY_ENTITIES_PATH",
+        "DEFAULT_HRDH_OVERLAY_PATH",
+    )
+
+    def _compute_source_hash(self) -> str:
+        """Return a stable hash of all source-file mtime+size pairs.
+
+        When any source file changes, the hash changes → triggers re-seed.
+        Missing files contribute the string 'missing'.
+        """
+        import hashlib as _hl
+        h = _hl.md5(usedforsecurity=False)
+        import sys
+        module = sys.modules[__name__]
+        for attr_name in self._SOURCE_PATHS:
+            path: Path | None = getattr(module, attr_name, None)
+            if path is None:
+                # Fall back to instance attribute (canonical_glossary_path etc.)
+                path = getattr(self, attr_name.lower().replace("default_", "").replace("_path", "") + "_path", None)
+            if path is not None and path.exists():
+                stat = path.stat()
+                h.update(f"{path}:{stat.st_mtime}:{stat.st_size}".encode())
+            else:
+                h.update(f"{attr_name}:missing".encode())
+        return h.hexdigest()
+
+    def _load_from_db(self) -> None:
+        """Populate in-memory knowledge state directly from the SQLite DB."""
+        knowledge_dicts, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
+
+        for d in canonical_dicts:
+            for alias in d["aliases"]:
+                self._canonical_alias_to_concepts.setdefault(alias, set()).add(d["concept_id"])
+            self._canonical_concepts_by_id[d["concept_id"]] = CanonicalBusinessConcept(
+                concept_id=d["concept_id"],
+                entity=d["entity"],
+                attribute=d["attribute"],
+                display_name=d["display_name"],
+                description=d["description"],
+                data_type=d["data_type"],
+                aliases=frozenset(d["aliases"]),
+            )
+
+        for d in knowledge_dicts:
+            contexts = tuple(
+                KnowledgeFieldContext(
+                    system=ctx["system"],
+                    object_name=ctx["object_name"],
+                    field_name=ctx["field_name"],
+                    category=ctx["category"],
+                    object_description=ctx["object_description"],
+                    field_description=ctx["field_description"],
+                    note=ctx["note"],
+                )
+                for ctx in d["contexts"]
+            )
+            concept = KnowledgeConcept(
+                concept_id=d["concept_id"],
+                domain=d["domain"],
+                canonical_name=d["canonical_name"],
+                aliases=frozenset(d["aliases"]),
+                contexts=contexts,
+                context_terms=frozenset(d["context_terms"]),
+            )
+            self._concepts_by_id[d["concept_id"]] = concept
+            for alias in concept.aliases:
+                self._alias_to_concepts.setdefault(alias, set()).add(d["concept_id"])
+            for ctx in contexts:
+                alias = _normalize_alias(ctx.field_name)
+                if alias:
+                    self._field_alias_to_contexts.setdefault(alias, []).append((d["concept_id"], ctx))
+
+        for ctx in canonical_context_dicts:
+            context = KnowledgeFieldContext(
+                system=ctx["system"],
+                object_name=ctx["object_name"],
+                field_name=ctx["field_name"],
+                category=ctx["category"],
+                object_description=ctx["object_description"],
+                field_description=ctx["field_description"],
+                note=ctx["note"],
+            )
+            alias = _normalize_alias(context.field_name)
+            if alias:
+                self._field_alias_to_contexts.setdefault(alias, []).append((ctx["concept_id"], context))
+
+    def _seed_to_db(self, source_hash: str) -> None:
+        """Persist current in-memory knowledge to the DB."""
+        canonical_field_contexts: list[tuple[str, KnowledgeFieldContext]] = []
+        seen_canonical_contexts: set[tuple[str, str, str, str, str, str, str, str]] = set()
+        for entries in self._field_alias_to_contexts.values():
+            for concept_id, context in entries:
+                if concept_id not in self._canonical_concepts_by_id:
+                    continue
+                context_key = (
+                    concept_id,
+                    context.system,
+                    context.object_name,
+                    context.field_name,
+                    context.category,
+                    context.object_description,
+                    context.field_description,
+                    context.note,
+                )
+                if context_key in seen_canonical_contexts:
+                    continue
+                seen_canonical_contexts.add(context_key)
+                canonical_field_contexts.append((concept_id, context))
+
+        persistence_service.seed_knowledge_concepts(
+            list(self._concepts_by_id.values()),
+            list(self._canonical_concepts_by_id.values()),
+            canonical_field_contexts,
+        )
+        persistence_service.save_knowledge_seed_meta(
+            source_hash=source_hash,
+            concept_count=len(self._concepts_by_id),
+            canonical_count=len(self._canonical_concepts_by_id),
+        )
 
     def _load_canonical_glossary(self) -> None:
         if not self.canonical_glossary_path.exists():
@@ -601,17 +834,116 @@ class MetadataKnowledgeService:
         configure_normalization_overrides(overlay_abbreviations, overlay_synonyms)
 
     def _load_workbook_contexts(self) -> None:
-        sap_descriptions = self._load_sap_table_descriptions()
+        sap_descriptions, sap_field_descriptions = self._load_sap_table_descriptions()
         qad_descriptions = self._load_qad_table_descriptions()
         workday_entities, workday_fields = self._load_workday_entity_descriptions()
-        self._load_metadata_mapping_sheet(sap_descriptions, qad_descriptions, workday_entities, workday_fields)
+        self._load_metadata_mapping_sheet(sap_descriptions, sap_field_descriptions, qad_descriptions, workday_entities, workday_fields)
+        self._auto_register_sap_field_aliases(sap_field_descriptions)
+        self._load_csv_knowledge_overlay(DEFAULT_HRDH_OVERLAY_PATH, source_tag="HRDH")
 
-    def _load_sap_table_descriptions(self) -> dict[str, str]:
-        descriptions: dict[str, str] = {}
+    def _auto_register_sap_field_aliases(self, field_descriptions: dict[tuple[str, str], str]) -> None:
+        """Auto-register SAP fields from Tbls_Clm as canonical concept aliases and field contexts."""
+        registered_field_aliases: set[str] = set()
+        for (table, field), description in field_descriptions.items():
+            canonical_id = self.resolve_canonical_concept_id(description)
+            if canonical_id is None:
+                continue
+            existing = self._canonical_concepts_by_id.get(canonical_id)
+            if existing is None:
+                continue
+            context = KnowledgeFieldContext(
+                system="SAP",
+                object_name=table,
+                field_name=field,
+                category=existing.entity,
+                object_description="",
+                field_description=description,
+                note="",
+            )
+            self._register_field_context(field, canonical_id, context)
+            if field not in registered_field_aliases:
+                self._register_canonical_concept(
+                    concept_id=canonical_id,
+                    entity=existing.entity,
+                    attribute=existing.attribute,
+                    display_name=existing.display_name,
+                    description=existing.description,
+                    data_type=existing.data_type,
+                    aliases={field},
+                )
+                registered_field_aliases.add(field)
+
+    def _load_csv_knowledge_overlay(self, csv_path: Path, source_tag: str = "") -> None:
+        """Generic loader: reads a concept_alias CSV and registers aliases into canonical concepts.
+
+        CSV format (same as Admin UI overlay):
+            entry_type, canonical_term, canonical_concept_id, alias, domain, source_system, note
+        Only rows with entry_type=concept_alias are processed.
+
+        Each alias is registered in both layers:
+        - CC layer: as a canonical alias on the CC concept (for direct CC matching)
+        - KC layer: as an alias on a KC concept keyed by the canonical_concept_id
+                    (so the KC→CC bridge can also reach it)
+        """
+        if not csv_path.exists():
+            return
+
+        import csv as _csv
+
+        with csv_path.open(encoding="utf-8-sig") as fh:
+            for row in _csv.DictReader(fh):
+                entry_type = (row.get("entry_type") or "").strip()
+                if entry_type != "concept_alias":
+                    continue
+                canonical_concept_id = (row.get("canonical_concept_id") or "").strip()
+                alias = _normalize_alias((row.get("alias") or "").strip())
+                if not canonical_concept_id or not alias:
+                    continue
+                concept = self._canonical_concepts_by_id.get(canonical_concept_id)
+                if concept is None:
+                    continue
+
+                # --- CC layer (direct CC matching) ---
+                self._register_canonical_concept(
+                    concept_id=canonical_concept_id,
+                    entity=concept.entity,
+                    attribute=concept.attribute,
+                    display_name=concept.display_name,
+                    description=concept.description,
+                    data_type=concept.data_type,
+                    aliases={alias},
+                )
+
+                # --- KC layer (dual-registration so KC→CC bridge fires) ---
+                # The KC concept uses canonical_concept_id as its concept_id so that
+                # _rebuild_kc_cc_bridge() can trivially link it to the CC concept
+                # (they share the display_name alias at minimum).
+                domain = (row.get("domain") or concept.entity or source_tag or "overlay").strip()
+                self._register_concept(
+                    canonical_concept_id,
+                    domain,
+                    concept.display_name,
+                    aliases={alias},
+                )
+
+    def _load_sap_table_descriptions(self) -> tuple[dict[str, str], dict[tuple[str, str], str]]:
+        table_descriptions: dict[str, str] = {}
+        field_descriptions: dict[tuple[str, str], str] = {}
         if not self.sap_tables_path.exists():
-            return descriptions
+            return table_descriptions, field_descriptions
         workbook = load_workbook(self.sap_tables_path, read_only=True, data_only=True)
+        # Load field-level data from Tbls_Clm sheet (Table, #, Field, Description, ...)
+        if "Tbls_Clm" in workbook.sheetnames:
+            for row in workbook["Tbls_Clm"].iter_rows(min_row=2, values_only=True):
+                table_name = _normalize_alias(str(row[0] or ""))
+                field_name = _normalize_alias(str(row[2] or ""))
+                description = str(row[3] or "").strip()
+                if table_name and field_name and description:
+                    field_descriptions[(table_name, field_name)] = description
+        # Load table-level descriptions from module sheets (header at row 4, col 0 == "Table")
         for sheet_name in workbook.sheetnames:
+            if sheet_name == "Tbls_Clm":
+                continue
             worksheet = workbook[sheet_name]
             header = [value for value in next(worksheet.iter_rows(min_row=4, max_row=4, values_only=True), ())]
             if not header or header[0] != "Table":
@@ -625,32 +957,40 @@ class MetadataKnowledgeService:
                     for part in (str(row[1] or "").strip(), str(row[4] or "").strip(), sheet_name.replace("_", " "))
                     if part and part.strip()
                 )
-                descriptions[table_name] = description
-        return descriptions
+                table_descriptions[table_name] = description
+        return table_descriptions, field_descriptions
 
     def _load_qad_table_descriptions(self) -> dict[str, str]:
         descriptions: dict[str, str] = {}
         if not self.qad_tables_path.exists():
             return descriptions
         workbook = load_workbook(self.qad_tables_path, read_only=True, data_only=True)
-        worksheet = workbook["Core Tables Catalog"] if "Core Tables Catalog" in workbook.sheetnames else None
-        if worksheet is None:
-            return descriptions
-        for row in worksheet.iter_rows(min_row=2, values_only=True):
-            table_name = _normalize_alias(str(row[0] or ""))
-            if not table_name:
-                continue
-            description = " ".join(
-                part.strip()
-                for part in (
-                    str(row[2] or "").strip(),
-                    str(row[3] or "").strip(),
-                    str(row[4] or "").strip(),
-                    str(row[5] or "").strip(),
+        # Core Tables Catalog: col 0=name, 2=desc, 3=module, 4=sub-area, 5=key fields
+        if "Core Tables Catalog" in workbook.sheetnames:
+            for row in workbook["Core Tables Catalog"].iter_rows(min_row=2, values_only=True):
+                table_name = _normalize_alias(str(row[0] or ""))
+                if not table_name:
+                    continue
+                description = " ".join(
+                    part.strip()
+                    for part in (
+                        str(row[2] or "").strip(),
+                        str(row[3] or "").strip(),
+                        str(row[4] or "").strip(),
+                        str(row[5] or "").strip(),
+                    )
+                    if part and part.strip()
                 )
-                if part and part.strip()
-            )
-            descriptions[table_name] = description
+                descriptions[table_name] = description
+        # TablesList: col 0=name, 1=description — adds breadth (930 tables)
+        if "TablesList" in workbook.sheetnames:
+            for row in workbook["TablesList"].iter_rows(min_row=2, values_only=True):
+                table_name = _normalize_alias(str(row[0] or ""))
+                if not table_name or table_name in descriptions:
+                    continue
+                description = str(row[1] or "").strip()
+                if description:
+                    descriptions[table_name] = description
         return descriptions
 
     def _load_workday_entity_descriptions(self) -> tuple[dict[str, str], dict[tuple[str, str], str]]:
@@ -693,6 +1033,7 @@ class MetadataKnowledgeService:
     def _load_metadata_mapping_sheet(
         self,
         sap_descriptions: dict[str, str],
+        sap_field_descriptions: dict[tuple[str, str], str],
         qad_descriptions: dict[str, str],
         workday_entities: dict[str, str],
         workday_fields: dict[tuple[str, str], str],
@@ -717,14 +1058,18 @@ class MetadataKnowledgeService:
             sap_table = str(row.get("SAP tabela") or "").strip()
             sap_field = str(row.get("SAP polje") or "").strip()
             if sap_table and sap_field:
+                napomena = str(row.get("Napomena") or "").strip()
+                sap_auto_desc = sap_field_descriptions.get(
+                    (_normalize_alias(sap_table), _normalize_alias(sap_field)), ""
+                )
                 context = KnowledgeFieldContext(
                     system="SAP",
                     object_name=sap_table,
                     field_name=sap_field,
                     category=category,
                     object_description=sap_descriptions.get(_normalize_alias(sap_table), ""),
-                    field_description=str(row.get("Napomena") or "").strip(),
-                    note=str(row.get("Napomena") or "").strip(),
+                    field_description=napomena or sap_auto_desc,
+                    note=napomena,
                 )
                 contexts.append(context)
                 self._register_field_context(sap_field, concept_id, context)

@@ -17,7 +17,7 @@ def build_virtual_target_schema(target_system: TargetSystem = "canonical") -> Sc
 
     return SchemaProfile(
         dataset_id="virtual-target:canonical",
-        dataset_name="canonical_glossary.csv",
+        dataset_name=metadata_knowledge_service.canonical_glossary_path.name,
         row_count=0,
         columns=columns,
     )

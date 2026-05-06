@@ -24,7 +24,7 @@ class Settings:
     embedding_dimensions: int = 24
     llm_provider: str = "none"
     llm_model: str = "mock-validator"
-    llm_timeout_seconds: float = 5.0
+    llm_timeout_seconds: float = 30.0
     llm_max_retries: int = 2
     llm_min_confidence: float = 0.5
     llm_gate_min_score: float = 0.4
@@ -34,7 +34,7 @@ class Settings:
     openai_base_url: str = "https://api.openai.com/v1/responses"
     openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434/api/generate"
-    lmstudio_base_url: str = "http://127.0.0.1:1234/v1/responses"
+    lmstudio_base_url: str = "http://127.0.0.1:1234/v1/chat/completions"
 
 
 def load_settings(dotenv_path: str | Path | None = None) -> Settings:
@@ -63,6 +63,8 @@ def settings_snapshot() -> dict[str, Any]:
     return {
         "llm_provider": settings.llm_provider,
         "llm_model": settings.llm_model,
+        "llm_timeout_seconds": settings.llm_timeout_seconds,
+        "lmstudio_base_url": settings.lmstudio_base_url,
         "embedding_provider": settings.embedding_provider,
         "cors_origins": list(settings.cors_origins),
         "sqlite_path": settings.sqlite_path,

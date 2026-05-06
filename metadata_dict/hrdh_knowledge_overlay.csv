@@ -1,0 +1,145 @@
+entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note
+concept_alias,Cost Center,cost_center.id,CostCenter,Human Capital Management,Workday_HRDH,HRDH column: CostCenter
+concept_alias,Job Profile ID,job.id,JobReqId,Human Capital Management,Workday_HRDH,HRDH column: JobReqId
+concept_alias,Job Title,job.title,JobTitle,Human Capital Management,Workday_HRDH,HRDH column: JobTitle
+concept_alias,Address Country,address.country,CountryName,Human Capital Management,Workday_HRDH,HRDH column: CountryName
+concept_alias,Address City,address.city,CityName,Human Capital Management,Workday_HRDH,HRDH column: CityName
+concept_alias,Employee ID,employee.id,ID_EMPLOYEE,Human Capital Management,Workday_HRDH,HRDH column: ID_EMPLOYEE
+concept_alias,Position ID,position.id,ID_POSITION,Human Capital Management,Workday_HRDH,HRDH column: ID_POSITION
+concept_alias,Company ID,company.id,ID_COMPANY,Human Capital Management,Workday_HRDH,HRDH column: ID_COMPANY
+concept_alias,Compensation Grade,compensation.grade,ID_COMP_GRADE,Human Capital Management,Workday_HRDH,HRDH column: ID_COMP_GRADE
+concept_alias,Compensation Grade,compensation.grade,ID_COMP_GRADE_PROFILE,Human Capital Management,Workday_HRDH,HRDH column: ID_COMP_GRADE_PROFILE
+concept_alias,Compensation Grade,compensation.grade,ID_COMP_STEP,Human Capital Management,Workday_HRDH,HRDH column: ID_COMP_STEP
+concept_alias,Compensation Plan,compensation.plan,ID_COMP_PLAN,Human Capital Management,Workday_HRDH,HRDH column: ID_COMP_PLAN
+concept_alias,Employee ID,employee.id,EM_EMPLOYEE_NK,Human Capital Management,Workday_HRDH,HRDH column: EM_EMPLOYEE_NK
+concept_alias,Employee ID,employee.id,EM_WORKDAY_ID,Human Capital Management,Workday_HRDH,HRDH column: EM_WORKDAY_ID
+concept_alias,Employee Name,employee.name,EM_FIRST_NAME,Human Capital Management,Workday_HRDH,The worker's legal first or given name.
+concept_alias,Employee Name,employee.name,EM_MIDDLE_NAME,Human Capital Management,Workday_HRDH,The worker's legal middle name.
+concept_alias,Employee Name,employee.name,EM_LAST_NAME,Human Capital Management,Workday_HRDH,The worker's legal family name.
+concept_alias,Address Line 1,address.line1,EM_FIRST_ADDRESS_LINE1,Human Capital Management,Workday_HRDH,The local address line 1 for an address.
+concept_alias,Address Line 2,address.line2,EM_FIRST_ADDRESS_LINE2,Human Capital Management,Workday_HRDH,The local address line 2 for an address.
+concept_alias,Address City,address.city,EM_FIRST_ADDRESS_CITY,Human Capital Management,Workday_HRDH,The city for an address.
+concept_alias,State/Region,address.region,EM_FIRST_ADDRESS_STATE,Human Capital Management,Workday_HRDH,The State ISO code for an address.
+concept_alias,Address Postal Code,address.postal_code,EM_FIRST_ADDRESS_POSTCODE,Human Capital Management,Workday_HRDH,The postal code for an address
+concept_alias,Address Country,address.country,EM_FIRST_ADDRESS_COUNTRY,Human Capital Management,Workday_HRDH,The Country Region for an address.
+concept_alias,Address Line 1,address.line1,EM_SECOND_ADDRESS_LINE1,Human Capital Management,Workday_HRDH,The local address line 1 for the second address.
+concept_alias,Address Line 2,address.line2,EM_SECOND_ADDRESS_LINE2,Human Capital Management,Workday_HRDH,The local address line 2 for the second address.
+concept_alias,Address City,address.city,EM_SECOND_ADDRESS_CITY,Human Capital Management,Workday_HRDH,The city for the second address.
+concept_alias,State/Region,address.region,EM_SECOND_ADDRESS_STATE,Human Capital Management,Workday_HRDH,The State ISO code for the second address.
+concept_alias,Address Postal Code,address.postal_code,EM_SECOND_ADDRESS_POSTCODE,Human Capital Management,Workday_HRDH,The postal code for the second address
+concept_alias,Address Country,address.country,EM_SECOND_ADDRESS_COUNTRY,Human Capital Management,Workday_HRDH,The Country Region for the second address.
+concept_alias,Employment Status,employee.employment_status,EM_REMOTE_WORKER,Human Capital Management,Workday_HRDH,"Shows if the worker is a remote worker, 1=Yes, 0=No"
+concept_alias,employee.phone,employee.phone,EM_PHONE_WORK_COUNTRY_CODE,Human Capital Management,Workday_HRDH,Country code of the worker's work landline
+concept_alias,employee.phone,employee.phone,EM_PHONE_WORK_AREA_CODE,Human Capital Management,Workday_HRDH,Area code of the worker's work landline
+concept_alias,employee.phone,employee.phone,EM_PHONE_WORK_NUMBER,Human Capital Management,Workday_HRDH,Worker's work landline number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_WORK_COUNTRY_CODE,Human Capital Management,Workday_HRDH,Country code of the workers work mobile phone number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_WORK_AREA_CODE,Human Capital Management,Workday_HRDH,Area code of the workers work mobile phone number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_WORK_NUMBER,Human Capital Management,Workday_HRDH,Employees work mobile phone number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_PERSONAL_COUNTRY_CODE,Human Capital Management,Workday_HRDH,Country code of the workers personal mobile phone number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_PERSONAL_AREA_CODE,Human Capital Management,Workday_HRDH,Area code of the workers personal mobile phone number
+concept_alias,employee.phone,employee.phone,EM_MOBILE_PERSONAL_NUMBER,Human Capital Management,Workday_HRDH,Employees personal mobile phone number
+concept_alias,employee.phone,employee.phone,EM_PHONE_PERSONAL_COUNTRY_CODE,Human Capital Management,Workday_HRDH,Country code of the worker's personal landline
+concept_alias,employee.phone,employee.phone,EM_PHONE_PERSONAL_AREA_CODE,Human Capital Management,Workday_HRDH,Area code of the worker's personal landline
+concept_alias,employee.phone,employee.phone,EM_PHONE_PERSONAL_NUMBER,Human Capital Management,Workday_HRDH,Worker's personal landline number
+concept_alias,Employee Email,employee.email,EM_EMAIL_PERSONAL1,Human Capital Management,Workday_HRDH,Worker's personal email number 1
+concept_alias,Employee Email,employee.email,EM_EMAIL_WORK1,Human Capital Management,Workday_HRDH,Worker's work email number 1
+concept_alias,Employee Email,employee.email,EM_EMAIL_PERSONAL2,Human Capital Management,Workday_HRDH,Worker's personal email number 2
+concept_alias,Employee Email,employee.email,EM_EMAIL_WORK2,Human Capital Management,Workday_HRDH,Worker's work email number 2
+concept_alias,Employee Email,employee.email,EM_EMAIL_PERSONAL3,Human Capital Management,Workday_HRDH,Worker's personal email number 3
+concept_alias,Employee Email,employee.email,EM_EMAIL_WORK3,Human Capital Management,Workday_HRDH,Worker's work email number 3
+concept_alias,Date of Birth,employee.birth_date,EM_BIRTH_DATE,Human Capital Management,Workday_HRDH,The birth date of the worker.
+concept_alias,Nationality,employee.nationality,EM_CITIZENSHIP_PRIMARY,Human Capital Management,Workday_HRDH,The countries of which the worker is a citizen.
+concept_alias,Nationality,employee.nationality,EM_CITIZENSHIP2,Human Capital Management,Workday_HRDH,Workers's citizenship number 2
+concept_alias,Nationality,employee.nationality,EM_CITIZENSHIP3,Human Capital Management,Workday_HRDH,Workers's citizenship number 3
+concept_alias,Nationality,employee.nationality,EM_CITIZENSHIP4,Human Capital Management,Workday_HRDH,Workers's citizenship number 4
+concept_alias,Contract End Date,employee.contract_end_date,EM_CONTRACT_EXP_DATE,Human Capital Management,Workday_HRDH,The date that the worker contract ends.
+concept_alias,Employment Status,employee.employment_status,EM_EMPLOYMENT_STATUS,Human Capital Management,Workday_HRDH,Returns the active status of the worker (Active / Terminated / On Leave). Certain types of leave will return as Active r
+concept_alias,Gender,employee.gender,EM_GENDER,Human Capital Management,Workday_HRDH,"The gender of the worker (Female, Male, Other, Undisclosed)"
+concept_alias,Marital Status,employee.marital_status,EM_MARITAL_STATUS,Human Capital Management,Workday_HRDH,The marital status of a worker
+concept_alias,Service Date,employee.service_date,EM_MAGNA_SERVICE_DATE,Human Capital Management,Workday_HRDH,Employee service date taking into account breaks in service.
+concept_alias,Service Date,employee.service_date,EM_SENIORITY_DATE,Human Capital Management,Workday_HRDH,The seniority date (division seniority date) for the worker.
+concept_alias,Service Date,employee.service_date,EM_COMPANY_SERVICE_DATE,Human Capital Management,Workday_HRDH,Company Service Date (Division Entry Date) for the Worker.
+concept_alias,Nationality,employee.nationality,EM_NATIONALITY,Human Capital Management,Workday_HRDH,Indicates the primary nationality for the person.
+concept_alias,Hire Date,employee.hire_date,EM_ORIGINAL_HIRE_DATE,Human Capital Management,Workday_HRDH,The date when the worker was first hired.
+concept_alias,Hire Date,employee.hire_date,EM_REHIRE_DATE,Human Capital Management,Workday_HRDH,HRDH column: EM_REHIRE_DATE
+concept_alias,Employee Name,employee.name,EM_POST_TITLE_CODE,Human Capital Management,Workday_HRDH,The suffix title from the worker's legal name
+concept_alias,Employee Name,employee.name,EM_PRE_TITLE_CODE,Human Capital Management,Workday_HRDH,The prefix title from the worker's legal name
+concept_alias,Employee Name,employee.name,EM_PREFERRED_FIRST_NAME,Human Capital Management,Workday_HRDH,The worker's preferred first or given name.
+concept_alias,Employee Name,employee.name,EM_PREFERRED_LAST_NAME,Human Capital Management,Workday_HRDH,The worker's preferred family name.
+concept_alias,FTE,employee.fte,EM_FULL_PARTTIME_INDICATOR,Human Capital Management,Workday_HRDH,Indicates if the worker is emlpoyed on full-time or part-time
+concept_alias,Employee Type,employee.employee_type,EM_WORKER_TYPE,Human Capital Management,Workday_HRDH,The worker type (worker or contingent worker) for a worker.
+concept_alias,Employee Type,employee.employee_type,EM_EMPLOYEE_TYPE,Human Capital Management,Workday_HRDH,"Indicates worker's type (Apprentice, Fixed term, Intern, Regular, etc)"
+concept_alias,Pay Group,employee.pay_group,EM_PAY_RATE_TYPE,Human Capital Management,Workday_HRDH,The pay rate type for an worker's position and is used by payroll.
+concept_alias,FTE,employee.fte,EM_FTE,Human Capital Management,Workday_HRDH,The full time equivalent for the worker's primary position.
+concept_alias,FTE,employee.fte,EM_SCHEDULED_WEEKLY_HOURS,Human Capital Management,Workday_HRDH,The weekly hours for the worker's primary position. This is used in the Full Time Equivalent calculation: Scheduled Week
+concept_alias,Termination Date,employee.termination_date,EM_LAST_DAY_OF_WORK,Human Capital Management,Workday_HRDH,The last day of work for the worker's latest termination. Includes future-dated terminations.
+concept_alias,Termination Date,employee.termination_date,EM_END_EMPLOYMENT_DATE,Human Capital Management,Workday_HRDH,The end employment date for a fixed term worker's primary position.
+concept_alias,Termination Date,employee.termination_date,EM_TERMINATION_DATE,Human Capital Management,Workday_HRDH,"Returns the worker termination date, contingent worker contract end date, terminated worker previous contract end date, "
+concept_alias,Termination Reason,employee.termination_reason,EM_TERMINATION_REASON,Human Capital Management,Workday_HRDH,"Returns a termination reason if the worker is terminated, or if they were terminated in the past on a previous contract "
+concept_alias,Pay Group,employee.pay_group,EM_PAY_GROUP,Human Capital Management,Workday_HRDH,"Returns the Pay Group Reference ID, or if blank returns the Pay Group Reference ID as of the Worker's Hire Date."
+concept_alias,Service Date,employee.service_date,EM_WORKER_DIVISION_ENTRY_DATE,Human Capital Management,Workday_HRDH,Company Service Date (Division Entry Date) for the Worker.
+concept_alias,Employee ID,employee.id,EM_COLLECTIVE_AGREEMENT_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Position ID,position.id,PO_POSITION_NK,Human Capital Management,Workday_HRDH,HRDH column: PO_POSITION_NK
+concept_alias,Location ID,location.id,ID_LOCATION,Human Capital Management,Workday_HRDH,HRDH column: ID_LOCATION
+concept_alias,Job Profile ID,job.id,ID_JOB,Human Capital Management,Workday_HRDH,HRDH column: ID_JOB
+concept_alias,Cost Center,cost_center.id,ID_COST_CENTER,Human Capital Management,Workday_HRDH,HRDH column: ID_COST_CENTER
+concept_alias,Department ID,department.id,ID_DEPARTMENT,Human Capital Management,Workday_HRDH,HRDH column: ID_DEPARTMENT
+concept_alias,Employee ID,employee.id,LOA_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Address Country,address.country,LOA_COUNTRY,Human Capital Management,Workday_HRDH,Returns a list of countries or country regions related to the leave type.
+concept_alias,Employee Email,employee.email,AD_EMAIL_ADDRESS,Human Capital Management,Workday_HRDH,"Active directory field,  email address"
+concept_alias,Address Country,address.country,AD_COUNTRY_CODE,Human Capital Management,Workday_HRDH,"Active directory field, country code"
+concept_alias,Job Title,job.title,AD_DESCRIPTION,Human Capital Management,Workday_HRDH,"Active directory account description, usually contains job title"
+concept_alias,Employee ID,employee.id,WI_IDENTIFIER_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,National ID,employee.national_id,WI_IDENTIFIER_TYPE_NAME,Human Capital Management,Workday_HRDH,Returns the National Identifier Type Name
+concept_alias,National ID,employee.national_id,WI_IDENTIFIER_ID,Human Capital Management,Workday_HRDH,HRDH column: WI_IDENTIFIER_ID
+concept_alias,Address Country,address.country,WI_IDENTIFIER_COUNTRY_CODE,Human Capital Management,Workday_HRDH,Returns the Country Code of the License Issued By Country
+concept_alias,Address Country,address.country,WI_IDENTIFIER_COUNTRY_REGION_CODE,Human Capital Management,Workday_HRDH,Returns the Region Code of the License Issued By Country
+concept_alias,National ID,employee.national_id,WI_IDENTIFIER_NATIONAL_ID_ISSUED_BY,Human Capital Management,Workday_HRDH,"The name of the agency and/or regional government (e.g., state or province) that issued the ID."
+concept_alias,National ID,employee.national_id,WI_IDENTIFIER_NATIONAL_ID_SERIES,Human Capital Management,Workday_HRDH,"The series of the National ID, for National ID Types where a series applies."
+concept_alias,Position Title,position.title,PO_BUSINESS_TITLE,Human Capital Management,Workday_HRDH,"Returns the Business Title, or if the position has a Future Position Fill returns the Default Job Title"
+concept_alias,Department Code,department.code,PO_DEPARTMENT_CODE,Human Capital Management,Workday_HRDH,HRDH column: PO_DEPARTMENT_CODE
+concept_alias,Position Title,position.title,PO_SHOP_FLOOR_OFFICE_STAFF,Human Capital Management,Workday_HRDH,Indicates if the position is a shop floor staff or office staff position
+concept_alias,Position Start Date,position.start_date,PO_START_DATE,Human Capital Management,Workday_HRDH,The availability date of the position or job management organization. This date represents the first day when staffing a
+concept_alias,Position End Date,position.end_date,PO_END_DATE,Human Capital Management,Workday_HRDH,HRDH column: PO_END_DATE
+concept_alias,Company Name,company.name,PO_LEGAL_COMPANY,Human Capital Management,Workday_HRDH,The legal organization name for the organization
+concept_alias,Location ID,location.id,LO_LOCATION_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Location Name,location.name,LO_NAME,Human Capital Management,Workday_HRDH,"Location name, usually contains address, postcode, city and  country code"
+concept_alias,Address Line 1,address.line1,LO_ADDRESS_LINE1,Human Capital Management,Workday_HRDH,Returns location street name and number
+concept_alias,Address City,address.city,LO_CITY,Human Capital Management,Workday_HRDH,Shows the city where the company is located
+concept_alias,Address City,address.city,LO_SUBLOCALITY,Human Capital Management,Workday_HRDH,"Shows location entity smaller that the city (ex. municipality, or district)"
+concept_alias,Address Postal Code,address.postal_code,LO_POST_ZIP,Human Capital Management,Workday_HRDH,Shows zip (postal) code of the location
+concept_alias,Address Country,address.country,LO_COUNTRY,Human Capital Management,Workday_HRDH,Returns a 2 letter company country code
+concept_alias,Employee ID,employee.id,TO_ENTRY_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Employee ID,employee.id,TO_APPROVED_BY_ID_EMPLOYEE,Human Capital Management,Workday_HRDH,Returns the Employee ID of the worker who approved the Time Off Entry
+concept_alias,Company ID,company.id,CO_COMPANY_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Company Name,company.name,CO_LEGAL_NAME,Human Capital Management,Workday_HRDH,Company legal name
+concept_alias,Department ID,department.id,DP_DEPARTMENT_NK,Human Capital Management,Workday_HRDH,Reference Id for an organization of any organization type
+concept_alias,Department ID,department.id,DP_PARENT_DEPARTMENT,Human Capital Management,Workday_HRDH,Reference ID of the superior (Parent) organization
+concept_alias,Department Name,department.name,DP_NAME,Human Capital Management,Workday_HRDH,The organization name for the organization
+concept_alias,Department Code,department.code,DP_CODE,Human Capital Management,Workday_HRDH,The organization id for the organization.
+concept_alias,Department Name,department.name,DP_EFFECTIVE_DATE,Human Capital Management,Workday_HRDH,Returns the effective date of the organization name / code. If the custom report is configured with a run time prompt fo
+concept_alias,Department ID,department.id,DP_PRIMARY_LOCATION,Human Capital Management,Workday_HRDH,Returns primary location of supervisory organization as of specified effective date. If no date is specified then primar
+concept_alias,Department Manager ID,department.manager_id,DP_MANAGER_ID,Human Capital Management,Workday_HRDH,The Employee ID or Contingent Worker ID for the worker that is Department manager
+concept_alias,Position ID,position.id,DP_MANAGER_POSITION_ID,Human Capital Management,Workday_HRDH,The unique identifier for thethat is Department manager's primary position.
+concept_alias,Employee ID,employee.id,EC_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Contract End Date,employee.contract_end_date,EC_END_DATE,Human Capital Management,Workday_HRDH,Employee contract end date
+concept_alias,Pay Group,employee.pay_group,PG_NAME,Human Capital Management,Workday_HRDH,HRDH column: PG_NAME
+concept_alias,Employee ID,employee.id,TO_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Address Country,address.country,TO_COUNTRY,Human Capital Management,Workday_HRDH,Returns the Country associated with the Time Off Plan
+concept_alias,Job Profile ID,job.id,JO_JOB_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,Job Title,job.title,JO_JOB_TITLE,Human Capital Management,Workday_HRDH,The Job Title Default for the job profile
+concept_alias,Career Level,job.career_level,JO_CAREER_STREAM,Human Capital Management,Workday_HRDH,The management level for the job profile
+concept_alias,Job Category,job.category,JO_CATEGORY,Human Capital Management,Workday_HRDH,The Job Category for the Job Profile
+concept_alias,Job Function,job.function,JO_FUNCTION,Human Capital Management,Workday_HRDH,The job family or job family group. This field enables you to drill down on the details of the job family or job family 
+concept_alias,Job Function,job.function,JO_FUNCTION_REF_ID,Human Capital Management,Workday_HRDH,"The Reference ID to use for lookups within our Workday Web Services. For supervisory organizations, this is also the 'Or"
+concept_alias,Job Function,job.function,JO_SUB_FUNCTION,Human Capital Management,Workday_HRDH,The job family or job family group. This field enables you to drill down on the details of the job family or job family 
+concept_alias,Job Function,job.function,JO_SUB_FUNCTION_REF_ID,Human Capital Management,Workday_HRDH,The reference ID of job family or job family group.
+concept_alias,Career Level,job.career_level,JO_TRAINING_LEVEL,Human Capital Management,Workday_HRDH,Contains the training that is associated to a job profile or position
+concept_alias,Cost Center,cost_center.id,CC_NK,Human Capital Management,Workday_HRDH,Reference Id for an organization of any organization type
+concept_alias,Cost Center Code,cost_center.code,CC_CODE,Human Capital Management,Workday_HRDH,The organization id for the organization
+concept_alias,Cost Center Name,cost_center.name,CC_NAME,Human Capital Management,Workday_HRDH,The organization name for the organization
+concept_alias,Department Name,department.name,CC_ORG_NAME_CODE_EFFECTIVE_DATE,Human Capital Management,Workday_HRDH,Returns the effective date of the organization name / code. If the custom report is configured with a run time prompt fo
+concept_alias,Cost Center Manager ID,cost_center.manager_id,CC_COST_CENTER_MANAGER,Human Capital Management,Workday_HRDH,The organization manager
+concept_alias,Employee ID,employee.id,LOA_EVENT_NK,Human Capital Management,Workday_HRDH,Natural Key - unique identifier
+concept_alias,FTE,employee.fte,LOA_FIRST_DAY_BACK_AT_WORK,Human Capital Management,Workday_HRDH,The first day an employee returned to work after a leave has ended
+concept_alias,Employee ID,employee.id,LOA_APPROVED_BY,Human Capital Management,Workday_HRDH,Returns the Employee ID of the worker who completed the Approval step of the business process

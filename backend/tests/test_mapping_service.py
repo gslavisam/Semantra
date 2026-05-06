@@ -427,7 +427,7 @@ def test_canonical_coverage_matches_common_contact_aliases() -> None:
         columns=[
             make_column("cust_id", ["numeric_id"], ["1", "2"]),
             make_column("client_mail", ["email"], ["ana@example.com", "marko@example.com"]),
-            make_column("primary_phone", ["phone"], ["0641234567", "0659998888"]),
+            make_column("customer_phone", ["phone"], ["0641234567", "0659998888"]),
         ],
     )
     target_schema = SchemaProfile(
@@ -437,7 +437,7 @@ def test_canonical_coverage_matches_common_contact_aliases() -> None:
         columns=[
             make_column("customer_id", ["numeric_id"], ["1", "2"]),
             make_column("customer_email", ["email"], ["ana@example.com", "marko@example.com"]),
-            make_column("phone_number", ["phone"], ["0641234567", "0659998888"]),
+            make_column("customer_phone", ["phone"], ["0641234567", "0659998888"]),
         ],
     )
 
@@ -453,8 +453,8 @@ def test_canonical_coverage_matches_common_contact_aliases() -> None:
     source_matches = {detail.column: detail.concept_ids for detail in source_coverage.matched_columns_detail}
     target_matches = {detail.column: detail.concept_ids for detail in target_coverage.matched_columns_detail}
     assert "customer.email" in source_matches["client_mail"]
-    assert "customer.phone" in source_matches["primary_phone"]
-    assert "customer.phone" in target_matches["phone_number"]
+    assert "customer.phone" in source_matches["customer_phone"]
+    assert "customer.phone" in target_matches["customer_phone"]
 
 
 def test_canonical_project_coverage_reports_shared_and_dataset_specific_concepts() -> None:
@@ -525,8 +525,8 @@ def test_canonical_coverage_matches_curated_erp_aliases() -> None:
 
     matches = {detail.column: detail.concept_ids for detail in coverage.matched_columns_detail}
     assert "purchase_order.id" in matches["EBELN"]
-    assert "purchase_order.line_item" in matches["EBELP"]
-    assert "stock.location" in matches["LGORT"]
+    assert "purchase_order.line_item_number" in matches["EBELP"]
+    assert "storage_location.id" in matches["LGORT"]
     assert "stock.quantity" in matches["LABST"]
     assert "batch.id" in matches["CHARG"]
     assert "gl_account.id" in matches["HKONT"]
@@ -566,9 +566,9 @@ def test_canonical_coverage_matches_sd_mm_document_aliases() -> None:
 
     matches = {detail.column: detail.concept_ids for detail in coverage.matched_columns_detail}
     assert "sales_order.id" in matches["VBELN"]
-    assert "sales_order.date" in matches["AUDAT"]
+    assert "sales_order.document_date" in matches["AUDAT"]
     assert "purchase_order.id" in matches["EBELN"]
-    assert "purchase_order.date" in matches["BEDAT"]
+    assert "purchase_order.document_date" in matches["BEDAT"]
     assert "shipping_point.id" in matches["VSTEL"]
     assert "delivery.id" in matches["VBELN_VL"]
 

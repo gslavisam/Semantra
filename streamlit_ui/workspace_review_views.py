@@ -250,19 +250,19 @@ def render_mapping_review(
     ]
 
     st.subheader("Selected Mapping")
-    st.dataframe(filtered_rows, width="stretch", hide_index=True)
+    st.dataframe(filtered_rows, use_container_width=True, hide_index=True)
 
     if source_concept_view_rows:
         st.subheader("Source -> Concept View")
-        st.dataframe(source_concept_view_rows, width="stretch", hide_index=True)
+        st.dataframe(source_concept_view_rows, use_container_width=True, hide_index=True)
 
     if concept_target_view_rows:
         st.subheader("Concept -> Target View")
-        st.dataframe(concept_target_view_rows, width="stretch", hide_index=True)
+        st.dataframe(concept_target_view_rows, use_container_width=True, hide_index=True)
 
     if concept_rows:
         st.subheader("Canonical Concept Summary")
-        st.dataframe(concept_rows, width="stretch", hide_index=True)
+        st.dataframe(concept_rows, use_container_width=True, hide_index=True)
 
     st.subheader("Ranked Candidates")
     for ranked in mapping_response["ranked_mappings"]:
@@ -280,7 +280,7 @@ def render_mapping_review(
                     for candidate in ranked["candidates"]
                     if selected_confidence == all_filter_option or candidate["confidence_label"] == selected_confidence
                 ],
-                width="stretch",
+                use_container_width=True,
                 hide_index=True,
             )
             for candidate in ranked["candidates"]:

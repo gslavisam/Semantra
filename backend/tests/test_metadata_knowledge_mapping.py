@@ -1,6 +1,6 @@
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
-from app.services.metadata_knowledge_service import metadata_knowledge_service
+from app.services.metadata_knowledge_service import MetadataKnowledgeService, metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 
 
@@ -108,6 +108,27 @@ def test_metadata_workbook_links_sap_material_to_workday_item_id() -> None:
     assert any("Context prior:" in line for line in result.mappings[0].explanation)
     assert any("SAP MARA.MATNR" in line for line in result.mappings[0].explanation)
     assert any("Workday Item.Item_ID" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_only_sap_field_context_survives_cold_start_db_reload() -> None:
+    metadata_knowledge_service.reseed_from_files()
+    file_seed_matches = metadata_knowledge_service.match_concepts(make_column("LSTEL", ["text"], ["A01", "A02"]))
+
+    cold_start_service = MetadataKnowledgeService()
+    cold_start_matches = cold_start_service.match_concepts(make_column("LSTEL", ["text"], ["A01", "A02"]))
+
+    file_seed_match = next(match for match in file_seed_matches if match.concept_id == "shipping_point.id")
+    cold_start_match = next(match for match in cold_start_matches if match.concept_id == "shipping_point.id")
+
+    assert tuple((context.system, context.object_name, context.field_name) for context in cold_start_match.contexts) == tuple(
+        (context.system, context.object_name, context.field_name) for context in file_seed_match.contexts
+    )
+
+
+def test_generated_workday_overlay_is_not_auto_loaded_into_base_knowledge() -> None:
+    middle_name_matches = metadata_knowledge_service.match_canonical_concepts(make_column("Middle_Name", ["text"], ["Ana", "Mila"]))
+
+    assert "address.country" not in {match.concept_id for match in middle_name_matches}
 
 
 def test_active_overlay_field_alias_changes_mapping_result() -> None:

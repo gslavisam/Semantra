@@ -116,10 +116,25 @@ def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
     return _impl(uploaded_file, cache_key)
 
 
-def upload_dataset_handle(uploaded_file, *, mode: str, selected_table: str | None = None) -> dict:
+def upload_dataset_handle(
+    uploaded_file,
+    *,
+    mode: str,
+    selected_table: str | None = None,
+    name_col: str | None = None,
+    description_col: str | None = None,
+    type_col: str | None = None,
+) -> dict:
     from streamlit_ui.api import upload_dataset_handle as _impl
 
-    return _impl(uploaded_file, mode=mode, selected_table=selected_table)
+    return _impl(
+        uploaded_file,
+        mode=mode,
+        selected_table=selected_table,
+        name_col=name_col,
+        description_col=description_col,
+        type_col=type_col,
+    )
 
 
 # Local diagnostic helper

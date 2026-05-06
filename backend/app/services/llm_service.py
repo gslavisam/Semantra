@@ -78,19 +78,43 @@ class OllamaProvider:
         return body["response"]
 
 
+@dataclass
+class LMStudioProvider:
+    """LM Studio exposes an OpenAI-compatible /v1/chat/completions endpoint.
+    Use this instead of OpenAIResponsesProvider which targets the newer /v1/responses API.
+    """
+
+    model: str
+    base_url: str
+
+    def generate(self, prompt: str, timeout_seconds: float) -> str:
+        payload = json.dumps(
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+            }
+        ).encode("utf-8")
+        http_request = request.Request(
+            self.base_url,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with request.urlopen(http_request, timeout=timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return body["choices"][0]["message"]["content"]
+
+
 def build_provider_from_settings() -> LLMProvider | None:
     provider_name = settings.llm_provider.lower()
     if provider_name == "none":
         return None
-    # Support LM Studio as OpenAI-compatible endpoint
-    if provider_name in ("openai", "lmstudio"):
-        # If LM Studio, use custom base_url and no API key
-        base_url = settings.openai_base_url
-        api_key = settings.openai_api_key
-        if provider_name == "lmstudio":
-            base_url = getattr(settings, "lmstudio_base_url", None) or "http://127.0.0.1:1234/v1/responses"
-            api_key = ""
-        return OpenAIResponsesProvider(api_key=api_key, model=settings.llm_model, base_url=base_url)
+    if provider_name == "lmstudio":
+        base_url = getattr(settings, "lmstudio_base_url", None) or "http://127.0.0.1:1234/v1/chat/completions"
+        return LMStudioProvider(model=settings.llm_model, base_url=base_url)
+    if provider_name == "openai":
+        return OpenAIResponsesProvider(api_key=settings.openai_api_key, model=settings.llm_model, base_url=settings.openai_base_url)
     if provider_name == "ollama":
         return OllamaProvider(model=settings.llm_model)
     return None

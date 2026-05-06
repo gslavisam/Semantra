@@ -7,7 +7,7 @@ def test_build_virtual_target_schema_returns_canonical_concepts() -> None:
     profile = build_virtual_target_schema()
 
     assert profile.dataset_id == "virtual-target:canonical"
-    assert profile.dataset_name == "canonical_glossary.csv"
+    assert profile.dataset_name == "canonical_glossary_erp.csv"
     assert profile.row_count == 0
     assert profile.columns
     assert any(column.name == "customer.id" for column in profile.columns)
