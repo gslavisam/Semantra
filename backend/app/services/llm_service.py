@@ -106,6 +106,40 @@ class LMStudioProvider:
         return body["choices"][0]["message"]["content"]
 
 
+@dataclass
+class GeminiProvider:
+    """Google Gemini via its OpenAI-compatible /v1beta/openai/chat/completions endpoint.
+
+    Requires a Gemini API key from https://aistudio.google.com/apikey.
+    Set SEMANTRA_GEMINI_API_KEY and optionally SEMANTRA_GEMINI_BASE_URL in .env.
+    """
+
+    api_key: str
+    model: str
+    base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+
+    def generate(self, prompt: str, timeout_seconds: float) -> str:
+        payload = json.dumps(
+            {
+                "model": self.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0,
+            }
+        ).encode("utf-8")
+        http_request = request.Request(
+            self.base_url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            method="POST",
+        )
+        with request.urlopen(http_request, timeout=timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return body["choices"][0]["message"]["content"]
+
+
 def build_provider_from_settings() -> LLMProvider | None:
     provider_name = settings.llm_provider.lower()
     if provider_name == "none":
@@ -117,6 +151,9 @@ def build_provider_from_settings() -> LLMProvider | None:
         return OpenAIResponsesProvider(api_key=settings.openai_api_key, model=settings.llm_model, base_url=settings.openai_base_url)
     if provider_name == "ollama":
         return OllamaProvider(model=settings.llm_model)
+    if provider_name == "gemini":
+        base_url = getattr(settings, "gemini_base_url", None) or "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        return GeminiProvider(api_key=settings.gemini_api_key, model=settings.llm_model, base_url=base_url)
     return None
 
 

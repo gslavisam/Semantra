@@ -43,8 +43,6 @@ dist/
 .mypy_cache/
 .Python
 metadata_dictionary.xlsx
-epics.md
 parse_workday_xsd.py
 parse_hrdh_columns.py
 semantra_data_mapp_02.pptx
-INTEGRATION_CATALOG_VISION.md

@@ -239,7 +239,7 @@ Current catalog endpoints:
 - `GET /catalog/concepts/{concept_id}`
 
 Reference:
-- see `INTEGRATION_CATALOG_VISION.md` for the fuller target model and MVP shape
+- see `docs/vision/INTEGRATION_CATALOG_VISION.md` for the fuller target model and MVP shape
 
 ### 8. Evaluation and Benchmarking
 

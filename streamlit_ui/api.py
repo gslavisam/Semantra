@@ -172,10 +172,24 @@ def admin_token_required() -> bool:
     return bool(requirement.get("requires_token", True))
 
 
+def refresh_backend_reachability() -> None:
+    base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(f"{base_url}/", headers={"Accept": "application/json"})
+        response.raise_for_status()
+        st.session_state["backend_reachable"] = True
+    except httpx.HTTPError:
+        st.session_state["backend_reachable"] = False
+
+
 def backend_is_reachable() -> bool:
-    admin_token_required()
-    requirement = st.session_state.get("admin_requirement", {"reachable": False})
-    return bool(requirement.get("reachable", False))
+    current_base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL)
+    cached_base_url = st.session_state.get("backend_reachable_base_url")
+    if cached_base_url != current_base_url or "backend_reachable" not in st.session_state:
+        refresh_backend_reachability()
+        st.session_state["backend_reachable_base_url"] = current_base_url
+    return bool(st.session_state.get("backend_reachable", False))
 
 
 def request_llm_transformation_suggestion(source: str, target: str, instruction: str) -> dict:

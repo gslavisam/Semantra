@@ -248,46 +248,63 @@ def render_workspace_tab(
             )
             button_label = "Generate canonical mapping" if upload_mode == "canonical" else "Generate mapping"
             button_key = "generate_canonical_mapping" if upload_mode == "canonical" else "generate_mapping"
+            activity_label = (
+                "Canonical mapping activity"
+                if upload_mode == "canonical"
+                else "Mapping activity"
+            )
+            activity_placeholder = st.empty()
             if st.button(button_label, type="primary", key=button_key):
                 try:
-                    if upload_mode == "canonical":
-                        mapping_response = api_request(
-                            "POST",
-                            "/mapping/canonical",
-                            json={
-                                "source_dataset_id": upload_response["source"]["dataset_id"],
-                                "target_system": upload_response.get("target_system", "canonical"),
-                                "use_llm": use_llm,
-                            },
-                            timeout=600.0,
-                        )
-                    else:
-                        mapping_response = api_request(
-                            "POST",
-                            "/mapping/auto",
-                            json={
-                                "source_dataset_id": upload_response["source"]["dataset_id"],
-                                "target_dataset_id": upload_response["target"]["dataset_id"],
-                                "use_llm": use_llm,
-                            },
-                            timeout=600.0,
-                        )
-                    st.session_state["mapping_response"] = mapping_response
-                    initialize_mapping_editor_state(mapping_response)
-                    st.session_state.pop("preview_response", None)
-                    st.session_state.pop("codegen_response", None)
-                    st.session_state["last_action"] = {
-                        "level": "success",
-                        "message": (
-                            "Generated canonical mapping candidates from the current source dataset."
-                            if upload_mode == "canonical"
-                            else "Generated ranked mapping candidates from the current datasets."
-                        ),
-                    }
-                    st.rerun()
+                    with activity_placeholder.container():
+                        with st.status(activity_label, expanded=True) as status:
+                            status.write("Preparing mapping request.")
+                            if upload_mode == "canonical":
+                                status.write("Calling /mapping/canonical.")
+                                mapping_response = api_request(
+                                    "POST",
+                                    "/mapping/canonical",
+                                    json={
+                                        "source_dataset_id": upload_response["source"]["dataset_id"],
+                                        "target_system": upload_response.get("target_system", "canonical"),
+                                        "use_llm": use_llm,
+                                    },
+                                    timeout=600.0,
+                                )
+                            else:
+                                status.write("Calling /mapping/auto.")
+                                mapping_response = api_request(
+                                    "POST",
+                                    "/mapping/auto",
+                                    json={
+                                        "source_dataset_id": upload_response["source"]["dataset_id"],
+                                        "target_dataset_id": upload_response["target"]["dataset_id"],
+                                        "use_llm": use_llm,
+                                    },
+                                    timeout=600.0,
+                                )
+                            status.write("Initializing review state.")
+                            st.session_state["mapping_response"] = mapping_response
+                            initialize_mapping_editor_state(mapping_response)
+                            st.session_state.pop("preview_response", None)
+                            st.session_state.pop("codegen_response", None)
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": (
+                                    "Generated canonical mapping candidates from the current source dataset."
+                                    if upload_mode == "canonical"
+                                    else "Generated ranked mapping candidates from the current datasets."
+                                ),
+                            }
+                            status.write("Mapping results are ready for review.")
+                            status.update(label=f"{activity_label} complete", state="complete", expanded=True)
                 except httpx.HTTPError as error:
+                    with activity_placeholder.container():
+                        with st.status(activity_label, expanded=True) as status:
+                            status.write("Preparing mapping request.")
+                            status.write(f"Request failed: {error}")
+                            status.update(label=f"{activity_label} failed", state="error", expanded=True)
                     st.session_state["last_action"] = {"level": "error", "message": f"Mapping failed: {error}"}
-                    st.rerun()
 
             if mapping_response:
                 st.success(

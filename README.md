@@ -96,7 +96,12 @@ cd Semantra/backend
 Use these docs with different intent:
 - `README.md`: quick project summary, local run instructions, and high-level capability list
 - `PROJECT_OVERVIEW.md`: broader product and technical architecture overview
-- `epics.md`: roadmap, phase plan, backlog direction, and execution tracking notes for completed epic slices
-- `REAL_LIFE_PILOT_TEST_PLAN.md`: concrete pilot-validation plan for realistic source/target datasets before wider rollout or refactor
+- `project_docs/plan.md`: strategic roadmap, technical phases, working order, and execution rules
+- `project_docs/epics.md`: epic backlog and scope catalog
+- `project_docs/implementation_checklists.md`: active MVP and release checklists
+- `project_docs/completed_slices.md`: delivered slices and completed technical phases
+- `docs/pilot/REAL_LIFE_PILOT_TEST_PLAN.md`: concrete pilot-validation plan for realistic source/target datasets before wider rollout or refactor
+- `docs/vision/INTEGRATION_CATALOG_VISION.md`: deeper product and architecture memo for the integration catalog direction
+- `docs/presentation/presentation.md`: presentation and demo narrative for stakeholder-facing walkthroughs
 - `help.md`: practical usage guide in Serbian for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs
 - `help.en.md`: practical usage guide in English for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs

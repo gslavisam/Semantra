@@ -35,6 +35,8 @@ class Settings:
     openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434/api/generate"
     lmstudio_base_url: str = "http://127.0.0.1:1234/v1/chat/completions"
+    gemini_api_key: str = ""
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 
 def load_settings(dotenv_path: str | Path | None = None) -> Settings:
@@ -71,6 +73,7 @@ def settings_snapshot() -> dict[str, Any]:
         "llm_gate_min_score": settings.llm_gate_min_score,
         "llm_gate_max_score": settings.llm_gate_max_score,
         "admin_api_token_configured": bool(settings.admin_api_token.strip()),
+        "gemini_api_key_configured": bool(settings.gemini_api_key.strip()),
     }
 
 
