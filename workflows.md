@@ -188,7 +188,7 @@ Pravila bounded LLM validacije:
 
 Kada LLM gate pokušava da se aktivira:
 
-1. Standard ambiguity band: top score je u opsegu `llm_gate_min_score < score < llm_gate_max_score` (default `0.4 < score < 0.75`).
+1. Standard ambiguity band: top score je u opsegu `llm_gate_min_score < score < llm_gate_max_score` (default `0.3 < score < 0.75`).
 2. Canonical rescue: low-mid scenario gde je kandidat canonical naziv, semantika dovoljno jaka, ali nema knowledge/canonical potpore.
 3. Close strong canonical competitor: kod jakog canonical lock-a LLM se uključuje samo ako postoji skoro izjednačen jaki canonical challenger (margina < `0.05`).
 

@@ -58,6 +58,16 @@ def display_trust_layer(
             st.info(f"Source: **{source}**")
         with col2:
             st.success(f"Target: **{mapping.get('target') or '—'}**")
+            llm_recommendation = mapping.get("llm_recommendation") or {}
+            if mapping.get("llm_consulted") and llm_recommendation:
+                llm_target = llm_recommendation.get("selected_target") or "unmapped"
+                llm_confidence = int(float(llm_recommendation.get("confidence", 0.0) or 0.0) * 100)
+                if llm_target != (mapping.get("target") or ""):
+                    st.caption(
+                        f"LLM consulted: recommended {llm_target} ({llm_confidence}%), but the final target differs after global assignment."
+                    )
+                else:
+                    st.caption(f"LLM consulted: confirmed {llm_target} ({llm_confidence}%).")
             if has_knowledge_match(mapping.get("signals"), mapping.get("explanation")):
                 st.caption("Knowledge-backed match")
             if has_canonical_match(mapping.get("signals"), mapping.get("explanation")):
@@ -81,6 +91,15 @@ def display_trust_layer(
                     st.write(f"- {reason_line}")
             else:
                 st.write("No explanation provided.")
+
+            if mapping.get("llm_consulted") and llm_recommendation:
+                st.write("**LLM review:**")
+                st.write(
+                    f"- Recommended target: {llm_recommendation.get('selected_target') or 'unmapped'} "
+                    f"({int(float(llm_recommendation.get('confidence', 0.0) or 0.0) * 100)}%)"
+                )
+                for reason_line in llm_recommendation.get("reasoning", []) or []:
+                    st.write(f"- LLM: {reason_line}")
 
             canonical_labels = canonical_concept_labels(mapping.get("canonical_details"))
             if canonical_labels:
@@ -250,19 +269,19 @@ def render_mapping_review(
     ]
 
     st.subheader("Selected Mapping")
-    st.dataframe(filtered_rows, use_container_width=True, hide_index=True)
+    st.dataframe(filtered_rows, width="stretch", hide_index=True)
 
     if source_concept_view_rows:
         st.subheader("Source -> Concept View")
-        st.dataframe(source_concept_view_rows, use_container_width=True, hide_index=True)
+        st.dataframe(source_concept_view_rows, width="stretch", hide_index=True)
 
     if concept_target_view_rows:
         st.subheader("Concept -> Target View")
-        st.dataframe(concept_target_view_rows, use_container_width=True, hide_index=True)
+        st.dataframe(concept_target_view_rows, width="stretch", hide_index=True)
 
     if concept_rows:
         st.subheader("Canonical Concept Summary")
-        st.dataframe(concept_rows, use_container_width=True, hide_index=True)
+        st.dataframe(concept_rows, width="stretch", hide_index=True)
 
     st.subheader("Ranked Candidates")
     for ranked in mapping_response["ranked_mappings"]:
@@ -280,7 +299,7 @@ def render_mapping_review(
                     for candidate in ranked["candidates"]
                     if selected_confidence == all_filter_option or candidate["confidence_label"] == selected_confidence
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
             for candidate in ranked["candidates"]:

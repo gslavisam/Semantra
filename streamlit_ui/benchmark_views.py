@@ -48,7 +48,7 @@ def render_benchmark_tab(
     if st.button(
         "Save current mapping as benchmark",
         disabled=(benchmark_case is None) or (not benchmark_name.strip()),
-        use_container_width=True,
+        width="stretch",
         key="benchmark_save_current_mapping",
     ):
         try:

@@ -82,6 +82,8 @@ class MappingCandidate(BaseModel):
     canonical_details: CanonicalMappingDetails = Field(default_factory=CanonicalMappingDetails)
     alternatives: list[str] = Field(default_factory=list)
     transformation_code: str | None = None
+    llm_consulted: bool = False
+    llm_recommendation: LLMValidationResult | None = None
 
 
 class SourceMappingResult(BaseModel):

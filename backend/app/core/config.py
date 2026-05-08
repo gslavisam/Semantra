@@ -27,7 +27,7 @@ class Settings:
     llm_timeout_seconds: float = 30.0
     llm_max_retries: int = 2
     llm_min_confidence: float = 0.5
-    llm_gate_min_score: float = 0.4
+    llm_gate_min_score: float = 0.3
     llm_gate_max_score: float = 0.75
     admin_api_token: str = ""
     sqlite_path: str = str(Path(__file__).resolve().parents[2] / "semantra.sqlite3")

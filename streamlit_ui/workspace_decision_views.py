@@ -102,7 +102,7 @@ def render_mapping_io_panel(
         file_name="semantra_mapping_decisions.json",
         mime="application/json",
         disabled=export_disabled,
-        use_container_width=True,
+        width="stretch",
     )
     export_columns[1].download_button(
         "Download mapping Excel",
@@ -110,7 +110,7 @@ def render_mapping_io_panel(
         file_name="semantra_mapping_decisions.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         disabled=export_disabled,
-        use_container_width=True,
+        width="stretch",
     )
     imported_file = st.file_uploader(
         "Import mapping JSON",

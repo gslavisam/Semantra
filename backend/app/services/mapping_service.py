@@ -119,6 +119,8 @@ def generate_mapping_candidates(
                 ],
                 alternatives=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
                 transformation_code=transformation_code,
+                llm_consulted=True,
+                llm_recommendation=llm_result,
             )
             ranked_results.append(
                 SourceMappingResult(
@@ -133,15 +135,26 @@ def generate_mapping_candidates(
             continue
 
         if selected_score is None:
+            extra_explanation = ["No unique target was assigned by the global matching step; manual review required."]
+            if llm_result and llm_result.selected_target != "no_match":
+                extra_explanation.insert(
+                    0,
+                    f"LLM validator preferred '{llm_result.selected_target}', but that target was already assigned elsewhere by the global one-to-one matching step.",
+                )
             selected = build_selected_mapping(
                 source_column.name,
                 rankings[0],
                 status="needs_review",
-                extra_explanation=["No unique target was assigned by the global matching step; manual review required."],
+                extra_explanation=extra_explanation,
                 alternatives=[candidate.target.name for candidate in rankings[1:settings.top_k_candidates]],
+                llm_result=llm_result,
             )
         else:
             extra_explanation: list[str] = []
+            if llm_result and llm_result.selected_target != "no_match" and llm_result.selected_target != selected_score.target.name:
+                extra_explanation.append(
+                    f"LLM validator preferred '{llm_result.selected_target}', but global one-to-one assignment selected this target instead."
+                )
             if rankings[0].target.name != selected_score.target.name:
                 extra_explanation.append(
                     "Global assignment selected this target to maximize one-to-one mapping coverage across the full schema."
@@ -156,6 +169,7 @@ def generate_mapping_candidates(
                     for candidate in rankings[: settings.top_k_candidates]
                     if candidate.target.name != selected_score.target.name
                 ],
+                llm_result=llm_result,
             )
         # Attach transformation_code if present
         if transformation_code:
@@ -498,6 +512,7 @@ def build_selected_mapping(
     status: str,
     extra_explanation: list[str],
     alternatives: list[str],
+    llm_result: LLMValidationResult | None = None,
 ) -> MappingCandidate:
     return MappingCandidate(
         source=source_name,
@@ -510,6 +525,8 @@ def build_selected_mapping(
         explanation=list(score.explanation) + extra_explanation,
         canonical_details=score.canonical_details,
         alternatives=alternatives,
+        llm_consulted=llm_result is not None,
+        llm_recommendation=llm_result,
     )
 
 

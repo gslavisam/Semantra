@@ -194,6 +194,61 @@ def test_trust_layer_rows_preserves_selected_candidate_signals() -> None:
     assert rows[0]["canonical_details"]["shared_concepts"][0]["concept_id"] == "customer.id"
 
 
+def test_trust_layer_rows_prefer_final_selected_row_metadata_when_target_matches() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "suggested_mapping_by_source",
+        "resolve_suggested_transformation_code",
+        "effective_transformation_code",
+        "transformation_mode",
+        "trust_layer_rows",
+    )
+    trust_layer_rows = functions[-1]
+
+    fake_streamlit.session_state.update({"mapping_editor_state": {}})
+
+    mapping_response = {
+        "mappings": [
+            {
+                "source": "purchaser",
+                "target": "customer_id",
+                "confidence": 0.4334,
+                "explanation": [
+                    "LLM validator preferred 'customer', but global one-to-one assignment selected this target instead."
+                ],
+                "signals": {"pattern": 1.0, "statistical": 0.96},
+                "llm_consulted": True,
+                "llm_recommendation": {
+                    "selected_target": "customer",
+                    "confidence": 0.5723,
+                    "reasoning": ["The source field 'purchaser' represents a company name."],
+                },
+            }
+        ],
+        "ranked_mappings": [
+            {
+                "source": "purchaser",
+                "candidates": [
+                    {
+                        "target": "customer_id",
+                        "confidence": 0.4334,
+                        "explanation": ["Strong pattern alignment: source text matches target text."],
+                        "signals": {"pattern": 1.0, "statistical": 0.96},
+                        "canonical_details": {"shared_concepts": []},
+                    }
+                ],
+            }
+        ],
+    }
+
+    rows = trust_layer_rows(mapping_response)
+
+    assert rows[0]["explanation"] == [
+        "LLM validator preferred 'customer', but global one-to-one assignment selected this target instead."
+    ]
+    assert rows[0]["llm_consulted"] is True
+    assert rows[0]["llm_recommendation"]["selected_target"] == "customer"
+
+
 def test_canonical_concept_labels_prefers_shared_concepts() -> None:
     _, [canonical_concept_labels] = load_streamlit_functions("canonical_concept_labels")
 

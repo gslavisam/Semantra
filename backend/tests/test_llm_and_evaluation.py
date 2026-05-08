@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -242,6 +243,65 @@ def test_llm_can_generate_transformation_code_from_user_instruction() -> None:
     assert result is not None
     assert 'df_source["email"]' in result.transformation_code
     assert result.reasoning == ["Extract local part", "Replace dots with spaces", "Title-case the result"]
+
+
+def test_llm_override_is_explained_when_global_assignment_picks_a_different_target() -> None:
+    customer = make_column("customer", ["text"], ["Acme North", "Contoso Trade"])
+    customer_id = make_column("customer_id", ["text"], ["C0001", "C0002"])
+    customer_segment = make_column("customer_segment", ["text"], ["A", "B"])
+
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=2,
+        columns=[
+            make_column("LEGACY_CUST", ["text"], ["C0001", "C0002"]),
+            make_column("purchaser", ["text"], ["Acme North", "Contoso Trade"]),
+        ],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=2,
+        columns=[customer, customer_id, customer_segment],
+    )
+
+    def fake_rankings(source_column, _targets):
+        if source_column.name == "LEGACY_CUST":
+            return [
+                CandidateScore(customer, customer, 0.6119, ScoringSignals(), [], set()),
+                CandidateScore(customer, customer_id, 0.6102, ScoringSignals(), [], set()),
+                CandidateScore(customer, customer_segment, 0.5615, ScoringSignals(), [], set()),
+            ]
+        return [
+            CandidateScore(source_column, customer, 0.5723, ScoringSignals(), [], set()),
+            CandidateScore(source_column, customer_id, 0.4334, ScoringSignals(), [], set()),
+            CandidateScore(source_column, customer_segment, 0.4330, ScoringSignals(), [], set()),
+        ]
+
+    provider = StaticLLMProvider(
+        lambda prompt: json.dumps(
+            {
+                "selected_target": "customer",
+                "confidence": 0.6119 if "LEGACY_CUST" in prompt else 0.5723,
+                "reasoning": ["LLM prefers the generic customer field."],
+            }
+        )
+    )
+
+    with patch("app.services.mapping_service.rank_targets_for_source", side_effect=fake_rankings):
+        result = generate_mapping_candidates(source_schema, target_schema, llm_provider=provider)
+
+    purchaser = next(mapping for mapping in result.mappings if mapping.source == "purchaser")
+
+    assert purchaser.target == "customer_id"
+    assert purchaser.llm_consulted is True
+    assert purchaser.llm_recommendation is not None
+    assert purchaser.llm_recommendation.selected_target == "customer"
+    assert any(
+        "LLM validator preferred 'customer', but global one-to-one assignment selected this target instead." == line
+        for line in purchaser.explanation
+    )
 
 
 def test_evaluation_harness_reports_accuracy_and_bucket_metrics() -> None:

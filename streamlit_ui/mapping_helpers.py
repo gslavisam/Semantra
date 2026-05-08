@@ -264,15 +264,19 @@ def trust_layer_rows(
             (candidate for candidate in ranked["candidates"] if candidate["target"] == current_target),
             None,
         )
+        use_selected_row = current_target == selected_row.get("target")
+        active_row = selected_row if use_selected_row or not selected_candidate else selected_candidate
         fallback_code = resolve_suggested_transformation_code_func(current_state, selected_row.get("transformation_code"))
         rows.append(
             {
                 "source": source,
                 "target": current_target,
-                "confidence": selected_candidate["confidence"] if selected_candidate else selected_row.get("confidence", 0.0),
-                "explanation": selected_candidate["explanation"] if selected_candidate else selected_row.get("explanation", []),
-                "signals": selected_candidate["signals"] if selected_candidate else selected_row.get("signals", {}),
-                "canonical_details": selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {}),
+                "confidence": active_row.get("confidence", 0.0),
+                "explanation": active_row.get("explanation", []),
+                "signals": active_row.get("signals", {}),
+                "canonical_details": active_row.get("canonical_details", {}),
+                "llm_consulted": bool(selected_row.get("llm_consulted", False)) if use_selected_row else False,
+                "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
                 "suggested_transformation_code": fallback_code,
                 "active_transformation_code": effective_transformation_code_func(source, session_state, fallback_code),
                 "transformation_mode": transformation_mode_func(source, session_state, fallback_code),
@@ -300,20 +304,20 @@ def current_mapping_rows(
             (candidate for candidate in ranked["candidates"] if candidate["target"] == current_target),
             None,
         )
-        canonical_details = selected_candidate.get("canonical_details", {}) if selected_candidate else selected_row.get("canonical_details", {})
+        use_selected_row = current_target == selected_row.get("target")
+        active_row = selected_row if use_selected_row or not selected_candidate else selected_candidate
+        canonical_details = active_row.get("canonical_details", {})
         rows.append(
             {
                 "source": source,
                 "target": current_target,
-                "confidence": selected_candidate["confidence"] if selected_candidate else selected_row.get("confidence", 0.0),
-                "confidence_label": (
-                    selected_candidate["confidence_label"] if selected_candidate else selected_row.get("confidence_label", "low_confidence")
-                ),
+                "confidence": active_row.get("confidence", 0.0),
+                "confidence_label": active_row.get("confidence_label", "low_confidence"),
                 "status": current_state.get("status", selected_row.get("status", "needs_review")),
-                "validator": validator_badge(
-                    selected_candidate["method"] if selected_candidate else selected_row.get("method", "manual_review")
-                ),
+                "validator": validator_badge(active_row.get("method", "manual_review")),
                 "canonical_path": canonical_path_label_func(source, current_target, canonical_details),
+                "llm_consulted": bool(selected_row.get("llm_consulted", False)) if use_selected_row else False,
+                "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
             }
         )
     return rows
