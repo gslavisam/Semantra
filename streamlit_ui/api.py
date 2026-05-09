@@ -114,6 +114,34 @@ def upload_dataset_handle(
     )
 
 
+def enrich_dataset_metadata(
+    dataset_id: str,
+    uploaded_file,
+    *,
+    name_col: str | None = None,
+    description_col: str | None = None,
+    type_col: str | None = None,
+) -> dict:
+    if not dataset_id:
+        raise ValueError("Select and upload the source dataset before applying companion metadata.")
+    if uploaded_file is None:
+        raise ValueError("Select a companion schema/spec file before applying metadata enrichment.")
+
+    form_data = {"dataset_id": dataset_id}
+    if name_col:
+        form_data["name_col"] = name_col
+    if description_col:
+        form_data["description_col"] = description_col
+    if type_col:
+        form_data["type_col"] = type_col
+    return api_request(
+        "POST",
+        "/upload/handle/metadata",
+        files=upload_file_to_request_files(uploaded_file),
+        data=form_data,
+    )
+
+
 def api_request_content(method: str, path: str, files: dict | None = None, data: dict | None = None) -> bytes:
     headers = {}
     admin_token = st.session_state.get("admin_token", "").strip()

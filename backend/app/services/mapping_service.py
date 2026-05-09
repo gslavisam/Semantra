@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from collections.abc import Callable
 
 from app.core.config import settings
 from app.models.mapping import (
@@ -39,6 +40,7 @@ WEIGHTS = {
 
 TOTAL_WEIGHT = sum(WEIGHTS.values())
 STRONG_CANONICAL_LLM_MARGIN = 0.05
+ProgressCallback = Callable[[str], None]
 
 
 @dataclass
@@ -59,20 +61,29 @@ def generate_mapping_candidates(
     target_schema: SchemaProfile,
     llm_provider: LLMProvider | None = None,
     write_decision_log: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> AutoMappingResponse:
-    per_source_scores = {
-        source_column.name: rank_targets_for_source(source_column, target_schema.columns)
-        for source_column in source_schema.columns
-    }
+    source_columns = list(source_schema.columns)
+    target_columns = list(target_schema.columns)
+    _emit_progress(
+        progress_callback,
+        f"Loaded {len(source_columns)} source fields and {len(target_columns)} target fields for mapping.",
+    )
+    per_source_scores: dict[str, list[CandidateScore]] = {}
+    for index, source_column in enumerate(source_columns, start=1):
+        _emit_progress(progress_callback, f"Ranking {index}/{len(source_columns)}: {source_column.name}.")
+        per_source_scores[source_column.name] = rank_targets_for_source(source_column, target_columns)
 
-    llm_decisions = apply_llm_validation(per_source_scores, llm_provider)
+    _emit_progress(progress_callback, "Applying LLM validation gates." if llm_provider else "LLM validation disabled; using heuristic ranking only.")
+    llm_decisions = apply_llm_validation(per_source_scores, llm_provider, progress_callback=progress_callback)
 
+    _emit_progress(progress_callback, "Assigning unique target fields across the full schema.")
     assigned_scores = assign_unique_targets(per_source_scores)
     selected_mappings: list[MappingCandidate] = []
     ranked_results: list[SourceMappingResult] = []
 
 
-    for source_column in source_schema.columns:
+    for index, source_column in enumerate(source_columns, start=1):
         rankings = per_source_scores[source_column.name]
         selected_score = assigned_scores.get(source_column.name)
         candidate_options = [build_candidate_option(score) for score in rankings[: settings.top_k_candidates]]
@@ -102,6 +113,7 @@ def generate_mapping_candidates(
                     # transformation_code intentionally omitted
                 )
             )
+            _emit_progress(progress_callback, f"Selected {index}/{len(source_columns)}: {source_column.name} -> no_match.")
             continue
 
         if llm_result and llm_result.selected_target == "no_match":
@@ -130,6 +142,7 @@ def generate_mapping_candidates(
                 )
             )
             selected_mappings.append(selected)
+            _emit_progress(progress_callback, f"Selected {index}/{len(source_columns)}: {source_column.name} -> no_match by LLM.")
             if write_decision_log:
                 log_decision(source_column.name, rankings[: settings.top_k_candidates], llm_result, selected)
             continue
@@ -186,6 +199,11 @@ def generate_mapping_candidates(
             )
         )
         selected_mappings.append(selected)
+        _emit_progress(
+            progress_callback,
+            f"Selected {index}/{len(source_columns)}: {source_column.name} -> {selected.target or 'no_match'} "
+            f"({selected.confidence:.0%}, {selected.method}).",
+        )
 
     source_canonical_coverage = metadata_knowledge_service.canonical_coverage(source_schema)
     target_canonical_coverage = metadata_knowledge_service.canonical_coverage(target_schema)
@@ -198,11 +216,15 @@ def generate_mapping_candidates(
         ),
     )
 
-    return AutoMappingResponse(
+    _emit_progress(progress_callback, "Computing canonical coverage summary.")
+
+    response = AutoMappingResponse(
         mappings=selected_mappings,
         ranked_mappings=ranked_results,
         canonical_coverage=canonical_coverage,
     )
+    _emit_progress(progress_callback, "Mapping response assembled.")
+    return response
 
 
 def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile]) -> list[CandidateScore]:
@@ -228,6 +250,7 @@ def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile])
 def apply_llm_validation(
     per_source_scores: dict[str, list[CandidateScore]],
     llm_provider: LLMProvider | None,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, LLMValidationResult]:
     llm_decisions: dict[str, LLMValidationResult] = {}
 
@@ -239,21 +262,30 @@ def apply_llm_validation(
             continue
         rescue_mode = should_run_canonical_semantic_rescue(rankings[0])
         if not should_run_llm_validation(rankings):
+            _emit_progress(progress_callback, f"LLM skipped for {source_name}: ranking is outside the ambiguity band.")
             continue
 
         candidate_scores = rankings[: settings.top_k_candidates]
         source_column = candidate_scores[0].source
+        _emit_progress(progress_callback, f"LLM validating {source_name} against top {len(candidate_scores)} candidates.")
         llm_result = call_validator(
             source_field={
                 "name": source_column.name,
+                "description": source_column.description,
+                "declared_type": source_column.declared_type,
                 "sample_values": source_column.sample_values,
                 "pattern": source_column.detected_patterns,
+                "detected_patterns": source_column.detected_patterns,
                 "unique_ratio": source_column.unique_ratio,
             },
             candidate_targets=[
                 {
                     "name": candidate.target.name,
+                    "description": candidate.target.description,
+                    "declared_type": candidate.target.declared_type,
+                    "sample_values": candidate.target.sample_values,
                     "pattern": candidate.target.detected_patterns,
+                    "detected_patterns": candidate.target.detected_patterns,
                     "confidence": candidate.score,
                 }
                 for candidate in candidate_scores
@@ -262,10 +294,16 @@ def apply_llm_validation(
             low_confidence_fallback_to_no_match=rescue_mode,
         )
         if llm_result is None:
+            _emit_progress(progress_callback, f"LLM returned no usable recommendation for {source_name}; keeping heuristic ranking.")
             continue
         llm_decisions[source_name] = llm_result
+        if source_column.description or source_column.declared_type:
+            llm_result.reasoning = list(llm_result.reasoning) + [
+                "LLM received source field metadata context (description/type) for this decision."
+            ]
 
         if llm_result.selected_target == "no_match":
+            _emit_progress(progress_callback, f"LLM rejected all candidates for {source_name}.")
             continue
 
         for candidate in candidate_scores:
@@ -280,11 +318,21 @@ def apply_llm_validation(
                 ["LLM validator re-ranked this candidate within the closed candidate set."]
                 + [f"LLM: {reason}" for reason in llm_result.reasoning]
             )
+            _emit_progress(progress_callback, f"LLM preferred {source_name} -> {llm_result.selected_target} ({llm_result.confidence:.0%}).")
             break
 
         rankings.sort(key=lambda item: (item.llm_selected, item.score), reverse=True)
 
     return llm_decisions
+
+
+def _emit_progress(progress_callback: ProgressCallback | None, message: str) -> None:
+    if progress_callback is None:
+        return
+    try:
+        progress_callback(message)
+    except Exception:
+        return
 
 
 def should_run_llm_validation(rankings: list[CandidateScore]) -> bool:

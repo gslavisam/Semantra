@@ -33,7 +33,18 @@ TYPE_CANDIDATES = {
     "dtype",
     "format",
 }
+SAMPLE_VALUE_CANDIDATES = {
+    "sample",
+    "samples",
+    "sample value",
+    "sample values",
+    "example",
+    "examples",
+    "example value",
+    "example values",
+}
 SPEC_LAYOUT_MAX_COLUMNS = 20
+MAX_SPEC_SAMPLE_VALUES = 5
 
 
 def build_spec_layout_hint(rows: list[dict[str, object]]) -> SpecLayoutHint | None:
@@ -55,6 +66,7 @@ def detect_spec_layout(headers: list[str]) -> SpecLayoutHint | None:
 
     description_col = find_matching_header(headers, normalized_headers, DESCRIPTION_CANDIDATES)
     type_col = find_matching_header(headers, normalized_headers, TYPE_CANDIDATES)
+    sample_values_col = find_matching_header(headers, normalized_headers, SAMPLE_VALUE_CANDIDATES)
     if not description_col and not type_col:
         return None
 
@@ -63,6 +75,7 @@ def detect_spec_layout(headers: list[str]) -> SpecLayoutHint | None:
         name_col=name_col,
         description_col=description_col,
         type_col=type_col,
+        sample_values_col=sample_values_col,
         confidence=confidence,
     )
 
@@ -74,6 +87,7 @@ def parse_spec_payload(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> SchemaProfile:
     rows = parse_tabular_payload(payload, filename)
     return parse_spec_rows(
@@ -83,6 +97,7 @@ def parse_spec_payload(
         name_col=name_col,
         description_col=description_col,
         type_col=type_col,
+        sample_values_col=sample_values_col,
     )
 
 
@@ -94,11 +109,18 @@ def parse_spec_rows(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> SchemaProfile:
     if not rows:
         raise ValueError("Spec upload requires at least one field row")
 
-    hint = resolve_spec_layout(rows, name_col=name_col, description_col=description_col, type_col=type_col)
+    hint = resolve_spec_layout(
+        rows,
+        name_col=name_col,
+        description_col=description_col,
+        type_col=type_col,
+        sample_values_col=sample_values_col,
+    )
     columns: list[ColumnProfile] = []
 
     for row in rows:
@@ -112,20 +134,26 @@ def parse_spec_rows(
 
         raw_description = row.get(hint.description_col) if hint.description_col else None
         raw_type = row.get(hint.type_col) if hint.type_col else None
+        raw_samples = row.get(hint.sample_values_col) if hint.sample_values_col else None
+        description = "" if is_nullish(raw_description) else str(raw_description).strip()
+        declared_type = "" if is_nullish(raw_type) else str(raw_type).strip()
+        sample_values = parse_spec_sample_values(raw_samples)
         mapped_dtype = map_spec_type(raw_type)
         detected_patterns = [map_spec_pattern(mapped_dtype)]
 
         columns.append(
             ColumnProfile(
                 name=column_name,
-                normalized_name=str(raw_description).strip() if not is_nullish(raw_description) else normalize_name(column_name),
+                normalized_name=normalize_name(column_name),
+                description=description,
+                declared_type=declared_type,
                 dtype=mapped_dtype,
                 null_ratio=0.0,
                 unique_ratio=0.0,
                 avg_length=0.0,
                 non_null_count=0,
-                sample_values=[],
-                distinct_sample_values=[],
+                sample_values=sample_values,
+                distinct_sample_values=list(sample_values),
                 detected_patterns=detected_patterns,
                 tokenized_name=tokenize_name(column_name),
             )
@@ -148,6 +176,7 @@ def resolve_spec_layout(
     name_col: str | None,
     description_col: str | None,
     type_col: str | None,
+    sample_values_col: str | None,
 ) -> SpecLayoutHint:
     headers = list(rows[0].keys())
     available_headers = {normalize_tabular_header(header): header for header in headers}
@@ -158,11 +187,13 @@ def resolve_spec_layout(
             raise ValueError(f"Unknown spec name column: {name_col}")
         resolved_description_col = resolve_optional_header(description_col, available_headers, "description")
         resolved_type_col = resolve_optional_header(type_col, available_headers, "type")
+        resolved_sample_values_col = resolve_optional_header(sample_values_col, available_headers, "sample values")
         confidence = 1.0 if resolved_description_col and resolved_type_col else 0.8 if (resolved_description_col or resolved_type_col) else 0.6
         return SpecLayoutHint(
             name_col=resolved_name_col,
             description_col=resolved_description_col,
             type_col=resolved_type_col,
+            sample_values_col=resolved_sample_values_col,
             confidence=confidence,
         )
 
@@ -240,3 +271,28 @@ def map_spec_pattern(dtype: str) -> str:
     if dtype == "integer":
         return "integer"
     return "text"
+
+
+def parse_spec_sample_values(raw_value: object) -> list[str]:
+    if is_nullish(raw_value):
+        return []
+
+    text = str(raw_value).strip()
+    if not text:
+        return []
+
+    parts = re.split(r"\s*(?:\||;|\r?\n)\s*", text)
+    values: list[str] = []
+    seen: set[str] = set()
+    for part in parts:
+        cleaned = part.strip().strip(",")
+        if not cleaned:
+            continue
+        dedupe_key = cleaned.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        values.append(cleaned)
+        if len(values) >= MAX_SPEC_SAMPLE_VALUES:
+            break
+    return values

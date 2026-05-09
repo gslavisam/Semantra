@@ -10,7 +10,13 @@ from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import evaluate_cases
-from app.services.llm_service import StaticLLMProvider, call_transformation_generator, call_validator
+from app.services.llm_service import (
+    StaticLLMProvider,
+    build_transformation_generator_prompt,
+    build_validator_prompt,
+    call_transformation_generator,
+    call_validator,
+)
 from app.services.mapping_service import CandidateScore, generate_mapping_candidates, should_run_canonical_semantic_rescue, should_run_llm_validation
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.spec_upload_service import parse_spec_payload
@@ -122,6 +128,61 @@ def test_llm_transformation_logs_classified_failures(caplog: pytest.LogCaptureFi
 
     assert result is None
     assert "invalid_json" in caplog.text
+
+
+def test_validator_prompt_includes_description_aware_context_with_guardrails() -> None:
+    prompt = build_validator_prompt(
+        source_field={
+            "name": "AKONT",
+            "description": "A" * 400,
+            "declared_type": "CHAR(10)",
+            "sample_values": ["1000", "2000", "3000", "4000", "5000", "6000"],
+            "detected_patterns": ["categorical"],
+            "unique_ratio": 0.8,
+        },
+        candidate_targets=[
+            {
+                "name": "reconciliation_account",
+                "description": "General ledger reconciliation account used for vendor postings",
+                "declared_type": "VARCHAR",
+                "sample_values": ["100000", "200000"],
+                "detected_patterns": ["categorical"],
+                "confidence": 0.61,
+            }
+        ],
+    )
+
+    assert '"description_truncation": 280' in prompt
+    assert '"sample_values_limit": 5' in prompt
+    assert '"declared_type": "CHAR(10)"' in prompt
+    assert '"name": "reconciliation_account"' in prompt
+    assert '"6000"' not in prompt
+    assert 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' in prompt
+    assert ('A' * 320) not in prompt
+
+
+def test_transformation_prompt_includes_description_aware_context() -> None:
+    prompt = build_transformation_generator_prompt(
+        source_field={
+            "name": "ERDAT",
+            "description": "SAP created-on date",
+            "declared_type": "DATS",
+            "sample_values": ["20240101"],
+            "detected_patterns": ["date"],
+        },
+        target_field={
+            "name": "document.created_date",
+            "description": "Canonical document creation date",
+            "declared_type": "date",
+            "sample_values": ["2024-01-01"],
+            "detected_patterns": ["date"],
+        },
+        user_instruction="Convert SAP DATS to ISO date.",
+    )
+
+    assert '"description": "SAP created-on date"' in prompt
+    assert '"declared_type": "DATS"' in prompt
+    assert '"name": "document.created_date"' in prompt
 
 
 def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -> None:

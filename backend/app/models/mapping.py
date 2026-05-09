@@ -151,6 +151,76 @@ class AutoMappingResponse(BaseModel):
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
 
 
+MappingJobStatus = Literal["queued", "running", "completed", "failed"]
+
+
+class MappingJobStartResponse(BaseModel):
+    job_id: str
+    status: MappingJobStatus
+
+
+class MappingJobStatusResponse(BaseModel):
+    job_id: str
+    status: MappingJobStatus
+    activity: list[str] = Field(default_factory=list)
+    response: AutoMappingResponse | None = None
+    error: str | None = None
+
+
+CanonicalGapSuggestionAction = Literal["existing_concept_alias", "new_canonical_concept", "no_action"]
+
+
+class CanonicalGapCandidate(BaseModel):
+    source: str
+    target: str
+    confidence: float = 0.0
+    confidence_label: ConfidenceLabel = "low_confidence"
+    status: DecisionStatus = "needs_review"
+    method: str = "multi_signal_heuristic"
+    signals: ScoringSignals = Field(default_factory=ScoringSignals)
+    explanation: list[str] = Field(default_factory=list)
+    canonical_details: CanonicalMappingDetails = Field(default_factory=CanonicalMappingDetails)
+    reason: str = ""
+
+
+class CanonicalGapCandidatesRequest(BaseModel):
+    mapping_response: AutoMappingResponse
+    min_confidence: float = 0.65
+
+
+class CanonicalGapCandidatesResponse(BaseModel):
+    candidates: list[CanonicalGapCandidate] = Field(default_factory=list)
+
+
+class CanonicalGapSuggestionRequest(BaseModel):
+    candidate: CanonicalGapCandidate
+
+
+class CanonicalGapSuggestion(BaseModel):
+    action: CanonicalGapSuggestionAction = "no_action"
+    concept_id: str | None = None
+    display_name: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    reasoning: list[str] = Field(default_factory=list)
+    risk_notes: list[str] = Field(default_factory=list)
+    raw_response: str | None = None
+
+
+class CanonicalGapApproveRequest(BaseModel):
+    candidate: CanonicalGapCandidate
+    suggestion: CanonicalGapSuggestion
+    approved_by: str | None = None
+    overlay_name: str | None = None
+
+
+class CanonicalGapApproveResponse(BaseModel):
+    overlay_id: int
+    overlay_name: str
+    saved_entry_count: int = 0
+    activated: bool = True
+
+
 class DecisionLogEntry(BaseModel):
     source: str
     candidate_targets: list[str] = Field(default_factory=list)

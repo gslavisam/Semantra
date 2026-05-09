@@ -34,6 +34,7 @@ def test_spec_detect_endpoint_returns_hint_for_spec_file() -> None:
         "name_col": "Column",
         "description_col": "Description",
         "type_col": "Type",
+        "sample_values_col": None,
         "confidence": 1.0,
     }
 
@@ -74,7 +75,9 @@ def test_spec_upload_endpoint_returns_dataset_handle() -> None:
     payload = response.json()
     assert payload["dataset_id"]
     assert [column["name"] for column in payload["schema_profile"]["columns"]] == ["KUNNR", "ERDAT"]
-    assert payload["schema_profile"]["columns"][0]["normalized_name"] == "Customer number"
+    assert payload["schema_profile"]["columns"][0]["normalized_name"] == "kunnr"
+    assert payload["schema_profile"]["columns"][0]["description"] == "Customer number"
+    assert payload["schema_profile"]["columns"][0]["declared_type"] == "CHAR"
     assert payload["preview_rows"] == []
 
 
@@ -115,6 +118,77 @@ def test_upload_handle_endpoint_returns_dataset_handle_for_row_data() -> None:
     assert payload["dataset_id"]
     assert [column["name"] for column in payload["schema_profile"]["columns"]] == ["cust_id", "phone"]
     assert payload["preview_rows"][0]["cust_id"] == "1"
+
+
+def test_upload_handle_metadata_endpoint_enriches_existing_dataset_handle() -> None:
+    upload_response = client.post(
+        "/upload/handle",
+        files={
+            "file": (
+                "source.csv",
+                csv_bytes("KUNNR,ERDAT\n1,2024-01-01\n2,2024-01-02\n"),
+                "text/csv",
+            )
+        },
+    )
+
+    response = client.post(
+        "/upload/handle/metadata",
+        data={"dataset_id": upload_response.json()["dataset_id"]},
+        files={
+            "file": (
+                "source_spec.csv",
+                csv_bytes(
+                    "Column,Description,Type,Sample Values\n"
+                    "KUNNR,Customer number,CHAR,1000|2000\n"
+                    "ERDAT,Created on,DATS,20240101\n"
+                    "UNUSED,Unused,CHAR,XX\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["matched_columns"] == 2
+    assert payload["unmatched_columns"] == ["UNUSED"]
+    assert payload["dataset"]["dataset_id"] == upload_response.json()["dataset_id"]
+    assert payload["dataset"]["preview_rows"][0]["KUNNR"] == "1"
+    assert payload["dataset"]["schema_profile"]["columns"][0]["description"] == "Customer number"
+    assert payload["dataset"]["schema_profile"]["columns"][0]["declared_type"] == "CHAR"
+    assert payload["dataset"]["schema_profile"]["columns"][0]["sample_values"] == ["1000", "2000"]
+
+
+def test_upload_handle_metadata_endpoint_returns_400_when_no_columns_match() -> None:
+    upload_response = client.post(
+        "/upload/handle",
+        files={
+            "file": (
+                "source.csv",
+                csv_bytes("KUNNR,ERDAT\n1,2024-01-01\n"),
+                "text/csv",
+            )
+        },
+    )
+
+    response = client.post(
+        "/upload/handle/metadata",
+        data={"dataset_id": upload_response.json()["dataset_id"]},
+        files={
+            "file": (
+                "source_spec.csv",
+                csv_bytes(
+                    "Column,Description,Type\n"
+                    "LAND1,Country,CHAR\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Companion metadata did not match any existing dataset columns."
 
 
 def csv_bytes(text: str) -> bytes:

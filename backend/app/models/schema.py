@@ -23,6 +23,8 @@ DetectedPattern = Literal[
 class ColumnProfile(BaseModel):
     name: str
     normalized_name: str
+    description: str = ""
+    declared_type: str = ""
     dtype: str
     null_ratio: float
     unique_ratio: float
@@ -52,6 +54,7 @@ class SpecLayoutHint(BaseModel):
     name_col: str
     description_col: str | None = None
     type_col: str | None = None
+    sample_values_col: str | None = None
     confidence: float
 
 
@@ -62,6 +65,12 @@ class SpecDetectionResponse(BaseModel):
 class UploadResponse(BaseModel):
     source: DatasetHandle
     target: DatasetHandle
+
+
+class MetadataEnrichmentResponse(BaseModel):
+    dataset: DatasetHandle
+    matched_columns: int
+    unmatched_columns: list[str] = Field(default_factory=list)
 
 
 class SqlTableDiscoveryResponse(BaseModel):

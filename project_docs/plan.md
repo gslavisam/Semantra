@@ -10,6 +10,7 @@ Ovaj dokument drži plan i redosled rada.
 Detaljni epic backlog je u `epics.md`.
 Radne checkliste su u `implementation_checklists.md`.
 Završeni slice-ovi su u `completed_slices.md`.
+Revizija strategije i trenutnog stanja iz 2026-05-09 je u `strategy_review_2026-05-09.md`.
 
 ## Product Roadmap
 
@@ -109,11 +110,13 @@ Cilj: meriti trošak po request-u, učiniti module preglednijim i srediti docs/t
 Trenutni preporučeni redosled rada:
 
 1. Zatvoriti preostali `Epic 6` export/run gate za `approved` mapping setove.
-2. Nastaviti `Epic 13D` discovery i reuse slice nad postojećim katalogom.
-3. Ispratiti `Epic 14D` description-aware context i companion schema kao najdirektniji kvalitetni dobitak za mapping odluke.
-4. Posle stabilnog context sloja razmotriti `Epic 12B` system-specific virtual target-e tamo gde metadata kvalitet to opravdava.
-5. `Epic 15` graph projection uvoditi kao derived sloj posle sazrevanja canonical, catalog i description-aware context rada.
-6. Faze 3-6 koristiti kao ciljane tehničke talase, ne kao blokadu za svaki novi feature.
+2. Validirati `Epic 14E` Canonical Gap Assistant kao praktični beta slice: prazni `canonical_path` i jaki mapping signali postaju LLM-assisted, human-approved predlozi za canonical overlay.
+3. Izdvojiti `Epic 14F` Canonical Concept Management Console kao glavni governance ekran za canonical concepts, aliases, gap queue, overlay status i EA/MDM reuse pregled.
+4. Nastaviti `Epic 13D` discovery i reuse slice nad postojećim katalogom, koristeći iste usage/read modele koje 14F traži.
+5. Ispratiti `Epic 14D` description-aware context i companion schema kao najdirektniji kvalitetni dobitak za mapping odluke.
+6. Posle stabilnog context sloja razmotriti `Epic 12B` system-specific virtual target-e tamo gde metadata kvalitet to opravdava.
+7. `Epic 15` graph projection uvoditi kao derived sloj posle sazrevanja canonical, catalog i description-aware context rada.
+8. Faze 3-6 koristiti kao ciljane tehničke talase, ne kao blokadu za svaki novi feature.
 
 Detaljna release i MVP checklista je u `implementation_checklists.md`.
 
@@ -125,8 +128,10 @@ Pravila tokom beta validacije:
 - Kada mapping uspešno prolazi, ali `canonical` ostaje `0`, tretirati to prvo kao canonical glossary gap kandidat, ne kao automatski bug.
 - Nove alias/synonym/concept gap-ove prvo upisivati kroz knowledge overlay, ne direktno u base dictionary.
 - Nove canonical concept gap-ove prvo pokrivati kroz canonical glossary i `concept_alias` overlay putanju, ne kao ad hoc workaround u scoring-u.
+- LLM može da predlaže canonical concept/alias popune za gap-ove, ali ne sme automatski da ih promoviše u base dictionary ili stabilni glossary bez review-a.
 - Tek kada se isti unos pokaže korisnim kroz više realnih datasetova ili više projekata, promovisati ga iz overlay sloja u base dictionary ili stabilni canonical glossary sloj.
 - Ako je unos lokalno specifičan za jedan klijent, jedan source sistem ili jedan pilot tok, ostaviti ga u overlay sloju.
+- Canonical concept management treba tretirati kao product konzolu za EA/MDM/integration governance, ne kao debug/admin pomoćni ekran.
 
 ## Post-Beta Scaling and Debt Backlog
 
@@ -137,6 +142,7 @@ Preporučeni redosled:
 1. Mali SQLite hardening korak (`WAL`, `busy_timeout`, osnovno merenje contention-a) pre većeg persistence redesign-a.
 2. Razdvajanje knowledge runtime-a tako da overlay lifecycle ne tera puni runtime rebuild za svaku activation/deactivation promenu.
 3. Kasnije uklanjanje AST-test-driven adapter workaround-a iz `streamlit_app.py` kada novi test/setup režim bude spreman.
+4. Produkcioni hardening mapping progress jobova: trenutni in-memory/thread job status je dovoljno lagan za lokalni demo/dev tok, ali za multi-user ili dugotrajne run-ove treba planirati persistent queue/status sloj (`Redis/RQ/Celery` ili ekvivalent), TTL cleanup, retry/cancel semantiku i merenje overhead-a.
 
 Konkretne debt stavke:
 

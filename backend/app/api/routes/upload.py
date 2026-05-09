@@ -4,7 +4,14 @@ from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.models.schema import DatasetHandle, SpecDetectionResponse, SpecLayoutHint, SqlTableDiscoveryResponse, UploadResponse
+from app.models.schema import (
+    DatasetHandle,
+    MetadataEnrichmentResponse,
+    SpecDetectionResponse,
+    SpecLayoutHint,
+    SqlTableDiscoveryResponse,
+    UploadResponse,
+)
 from app.services.schema_snapshot_service import build_schema_profile_from_sql_snapshot, list_tables_from_sql_snapshot
 from app.services.spec_upload_service import build_spec_layout_hint, parse_spec_payload
 from app.services.tabular_upload_service import SUPPORTED_ROW_FORMATS, parse_tabular_payload
@@ -78,6 +85,47 @@ async def upload_dataset_handle(
     selected_table: str | None = Form(default=None),
 ) -> DatasetHandle:
     return await parse_and_store_upload(file, fallback_name="dataset.csv", selected_table=selected_table)
+
+
+@router.post("/upload/handle/metadata", response_model=MetadataEnrichmentResponse)
+async def enrich_dataset_metadata(
+    dataset_id: str = Form(...),
+    file: UploadFile = File(...),
+    name_col: str | None = Form(default=None),
+    description_col: str | None = Form(default=None),
+    type_col: str | None = Form(default=None),
+) -> MetadataEnrichmentResponse:
+    filename = (file.filename or "").lower()
+    if not filename.endswith(SUPPORTED_ROW_FORMATS):
+        raise HTTPException(
+            status_code=400,
+            detail="Companion metadata upload supports CSV, JSON, XML, and XLSX tabular uploads.",
+        )
+
+    payload = await file.read()
+    upload_name = file.filename or "companion_spec.csv"
+    try:
+        companion_profile = parse_spec_payload(
+            payload,
+            upload_name,
+            name_col=name_col,
+            description_col=description_col,
+            type_col=type_col,
+        )
+        dataset_handle, matched_columns, unmatched_columns = dataset_store.merge_companion_metadata(
+            dataset_id,
+            companion_profile,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+    return MetadataEnrichmentResponse(
+        dataset=dataset_handle,
+        matched_columns=matched_columns,
+        unmatched_columns=unmatched_columns,
+    )
 
 
 @router.post("/upload", response_model=UploadResponse)

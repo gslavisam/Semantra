@@ -79,6 +79,46 @@ def canonical_concept_labels(canonical_details: dict | None) -> list[str]:
     return labels
 
 
+def canonical_scope_labels(canonical_details: dict | None, scope: str) -> list[str]:
+    details = canonical_details or {}
+    concepts = details.get(scope) or []
+    labels: list[str] = []
+    for concept in concepts:
+        concept_id = str(concept.get("concept_id") or "").strip()
+        display_name = str(concept.get("display_name") or concept_id).strip()
+        if not concept_id and not display_name:
+            continue
+        labels.append(f"{display_name} ({concept_id})" if concept_id else display_name)
+    return labels
+
+
+def canonical_match_status(canonical_details: dict | None) -> str:
+    details = canonical_details or {}
+    shared = details.get("shared_concepts") or []
+    source = details.get("source_concepts") or []
+    target = details.get("target_concepts") or []
+    if shared:
+        return "shared_match"
+    if source and target:
+        return "source_target_mismatch"
+    if source:
+        return "source_only"
+    if target:
+        return "target_only"
+    return "no_canonical_match"
+
+
+def canonical_match_status_label(status: str) -> str:
+    labels = {
+        "shared_match": "Shared canonical concept",
+        "source_only": "Source resolved, target unresolved",
+        "target_only": "Target resolved, source unresolved",
+        "source_target_mismatch": "Source and target resolve to different concepts",
+        "no_canonical_match": "No canonical concept resolved",
+    }
+    return labels.get(status, "No canonical concept resolved")
+
+
 def canonical_path_label(
     source: str,
     target: str | None,
@@ -307,6 +347,9 @@ def current_mapping_rows(
         use_selected_row = current_target == selected_row.get("target")
         active_row = selected_row if use_selected_row or not selected_candidate else selected_candidate
         canonical_details = active_row.get("canonical_details", {})
+        shared_labels = canonical_scope_labels(canonical_details, "shared_concepts")
+        source_labels = canonical_scope_labels(canonical_details, "source_concepts")
+        target_labels = canonical_scope_labels(canonical_details, "target_concepts")
         rows.append(
             {
                 "source": source,
@@ -315,6 +358,11 @@ def current_mapping_rows(
                 "confidence_label": active_row.get("confidence_label", "low_confidence"),
                 "status": current_state.get("status", selected_row.get("status", "needs_review")),
                 "validator": validator_badge(active_row.get("method", "manual_review")),
+                "canonical_status": canonical_match_status(canonical_details),
+                "canonical_status_label": canonical_match_status_label(canonical_match_status(canonical_details)),
+                "shared_concepts": " | ".join(shared_labels),
+                "source_concepts": " | ".join(source_labels),
+                "target_concepts": " | ".join(target_labels),
                 "canonical_path": canonical_path_label_func(source, current_target, canonical_details),
                 "llm_consulted": bool(selected_row.get("llm_consulted", False)) if use_selected_row else False,
                 "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,

@@ -1,0 +1,4 @@
+Column,Description,Type,Sample Values
+KUNNR,Customer number,CHAR,1000|2000
+NAME1,Customer name,VARCHAR,Acme GmbH|Contoso AG
+ERDAT,Created on,DATS,20240101|20240102

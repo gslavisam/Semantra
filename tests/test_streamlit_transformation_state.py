@@ -329,6 +329,71 @@ def test_current_mapping_rows_includes_canonical_path_for_selected_candidate() -
     )
 
     assert rows[0]["canonical_path"] == "sold_to_party -> Customer ID (customer.id) -> customer_id"
+    assert rows[0]["canonical_status"] == "shared_match"
+    assert rows[0]["shared_concepts"] == "Customer ID (customer.id)"
+    assert rows[0]["source_concepts"] == ""
+    assert rows[0]["target_concepts"] == ""
+
+
+def test_current_mapping_rows_marks_source_only_canonical_mismatch() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "suggested_mapping_by_source",
+        "validator_badge",
+        "canonical_concept_labels",
+        "canonical_path_label",
+        "current_mapping_rows",
+    )
+    current_mapping_rows = functions[-1]
+
+    fake_streamlit.session_state.update({"mapping_editor_state": {}})
+
+    rows = current_mapping_rows(
+        {
+            "mappings": [
+                {
+                    "source": "REGIO",
+                    "target": "region_code",
+                    "confidence": 0.57,
+                    "confidence_label": "low_confidence",
+                    "status": "needs_review",
+                    "method": "multi_signal_heuristic",
+                    "canonical_details": {
+                        "source_concepts": [
+                            {"concept_id": "supplier.region_code", "display_name": "Supplier Region Code", "strength": 0.8}
+                        ],
+                        "target_concepts": [],
+                        "shared_concepts": [],
+                    },
+                }
+            ],
+            "ranked_mappings": [
+                {
+                    "source": "REGIO",
+                    "candidates": [
+                        {
+                            "target": "region_code",
+                            "confidence": 0.57,
+                            "confidence_label": "low_confidence",
+                            "method": "multi_signal_heuristic",
+                            "canonical_details": {
+                                "source_concepts": [
+                                    {"concept_id": "supplier.region_code", "display_name": "Supplier Region Code", "strength": 0.8}
+                                ],
+                                "target_concepts": [],
+                                "shared_concepts": [],
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    assert rows[0]["canonical_status"] == "source_only"
+    assert rows[0]["canonical_path"] == "REGIO -> Supplier Region Code (supplier.region_code) -> region_code"
+    assert rows[0]["source_concepts"] == "Supplier Region Code (supplier.region_code)"
+    assert rows[0]["target_concepts"] == ""
+    assert rows[0]["shared_concepts"] == ""
 
 
 def test_default_editor_entry_preserves_unmapped_selected_result() -> None:

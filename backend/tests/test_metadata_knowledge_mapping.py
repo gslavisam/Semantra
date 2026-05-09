@@ -183,6 +183,35 @@ def test_material_master_sap_field_aliases_gain_knowledge_or_canonical_support(
     )
 
 
+def test_supplier_master_sperr_gains_supplier_posting_block_support() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("SPERR", ["text"], ["X", ""])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("posting_block_flag", ["text"], ["X", ""]),
+            make_column("deletion_mark", ["text"], ["X", ""]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    selected = result.mappings[0]
+
+    assert selected.target == "posting_block_flag"
+    assert selected.signals.knowledge > 0 or selected.signals.canonical > 0
+    assert any(
+        marker in line
+        for marker in ("Internal metadata dictionary aligns", "Canonical glossary aligns both fields")
+        for line in selected.explanation
+    )
+
+
 def test_canonical_only_sap_field_context_survives_cold_start_db_reload() -> None:
     metadata_knowledge_service.reseed_from_files()
     file_seed_matches = metadata_knowledge_service.match_concepts(make_column("LSTEL", ["text"], ["A01", "A02"]))

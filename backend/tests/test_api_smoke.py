@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
@@ -14,6 +15,7 @@ from app.main import app
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.llm_service import StaticLLMProvider
+from app.services.mapping_job_service import mapping_job_store
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 from app.services.upload_store import dataset_store
@@ -32,6 +34,7 @@ def setup_function() -> None:
     persistence_service.clear_evaluation_runs()
     persistence_service.clear_transformation_test_sets()
     persistence_service.clear_knowledge_overlays()
+    mapping_job_store.clear()
     metadata_knowledge_service.refresh()
     settings.admin_api_token = ""
 
@@ -317,6 +320,55 @@ def test_auto_map_accepts_json_to_xlsx_inputs() -> None:
     mappings = {item["source"]: item["target"] for item in map_response.json()["mappings"]}
     assert mappings["client_mail"] == "customer_email"
     assert mappings["primary_phone"] == "phone_number"
+
+
+def test_auto_map_job_reports_progress_activity() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "source.csv",
+                csv_bytes("client_mail,primary_phone\nana@example.com,0641234567\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_email,phone_number\nana@example.com,0641234567\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+
+    start_response = client.post(
+        "/mapping/auto/jobs",
+        json={
+            "source_dataset_id": payload["source"]["dataset_id"],
+            "target_dataset_id": payload["target"]["dataset_id"],
+            "use_llm": False,
+        },
+    )
+
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+
+    status_payload = None
+    for _ in range(50):
+        status_response = client.get(f"/mapping/jobs/{job_id}")
+        assert status_response.status_code == 200
+        status_payload = status_response.json()
+        if status_payload["status"] == "completed":
+            break
+        time.sleep(0.01)
+
+    assert status_payload is not None
+    assert status_payload["status"] == "completed"
+    assert any("Ranking 1/2: client_mail" in line for line in status_payload["activity"])
+    assert any("Selected 1/2: client_mail" in line for line in status_payload["activity"])
+    mappings = {item["source"]: item["target"] for item in status_payload["response"]["mappings"]}
+    assert mappings["client_mail"] == "customer_email"
 
 
 @pytest.mark.parametrize("source_format", ["csv", "json", "xml", "xlsx"])
@@ -613,6 +665,55 @@ def test_canonical_glossary_export_excludes_active_overlay_aliases() -> None:
     assert export_response.status_code == 200
     assert "legacy customer identifier" not in export_response.text
     assert "customer.id" in export_response.text
+
+
+def test_canonical_gap_candidates_and_approve_endpoint_persist_overlay_alias() -> None:
+    mapping_response = {
+        "mappings": [
+            {
+                "source": "NTGEW",
+                "target": "net_weight",
+                "confidence": 0.72,
+                "confidence_label": "medium_confidence",
+                "status": "needs_review",
+                "method": "multi_signal_heuristic",
+                "signals": {"name": 0.8, "semantic": 0.75},
+                "explanation": ["Name and semantic signals strongly align."],
+                "canonical_details": {"source_concepts": [], "target_concepts": [], "shared_concepts": []},
+            }
+        ],
+        "ranked_mappings": [],
+        "canonical_coverage": {},
+    }
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": mapping_response},
+    )
+
+    assert candidates_response.status_code == 200
+    candidates = candidates_response.json()["candidates"]
+    assert len(candidates) == 1
+
+    approve_response = client.post(
+        "/knowledge/canonical-gaps/approve",
+        json={
+            "candidate": candidates[0],
+            "suggestion": {
+                "action": "new_canonical_concept",
+                "concept_id": "material.net_weight",
+                "display_name": "Material Net Weight",
+                "aliases": ["NTGEW", "net_weight", "MARA-NTGEW"],
+                "confidence": 0.88,
+                "reasoning": ["SAP NTGEW and net_weight describe material net weight."],
+            },
+            "approved_by": "test",
+        },
+    )
+
+    assert approve_response.status_code == 200
+    assert approve_response.json()["activated"] is True
+    assert metadata_knowledge_service.resolve_canonical_concept_id("NTGEW") == "material.net_weight"
 
 
 def test_preview_projects_rows_from_mapping_decisions() -> None:

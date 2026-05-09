@@ -71,6 +71,20 @@ Prvi veliki katalog slice-ovi su isporučeni.
 
 Otvoren ostaje 13D concept and visual discovery slice.
 
+### 2026-05-09: Epic 14D description-aware context and companion enrichment slice
+
+Isporučen je prvi praktični 14D slice koji povezuje schema metadata enrichment sa mapping tokom bez promene osnovnog API contract-a.
+
+- `description` i `declared_type` uvedeni su kao first-class polja u `ColumnProfile`
+- spec upload više ne prepisuje `normalized_name` opisom kolone
+- LLM validator i transformation prompt sada dobijaju description/type/sample context uz guardrails
+- dodat je source-side companion metadata enrichment nad već uploadovanim dataset handle-om
+- companion/spec parser sada ume da popuni i `sample_values` kada fajl sadrži primer vrednosti
+- Streamlit Setup dobio je minimalistički source companion upload i summary o matched/unmatched kolonama
+- lokalni browser smoke potvrđen nad canonical Setup tokom: source row-data upload, companion enrichment `3/3`, pa uspešan rerun canonical mapping-a
+
+Svesna odluka ovog slice-a je da description/type još ne ulaze u deterministic scoring. Trenutni `compute_signals()` ostaje nepromenjen dok ne postoji benchmark corpus koji pokazuje da description-aware score fusion poboljšava kvalitet bez regresije nad postojećim knowledge/canonical signalima.
+
 ## Completed Technical Phases
 
 ### 2026-05-03: Faza 1

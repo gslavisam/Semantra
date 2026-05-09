@@ -137,6 +137,25 @@ def upload_dataset_handle(
     )
 
 
+def enrich_dataset_metadata(
+    dataset_id: str,
+    uploaded_file,
+    *,
+    name_col: str | None = None,
+    description_col: str | None = None,
+    type_col: str | None = None,
+) -> dict:
+    from streamlit_ui.api import enrich_dataset_metadata as _impl
+
+    return _impl(
+        dataset_id,
+        uploaded_file,
+        name_col=name_col,
+        description_col=description_col,
+        type_col=type_col,
+    )
+
+
 # Local diagnostic helper
 
 def knowledge_debug_rows(mapping_response: dict) -> list[dict]:
@@ -201,6 +220,7 @@ def display_trust_layer(mapping_response: dict) -> None:
         request_llm_transformation_suggestion=request_llm_transformation_suggestion,
         request_transformation_templates=request_transformation_templates,
         materialize_transformation_template=materialize_transformation_template,
+        api_request=api_request,
     )
 
 
@@ -547,6 +567,7 @@ def render_workspace_tab() -> None:
         sql_tables_for_upload=sql_tables_for_upload,
         api_request=api_request,
         upload_dataset_handle=upload_dataset_handle,
+        enrich_dataset_metadata=enrich_dataset_metadata,
         uploaded_file_bytes=uploaded_file_bytes,
         render_dataset_summary=render_dataset_summary,
         initialize_mapping_editor_state=initialize_mapping_editor_state,

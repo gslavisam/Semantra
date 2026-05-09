@@ -150,6 +150,7 @@ Scope summary:
 - batch run i run history
 - webhook/API trigger za automation
 - packaging mapping + transformation + metadata u jedan release artifact
+- production-ready background jobs za duže mapping/batch procese: persistent queue, progress status, cancellation, retry policy i cleanup umesto samo in-memory lokalnog job store-a
 
 ### Epic 11: Schema Specification Upload
 
@@ -265,17 +266,78 @@ Cilj: proširiti LLM iz closed-set rerank validatora u reasoning sloj koji može
 
 #### Epic 14D: Description-aware LLM context and companion schema ingestion
 
-Status: proposed.
+Status: source companion enrichment slice implemented and smoke-validated on 2026-05-09; deterministic score fusion remains deferred pending benchmark evidence.
 
 Cilj: poboljšati kvalitet mapiranja tako što LLM i scoring sloj dobijaju bogatiji field context od samog naziva kolone, naročito za kratke šifre, interne skraćenice i enterprise oznake.
 
 Napomena:
 
-- današnji `ColumnProfile` ne čuva first-class `description`
-- spec upload opis danas pomaže samo posredno
-- row-data upload nema companion schema/spec enrichment put
+- `ColumnProfile` sada čuva first-class `description` i `declared_type`, a source companion metadata može da se nakači na već uploadovan dataset handle
+- spec upload sada upisuje description odvojeno od `normalized_name`
+- row-data upload sada ima tanak source-side companion schema/spec enrichment put bez promene osnovnog mapping contract-a
+- schema/spec i companion upload sada mogu da popune i `sample_values` kada spec fajl sadrži primer vrednosti
+- odluka trenutnog slice-a je da `description`/`declared_type` ostanu LLM/context input, a ne novi deterministic signal, dok benchmark ne pokaže jasan kvalitetni dobitak bez regressions
 
 Referenca: detaljna MVP i fajl-level checklist su u `implementation_checklists.md`.
+
+#### Epic 14E: Canonical Gap Assistant
+
+Status: initial MVP implemented on 2026-05-09; pending real UI/LLM validation.
+
+Cilj: pretvoriti prazne ili slabe `canonical_path` rezultate u kontrolisane predloge za canonical glossary/overlay rad, uz LLM kao assistant-a i human approval kao gate.
+
+Scope summary:
+
+- detektovati mapping redove gde je target izabran, confidence/knowledge/semantic signal je dovoljno jak, ali `canonical_path` ili `shared_concepts` nedostaju
+- generisati `canonical_gap_candidate` payload iz source field-a, target field-a, signal breakdown-a, sample values, detected patterns i najbližih postojećih canonical concepts
+- koristiti LLM samo kao predlagača za postojeći canonical concept, `concept_alias`, ili novi canonical concept proposal
+- prikazati predloge u UI kao review queue, sa jasnim reasoning-om i confidence-om
+- odobrene predloge upisivati prvo u overlay/canonical alias sloj, ne direktno u base dictionary
+- posle odobrenja omogućiti re-run mapping-a da se vidi popunjen `canonical_path`
+
+MVP nije:
+
+- automatska promocija LLM predloga u stabilni `canonical_glossary_erp.csv`
+- free-form ontology generator bez closed-review koraka
+- zamena postojećeg deterministic canonical matching-a
+
+Referenca: detaljna MVP checklista je u `implementation_checklists.md`.
+
+#### Epic 14F: Canonical Concept Management Console
+
+Status: proposed.
+
+Cilj: pretvoriti Canonical Gap Assistant i postojeći Knowledge/Admin ekran u glavnu konzolu za upravljanje canonical konceptima, aliasima i governance odlukama. Ovo je ključni sloj za Enterprise Architecture, MDM i buduće integracije, jer canonical model postaje kontrolisani poslovni asset, ne samo pomoćni lookup fajl.
+
+Zašto postoji:
+
+- `canonical_path` i concept reuse su srce Semantra vrednosti za enterprise integracije
+- EA treba pregled poslovnih koncepata, sistema i integracija koje ih koriste
+- MDM treba kontrolisan lifecycle aliasa, koncepta, duplikata i semantic gap-ova
+- Canonical Gap Assistant generiše prirodan review queue, ali treba mu centralna konzola za dugoročno upravljanje
+
+Scope summary:
+
+- concept registry: searchable lista canonical concepts sa display name, entity, attribute, data type, aliases i statusom
+- concept detail page/panel: aliases, source/target field contexts, linked integrations, mapping set usage i audit trail
+- gap queue: predlozi iz mapping review-a, LLM-assisted suggestions, approve/reject/merge workflow
+- overlay management: aktivni overlay, staged overlay entries, promotion candidate-i za stable glossary
+- impact view: koje integracije i mapping setovi se menjaju ako se doda, spoji ili preimenuje concept/alias
+- stewardship metadata: owner, domain, status, review note i created/approved timestamps
+
+MVP nije:
+
+- potpuni enterprise ontology editor
+- automatsko spajanje canonical concepts bez review-a
+- direktan write u base glossary bez promotion workflow-a
+
+Prvi praktični slice:
+
+- izdvojiti `Canonical Console` kao zaseban Streamlit tab ili Admin subsection
+- prikazati concept registry iz runtime canonical glossary-ja
+- prikazati active overlay entries po concept-u
+- prikazati canonical gap suggestions kao review queue
+- omogućiti approve/reject i audit iz iste konzole, uz postojeći overlay-first persist pristup
 
 ### Epic 15: Graph Projection, Lineage and Reuse Analysis
 

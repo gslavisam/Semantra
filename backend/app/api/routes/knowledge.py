@@ -15,6 +15,20 @@ from app.models.knowledge import (
     KnowledgeRuntimeStatus,
 )
 from app.services.knowledge_overlay_service import knowledge_overlay_validation_service
+from app.models.mapping import (
+    CanonicalGapApproveRequest,
+    CanonicalGapApproveResponse,
+    CanonicalGapCandidatesRequest,
+    CanonicalGapCandidatesResponse,
+    CanonicalGapSuggestion,
+    CanonicalGapSuggestionRequest,
+)
+from app.services.canonical_gap_service import (
+    approve_canonical_gap_suggestion,
+    extract_canonical_gap_candidates,
+    nearest_canonical_concepts,
+)
+from app.services.llm_service import build_provider_from_settings, call_canonical_gap_assistant
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 
@@ -188,6 +202,48 @@ async def rollback_knowledge_overlay() -> KnowledgeRuntimeStatus:
     else:
         append_audit_entry("rollback", "Rolled back to base-only knowledge mode.")
     return build_runtime_status()
+
+
+@router.post("/canonical-gaps/candidates", response_model=CanonicalGapCandidatesResponse, dependencies=[Depends(require_admin)])
+async def canonical_gap_candidates(request: CanonicalGapCandidatesRequest) -> CanonicalGapCandidatesResponse:
+    return CanonicalGapCandidatesResponse(
+        candidates=extract_canonical_gap_candidates(
+            request.mapping_response,
+            min_confidence=request.min_confidence,
+        )
+    )
+
+
+@router.post("/canonical-gaps/suggest", response_model=CanonicalGapSuggestion, dependencies=[Depends(require_admin)])
+async def suggest_canonical_gap(request: CanonicalGapSuggestionRequest) -> CanonicalGapSuggestion:
+    nearest = nearest_canonical_concepts(request.candidate)
+    suggestion = call_canonical_gap_assistant(request.candidate, nearest, build_provider_from_settings())
+    if suggestion is None:
+        return CanonicalGapSuggestion(
+            action="no_action",
+            confidence=0.0,
+            reasoning=["No usable LLM canonical gap suggestion was returned."],
+            risk_notes=["Review the mapping and glossary manually."],
+        )
+    return suggestion
+
+
+@router.post("/canonical-gaps/approve", response_model=CanonicalGapApproveResponse, dependencies=[Depends(require_admin)])
+async def approve_canonical_gap(request: CanonicalGapApproveRequest) -> CanonicalGapApproveResponse:
+    try:
+        response = approve_canonical_gap_suggestion(
+            request.candidate,
+            request.suggestion,
+            approved_by=request.approved_by,
+            overlay_name=request.overlay_name,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    append_audit_entry(
+        "create",
+        f"Approved canonical gap suggestion for {request.candidate.source} -> {request.candidate.target} into overlay '{response.overlay_name}'.",
+    )
+    return response
 
 
 @router.post("/reload", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])

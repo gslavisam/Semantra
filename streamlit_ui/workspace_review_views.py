@@ -16,6 +16,7 @@ def display_trust_layer(
     request_llm_transformation_suggestion,
     request_transformation_templates,
     materialize_transformation_template,
+    api_request=None,
 ) -> None:
     st.subheader("🎯 Mapping Trust Layer")
     canonical_only = (st.session_state.get("upload_response") or {}).get("mapping_mode") == "canonical"
@@ -230,6 +231,107 @@ def display_trust_layer(
                 st.write("✅ High confidence based on signals.")
 
     st.session_state["mapping_editor_state"] = editor_state
+    if api_request is not None:
+        render_canonical_gap_assistant(mapping_response, api_request=api_request)
+
+
+def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> None:
+    st.subheader("Canonical Gap Suggestions")
+    st.caption("Review high-confidence mappings that are missing a canonical path, then approve overlay-only glossary updates.")
+    if st.button("Find canonical gaps", key="canonical_gap_find"):
+        try:
+            st.session_state["canonical_gap_candidates"] = api_request(
+                "POST",
+                "/knowledge/canonical-gaps/candidates",
+                json={"mapping_response": mapping_response},
+            ).get("candidates", [])
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": "Loaded canonical gap candidates for review.",
+            }
+        except httpx.HTTPError as error:
+            st.session_state["last_action"] = {
+                "level": "error",
+                "message": f"Canonical gap detection failed: {error}",
+            }
+        st.rerun()
+
+    candidates = st.session_state.get("canonical_gap_candidates") or []
+    if not candidates:
+        st.info("No canonical gap candidates loaded yet, or no high-confidence gaps were found.")
+        return
+
+    suggestions = st.session_state.setdefault("canonical_gap_suggestions", {})
+    for index, candidate in enumerate(candidates):
+        source = candidate.get("source", "")
+        target = candidate.get("target", "")
+        key = f"canonical_gap_{index}_{source}_{target}".replace(" ", "_")
+        with st.container(border=True):
+            columns = st.columns([3, 3, 2])
+            columns[0].markdown(f"**Source:** {source}")
+            columns[1].markdown(f"**Target:** {target}")
+            columns[2].metric("Confidence", f"{int(float(candidate.get('confidence', 0.0) or 0.0) * 100)}%")
+            st.caption(candidate.get("reason") or "Missing canonical path.")
+            if candidate.get("explanation"):
+                st.caption("Signals: " + " | ".join(candidate.get("explanation") or []))
+
+            action_columns = st.columns(2)
+            if action_columns[0].button("Suggest with LLM", key=f"suggest_{key}"):
+                try:
+                    suggestions[key] = api_request(
+                        "POST",
+                        "/knowledge/canonical-gaps/suggest",
+                        json={"candidate": candidate},
+                        timeout=90.0,
+                    )
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Generated canonical gap suggestion for {source} -> {target}.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Canonical gap suggestion failed: {error}",
+                    }
+                st.rerun()
+
+            suggestion = suggestions.get(key)
+            if not suggestion:
+                continue
+            st.write(f"Action: **{suggestion.get('action', 'no_action')}**")
+            st.write(f"Concept: **{suggestion.get('concept_id') or 'n/a'}** - {suggestion.get('display_name') or 'n/a'}")
+            if suggestion.get("aliases"):
+                st.caption("Aliases: " + ", ".join(suggestion.get("aliases") or []))
+            for line in suggestion.get("reasoning") or []:
+                st.caption(f"Reason: {line}")
+            for line in suggestion.get("risk_notes") or []:
+                st.caption(f"Risk: {line}")
+
+            disabled = suggestion.get("action") == "no_action"
+            if action_columns[1].button("Approve and persist", key=f"approve_{key}", disabled=disabled):
+                try:
+                    response = api_request(
+                        "POST",
+                        "/knowledge/canonical-gaps/approve",
+                        json={
+                            "candidate": candidate,
+                            "suggestion": suggestion,
+                            "approved_by": st.session_state.get("admin_token", "") or "streamlit-review",
+                        },
+                    )
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": (
+                            f"Approved canonical gap into overlay '{response.get('overlay_name')}'. "
+                            "Regenerate mapping to see the canonical path filled."
+                        ),
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Canonical gap approval failed: {error}",
+                    }
+                st.rerun()
 
 
 def render_mapping_review(
@@ -267,20 +369,50 @@ def render_mapping_review(
         and (selected_confidence == all_filter_option or row["confidence_label"] == selected_confidence)
         and (selected_source == all_filter_option or row["source"] == selected_source)
     ]
+    canonical_mismatch_rows = [
+        row
+        for row in filtered_rows
+        if row.get("canonical_status") != "shared_match"
+    ]
+    selected_mapping_display_rows = [
+        {
+            **{key: value for key, value in row.items() if key != "canonical_status"},
+            "canonical_status": row.get("canonical_status_label") or row.get("canonical_status") or "",
+        }
+        for row in filtered_rows
+    ]
+    canonical_mismatch_display_rows = [
+        {
+            **{key: value for key, value in row.items() if key != "canonical_status"},
+            "canonical_status": row.get("canonical_status_label") or row.get("canonical_status") or "",
+        }
+        for row in canonical_mismatch_rows
+    ]
 
     st.subheader("Selected Mapping")
-    st.dataframe(filtered_rows, width="stretch", hide_index=True)
+    st.caption(
+        "Canonical status shows whether both sides share a business concept, only the source resolved, only the target resolved, source and target resolve to different concepts, or neither side resolved to a canonical concept."
+    )
+    st.dataframe(selected_mapping_display_rows, width="stretch", hide_index=True)
+
+    if canonical_mismatch_rows:
+        st.subheader("Canonical Mismatch Review")
+        st.caption("These are the rows where the selected mapping does not have a shared canonical concept yet.")
+        st.dataframe(canonical_mismatch_display_rows, width="stretch", hide_index=True)
 
     if source_concept_view_rows:
         st.subheader("Source -> Concept View")
+        st.caption("Shows only concepts resolved on the source side of the currently selected mapping.")
         st.dataframe(source_concept_view_rows, width="stretch", hide_index=True)
 
     if concept_target_view_rows:
         st.subheader("Concept -> Target View")
+        st.caption("Shows only concepts resolved on the target side of the currently selected mapping.")
         st.dataframe(concept_target_view_rows, width="stretch", hide_index=True)
 
     if concept_rows:
         st.subheader("Canonical Concept Summary")
+        st.caption("Summarizes only rows with a shared source-target canonical concept.")
         st.dataframe(concept_rows, width="stretch", hide_index=True)
 
     st.subheader("Ranked Candidates")

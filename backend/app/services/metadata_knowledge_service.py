@@ -816,6 +816,16 @@ class MetadataKnowledgeService:
                 canonical_concept_id = entry.canonical_concept_id or self.resolve_canonical_concept_id(entry.canonical_term)
                 if canonical_concept_id is None:
                     continue
+                if canonical_concept_id not in self._canonical_concepts_by_id:
+                    self._register_canonical_concept(
+                        concept_id=canonical_concept_id,
+                        entity=canonical_concept_id.split(".", 1)[0] if "." in canonical_concept_id else "general",
+                        attribute=canonical_concept_id.split(".", 1)[1] if "." in canonical_concept_id else canonical_concept_id,
+                        display_name=entry.canonical_term,
+                        description=f"Overlay-only canonical concept proposed by {entry.source_system or 'knowledge overlay'}.",
+                        data_type="",
+                        aliases={_normalize_alias(entry.canonical_term)},
+                    )
                 self._register_canonical_concept(
                     concept_id=canonical_concept_id,
                     entity=self._canonical_concepts_by_id.get(canonical_concept_id).entity if canonical_concept_id in self._canonical_concepts_by_id else "general",

@@ -2,10 +2,59 @@ from __future__ import annotations
 
 import httpx
 import streamlit as st
+import time
+
+
+def poll_mapping_job(
+    *,
+    api_request,
+    start_path: str,
+    payload: dict,
+    status,
+    timeout_seconds: float = 600.0,
+) -> dict:
+    started = api_request("POST", start_path, json=payload, timeout=30.0)
+    job_id = started["job_id"]
+    status.write(f"Started mapping job {job_id}.")
+
+    seen_activity_count = 0
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        job_status = api_request("GET", f"/mapping/jobs/{job_id}", timeout=30.0)
+        activity = job_status.get("activity") or []
+        for line in activity[seen_activity_count:]:
+            status.write(line)
+        seen_activity_count = len(activity)
+
+        if job_status.get("status") == "completed":
+            response = job_status.get("response")
+            if not response:
+                raise RuntimeError("Mapping job completed without a response payload.")
+            return response
+        if job_status.get("status") == "failed":
+            raise RuntimeError(job_status.get("error") or "Mapping job failed.")
+
+        time.sleep(0.5)
+
+    raise RuntimeError(f"Mapping job {job_id} did not finish before the timeout.")
 
 
 def should_show_table_selector(available_tables: list[str], upload_mode: str, *, is_sql: bool) -> bool:
     return bool(available_tables) and (is_sql or upload_mode == "Row data")
+
+
+def companion_enrichment_message(result: dict | None) -> str:
+    if not result:
+        return ""
+
+    matched_columns = int(result.get("matched_columns") or 0)
+    unmatched_columns = [str(item) for item in (result.get("unmatched_columns") or []) if str(item).strip()]
+    if unmatched_columns:
+        return (
+            f"Source companion metadata enriched {matched_columns} columns; "
+            f"unmatched spec fields: {', '.join(unmatched_columns)}."
+        )
+    return f"Source companion metadata enriched {matched_columns} columns; all companion fields matched."
 
 
 def render_workspace_tab(
@@ -15,6 +64,7 @@ def render_workspace_tab(
     sql_tables_for_upload,
     api_request,
     upload_dataset_handle,
+    enrich_dataset_metadata,
     uploaded_file_bytes,
     render_dataset_summary,
     initialize_mapping_editor_state,
@@ -240,6 +290,93 @@ def render_workspace_tab(
                 with right:
                     render_dataset_summary("Target", upload_response["target"])
 
+            st.subheader("Source Companion Metadata")
+            st.caption(
+                "Optionally attach a source-side schema/spec file to enrich the uploaded source dataset with descriptions and declared types by column name."
+            )
+            companion_result = st.session_state.get("source_companion_metadata_result")
+            if companion_result:
+                st.info(companion_enrichment_message(companion_result))
+
+            source_companion_file = st.file_uploader(
+                "Source companion schema/spec",
+                type=all_upload_types,
+                key="source_companion_file",
+                help="Use a field-per-row schema/spec file whose column names match the uploaded source dataset.",
+            )
+            source_companion_hint = detect_spec_hint_for_upload(source_companion_file, "source_companion")
+            if source_companion_file is not None and source_companion_hint:
+                st.caption(
+                    "Companion file looks like a field specification: "
+                    f"name={source_companion_hint['name_col']}, "
+                    f"description={source_companion_hint.get('description_col') or '-'}, "
+                    f"type={source_companion_hint.get('type_col') or '-'}"
+                )
+            elif source_companion_file is not None:
+                st.caption(
+                    "Auto-detection found no matching column headers in the companion file. "
+                    "Enter the spec header names manually."
+                )
+                _cmp_cols = st.columns(3)
+                _cmp_cols[0].text_input(
+                    "Companion name column",
+                    key="source_companion_manual_name_col",
+                    placeholder="e.g. Column",
+                )
+                _cmp_cols[1].text_input(
+                    "Companion description column",
+                    key="source_companion_manual_desc_col",
+                    placeholder="e.g. Description",
+                )
+                _cmp_cols[2].text_input(
+                    "Companion type column",
+                    key="source_companion_manual_type_col",
+                    placeholder="e.g. Type",
+                )
+
+            if st.button("Apply source companion metadata", key="apply_source_companion_metadata"):
+                try:
+                    enrichment_result = enrich_dataset_metadata(
+                        upload_response["source"]["dataset_id"],
+                        source_companion_file,
+                        name_col=(
+                            source_companion_hint.get("name_col")
+                            if source_companion_hint
+                            else (st.session_state.get("source_companion_manual_name_col") or None)
+                        ),
+                        description_col=(
+                            source_companion_hint.get("description_col")
+                            if source_companion_hint
+                            else (st.session_state.get("source_companion_manual_desc_col") or None)
+                        ),
+                        type_col=(
+                            source_companion_hint.get("type_col")
+                            if source_companion_hint
+                            else (st.session_state.get("source_companion_manual_type_col") or None)
+                        ),
+                    )
+                    st.session_state["upload_response"]["source"] = enrichment_result["dataset"]
+                    st.session_state["source_companion_metadata_result"] = {
+                        "matched_columns": enrichment_result.get("matched_columns", 0),
+                        "unmatched_columns": enrichment_result.get("unmatched_columns", []),
+                    }
+                    st.session_state.pop("mapping_response", None)
+                    st.session_state.pop("preview_response", None)
+                    st.session_state.pop("codegen_response", None)
+                    st.session_state.pop("mapping_editor_state", None)
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": companion_enrichment_message(st.session_state["source_companion_metadata_result"])
+                        + " Re-run mapping to use the enriched source metadata.",
+                    }
+                    st.rerun()
+                except (ValueError, httpx.HTTPError) as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Source companion metadata failed: {error}",
+                    }
+                    st.rerun()
+
             st.subheader("3. Review Mapping")
             use_llm = st.checkbox(
                 "Use LLM validation",
@@ -264,28 +401,28 @@ def render_workspace_tab(
                         with st.status(activity_label, expanded=True) as status:
                             status.write("Preparing mapping request.")
                             if upload_mode == "canonical":
-                                status.write("Calling /mapping/canonical.")
-                                mapping_response = api_request(
-                                    "POST",
-                                    "/mapping/canonical",
-                                    json={
+                                status.write("Starting /mapping/canonical job.")
+                                mapping_response = poll_mapping_job(
+                                    api_request=api_request,
+                                    start_path="/mapping/canonical/jobs",
+                                    payload={
                                         "source_dataset_id": upload_response["source"]["dataset_id"],
                                         "target_system": upload_response.get("target_system", "canonical"),
                                         "use_llm": use_llm,
                                     },
-                                    timeout=600.0,
+                                    status=status,
                                 )
                             else:
-                                status.write("Calling /mapping/auto.")
-                                mapping_response = api_request(
-                                    "POST",
-                                    "/mapping/auto",
-                                    json={
+                                status.write("Starting /mapping/auto job.")
+                                mapping_response = poll_mapping_job(
+                                    api_request=api_request,
+                                    start_path="/mapping/auto/jobs",
+                                    payload={
                                         "source_dataset_id": upload_response["source"]["dataset_id"],
                                         "target_dataset_id": upload_response["target"]["dataset_id"],
                                         "use_llm": use_llm,
                                     },
-                                    timeout=600.0,
+                                    status=status,
                                 )
                             status.write("Initializing review state.")
                             st.session_state["mapping_response"] = mapping_response
@@ -302,7 +439,7 @@ def render_workspace_tab(
                             }
                             status.write("Mapping results are ready for review.")
                             status.update(label=f"{activity_label} complete", state="complete", expanded=True)
-                except httpx.HTTPError as error:
+                except (httpx.HTTPError, RuntimeError) as error:
                     with activity_placeholder.container():
                         with st.status(activity_label, expanded=True) as status:
                             status.write("Preparing mapping request.")

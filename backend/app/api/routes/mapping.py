@@ -18,6 +18,8 @@ from app.models.mapping import (
     MappingSetDetail,
     MappingSetRecord,
     MappingSetStatusUpdateRequest,
+    MappingJobStartResponse,
+    MappingJobStatusResponse,
     PreviewRequest,
     PreviewResponse,
     TransformationGenerationRequest,
@@ -30,6 +32,7 @@ from app.models.mapping import (
 )
 from app.services.llm_service import build_provider_from_settings, call_transformation_generator
 from app.services.codegen_service import generate_pandas_code
+from app.services.mapping_job_service import mapping_job_store
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.persistence_service import persistence_service
 from app.services.preview_service import build_preview
@@ -78,6 +81,26 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
     )
 
 
+@router.post("/auto/jobs", response_model=MappingJobStartResponse)
+async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResponse:
+    try:
+        source = dataset_store.get_dataset(request.source_dataset_id)
+        target = dataset_store.get_dataset(request.target_dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    def worker(progress_callback):
+        return generate_mapping_candidates(
+            source.handle.schema_profile,
+            target.handle.schema_profile,
+            llm_provider=build_provider_from_settings() if request.use_llm else None,
+            progress_callback=progress_callback,
+        )
+
+    job = mapping_job_store.start(worker)
+    return MappingJobStartResponse(job_id=job.job_id, status=job.status)
+
+
 @router.post("/canonical", response_model=AutoMappingResponse)
 async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse:
     try:
@@ -94,6 +117,37 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
         target_schema,
         llm_provider=build_provider_from_settings() if request.use_llm else None,
     )
+
+
+@router.post("/canonical/jobs", response_model=MappingJobStartResponse)
+async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJobStartResponse:
+    try:
+        source = dataset_store.get_dataset(request.source_dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    target_schema = build_virtual_target_schema(request.target_system)
+    if not target_schema.columns:
+        raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
+
+    def worker(progress_callback):
+        return generate_mapping_candidates(
+            source.handle.schema_profile,
+            target_schema,
+            llm_provider=build_provider_from_settings() if request.use_llm else None,
+            progress_callback=progress_callback,
+        )
+
+    job = mapping_job_store.start(worker)
+    return MappingJobStartResponse(job_id=job.job_id, status=job.status)
+
+
+@router.get("/jobs/{job_id}", response_model=MappingJobStatusResponse)
+async def get_mapping_job_status(job_id: str) -> MappingJobStatusResponse:
+    try:
+        return mapping_job_store.get_status(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=f"Mapping job not found: {job_id}") from error
 
 
 @router.post("/preview", response_model=PreviewResponse)

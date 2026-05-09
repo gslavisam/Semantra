@@ -10,9 +10,14 @@ from typing import Callable, Protocol
 
 from app.core.config import settings
 from app.models.mapping import LLMValidationResult, TransformationGenerationResponse
+from app.models.mapping import CanonicalGapCandidate, CanonicalGapSuggestion
 
 
 logger = logging.getLogger(__name__)
+
+MAX_PROMPT_DESCRIPTION_LENGTH = 280
+MAX_PROMPT_SAMPLE_VALUES = 5
+MAX_PROMPT_SAMPLE_VALUE_LENGTH = 80
 
 
 class LLMProvider(Protocol):
@@ -267,6 +272,47 @@ def extract_first_json_object(raw_response: str) -> str | None:
     return None
 
 
+def truncate_prompt_text(value: object, max_length: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= max_length:
+        return text
+    return f"{text[: max_length - 3].rstrip()}..."
+
+
+def sanitize_prompt_sample_values(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    sanitized: list[str] = []
+    for value in values[:MAX_PROMPT_SAMPLE_VALUES]:
+        text = truncate_prompt_text(value, MAX_PROMPT_SAMPLE_VALUE_LENGTH)
+        if text:
+            sanitized.append(text)
+    return sanitized
+
+
+def sanitize_prompt_patterns(value: object) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str) and value.strip():
+        return [value.strip()]
+    return []
+
+
+def sanitize_prompt_field_context(field: dict) -> dict:
+    sanitized = {
+        "name": str(field.get("name") or "").strip(),
+        "description": truncate_prompt_text(field.get("description") or "", MAX_PROMPT_DESCRIPTION_LENGTH),
+        "declared_type": truncate_prompt_text(field.get("declared_type") or "", MAX_PROMPT_DESCRIPTION_LENGTH),
+        "sample_values": sanitize_prompt_sample_values(field.get("sample_values")),
+        "detected_patterns": sanitize_prompt_patterns(field.get("detected_patterns") or field.get("pattern")),
+    }
+    if "unique_ratio" in field:
+        sanitized["unique_ratio"] = field.get("unique_ratio")
+    if "confidence" in field:
+        sanitized["confidence"] = field.get("confidence")
+    return {key: value for key, value in sanitized.items() if value not in ("", [], None)}
+
+
 def call_validator(
     source_field: dict,
     candidate_targets: list[dict],
@@ -366,6 +412,42 @@ def call_transformation_generator(
     return None
 
 
+def call_canonical_gap_assistant(
+    candidate: CanonicalGapCandidate,
+    nearest_concepts: list[dict],
+    provider: LLMProvider | None,
+    max_retries: int | None = None,
+    timeout_seconds: float | None = None,
+) -> CanonicalGapSuggestion | None:
+    if provider is None:
+        return None
+
+    retries = max_retries if max_retries is not None else settings.llm_max_retries
+    timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
+    prompt = build_canonical_gap_prompt(candidate, nearest_concepts)
+    response = request_llm_json(provider, prompt, timeout, retries, "canonical_gap")
+    if response is None:
+        return None
+
+    raw_response, parsed = response
+    try:
+        suggestion = CanonicalGapSuggestion(
+            action=parsed.get("action", "no_action"),
+            concept_id=parsed.get("concept_id"),
+            display_name=parsed.get("display_name"),
+            aliases=normalize_llm_list_field(parsed.get("aliases") or []),
+            confidence=float(parsed.get("confidence", 0.0) or 0.0),
+            reasoning=normalize_llm_list_field(parsed.get("reasoning") or []),
+            risk_notes=normalize_llm_list_field(parsed.get("risk_notes") or []),
+            raw_response=raw_response,
+        )
+        if validate_canonical_gap_suggestion(suggestion, candidate, nearest_concepts):
+            return suggestion
+    except Exception as error:
+        logger.warning("LLM canonical gap response rejected (%s): %s", classify_llm_error(error), error)
+    return None
+
+
 def validate_result(result: LLMValidationResult | None, candidate_targets: list[dict]) -> bool:
     if result is None:
         return False
@@ -384,14 +466,40 @@ def validate_result(result: LLMValidationResult | None, candidate_targets: list[
     return True
 
 
+def validate_canonical_gap_suggestion(
+    suggestion: CanonicalGapSuggestion,
+    candidate: CanonicalGapCandidate,
+    nearest_concepts: list[dict],
+) -> bool:
+    if suggestion.action == "no_action":
+        return True
+    if not 0.0 <= suggestion.confidence <= 1.0:
+        return False
+    if suggestion.confidence < settings.llm_min_confidence:
+        return False
+    if not suggestion.concept_id or not suggestion.display_name:
+        return False
+    aliases = {alias.strip().lower() for alias in suggestion.aliases if alias.strip()}
+    if candidate.source.lower() not in aliases and candidate.target.lower() not in aliases:
+        return False
+    if suggestion.action == "existing_concept_alias":
+        valid_concepts = {str(item.get("concept_id") or "") for item in nearest_concepts}
+        return suggestion.concept_id in valid_concepts
+    if suggestion.action == "new_canonical_concept":
+        return "." in suggestion.concept_id
+    return False
+
+
 def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) -> str:
     payload = {
-        "source_field": source_field,
-        "candidate_targets": candidate_targets,
+        "source_field": sanitize_prompt_field_context(source_field),
+        "candidate_targets": [sanitize_prompt_field_context(target) for target in candidate_targets],
         "rules": {
             "closed_set_only": True,
             "allow_no_match": True,
             "json_only": True,
+            "description_truncation": MAX_PROMPT_DESCRIPTION_LENGTH,
+            "sample_values_limit": MAX_PROMPT_SAMPLE_VALUES,
         },
         "response_format": {
             "selected_target": "string",
@@ -408,16 +516,49 @@ def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) ->
     )
 
 
+def build_canonical_gap_prompt(candidate: CanonicalGapCandidate, nearest_concepts: list[dict]) -> str:
+    payload = {
+        "canonical_gap_candidate": candidate.model_dump(mode="json"),
+        "nearest_existing_canonical_concepts": nearest_concepts,
+        "rules": {
+            "json_only": True,
+            "allowed_actions": ["existing_concept_alias", "new_canonical_concept", "no_action"],
+            "do_not_invent_source_or_target_fields": True,
+            "prefer_existing_concepts_when_semantically_correct": True,
+            "return_no_action_if_uncertain_or_generic": True,
+        },
+        "response_format": {
+            "action": "existing_concept_alias | new_canonical_concept | no_action",
+            "concept_id": "canonical concept id or null",
+            "display_name": "human readable concept name or null",
+            "aliases": ["source/target aliases to attach"],
+            "confidence": "0.0-1.0",
+            "reasoning": ["short bullet points"],
+            "risk_notes": ["short bullet points"],
+        },
+    }
+    return (
+        "You are a strict canonical glossary assistant.\n"
+        "A mapping row is already selected, but its canonical path is missing.\n"
+        "Suggest a controlled canonical overlay change only when it is well-supported by the provided source/target names, signals, and explanations.\n"
+        "Use an existing concept if it fits. Propose a new canonical concept only for clear enterprise data concepts.\n"
+        "Return only valid JSON.\n\n"
+        f"{json.dumps(payload, ensure_ascii=True)}"
+    )
+
+
 def build_transformation_generator_prompt(source_field: dict, target_field: dict, user_instruction: str) -> str:
     payload = {
-        "source_field": source_field,
-        "target_field": target_field,
+        "source_field": sanitize_prompt_field_context(source_field),
+        "target_field": sanitize_prompt_field_context(target_field),
         "user_instruction": user_instruction,
         "rules": {
             "json_only": True,
             "language": "python-pandas",
             "allowed_objects": ["df_source", "df_target", "pd"],
             "allow_expression_only": True,
+            "description_truncation": MAX_PROMPT_DESCRIPTION_LENGTH,
+            "sample_values_limit": MAX_PROMPT_SAMPLE_VALUES,
         },
         "response_format": {
             "transformation_code": "string",
