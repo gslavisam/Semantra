@@ -12,6 +12,7 @@ from openpyxl import Workbook
 
 from app.core.config import settings
 from app.main import app
+from app.models.mapping import CanonicalGapSuggestion
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.llm_service import StaticLLMProvider
@@ -716,6 +717,315 @@ def test_canonical_gap_candidates_and_approve_endpoint_persist_overlay_alias() -
     assert metadata_knowledge_service.resolve_canonical_concept_id("NTGEW") == "material.net_weight"
 
 
+def test_canonical_concept_registry_and_detail_expose_usage_and_active_overlay_aliases() -> None:
+    create_mapping_set_response = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "source_dataset_id": "source-1",
+            "target_dataset_id": "target-1",
+            "integration_name": "Customer Master Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "interface_type": "batch",
+            "description": "Customer master sync",
+            "artifact_type": "standard",
+            "canonical_concepts": ["customer.id"],
+            "unmatched_sources": [],
+            "mapping_decisions": [
+                {"source": "KUNNR", "target": "customer_id", "status": "accepted"},
+            ],
+            "created_by": "demo-user",
+        },
+    )
+    assert create_mapping_set_response.status_code == 200
+
+    overlay_response = client.post(
+        "/knowledge/overlays",
+        data={"name": "overlay-canonical-console", "created_by": "demo-user"},
+        files={
+            "file": (
+                "knowledge_overlay.csv",
+                csv_bytes(
+                    "entry_type,canonical_term,alias,domain,source_system,note\n"
+                    "concept_alias,Customer ID,legacy_customer_identifier,master_data,LegacyERP,Canonical console alias\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+    assert overlay_response.status_code == 200
+    overlay_id = overlay_response.json()["version"]["overlay_id"]
+
+    activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+    assert activate_response.status_code == 200
+
+    list_response = client.get("/knowledge/canonical-concepts")
+    detail_response = client.get("/knowledge/canonical-concepts/customer.id")
+
+    assert list_response.status_code == 200
+    assert detail_response.status_code == 200
+
+    concept_list = list_response.json()
+    customer_id = next(item for item in concept_list if item["concept_id"] == "customer.id")
+    assert customer_id["usage_count"] >= 1
+    assert customer_id["source"] == "base_plus_active_overlay"
+    assert "legacy_customer_identifier" in customer_id["active_overlay_aliases"]
+
+    detail = detail_response.json()
+    assert detail["concept"]["concept_id"] == "customer.id"
+    assert detail["concept"]["active_overlay_entry_count"] == 1
+    assert detail["active_overlay_entries"][0]["overlay_id"] == overlay_id
+    assert detail["active_overlay_entries"][0]["alias"] == "legacy_customer_identifier"
+    assert detail["integrations"][0]["integration_name"] == "Customer Master Sync"
+    assert any(entry["action"] == "activate" for entry in detail["audit_entries"])
+
+
+def test_material_canonical_gap_suggest_approve_and_rerun_flow() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "material_source.csv",
+                csv_bytes("NTGEW\n10.5\n12.0\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "material_target.csv",
+                csv_bytes("net_weight,gross_weight\n10.5,11.0\n12.0,12.5\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    initial_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert initial_map_response.status_code == 200
+    initial_mapping = initial_map_response.json()["mappings"][0]
+    assert initial_mapping["source"] == "NTGEW"
+    assert initial_mapping["target"] == "net_weight"
+    assert initial_mapping["canonical_details"]["shared_concepts"] == []
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": initial_map_response.json()},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+
+    with patch(
+        "app.api.routes.knowledge.call_canonical_gap_assistant",
+        return_value=CanonicalGapSuggestion(
+            action="new_canonical_concept",
+            concept_id="material.net_weight",
+            display_name="Material Net Weight",
+            aliases=["NTGEW", "net_weight", "MARA-NTGEW"],
+            confidence=0.88,
+            reasoning=["SAP NTGEW and net_weight describe material net weight."],
+            risk_notes=["Overlay-only approval keeps this change reviewable."],
+        ),
+    ):
+        suggest_response = client.post(
+            "/knowledge/canonical-gaps/suggest",
+            json={"candidate": candidate},
+        )
+
+    assert suggest_response.status_code == 200
+    suggestion = suggest_response.json()
+    assert suggestion["action"] == "new_canonical_concept"
+    assert suggestion["concept_id"] == "material.net_weight"
+
+    approve_response = client.post(
+        "/knowledge/canonical-gaps/approve",
+        json={
+            "candidate": candidate,
+            "suggestion": suggestion,
+            "approved_by": "test",
+        },
+    )
+
+    assert approve_response.status_code == 200
+    assert approve_response.json()["activated"] is True
+
+    rerun_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert rerun_map_response.status_code == 200
+    rerun_mapping = rerun_map_response.json()["mappings"][0]
+    assert rerun_mapping["target"] == "net_weight"
+    assert rerun_mapping["signals"]["canonical"] > 0
+    assert [concept["concept_id"] for concept in rerun_mapping["canonical_details"]["shared_concepts"]] == [
+        "material.net_weight"
+    ]
+
+
+def test_material_canonical_gap_reject_persists_audit_event() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "material_source.csv",
+                csv_bytes("NTGEW\n10.5\n12.0\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "material_target.csv",
+                csv_bytes("net_weight,gross_weight\n10.5,11.0\n12.0,12.5\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    initial_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert initial_map_response.status_code == 200
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": initial_map_response.json()},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+
+    with patch(
+        "app.api.routes.knowledge.call_canonical_gap_assistant",
+        return_value=CanonicalGapSuggestion(
+            action="new_canonical_concept",
+            concept_id="material.net_weight",
+            display_name="Material Net Weight",
+            aliases=["NTGEW", "net_weight", "MARA-NTGEW"],
+            confidence=0.88,
+            reasoning=["SAP NTGEW and net_weight describe material net weight."],
+            risk_notes=["Overlay-only approval keeps this change reviewable."],
+        ),
+    ):
+        suggest_response = client.post(
+            "/knowledge/canonical-gaps/suggest",
+            json={"candidate": candidate},
+        )
+
+    assert suggest_response.status_code == 200
+    suggestion = suggest_response.json()
+
+    reject_response = client.post(
+        "/knowledge/canonical-gaps/reject",
+        json={
+            "candidate": candidate,
+            "suggestion": suggestion,
+            "disposition": "rejected",
+            "rejected_by": "test-reviewer",
+            "note": "Duplicate with an existing material weight concept under review.",
+        },
+    )
+
+    assert reject_response.status_code == 200
+    reject_payload = reject_response.json()
+    assert reject_payload["action"] == "reject"
+    assert "NTGEW -> net_weight" in reject_payload["message"]
+    assert "Disposition=rejected." in reject_payload["message"]
+    assert "Rejected by=test-reviewer." in reject_payload["message"]
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    assert any(
+        entry["action"] == "reject"
+        and "Concept=material.net_weight." in entry["message"]
+        and "Duplicate with an existing material weight concept under review." in entry["message"]
+        for entry in audit_response.json()
+    )
+
+
+def test_material_canonical_gap_ignore_persists_audit_event() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "material_source.csv",
+                csv_bytes("NTGEW\n10.5\n12.0\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "material_target.csv",
+                csv_bytes("net_weight,gross_weight\n10.5,11.0\n12.0,12.5\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    initial_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert initial_map_response.status_code == 200
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": initial_map_response.json()},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+
+    ignore_response = client.post(
+        "/knowledge/canonical-gaps/reject",
+        json={
+            "candidate": candidate,
+            "disposition": "ignored",
+            "rejected_by": "test-reviewer",
+            "note": "Keep this visible only in review for now.",
+        },
+    )
+
+    assert ignore_response.status_code == 200
+    ignore_payload = ignore_response.json()
+    assert ignore_payload["action"] == "ignore"
+    assert "Ignored canonical gap suggestion for NTGEW -> net_weight." in ignore_payload["message"]
+    assert "Disposition=ignored." in ignore_payload["message"]
+    assert "Reviewed by=test-reviewer." in ignore_payload["message"]
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    assert any(
+        entry["action"] == "ignore"
+        and "NTGEW -> net_weight" in entry["message"]
+        and "Keep this visible only in review for now." in entry["message"]
+        for entry in audit_response.json()
+    )
+
+
 def test_preview_projects_rows_from_mapping_decisions() -> None:
     upload_payload = upload_example_datasets()
     preview_response = client.post(
@@ -1054,12 +1364,12 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     status_response = client.post(
         f"/mapping/sets/{mapping_set_id}/status",
         json={
-            "status": "review",
+            "status": "approved",
             "changed_by": "demo-user",
-            "note": "Ready for review",
+            "note": "Ready for production use",
             "owner": "governance-team",
             "assignee": "analyst-2",
-            "review_note": "Waiting for approval",
+            "review_note": "Approved for reuse",
         },
         headers=admin_headers(),
     )
@@ -1092,14 +1402,60 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     assert detail["owner"] == "governance-team"
     assert detail["assignee"] == "analyst-1"
     assert detail["review_note"] == "Prepared for governance review"
-    assert updated["status"] == "review"
+    assert updated["status"] == "approved"
     assert updated["assignee"] == "analyst-2"
-    assert updated["review_note"] == "Waiting for approval"
+    assert updated["review_note"] == "Approved for reuse"
     assert applied["mapping_set_id"] == mapping_set_id
     assert audits[0]["action"] == "apply"
     assert audits[0]["created_at"] is not None
     assert audits[1]["action"] == "status_change"
     assert audits[-1]["action"] == "create"
+
+
+def test_apply_mapping_set_blocks_non_approved_versions() -> None:
+    settings.admin_api_token = "secret-token"
+
+    create_response = client.post(
+        "/mapping/sets",
+        json={
+            "name": "vendor-master",
+            "source_dataset_id": "source-1",
+            "target_dataset_id": "target-1",
+            "mapping_decisions": [
+                {"source": "vendor_id", "target": "supplier.id", "status": "accepted"},
+            ],
+            "created_by": "demo-user",
+            "note": "Draft mapping set",
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    mapping_set_id = create_response.json()["mapping_set_id"]
+
+    status_response = client.post(
+        f"/mapping/sets/{mapping_set_id}/status",
+        json={
+            "status": "review",
+            "changed_by": "demo-user",
+            "note": "Ready for review",
+        },
+        headers=admin_headers(),
+    )
+    apply_response = client.post(
+        f"/mapping/sets/{mapping_set_id}/apply",
+        json={"changed_by": "demo-user", "note": "Attempted workspace apply"},
+        headers=admin_headers(),
+    )
+    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=admin_headers())
+
+    assert status_response.status_code == 200
+    assert apply_response.status_code == 409
+    assert (
+        apply_response.json()["detail"]
+        == f"Mapping set #{mapping_set_id} is in status 'review' and cannot be applied. Only approved mapping sets can be used in workspace apply/reuse flows."
+    )
+    assert [entry["action"] for entry in audit_response.json()] == ["status_change", "create"]
 
 
 def test_catalog_integrations_endpoint_lists_queryable_mapping_summaries() -> None:

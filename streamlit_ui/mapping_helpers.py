@@ -3,36 +3,40 @@ from __future__ import annotations
 from collections.abc import Callable
 
 
+def _normalized_text(value: object) -> str:
+    return str(value or "").strip()
+
+
 def suggested_mapping_by_source(mapping_response: dict) -> dict[str, dict]:
     return {item["source"]: item for item in mapping_response.get("mappings", [])}
 
 
 def resolve_suggested_transformation_code(entry: dict | None, fallback_code: str | None = None) -> str:
     current_entry = entry or {}
-    current_target = str(current_entry.get("target") or "").strip()
-    suggested_target = str(current_entry.get("suggested_target") or "").strip()
+    current_target = _normalized_text(current_entry.get("target"))
+    suggested_target = _normalized_text(current_entry.get("suggested_target"))
     if suggested_target and current_target and suggested_target != current_target:
         return ""
-    return str(current_entry.get("suggested_transformation_code") or fallback_code or "").strip()
+    return _normalized_text(current_entry.get("suggested_transformation_code") or fallback_code)
 
 
 def effective_transformation_code(source: str, session_state: dict, fallback_code: str | None = None) -> str | None:
-    manual_code = session_state.get(f"manual_transform_{source}", "").strip()
+    manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
     if manual_code and session_state.get(f"manual_apply_{source}", False):
         return manual_code
 
-    suggested_code = (fallback_code or "").strip()
+    suggested_code = _normalized_text(fallback_code)
     if suggested_code and session_state.get(f"transform_{source}", False):
         return suggested_code
     return None
 
 
 def transformation_mode(source: str, session_state: dict, fallback_code: str | None = None) -> str:
-    manual_code = session_state.get(f"manual_transform_{source}", "").strip()
+    manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
     if manual_code and session_state.get(f"manual_apply_{source}", False):
         return "custom"
 
-    suggested_code = (fallback_code or "").strip()
+    suggested_code = _normalized_text(fallback_code)
     if suggested_code and session_state.get(f"transform_{source}", False):
         return "suggested"
     return "direct"

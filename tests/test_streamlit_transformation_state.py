@@ -105,6 +105,25 @@ def test_build_mapping_decisions_keeps_suggested_transformation_for_original_tar
     ]
 
 
+def test_effective_transformation_helpers_tolerate_none_manual_code() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "effective_transformation_code",
+        "transformation_mode",
+    )
+    effective_transformation_code, transformation_mode = functions
+
+    fake_streamlit.session_state.update(
+        {
+            "manual_transform_email": None,
+            "manual_apply_email": True,
+            "transform_email": True,
+        }
+    )
+
+    assert effective_transformation_code("email", 'df_source["email"]') == 'df_source["email"]'
+    assert transformation_mode("email", 'df_source["email"]') == "suggested"
+
+
 def test_build_pending_corrections_includes_rejected_review_decision() -> None:
     fake_streamlit, [build_pending_corrections] = load_streamlit_functions("build_pending_corrections")
 

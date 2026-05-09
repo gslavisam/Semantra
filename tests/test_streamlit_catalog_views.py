@@ -54,3 +54,11 @@ def test_apply_mapping_set_detail_to_workspace_sets_editor_state(monkeypatch) ->
     assert fake_streamlit.session_state["mapping_editor_state"]["KUNNR"]["target"] == "customer.id"
     assert fake_streamlit.session_state["manual_transform_KUNNR"] == 'df_target["customer_id"] = df_source["KUNNR"]'
     assert fake_streamlit.session_state["mapping_set_owner"] == "governance-team"
+
+
+def test_mapping_set_reuse_block_reason_requires_approved_status() -> None:
+    assert catalog_views._mapping_set_reuse_block_reason("approved") == ""
+    assert (
+        catalog_views._mapping_set_reuse_block_reason("review")
+        == "Only approved mapping set versions can be reused in Workspace. Current status: review."
+    )

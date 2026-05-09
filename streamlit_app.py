@@ -539,6 +539,21 @@ def render_admin_debug_tab() -> None:
     )
 
 
+def render_canonical_console_tab() -> None:
+    from streamlit_ui.admin_views import render_canonical_console_panel as _impl
+
+    if admin_token_required() and not str(st.session_state.get("admin_token", "")).strip():
+        st.header("Canonical Console")
+        st.warning("Admin token is required for canonical console governance endpoints.")
+        return
+
+    return _impl(
+        api_request=api_request,
+        api_request_content=api_request_content,
+        upload_file_to_request_files=upload_file_to_request_files,
+    )
+
+
 def render_benchmark_tab() -> None:
     from streamlit_ui.benchmark_views import render_benchmark_tab as _impl
 
@@ -601,10 +616,15 @@ def main() -> None:
             st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
             st.rerun()
 
-    workspace_tab, catalog_tab, benchmark_tab, debug_tab = st.tabs(["Workspace", "Catalog", "Benchmarks", "Admin / Debug"])
+    workspace_tab, canonical_console_tab, catalog_tab, benchmark_tab, debug_tab = st.tabs(
+        ["Workspace", "Canonical Console", "Catalog", "Benchmarks", "Admin / Debug"]
+    )
 
     with workspace_tab:
         render_workspace_tab()
+
+    with canonical_console_tab:
+        render_canonical_console_tab()
 
     with catalog_tab:
         render_catalog_tab()

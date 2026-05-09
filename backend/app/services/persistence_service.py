@@ -6,7 +6,12 @@ import sqlite3
 from contextlib import contextmanager
 
 from app.core.config import settings
-from app.models.knowledge import KnowledgeAuditEntry, KnowledgeOverlayEntry, KnowledgeOverlayVersion
+from app.models.knowledge import (
+    CanonicalConceptUsageRecord,
+    KnowledgeAuditEntry,
+    KnowledgeOverlayEntry,
+    KnowledgeOverlayVersion,
+)
 from app.models.mapping import (
     BenchmarkDatasetRecord,
     CatalogConceptDetail,
@@ -802,6 +807,40 @@ class SQLitePersistenceService:
         status: str | None = None,
         artifact_type: str | None = None,
     ) -> CatalogConceptDetail:
+        integrations = self.list_catalog_concept_usage_records(
+            concept_id,
+            source_system=source_system,
+            target_system=target_system,
+            status=status,
+            artifact_type=artifact_type,
+        )
+        if not integrations:
+            raise KeyError(f"Unknown catalog concept: {concept_id}")
+        return CatalogConceptDetail(
+            concept_id=concept_id,
+            usage_count=len(integrations),
+            integrations=[
+                CatalogConceptUsageRecord.model_validate(record.model_dump(mode="json"))
+                for record in integrations
+            ],
+        )
+
+    def list_catalog_concept_usage_counts(self) -> dict[str, int]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT concept_id, COUNT(*) FROM mapping_catalog_concepts GROUP BY concept_id"
+            ).fetchall()
+        return {str(row[0]): int(row[1]) for row in rows}
+
+    def list_catalog_concept_usage_records(
+        self,
+        concept_id: str,
+        *,
+        source_system: str | None = None,
+        target_system: str | None = None,
+        status: str | None = None,
+        artifact_type: str | None = None,
+    ) -> list[CanonicalConceptUsageRecord]:
         query = (
             "SELECT concept_id, mapping_set_id, name, integration_name, version, status, artifact_type, "
             "source_system, target_system, business_domain, owner, created_at "
@@ -824,10 +863,8 @@ class SQLitePersistenceService:
 
         with self.connection() as connection:
             rows = connection.execute(query, tuple(params)).fetchall()
-        if not rows:
-            raise KeyError(f"Unknown catalog concept: {concept_id}")
-        integrations = [
-            CatalogConceptUsageRecord(
+        return [
+            CanonicalConceptUsageRecord(
                 concept_id=row[0],
                 mapping_set_id=int(row[1]),
                 name=row[2],
@@ -843,11 +880,6 @@ class SQLitePersistenceService:
             )
             for row in rows
         ]
-        return CatalogConceptDetail(
-            concept_id=concept_id,
-            usage_count=len(integrations),
-            integrations=integrations,
-        )
 
     def append_mapping_set_audit_log(self, entry: MappingSetAuditEntry | dict[str, object]) -> MappingSetAuditEntry:
         payload_entry = entry if isinstance(entry, MappingSetAuditEntry) else MappingSetAuditEntry.model_validate(entry)

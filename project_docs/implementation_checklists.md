@@ -14,12 +14,12 @@ Završeni slice-ovi su u `completed_slices.md`.
 
 ### Epic 6: Governance and Versioning MVP
 
-Status: active.
+Status: MVP completed on 2026-05-09.
 
 - [x] Proširiti model mapping seta sa `owner` / `assignee` poljima na nivou celog mapping seta.
 - [x] Dodati `review_note` ili `comment` na nivou mapping set verzije.
 - [x] Zadržati i učiniti eksplicitnim status workflow: `draft`, `review`, `approved`, `archived`.
-- [ ] Dodati backend pravilo da export/run akcije mogu da koriste samo `approved` mapping set ili da eksplicitno prijave blokadu.
+- [x] Dodati backend pravilo da export/run akcije mogu da koriste samo `approved` mapping set ili da eksplicitno prijave blokadu.
 - [x] Dodati audit zapis za kreiranje verzije, promenu statusa i primenu sačuvane verzije.
 - [x] Dodati jednostavan diff između dve verzije mapping seta: added, removed, changed source-target-status-transformation odluke.
 - [x] Prikazati diff i audit u Streamlit UI bez menjanja osnovnog review toka.
@@ -122,7 +122,7 @@ Validation note:
 
 ### Epic 14E: Canonical Gap Assistant
 
-Status: initial MVP implemented; pending real UI/LLM validation and candidate enrichment.
+Status: initial MVP implemented; automated material-master suggest/approve/rerun validation completed, pending live UI/LLM validation and candidate enrichment.
 
 Problem koji rešava:
 
@@ -140,7 +140,7 @@ MVP scope:
 - [x] LLM output treba da podrži tri ishoda: `existing_concept_alias`, `new_canonical_concept`, `no_action`.
 - [x] LLM ne sme direktno da menja base glossary; rezultat ide u review queue.
 - [x] Dodati Streamlit UI panel za `Canonical Gap Suggestions` u Review toku.
-- [ ] Mirror-ovati/premestiti queue u buduću Canonical Console/Admin toku.
+- [x] Mirror-ovati read-only queue u Canonical Console/Admin toku.
 - [x] Omogućiti approve predloga i upis approved stavki u overlay/canonical alias sloj.
 - [ ] Dodati eksplicitan reject/ignore state za predloge, pored `no_action` i neodobravanja.
 - [x] Posle approve akcije prikazati jasan re-run mapping hint da korisnik vidi popunjen `canonical_path`.
@@ -177,6 +177,7 @@ Implementacioni checklist po fajlovima:
   - [x] Testirati extraction za slučaj `NTGEW -> net_weight` bez shared canonical concept-a.
   - [ ] Testirati da LLM suggestion ne prihvata hallucinated target/source.
   - [x] Testirati approve flow koji upisuje concept alias u overlay i refresh-uje canonical matcher.
+  - [x] Testirati endpoint-level material master tok: `mapping/auto -> candidates -> suggest -> approve -> rerun mapping` sa popunjenim shared canonical concept-om.
   - [ ] Dodati browser/UI smoke test za Review panel kada dev server bude stabilno pokrenut.
 
 MVP nije:
@@ -187,7 +188,7 @@ MVP nije:
 
 ### Epic 14F: Canonical Concept Management Console
 
-Status: proposed next slice after 14E validation.
+Status: top-level console tab with overlay summary, governance authoring UI, console-side approve, and persisted reject/ignore audit flow started on 2026-05-10.
 
 Cilj:
 
@@ -196,12 +197,16 @@ Cilj:
 
 MVP scope:
 
-- [ ] Dodati `Canonical Console` kao zaseban Streamlit tab ili jasno odvojenu Admin subsection.
-- [ ] Dodati backend read endpoint za concept registry: concept id, entity, attribute, display name, data type, aliases, source `base/overlay`, usage count ako postoji.
-- [ ] Dodati concept detail endpoint/panel: aliases, overlay entries, field contexts, linked mapping sets/catalog integrations, audit entries.
-- [ ] Premestiti ili mirror-ovati `Canonical Gap Suggestions` queue iz Review taba u Canonical Console.
+- [x] Dodati `Canonical Console` kao zaseban Streamlit tab ili jasno odvojenu Admin subsection.
+- [x] Dodati backend read endpoint za concept registry: concept id, entity, attribute, display name, data type, aliases, source `base/overlay`, usage count ako postoji.
+- [x] Dodati concept detail endpoint/panel: aliases, overlay entries, field contexts, linked mapping sets/catalog integrations, audit entries.
+- [x] Premestiti ili mirror-ovati read-only `Canonical Gap Suggestions` queue iz Review taba u Canonical Console.
 - [ ] Omogućiti approve/reject iz konzole uz postojeći overlay-first persist pristup.
-- [ ] Prikazati aktivni overlay status i entry breakdown uz concept-centric filter.
+  - [x] Approve iz konzole nad postojećim cached suggestion-om.
+  - [x] Session-scoped ignore/restore iz konzole.
+  - [x] Persisted reject audit iz konzole.
+  - [x] Persisted ignore audit iz konzole.
+- [x] Prikazati aktivni overlay status i entry breakdown uz concept-centric filter.
 - [ ] Dodati search/filter po concept id-u, display name-u, aliasu, domain/entity i source system-u.
 - [ ] Dodati lightweight impact preview: pre approve-a prikazati koje trenutne mapping/gap redove bi novi alias ili concept mogao da popravi.
 
@@ -216,24 +221,35 @@ Governance pravila:
 Implementacioni checklist po fajlovima:
 
 - `backend/app/models/knowledge.py`
-  - [ ] Dodati response modele za concept registry row, concept detail i concept usage summary.
+  - [x] Dodati response modele za concept registry row, concept detail i concept usage summary.
 - `backend/app/services/metadata_knowledge_service.py`
   - [ ] Dodati read helper koji vraća canonical concepts sa aliasima i overlay/source informacijom.
   - [ ] Dodati helper za concept detail i alias lookup.
 - `backend/app/services/persistence_service.py`
-  - [ ] Iskoristiti postojeće mapping catalog i knowledge audit tabele za usage/audit prikaz.
+  - [x] Iskoristiti postojeće mapping catalog i knowledge audit tabele za usage/audit prikaz.
   - [ ] Ne uvoditi novi write model dok overlay-first approve tok ne pokaže gde su stvarne rupe.
 - `backend/app/api/routes/knowledge.py`
-  - [ ] Dodati `GET /knowledge/canonical-concepts` i `GET /knowledge/canonical-concepts/{concept_id}`.
+  - [x] Dodati `GET /knowledge/canonical-concepts` i `GET /knowledge/canonical-concepts/{concept_id}`.
   - [ ] Dodati opcioni query/filter parametar za alias/domain/source/system.
 - `streamlit_ui/admin_views.py` ili novi `streamlit_ui/canonical_console_views.py`
-  - [ ] Izvući canonical glossary i overlay UI iz debug osećaja u product-style console.
-  - [ ] Prikazati concept registry tabelu, detail panel i gap review queue.
-  - [ ] Dodati approve/reject akcije iz iste konzole.
+  - [x] Izvući canonical console u zaseban top-level product-style tab.
+  - [x] Izvući canonical glossary i overlay management UI iz debug osećaja u isti product-style console.
+  - [x] Prikazati concept registry tabelu i detail panel.
+  - [x] Prikazati read-only gap review queue mirror.
+  - [x] Dodati approve akciju iz iste konzole.
+  - [x] Dodati session-scoped ignore/restore akciju iz iste konzole.
+  - [x] Dodati persisted reject akciju iz iste konzole.
+  - [x] Dodati persisted ignore akciju iz iste konzole.
+  - [x] Prikazati gap-specific audit reference direktno u queue detail prikazu.
+  - [x] Dodati overlay summary metrics i concept focus filter direktno u konzolu.
 - `backend/tests/*` i `tests/*`
-  - [ ] Testirati registry endpoint sa base concept-ima i active overlay aliasima.
+  - [x] Testirati registry endpoint sa base concept-ima i active overlay aliasima.
   - [ ] Testirati concept detail za overlay-only concept nastao iz Canonical Gap Assistant-a.
-  - [ ] Testirati da console read endpoint ne menja runtime state.
+  - [x] Testirati da console read endpoint ne menja runtime state.
+  - [x] Testirati UI helper-e za concept registry filter i registry row prikaz.
+  - [x] Testirati approve-ready helper i console approval payload builder.
+  - [x] Testirati console ignore/restore state helper-e i queue row state prikaz.
+  - [x] Testirati canonical gap reject audit endpoint i console reject request helper.
 
 MVP nije:
 

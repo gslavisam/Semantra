@@ -16,6 +16,14 @@ CATALOG_DETAIL_STATE_KEYS = (
 )
 
 
+def _mapping_set_reuse_block_reason(status: str | None) -> str:
+    normalized_status = str(status or "").strip().lower()
+    if normalized_status == "approved":
+        return ""
+    current_status = normalized_status or "draft"
+    return f"Only approved mapping set versions can be reused in Workspace. Current status: {current_status}."
+
+
 def _clear_catalog_mapping_set_context() -> None:
     for key in (
         "catalog_selected_mapping_set_detail",
@@ -460,6 +468,7 @@ def render_catalog_tab(
             key="catalog_selected_version_label",
         )
         selected_version = version_records[version_labels.index(selected_version_label)]
+        reuse_block_reason = _mapping_set_reuse_block_reason(selected_version.get("status"))
         drilldown_actions = st.columns(4)
         if drilldown_actions[0].button("Open selected version", width="stretch", key="catalog_open_selected_version"):
             try:
@@ -485,6 +494,7 @@ def render_catalog_tab(
             "Reuse in Workspace",
             width="stretch",
             key="catalog_reuse_selected_version",
+            disabled=bool(reuse_block_reason),
         ):
             try:
                 _reuse_catalog_mapping_set_in_workspace(selected_version["mapping_set_id"], api_request=api_request)
@@ -495,6 +505,8 @@ def render_catalog_tab(
                     "message": f"Reusing mapping set in workspace failed: {error}",
                 }
                 st.rerun()
+        if reuse_block_reason:
+            st.caption(reuse_block_reason)
         if drilldown_actions[3].button(
             "Open approved version",
             width="stretch",

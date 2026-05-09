@@ -389,6 +389,8 @@ Endpoints:
 - `POST /knowledge/overlays/{overlay_id}/archive`
 - `POST /knowledge/overlays/rollback`
 - `GET /knowledge/audit`
+- `GET /knowledge/canonical-concepts`
+- `GET /knowledge/canonical-concepts/{concept_id}`
 - `GET /knowledge/canonical-glossary/export`
 - `POST /knowledge/canonical-glossary/import`
 - `POST /knowledge/reload`

@@ -10,7 +10,8 @@ KnowledgeOverlayEntryType = Literal["abbreviation", "synonym", "field_alias", "c
 KnowledgeOverlayIssueSeverity = Literal["error", "warning"]
 KnowledgeOverlayRowStatus = Literal["valid", "invalid"]
 KnowledgeOverlayMode = Literal["base_only", "overlay_active"]
-KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed"]
+KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore"]
+CanonicalConceptSource = Literal["base", "overlay_only", "base_plus_active_overlay"]
 
 
 class KnowledgeOverlayVersion(BaseModel):
@@ -114,3 +115,62 @@ class KnowledgeAuditEntry(BaseModel):
     action: KnowledgeAuditAction
     message: str
     created_at: str | None = None
+
+
+class CanonicalConceptFieldContext(BaseModel):
+    system: str = ""
+    object_name: str = ""
+    field_name: str = ""
+    category: str = ""
+    object_description: str = ""
+    field_description: str = ""
+    note: str = ""
+
+
+class CanonicalConceptUsageRecord(BaseModel):
+    concept_id: str
+    mapping_set_id: int
+    name: str
+    integration_name: str
+    version: int = 1
+    status: str = "draft"
+    artifact_type: str = "standard"
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    owner: str | None = None
+    created_at: str | None = None
+
+
+class CanonicalConceptOverlayEntry(BaseModel):
+    entry_id: int | None = None
+    overlay_id: int
+    overlay_name: str
+    canonical_term: str
+    alias: str
+    source_system: str | None = None
+    note: str | None = None
+
+
+class CanonicalConceptSummary(BaseModel):
+    concept_id: str
+    entity: str = ""
+    attribute: str = ""
+    display_name: str
+    description: str = ""
+    data_type: str = ""
+    source: CanonicalConceptSource = "base"
+    base_aliases: list[str] = Field(default_factory=list)
+    active_overlay_aliases: list[str] = Field(default_factory=list)
+    alias_count: int = 0
+    field_context_count: int = 0
+    usage_count: int = 0
+    active_overlay_entry_count: int = 0
+
+
+class CanonicalConceptDetailResponse(BaseModel):
+    concept: CanonicalConceptSummary
+    field_contexts: list[CanonicalConceptFieldContext] = Field(default_factory=list)
+    active_overlay_entries: list[CanonicalConceptOverlayEntry] = Field(default_factory=list)
+    integrations: list[CanonicalConceptUsageRecord] = Field(default_factory=list)
+    audit_entries: list[KnowledgeAuditEntry] = Field(default_factory=list)

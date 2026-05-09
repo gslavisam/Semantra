@@ -20,17 +20,19 @@ Canonical semantic layer MVP je isporučen.
 
 Otvoreno ostaje dalji prelaz ka DB-only source-of-truth modelu za canonical i knowledge runtime.
 
-### 2026-05-03: Epic 6 governance MVP initial slice
+### 2026-05-09: Epic 6 governance MVP completed
 
-Isporučen je prvi review/governance slice nad mapping set workflow-om.
+Epic 6 governance MVP je zatvoren kroz status enforcement nad mapping set workflow-om.
 
 - metadata `owner`, `assignee`, `review_note`
 - eksplicitan status workflow
 - audit trail za create/status/apply
 - version diff između mapping set verzija
 - diff i audit prikaz u Streamlit UI
+- backend apply/reuse gate sada dozvoljava samo `approved` mapping set verzije
+- Workspace i Catalog UI eksplicitno blokiraju reuse/apply za neapproved verzije
 
-Otvoren ostaje export/run gate za `approved` mapping setove.
+Epic 6 MVP nema više otvorenih stavki; sledeći produktni fokus prelazi na canonical validation/governance redosled iz `plan.md`.
 
 ### 2026-05-03: Additional hardening slice
 
@@ -84,6 +86,23 @@ Isporučen je prvi praktični 14D slice koji povezuje schema metadata enrichment
 - lokalni browser smoke potvrđen nad canonical Setup tokom: source row-data upload, companion enrichment `3/3`, pa uspešan rerun canonical mapping-a
 
 Svesna odluka ovog slice-a je da description/type još ne ulaze u deterministic scoring. Trenutni `compute_signals()` ostaje nepromenjen dok ne postoji benchmark corpus koji pokazuje da description-aware score fusion poboljšava kvalitet bez regresije nad postojećim knowledge/canonical signalima.
+
+### 2026-05-10: Epic 14F initial Canonical Console product slice
+
+Isporučen je prvi upotrebljiv 14F Canonical Console slice kao zaseban top-level tok, uz fallback poruku u `Admin / Debug`.
+
+- dodat je `Canonical Console` top-level tab sa concept registry search/filter tabelom i detail panelom
+- dodat je active overlay summary sa runtime/version metricama i concept focus filter za overlay-centric pregled
+- canonical glossary import/export i overlay lifecycle authoring UI premešteni su iz `Admin / Debug` u Canonical Console
+- concept detail sada prikazuje aliases, field contexts, active overlay entries, catalog usage i knowledge audit reference
+- `Canonical Gap Suggestions` queue iz Review taba mirror-ovan je u konzolu radi concept-centric pregleda
+- konzola sada ume da approve-uje već generisan cached suggestion preko postojećeg overlay-first backend toka
+- konzola sada ima i session-scoped `ignore/restore` state za gap redove bez menjanja Review tab cached suggestion payload-a
+- konzola sada ume i da persistuje `reject` audit odluku za gap suggestion, uključujući reviewer i note
+- konzola sada ume i da persistuje `ignore` audit odluku i prikazuje vezane gap audit reference direktno u queue detail-u
+- posle approve akcije UI osvežava runtime status, concept registry/detail i overlay listu kada su učitani
+
+Otvoreno ostaje dalje 14F poliranje: širi source-system/domain filter, impact preview pre approve-a, i jači concept-centric overlay/gap stewardship tok.
 
 ## Completed Technical Phases
 

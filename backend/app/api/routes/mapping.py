@@ -232,6 +232,14 @@ async def apply_mapping_set(
         mapping_set = persistence_service.get_mapping_set(mapping_set_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    if mapping_set.status != "approved":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Mapping set #{mapping_set_id} is in status '{mapping_set.status}' and cannot be applied. "
+                "Only approved mapping sets can be used in workspace apply/reuse flows."
+            ),
+        )
     append_mapping_set_audit("apply", mapping_set, changed_by=request.changed_by, note=request.note)
     return mapping_set
 

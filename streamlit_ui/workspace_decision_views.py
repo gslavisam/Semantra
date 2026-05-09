@@ -240,11 +240,18 @@ def render_mapping_io_panel(
         )
         selected_mapping_set = saved_mapping_sets[mapping_set_labels.index(selected_mapping_set_label)]
         selected_mapping_set_id = selected_mapping_set["mapping_set_id"]
+        apply_block_reason = ""
+        if str(selected_mapping_set.get("status") or "").strip().lower() != "approved":
+            apply_block_reason = (
+                "Only approved mapping sets can be applied back into Workspace. "
+                f"Current status: {str(selected_mapping_set.get('status') or 'draft').strip() or 'draft'}."
+            )
         saved_mapping_set_actions = st.columns([2, 2])
         if saved_mapping_set_actions[0].button(
             "Apply saved mapping set",
             width="stretch",
             key="apply_saved_mapping_set",
+            disabled=bool(apply_block_reason),
         ):
             try:
                 mapping_set_detail = api_request(
@@ -276,6 +283,8 @@ def render_mapping_io_panel(
                     "message": f"Applying saved mapping set failed: {error}",
                 }
                 st.rerun()
+        if apply_block_reason:
+            st.caption(apply_block_reason)
 
         target_status = saved_mapping_set_actions[1].selectbox(
             "Saved mapping set status",

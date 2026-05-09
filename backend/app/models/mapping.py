@@ -168,6 +168,7 @@ class MappingJobStatusResponse(BaseModel):
 
 
 CanonicalGapSuggestionAction = Literal["existing_concept_alias", "new_canonical_concept", "no_action"]
+CanonicalGapDisposition = Literal["ignored", "rejected"]
 
 
 class CanonicalGapCandidate(BaseModel):
@@ -219,6 +220,14 @@ class CanonicalGapApproveResponse(BaseModel):
     overlay_name: str
     saved_entry_count: int = 0
     activated: bool = True
+
+
+class CanonicalGapRejectRequest(BaseModel):
+    candidate: CanonicalGapCandidate
+    suggestion: CanonicalGapSuggestion | None = None
+    disposition: CanonicalGapDisposition = "rejected"
+    rejected_by: str | None = None
+    note: str | None = None
 
 
 class DecisionLogEntry(BaseModel):

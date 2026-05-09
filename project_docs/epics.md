@@ -82,7 +82,7 @@ Referenca: detalji isporučenog MVP slice-a su u `completed_slices.md`.
 
 ### Epic 6: Governance and Versioning
 
-Status: active since 2026-05-03.
+Status: MVP completed on 2026-05-09.
 
 Cilj: mapping rezultat postane reviewable i kontrolisan.
 
@@ -248,7 +248,7 @@ Napomena:
 
 #### Epic 14A: Target vector cache
 
-Status: proposed.
+Status: backend and initial UI read slice started on 2026-05-09.
 
 Cilj: precomputed target embedding cache za brži similarity signal.
 
@@ -282,7 +282,7 @@ Referenca: detaljna MVP i fajl-level checklist su u `implementation_checklists.m
 
 #### Epic 14E: Canonical Gap Assistant
 
-Status: initial MVP implemented on 2026-05-09; pending real UI/LLM validation.
+Status: initial MVP implemented on 2026-05-09; automated material-master validation completed, pending live UI/LLM validation.
 
 Cilj: pretvoriti prazne ili slabe `canonical_path` rezultate u kontrolisane predloge za canonical glossary/overlay rad, uz LLM kao assistant-a i human approval kao gate.
 
@@ -305,7 +305,7 @@ Referenca: detaljna MVP checklista je u `implementation_checklists.md`.
 
 #### Epic 14F: Canonical Concept Management Console
 
-Status: proposed.
+Status: active, top-level Canonical Console tab with overlay summary, governance authoring UI, and persisted reject/ignore audit delivered on 2026-05-10.
 
 Cilj: pretvoriti Canonical Gap Assistant i postojeći Knowledge/Admin ekran u glavnu konzolu za upravljanje canonical konceptima, aliasima i governance odlukama. Ovo je ključni sloj za Enterprise Architecture, MDM i buduće integracije, jer canonical model postaje kontrolisani poslovni asset, ne samo pomoćni lookup fajl.
 
@@ -336,8 +336,35 @@ Prvi praktični slice:
 - izdvojiti `Canonical Console` kao zaseban Streamlit tab ili Admin subsection
 - prikazati concept registry iz runtime canonical glossary-ja
 - prikazati active overlay entries po concept-u
-- prikazati canonical gap suggestions kao review queue
+- prikazati canonical gap suggestions kao read-only review queue mirror
 - omogućiti approve/reject i audit iz iste konzole, uz postojeći overlay-first persist pristup
+
+Trenutno isporučeno:
+
+- `Canonical Console` kao zaseban top-level Streamlit tab, uz informativni fallback u `Admin / Debug`
+- active overlay summary metrics i concept focus filter direktno u konzoli
+- canonical glossary import/export i overlay lifecycle authoring UI premešteni iz `Admin / Debug` u konzolu
+- concept registry search/filter, tabela i detail panel
+- active overlay entries, field contexts, catalog usage i audit references po concept-u
+- read-only mirror `Canonical Gap Suggestions` queue-a iz Review taba, uključujući suggestion status, concept proposal i reasoning/risk detalje
+- approve akcija iz konzole za već generisane cached suggestion-e, uz refresh runtime/concept state-a
+- session-scoped `ignore/restore` stanje u konzoli za gap queue, bez brisanja Review tab suggestion state-a
+- persisted `reject` audit tok iz konzole preko `knowledge_audit_logs`, sa reviewer/note tragom
+- persisted `ignore` audit tok iz konzole preko `knowledge_audit_logs`, uz direktan gap audit reference prikaz u queue detail-u
+
+Trenutno isporučeno u prvom backend read slice-u:
+
+- `GET /knowledge/canonical-concepts`
+- `GET /knowledge/canonical-concepts/{concept_id}`
+- payload spaja base canonical glossary, active overlay aliases, field contexts, catalog usage count i knowledge audit reference gde postoji aktivni overlay
+- fokusirani backend smoke test potvrđuje registry/detail read bez promene runtime state-a
+
+Trenutno isporučeno u početnom UI read slice-u:
+
+- `Canonical Console` read-only subsection u `Admin / Debug` tabu
+- concept registry tabela sa osnovnim search/filter ponašanjem
+- concept detail panel za aliases, field contexts, active overlay entries, catalog usage i audit references
+- fokusirani Streamlit helper testovi potvrđuju filter i registry row prikaz
 
 ### Epic 15: Graph Projection, Lineage and Reuse Analysis
 

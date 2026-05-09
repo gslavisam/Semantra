@@ -109,14 +109,13 @@ Cilj: meriti trošak po request-u, učiniti module preglednijim i srediti docs/t
 
 Trenutni preporučeni redosled rada:
 
-1. Zatvoriti preostali `Epic 6` export/run gate za `approved` mapping setove.
-2. Validirati `Epic 14E` Canonical Gap Assistant kao praktični beta slice: prazni `canonical_path` i jaki mapping signali postaju LLM-assisted, human-approved predlozi za canonical overlay.
-3. Izdvojiti `Epic 14F` Canonical Concept Management Console kao glavni governance ekran za canonical concepts, aliases, gap queue, overlay status i EA/MDM reuse pregled.
-4. Nastaviti `Epic 13D` discovery i reuse slice nad postojećim katalogom, koristeći iste usage/read modele koje 14F traži.
-5. Ispratiti `Epic 14D` description-aware context i companion schema kao najdirektniji kvalitetni dobitak za mapping odluke.
-6. Posle stabilnog context sloja razmotriti `Epic 12B` system-specific virtual target-e tamo gde metadata kvalitet to opravdava.
-7. `Epic 15` graph projection uvoditi kao derived sloj posle sazrevanja canonical, catalog i description-aware context rada.
-8. Faze 3-6 koristiti kao ciljane tehničke talase, ne kao blokadu za svaki novi feature.
+1. Validirati `Epic 14E` Canonical Gap Assistant kao praktični beta slice: prazni `canonical_path` i jaki mapping signali postaju LLM-assisted, human-approved predlozi za canonical overlay.
+2. Izdvojiti `Epic 14F` Canonical Concept Management Console kao glavni governance ekran za canonical concepts, aliases, gap queue, overlay status i EA/MDM reuse pregled.
+3. Nastaviti `Epic 13D` discovery i reuse slice nad postojećim katalogom, koristeći iste usage/read modele koje 14F traži.
+4. Ispratiti `Epic 14D` description-aware context i companion schema kao najdirektniji kvalitetni dobitak za mapping odluke.
+5. Posle stabilnog context sloja razmotriti `Epic 12B` system-specific virtual target-e tamo gde metadata kvalitet to opravdava.
+6. `Epic 15` graph projection uvoditi kao derived sloj posle sazrevanja canonical, catalog i description-aware context rada.
+7. Faze 3-6 koristiti kao ciljane tehničke talase, ne kao blokadu za svaki novi feature.
 
 Detaljna release i MVP checklista je u `implementation_checklists.md`.
 

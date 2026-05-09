@@ -6,8 +6,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 
 from app.api.deps import require_admin
 from app.models.knowledge import (
+    CanonicalConceptDetailResponse,
+    CanonicalConceptFieldContext,
+    CanonicalConceptOverlayEntry,
+    CanonicalConceptSummary,
+    CanonicalConceptUsageRecord,
     CanonicalGlossaryImportResponse,
     KnowledgeAuditEntry,
+    KnowledgeOverlayEntry,
     KnowledgeOverlayCreateResponse,
     KnowledgeOverlayVersion,
     KnowledgeOverlayVersionEntriesResponse,
@@ -20,6 +26,7 @@ from app.models.mapping import (
     CanonicalGapApproveResponse,
     CanonicalGapCandidatesRequest,
     CanonicalGapCandidatesResponse,
+    CanonicalGapRejectRequest,
     CanonicalGapSuggestion,
     CanonicalGapSuggestionRequest,
 )
@@ -67,6 +74,128 @@ def build_runtime_status() -> KnowledgeRuntimeStatus:
         entry_type_counts=entry_type_counts,
         concept_count=metadata_knowledge_service.concept_count,
         canonical_concept_count=metadata_knowledge_service.canonical_concept_count,
+    )
+
+
+def _active_canonical_overlay_entries() -> tuple[KnowledgeOverlayVersion | None, dict[str, list[KnowledgeOverlayEntry]]]:
+    active_version = persistence_service.get_active_knowledge_overlay_version()
+    if active_version is None or active_version.overlay_id is None:
+        return None, {}
+
+    grouped: dict[str, list[KnowledgeOverlayEntry]] = {}
+    for entry in persistence_service.get_knowledge_overlay_entries(active_version.overlay_id):
+        if entry.entry_type != "concept_alias" or not entry.canonical_concept_id:
+            continue
+        grouped.setdefault(entry.canonical_concept_id, []).append(entry)
+    return active_version, grouped
+
+
+def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], dict[str, list[CanonicalConceptFieldContext]], KnowledgeOverlayVersion | None, dict[str, list[KnowledgeOverlayEntry]]]:
+    _, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
+    usage_counts = persistence_service.list_catalog_concept_usage_counts()
+    active_overlay_version, overlay_entries_by_concept = _active_canonical_overlay_entries()
+
+    contexts_by_concept: dict[str, list[CanonicalConceptFieldContext]] = {}
+    for context in canonical_context_dicts:
+        contexts_by_concept.setdefault(context["concept_id"], []).append(
+            CanonicalConceptFieldContext(
+                system=context["system"],
+                object_name=context["object_name"],
+                field_name=context["field_name"],
+                category=context["category"],
+                object_description=context["object_description"],
+                field_description=context["field_description"],
+                note=context["note"],
+            )
+        )
+
+    registry: dict[str, CanonicalConceptSummary] = {}
+    for concept in canonical_dicts:
+        concept_id = str(concept["concept_id"])
+        base_aliases = sorted({str(alias) for alias in concept.get("aliases", []) if str(alias).strip()})
+        overlay_entries = overlay_entries_by_concept.get(concept_id, [])
+        overlay_aliases = sorted({entry.alias for entry in overlay_entries if entry.alias.strip()})
+        source = "base_plus_active_overlay" if overlay_aliases else "base"
+        registry[concept_id] = CanonicalConceptSummary(
+            concept_id=concept_id,
+            entity=str(concept.get("entity") or ""),
+            attribute=str(concept.get("attribute") or ""),
+            display_name=str(concept.get("display_name") or concept_id),
+            description=str(concept.get("description") or ""),
+            data_type=str(concept.get("data_type") or ""),
+            source=source,
+            base_aliases=base_aliases,
+            active_overlay_aliases=overlay_aliases,
+            alias_count=len(set(base_aliases) | set(overlay_aliases)),
+            field_context_count=len(contexts_by_concept.get(concept_id, [])),
+            usage_count=usage_counts.get(concept_id, 0),
+            active_overlay_entry_count=len(overlay_entries),
+        )
+
+    for concept_id, overlay_entries in overlay_entries_by_concept.items():
+        if concept_id in registry:
+            continue
+        entity, _, attribute = concept_id.partition(".")
+        overlay_aliases = sorted({entry.alias for entry in overlay_entries if entry.alias.strip()})
+        display_name = next((entry.canonical_term for entry in overlay_entries if entry.canonical_term.strip()), concept_id)
+        registry[concept_id] = CanonicalConceptSummary(
+            concept_id=concept_id,
+            entity=entity,
+            attribute=attribute,
+            display_name=display_name,
+            source="overlay_only",
+            active_overlay_aliases=overlay_aliases,
+            alias_count=len(overlay_aliases),
+            usage_count=usage_counts.get(concept_id, 0),
+            active_overlay_entry_count=len(overlay_entries),
+        )
+
+    return registry, contexts_by_concept, active_overlay_version, overlay_entries_by_concept
+
+
+@router.get("/canonical-concepts", response_model=list[CanonicalConceptSummary], dependencies=[Depends(require_admin)])
+async def list_canonical_concepts() -> list[CanonicalConceptSummary]:
+    registry, _, _, _ = _canonical_concept_registry()
+    return [registry[concept_id] for concept_id in sorted(registry)]
+
+
+@router.get("/canonical-concepts/{concept_id}", response_model=CanonicalConceptDetailResponse, dependencies=[Depends(require_admin)])
+async def get_canonical_concept(concept_id: str) -> CanonicalConceptDetailResponse:
+    registry, contexts_by_concept, active_overlay_version, overlay_entries_by_concept = _canonical_concept_registry()
+    concept = registry.get(concept_id)
+    if concept is None:
+        raise HTTPException(status_code=404, detail=f"Unknown canonical concept: {concept_id}")
+
+    active_overlay_entries = [
+        CanonicalConceptOverlayEntry(
+            entry_id=entry.entry_id,
+            overlay_id=active_overlay_version.overlay_id,
+            overlay_name=active_overlay_version.name,
+            canonical_term=entry.canonical_term,
+            alias=entry.alias,
+            source_system=entry.source_system,
+            note=entry.note,
+        )
+        for entry in overlay_entries_by_concept.get(concept_id, [])
+        if active_overlay_version and active_overlay_version.overlay_id is not None
+    ]
+    audit_entries = []
+    if active_overlay_version and active_overlay_entries:
+        audit_entries = [
+            entry
+            for entry in persistence_service.list_knowledge_audit_logs()
+            if entry.overlay_id == active_overlay_version.overlay_id
+        ]
+
+    return CanonicalConceptDetailResponse(
+        concept=concept,
+        field_contexts=contexts_by_concept.get(concept_id, []),
+        active_overlay_entries=active_overlay_entries,
+        integrations=[
+            CanonicalConceptUsageRecord.model_validate(record.model_dump(mode="json"))
+            for record in persistence_service.list_catalog_concept_usage_records(concept_id)
+        ],
+        audit_entries=audit_entries,
     )
 
 
@@ -244,6 +373,27 @@ async def approve_canonical_gap(request: CanonicalGapApproveRequest) -> Canonica
         f"Approved canonical gap suggestion for {request.candidate.source} -> {request.candidate.target} into overlay '{response.overlay_name}'.",
     )
     return response
+
+
+@router.post("/canonical-gaps/reject", response_model=KnowledgeAuditEntry, dependencies=[Depends(require_admin)])
+async def reject_canonical_gap(request: CanonicalGapRejectRequest) -> KnowledgeAuditEntry:
+    suggestion_action = request.suggestion.action if request.suggestion is not None else "no_suggestion"
+    concept_id = request.suggestion.concept_id if request.suggestion is not None else None
+    note = (request.note or "").strip()
+    actor = (request.rejected_by or "").strip() or "unknown"
+    audit_action = "ignore" if request.disposition == "ignored" else "reject"
+    verb = "Ignored" if request.disposition == "ignored" else "Rejected"
+    message_parts = [
+        f"{verb} canonical gap suggestion for {request.candidate.source} -> {request.candidate.target}.",
+        f"Disposition={request.disposition}.",
+        f"Suggestion action={suggestion_action}.",
+        f"Reviewed by={actor}.",
+    ]
+    if concept_id:
+        message_parts.append(f"Concept={concept_id}.")
+    if note:
+        message_parts.append(f"Note={note}.")
+    return append_audit_entry(audit_action, " ".join(message_parts))
 
 
 @router.post("/reload", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])
