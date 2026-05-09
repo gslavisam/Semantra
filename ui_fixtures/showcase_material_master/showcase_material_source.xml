@@ -1,0 +1,72 @@
+<records>
+  <record>
+    <MATNR>MAT-100001</MATNR>
+    <BISMT>LEG-PUMP-A100</BISMT>
+    <MTART>FERT</MTART>
+    <MATKL>FG01</MATKL>
+    <MAKTX>Industrial Pump A100</MAKTX>
+    <MEINS>EA</MEINS>
+    <BRGEW>12.500</BRGEW>
+    <NTGEW>12.100</NTGEW>
+    <GEWEI>KG</GEWEI>
+    <ERSDA>2023-01-10</ERSDA>
+    <XCHPF>X</XCHPF>
+    <LVORM></LVORM>
+  </record>
+  <record>
+    <MATNR>MAT-100002</MATNR>
+    <BISMT>LEG-VALVE-V20</BISMT>
+    <MTART>HALB</MTART>
+    <MATKL>RM10</MATKL>
+    <MAKTX>Control Valve V20</MAKTX>
+    <MEINS>EA</MEINS>
+    <BRGEW>4.200</BRGEW>
+    <NTGEW>4.000</NTGEW>
+    <GEWEI>KG</GEWEI>
+    <ERSDA>2022-09-18</ERSDA>
+    <XCHPF></XCHPF>
+    <LVORM></LVORM>
+  </record>
+  <record>
+    <MATNR>MAT-100003</MATNR>
+    <BISMT>LEG-SEAL-S55</BISMT>
+    <MTART>ROH</MTART>
+    <MATKL>RM20</MATKL>
+    <MAKTX>Seal Kit S55</MAKTX>
+    <MEINS>SET</MEINS>
+    <BRGEW>0.800</BRGEW>
+    <NTGEW>0.760</NTGEW>
+    <GEWEI>KG</GEWEI>
+    <ERSDA>2024-02-07</ERSDA>
+    <XCHPF>X</XCHPF>
+    <LVORM></LVORM>
+  </record>
+  <record>
+    <MATNR>MAT-100004</MATNR>
+    <BISMT>LEG-MOTOR-M7</BISMT>
+    <MTART>FERT</MTART>
+    <MATKL>FG02</MATKL>
+    <MAKTX>Servo Motor M7</MAKTX>
+    <MEINS>EA</MEINS>
+    <BRGEW>18.900</BRGEW>
+    <NTGEW>18.300</NTGEW>
+    <GEWEI>KG</GEWEI>
+    <ERSDA>2021-06-25</ERSDA>
+    <XCHPF></XCHPF>
+    <LVORM></LVORM>
+  </record>
+  <record>
+    <MATNR>MAT-100005</MATNR>
+    <BISMT>LEG-CABLE-C90</BISMT>
+    <MTART>HAWA</MTART>
+    <MATKL>PK01</MATKL>
+    <MAKTX>Power Cable C90</MAKTX>
+    <MEINS>M</MEINS>
+    <BRGEW>6.100</BRGEW>
+    <NTGEW>5.950</NTGEW>
+    <GEWEI>KG</GEWEI>
+    <ERSDA>2020-11-03</ERSDA>
+    <XCHPF></XCHPF>
+    <LVORM>X</LVORM>
+  </record>
+</records>

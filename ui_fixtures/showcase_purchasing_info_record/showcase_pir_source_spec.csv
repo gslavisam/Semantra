@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+INFNR,SAP purchasing info record number,VARCHAR,20
+LIFNR,SAP supplier number linked to the info record,VARCHAR,20
+MATNR,SAP material number linked to the info record,VARCHAR,40
+EKORG,Purchasing organization code,VARCHAR,10
+WERKS,Plant code,VARCHAR,10
+ESOKZ,Info record category code,VARCHAR,5
+NETPR,Net price from the purchasing info record,DECIMAL(14,2),
+WAERS,Currency code,VARCHAR,5
+PEINH,Price unit quantity,DECIMAL(14,2),
+MINBM,Minimum order quantity,DECIMAL(14,2),
+APLFZ,Planned delivery time in days,INTEGER,
+INCO1,Incoterms code,VARCHAR,10
+INCO2,Incoterms location,VARCHAR,80
+BPRME,Order price unit or order unit code,VARCHAR,10

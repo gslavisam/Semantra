@@ -1,0 +1,82 @@
+<records>
+  <record>
+    <KUNNR>0000200001</KUNNR>
+    <NAME1>Acme Retail DE</NAME1>
+    <VKORG>1000</VKORG>
+    <VTWEG>10</VTWEG>
+    <SPART>00</SPART>
+    <KDGRP>01</KDGRP>
+    <BZIRK>BER</BZIRK>
+    <VSBED>01</VSBED>
+    <INCO1>CIP</INCO1>
+    <INCO2>Berlin</INCO2>
+    <WAERS>EUR</WAERS>
+    <ZTERM>0001</ZTERM>
+    <KALKS>1</KALKS>
+    <PLTYP>A1</PLTYP>
+  </record>
+  <record>
+    <KUNNR>0000200002</KUNNR>
+    <NAME1>Contoso Wholesale UK</NAME1>
+    <VKORG>2000</VKORG>
+    <VTWEG>20</VTWEG>
+    <SPART>01</SPART>
+    <KDGRP>02</KDGRP>
+    <BZIRK>LON</BZIRK>
+    <VSBED>02</VSBED>
+    <INCO1>DAP</INCO1>
+    <INCO2>London</INCO2>
+    <WAERS>GBP</WAERS>
+    <ZTERM>0002</ZTERM>
+    <KALKS>1</KALKS>
+    <PLTYP>B1</PLTYP>
+  </record>
+  <record>
+    <KUNNR>0000200003</KUNNR>
+    <NAME1>Northwind Pharma FR</NAME1>
+    <VKORG>1000</VKORG>
+    <VTWEG>30</VTWEG>
+    <SPART>02</SPART>
+    <KDGRP>03</KDGRP>
+    <BZIRK>PAR</BZIRK>
+    <VSBED>03</VSBED>
+    <INCO1>FCA</INCO1>
+    <INCO2>Paris</INCO2>
+    <WAERS>EUR</WAERS>
+    <ZTERM>0003</ZTERM>
+    <KALKS>2</KALKS>
+    <PLTYP>A2</PLTYP>
+  </record>
+  <record>
+    <KUNNR>0000200004</KUNNR>
+    <NAME1>Fabrikam Services US</NAME1>
+    <VKORG>3000</VKORG>
+    <VTWEG>10</VTWEG>
+    <SPART>00</SPART>
+    <KDGRP>04</KDGRP>
+    <BZIRK>NYC</BZIRK>
+    <VSBED>01</VSBED>
+    <INCO1>EXW</INCO1>
+    <INCO2>New York</INCO2>
+    <WAERS>USD</WAERS>
+    <ZTERM>0004</ZTERM>
+    <KALKS>1</KALKS>
+    <PLTYP>C1</PLTYP>
+  </record>
+  <record>
+    <KUNNR>0000200005</KUNNR>
+    <NAME1>Adventure Works RS</NAME1>
+    <VKORG>4000</VKORG>
+    <VTWEG>40</VTWEG>
+    <SPART>03</SPART>
+    <KDGRP>05</KDGRP>
+    <BZIRK>BEG</BZIRK>
+    <VSBED>04</VSBED>
+    <INCO1>DPU</INCO1>
+    <INCO2>Beograd</INCO2>
+    <WAERS>EUR</WAERS>
+    <ZTERM>0001</ZTERM>
+    <KALKS>2</KALKS>
+    <PLTYP>B2</PLTYP>
+  </record>
+</records>

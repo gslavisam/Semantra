@@ -1,0 +1,9 @@
+Column,Description,Type,Length
+legacy_customer_code,Stable legacy identifier for the customer account,VARCHAR,32
+purchaser,Customer or buyer company display name,VARCHAR,120
+primary_contact_email,Primary business email for the customer account,VARCHAR,255
+main_phone,Primary contact phone number including country prefix,VARCHAR,32
+billing_country,Two-letter billing country code,CHAR,2
+go_live_date,Date the customer relationship went live,DATE,
+segment_label,Business segment classification such as Enterprise or SMB,VARCHAR,40
+annual_spend_usd,Annual spend tracked in USD,DECIMAL(14,2),

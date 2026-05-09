@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+supplier_id,Canonical supplier identifier used by the target platform,VARCHAR,20
+supplier_group_id,Normalized supplier group or account group,VARCHAR,10
+supplier_name,Normalized supplier display name,VARCHAR,120
+country_code,Country code for the supplier,VARCHAR,5
+region_code,Region or state code,VARCHAR,10
+city_name,Supplier city,VARCHAR,80
+postal_code,Supplier postal code,VARCHAR,20
+street_address,Supplier street address,VARCHAR,120
+tax_id_number,Supplier tax identifier,VARCHAR,20
+payment_terms_id,Payment terms identifier,VARCHAR,10
+reconciliation_account,General ledger reconciliation account,VARCHAR,20
+posting_block_flag,Indicator that postings to the supplier are blocked,BOOLEAN,
+deletion_mark,Indicator that the supplier is flagged for deletion,BOOLEAN,
+phone_number,Primary supplier phone number,VARCHAR,40

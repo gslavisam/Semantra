@@ -1,0 +1,6 @@
+customer_id,customer_name,sales_organization_id,distribution_channel_id,division_id,customer_group_id,sales_district_id,shipping_condition_code,incoterm_code,incoterm_location,document_currency_code,payment_terms_id,customer_pricing_procedure_code,price_list_type_id
+0000200001,Acme Retail DE,1000,10,00,01,BER,01,CIP,Berlin,EUR,0001,1,A1
+0000200002,Contoso Wholesale UK,2000,20,01,02,LON,02,DAP,London,GBP,0002,1,B1
+0000200003,Northwind Pharma FR,1000,30,02,03,PAR,03,FCA,Paris,EUR,0003,2,A2
+0000200004,Fabrikam Services US,3000,10,00,04,NYC,01,EXW,New York,USD,0004,1,C1
+0000200005,Adventure Works RS,4000,40,03,05,BEG,04,DPU,Beograd,EUR,0001,2,B2

@@ -82,7 +82,7 @@ def detect_patterns(non_null: list[Any]) -> list[str]:
         lowered = value.lower()
         if EMAIL_RE.match(lowered):
             pattern_hits["email"] += 1
-        if PHONE_RE.match(value):
+        if not is_date_like(value) and PHONE_RE.match(value):
             pattern_hits["phone"] += 1
         if UUID_RE.match(lowered):
             pattern_hits["uuid"] += 1

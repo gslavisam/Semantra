@@ -1,0 +1,52 @@
+[
+  {
+    "account_id": "CUST-1001",
+    "customer_name": "Acme North",
+    "email_address": "ops@acmenorth.example",
+    "phone_number": "+381641112223",
+    "country_iso": "RS",
+    "created_date": "2023-01-15",
+    "customer_segment": "Enterprise",
+    "annual_revenue_usd": 125000.50
+  },
+  {
+    "account_id": "CUST-1002",
+    "customer_name": "Contoso Trade",
+    "email_address": "hello@contosotrade.example",
+    "phone_number": "+385981234567",
+    "country_iso": "HR",
+    "created_date": "2022-11-02",
+    "customer_segment": "SMB",
+    "annual_revenue_usd": 45200.00
+  },
+  {
+    "account_id": "CUST-1003",
+    "customer_name": "Fabrikam Retail",
+    "email_address": "contact@fabrikam-retail.example",
+    "phone_number": "+38761123456",
+    "country_iso": "BA",
+    "created_date": "2024-03-21",
+    "customer_segment": "Mid-Market",
+    "annual_revenue_usd": 78340.99
+  },
+  {
+    "account_id": "CUST-1004",
+    "customer_name": "Northwind Stores",
+    "email_address": "buyer@northwind.example",
+    "phone_number": "+421905778899",
+    "country_iso": "SK",
+    "created_date": "2021-07-30",
+    "customer_segment": "Enterprise",
+    "annual_revenue_usd": 210450.00
+  },
+  {
+    "account_id": "CUST-1005",
+    "customer_name": "Adventure Works",
+    "email_address": "sales@adventure-works.example",
+    "phone_number": "+420777888999",
+    "country_iso": "CZ",
+    "created_date": "2020-05-12",
+    "customer_segment": "Channel",
+    "annual_revenue_usd": 99870.25
+  }
+]

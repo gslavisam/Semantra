@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+purchasing_info_record_id,Canonical purchasing info record identifier,VARCHAR,20
+supplier_id,Canonical supplier identifier,VARCHAR,20
+material_id,Canonical material identifier,VARCHAR,40
+purchasing_organization_id,Canonical purchasing organization identifier,VARCHAR,10
+plant_id,Canonical plant identifier,VARCHAR,10
+info_category_code,Normalized info record category code,VARCHAR,5
+net_price_amount,Normalized net price amount,DECIMAL(14,2),
+currency_code,Currency code,VARCHAR,5
+price_unit_quantity,Price unit quantity,DECIMAL(14,2),
+minimum_order_quantity,Minimum order quantity,DECIMAL(14,2),
+planned_delivery_days,Planned delivery lead time in days,INTEGER,
+incoterm_code,Incoterms code,VARCHAR,10
+incoterm_location,Incoterms location,VARCHAR,80
+order_unit_code,Order unit code,VARCHAR,10

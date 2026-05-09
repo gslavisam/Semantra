@@ -1,0 +1,52 @@
+<records>
+  <record>
+    <legacy_customer_code>CUST-1001</legacy_customer_code>
+    <purchaser>Acme North</purchaser>
+    <primary_contact_email>ops@acmenorth.example</primary_contact_email>
+    <main_phone>+381641112223</main_phone>
+    <billing_country>RS</billing_country>
+    <go_live_date>2023-01-15</go_live_date>
+    <segment_label>Enterprise</segment_label>
+    <annual_spend_usd>125000.50</annual_spend_usd>
+  </record>
+  <record>
+    <legacy_customer_code>CUST-1002</legacy_customer_code>
+    <purchaser>Contoso Trade</purchaser>
+    <primary_contact_email>hello@contosotrade.example</primary_contact_email>
+    <main_phone>+385981234567</main_phone>
+    <billing_country>HR</billing_country>
+    <go_live_date>2022-11-02</go_live_date>
+    <segment_label>SMB</segment_label>
+    <annual_spend_usd>45200.00</annual_spend_usd>
+  </record>
+  <record>
+    <legacy_customer_code>CUST-1003</legacy_customer_code>
+    <purchaser>Fabrikam Retail</purchaser>
+    <primary_contact_email>contact@fabrikam-retail.example</primary_contact_email>
+    <main_phone>+38761123456</main_phone>
+    <billing_country>BA</billing_country>
+    <go_live_date>2024-03-21</go_live_date>
+    <segment_label>Mid-Market</segment_label>
+    <annual_spend_usd>78340.99</annual_spend_usd>
+  </record>
+  <record>
+    <legacy_customer_code>CUST-1004</legacy_customer_code>
+    <purchaser>Northwind Stores</purchaser>
+    <primary_contact_email>buyer@northwind.example</primary_contact_email>
+    <main_phone>+421905778899</main_phone>
+    <billing_country>SK</billing_country>
+    <go_live_date>2021-07-30</go_live_date>
+    <segment_label>Enterprise</segment_label>
+    <annual_spend_usd>210450.00</annual_spend_usd>
+  </record>
+  <record>
+    <legacy_customer_code>CUST-1005</legacy_customer_code>
+    <purchaser>Adventure Works</purchaser>
+    <primary_contact_email>sales@adventure-works.example</primary_contact_email>
+    <main_phone>+420777888999</main_phone>
+    <billing_country>CZ</billing_country>
+    <go_live_date>2020-05-12</go_live_date>
+    <segment_label>Channel</segment_label>
+    <annual_spend_usd>99870.25</annual_spend_usd>
+  </record>
+</records>

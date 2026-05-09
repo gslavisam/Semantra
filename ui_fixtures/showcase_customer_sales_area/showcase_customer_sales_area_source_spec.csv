@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+KUNNR,SAP customer number used to identify the sold-to party,VARCHAR,20
+NAME1,Customer name in the general master,VARCHAR,120
+VKORG,Sales organization responsible for the customer sales area,VARCHAR,10
+VTWEG,Distribution channel used for sales processing,VARCHAR,10
+SPART,Division code for the customer sales area,VARCHAR,10
+KDGRP,Customer group code used for segmentation,VARCHAR,10
+BZIRK,Sales district code,VARCHAR,10
+VSBED,Shipping conditions code,VARCHAR,10
+INCO1,Incoterms code,VARCHAR,10
+INCO2,Incoterms location,VARCHAR,80
+WAERS,Document currency code,VARCHAR,5
+ZTERM,Payment terms key,VARCHAR,10
+KALKS,Customer pricing procedure code,VARCHAR,10
+PLTYP,Price list type,VARCHAR,10

@@ -1,3 +1,5 @@
+import pytest
+
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.metadata_knowledge_service import MetadataKnowledgeService, metadata_knowledge_service
@@ -108,6 +110,77 @@ def test_metadata_workbook_links_sap_material_to_workday_item_id() -> None:
     assert any("Context prior:" in line for line in result.mappings[0].explanation)
     assert any("SAP MARA.MATNR" in line for line in result.mappings[0].explanation)
     assert any("Workday Item.Item_ID" in line for line in result.mappings[0].explanation)
+
+
+def test_material_master_matnr_prefers_material_id_over_engineering_part_number() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column("MATNR", ["text"], ["MAT-001", "MAT-002"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("material_id", ["text"], ["MAT-001", "MAT-002"]),
+            make_column("engineering_part_number", ["text"], ["LEG-001", "LEG-002"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    ranked = result.ranked_mappings[0]
+    engineering_candidate = next(candidate for candidate in ranked.candidates if candidate.target == "engineering_part_number")
+
+    assert result.mappings[0].target == "material_id"
+    assert result.mappings[0].signals.knowledge > 0
+    assert ranked.candidates[0].target == "material_id"
+    assert ranked.candidates[0].confidence > engineering_candidate.confidence
+
+
+@pytest.mark.parametrize(
+    ("source_name", "source_patterns", "sample_values", "expected_target", "other_target"),
+    [
+        ("BISMT", ["text"], ["LEG-PUMP-A100", "LEG-VALVE-V20"], "engineering_part_number", "material_id"),
+        ("ERSDA", ["date"], ["2023-01-10", "2022-09-18"], "created_date", "material_id"),
+        ("XCHPF", ["text"], ["X", ""], "batch_managed_flag", "deletion_mark"),
+        ("LVORM", ["text"], ["X", ""], "deletion_mark", "batch_managed_flag"),
+    ],
+)
+def test_material_master_sap_field_aliases_gain_knowledge_or_canonical_support(
+    source_name: str,
+    source_patterns: list[str],
+    sample_values: list[str],
+    expected_target: str,
+    other_target: str,
+) -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[make_column(source_name, source_patterns, sample_values)],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column(expected_target, source_patterns, sample_values),
+            make_column(other_target, ["text"], ["ALT-001", "ALT-002"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    selected = result.mappings[0]
+
+    assert selected.target == expected_target
+    assert selected.signals.knowledge > 0 or selected.signals.canonical > 0
+    assert any(
+        marker in line
+        for marker in ("Internal metadata dictionary aligns", "Canonical glossary aligns both fields")
+        for line in selected.explanation
+    )
 
 
 def test_canonical_only_sap_field_context_survives_cold_start_db_reload() -> None:

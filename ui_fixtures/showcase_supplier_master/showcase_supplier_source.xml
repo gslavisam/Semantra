@@ -1,0 +1,82 @@
+<records>
+  <record>
+    <LIFNR>0000100001</LIFNR>
+    <KTOKK>ZDOM</KTOKK>
+    <NAME1>Alpine Components GmbH</NAME1>
+    <LAND1>DE</LAND1>
+    <REGIO>BW</REGIO>
+    <ORT01>Stuttgart</ORT01>
+    <PSTLZ>70173</PSTLZ>
+    <STRAS>Koenigstrasse 12</STRAS>
+    <STCD1>DE123456789</STCD1>
+    <ZTERM>0001</ZTERM>
+    <AKONT>300000</AKONT>
+    <SPERR></SPERR>
+    <LOEVM></LOEVM>
+    <TELF1>+497111234500</TELF1>
+  </record>
+  <record>
+    <LIFNR>0000100002</LIFNR>
+    <KTOKK>ZINT</KTOKK>
+    <NAME1>Balkan Metals d.o.o.</NAME1>
+    <LAND1>RS</LAND1>
+    <REGIO>00</REGIO>
+    <ORT01>Beograd</ORT01>
+    <PSTLZ>11000</PSTLZ>
+    <STRAS>Bulevar Oslobodjenja 18</STRAS>
+    <STCD1>RS109876543</STCD1>
+    <ZTERM>0002</ZTERM>
+    <AKONT>300100</AKONT>
+    <SPERR></SPERR>
+    <LOEVM></LOEVM>
+    <TELF1>+38111333444</TELF1>
+  </record>
+  <record>
+    <LIFNR>0000100003</LIFNR>
+    <KTOKK>ZSVC</KTOKK>
+    <NAME1>Contoso Industrial Supplies</NAME1>
+    <LAND1>GB</LAND1>
+    <REGIO>LND</REGIO>
+    <ORT01>London</ORT01>
+    <PSTLZ>EC2A4NE</PSTLZ>
+    <STRAS>45 Bishopsgate</STRAS>
+    <STCD1>GB998877665</STCD1>
+    <ZTERM>0003</ZTERM>
+    <AKONT>300200</AKONT>
+    <SPERR>X</SPERR>
+    <LOEVM></LOEVM>
+    <TELF1>+442079460000</TELF1>
+  </record>
+  <record>
+    <LIFNR>0000100004</LIFNR>
+    <KTOKK>ZRAW</KTOKK>
+    <NAME1>Northwind Raw Materials</NAME1>
+    <LAND1>NL</LAND1>
+    <REGIO>NH</REGIO>
+    <ORT01>Amsterdam</ORT01>
+    <PSTLZ>1012AB</PSTLZ>
+    <STRAS>Prinsengracht 250</STRAS>
+    <STCD1>NL556677889</STCD1>
+    <ZTERM>0001</ZTERM>
+    <AKONT>300300</AKONT>
+    <SPERR></SPERR>
+    <LOEVM></LOEVM>
+    <TELF1>+31205550110</TELF1>
+  </record>
+  <record>
+    <LIFNR>0000100005</LIFNR>
+    <KTOKK>ZDOM</KTOKK>
+    <NAME1>Fabrikam Logistics Sp. z o.o.</NAME1>
+    <LAND1>PL</LAND1>
+    <REGIO>MZ</REGIO>
+    <ORT01>Warszawa</ORT01>
+    <PSTLZ>00-001</PSTLZ>
+    <STRAS>Marszalkowska 99</STRAS>
+    <STCD1>PL112233445</STCD1>
+    <ZTERM>0004</ZTERM>
+    <AKONT>300400</AKONT>
+    <SPERR></SPERR>
+    <LOEVM>X</LOEVM>
+    <TELF1>+48221234567</TELF1>
+  </record>
+</records>

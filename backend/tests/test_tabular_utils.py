@@ -35,6 +35,19 @@ def test_build_schema_profile_uses_shared_nullish_logic() -> None:
     assert email_column.non_null_count == 1
 
 
+def test_build_schema_profile_does_not_classify_iso_dates_as_phone_numbers() -> None:
+    profile = build_schema_profile(
+        [{"ERSDA": "2023-01-10"}, {"ERSDA": "2022-09-18"}, {"ERSDA": "2024-02-07"}],
+        dataset_id="source",
+        dataset_name="source.csv",
+    )
+
+    created_date_column = next(column for column in profile.columns if column.name == "ERSDA")
+
+    assert "date" in created_date_column.detected_patterns
+    assert "phone" not in created_date_column.detected_patterns
+
+
 def test_normalize_rows_rejects_empty_headers() -> None:
     with pytest.raises(ValueError, match="Column names must be non-empty"):
         normalize_rows([{"   ": "value"}])

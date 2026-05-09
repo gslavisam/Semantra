@@ -1,0 +1,6 @@
+supplier_id,supplier_group_id,supplier_name,country_code,region_code,city_name,postal_code,street_address,tax_id_number,payment_terms_id,reconciliation_account,posting_block_flag,deletion_mark,phone_number
+0000100001,ZDOM,Alpine Components GmbH,DE,BW,Stuttgart,70173,Koenigstrasse 12,DE123456789,0001,300000,false,false,+497111234500
+0000100002,ZINT,Balkan Metals d.o.o.,RS,00,Beograd,11000,Bulevar Oslobodjenja 18,RS109876543,0002,300100,false,false,+38111333444
+0000100003,ZSVC,Contoso Industrial Supplies,GB,LND,London,EC2A4NE,45 Bishopsgate,GB998877665,0003,300200,true,false,+442079460000
+0000100004,ZRAW,Northwind Raw Materials,NL,NH,Amsterdam,1012AB,Prinsengracht 250,NL556677889,0001,300300,false,false,+31205550110
+0000100005,ZDOM,Fabrikam Logistics Sp. z o.o.,PL,MZ,Warszawa,00-001,Marszalkowska 99,PL112233445,0004,300400,false,true,+48221234567

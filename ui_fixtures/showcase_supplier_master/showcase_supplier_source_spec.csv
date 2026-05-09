@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+LIFNR,SAP supplier or vendor master number,VARCHAR,20
+KTOKK,SAP account group for the supplier master,VARCHAR,10
+NAME1,Primary supplier name,VARCHAR,120
+LAND1,Country code for the supplier address,VARCHAR,5
+REGIO,Region or state code,VARCHAR,10
+ORT01,City name,VARCHAR,80
+PSTLZ,Postal code,VARCHAR,20
+STRAS,Street address line,VARCHAR,120
+STCD1,Primary tax identification number,VARCHAR,20
+ZTERM,Payment terms code,VARCHAR,10
+AKONT,Reconciliation account,VARCHAR,20
+SPERR,Posting block indicator,BOOLEAN,
+LOEVM,Deletion flag indicator,BOOLEAN,
+TELF1,Primary phone number,VARCHAR,40

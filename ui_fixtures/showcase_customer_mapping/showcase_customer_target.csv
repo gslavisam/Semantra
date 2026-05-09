@@ -1,0 +1,6 @@
+account_id,customer_name,email_address,phone_number,country_iso,created_date,customer_segment,annual_revenue_usd
+CUST-1001,Acme North,ops@acmenorth.example,+381641112223,RS,2023-01-15,Enterprise,125000.50
+CUST-1002,Contoso Trade,hello@contosotrade.example,+385981234567,HR,2022-11-02,SMB,45200.00
+CUST-1003,Fabrikam Retail,contact@fabrikam-retail.example,+38761123456,BA,2024-03-21,Mid-Market,78340.99
+CUST-1004,Northwind Stores,buyer@northwind.example,+421905778899,SK,2021-07-30,Enterprise,210450.00
+CUST-1005,Adventure Works,sales@adventure-works.example,+420777888999,CZ,2020-05-12,Channel,99870.25

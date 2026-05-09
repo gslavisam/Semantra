@@ -1,0 +1,72 @@
+[
+  {
+    "material_id": "MAT-100001",
+    "engineering_part_number": "LEG-PUMP-A100",
+    "material_type_code": "FERT",
+    "material_group_id": "FG01",
+    "material_description": "Industrial Pump A100",
+    "base_uom_code": "EA",
+    "gross_weight": 12.5,
+    "net_weight": 12.1,
+    "weight_unit_code": "KG",
+    "created_date": "2023-01-10",
+    "batch_managed_flag": true,
+    "deletion_mark": false
+  },
+  {
+    "material_id": "MAT-100002",
+    "engineering_part_number": "LEG-VALVE-V20",
+    "material_type_code": "HALB",
+    "material_group_id": "RM10",
+    "material_description": "Control Valve V20",
+    "base_uom_code": "EA",
+    "gross_weight": 4.2,
+    "net_weight": 4.0,
+    "weight_unit_code": "KG",
+    "created_date": "2022-09-18",
+    "batch_managed_flag": false,
+    "deletion_mark": false
+  },
+  {
+    "material_id": "MAT-100003",
+    "engineering_part_number": "LEG-SEAL-S55",
+    "material_type_code": "ROH",
+    "material_group_id": "RM20",
+    "material_description": "Seal Kit S55",
+    "base_uom_code": "SET",
+    "gross_weight": 0.8,
+    "net_weight": 0.76,
+    "weight_unit_code": "KG",
+    "created_date": "2024-02-07",
+    "batch_managed_flag": true,
+    "deletion_mark": false
+  },
+  {
+    "material_id": "MAT-100004",
+    "engineering_part_number": "LEG-MOTOR-M7",
+    "material_type_code": "FERT",
+    "material_group_id": "FG02",
+    "material_description": "Servo Motor M7",
+    "base_uom_code": "EA",
+    "gross_weight": 18.9,
+    "net_weight": 18.3,
+    "weight_unit_code": "KG",
+    "created_date": "2021-06-25",
+    "batch_managed_flag": false,
+    "deletion_mark": false
+  },
+  {
+    "material_id": "MAT-100005",
+    "engineering_part_number": "LEG-CABLE-C90",
+    "material_type_code": "HAWA",
+    "material_group_id": "PK01",
+    "material_description": "Power Cable C90",
+    "base_uom_code": "M",
+    "gross_weight": 6.1,
+    "net_weight": 5.95,
+    "weight_unit_code": "KG",
+    "created_date": "2020-11-03",
+    "batch_managed_flag": false,
+    "deletion_mark": true
+  }
+]

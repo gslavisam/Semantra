@@ -4,6 +4,10 @@ import httpx
 import streamlit as st
 
 
+def should_show_table_selector(available_tables: list[str], upload_mode: str, *, is_sql: bool) -> bool:
+    return bool(available_tables) and (is_sql or upload_mode == "Row data")
+
+
 def render_workspace_tab(
     *,
     all_upload_types,
@@ -164,7 +168,7 @@ def render_workspace_tab(
             st.error(f"Upload inspection failed: {inspection_error}")
 
         source_table = None
-        if source_tables and source_mode == "Row data":
+        if should_show_table_selector(source_tables, source_mode, is_sql=source_is_sql):
             source_table = st.selectbox("Source table", source_tables, key="source_table")
         elif source_mode == "Schema spec":
             st.info("Source upload will be parsed as a field-per-row schema specification.")
@@ -174,7 +178,7 @@ def render_workspace_tab(
         target_table = None
         if canonical_mode:
             st.info("Canonical mode builds a virtual target from canonical_glossary.csv when you generate mapping.")
-        elif target_tables and target_mode == "Row data":
+        elif should_show_table_selector(target_tables, target_mode, is_sql=target_is_sql):
             target_table = st.selectbox("Target table", target_tables, key="target_table")
         elif target_mode == "Schema spec":
             st.info("Target upload will be parsed as a field-per-row schema specification.")

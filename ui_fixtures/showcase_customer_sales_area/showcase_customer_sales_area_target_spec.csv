@@ -1,0 +1,15 @@
+Column,Description,Type,Length
+customer_id,Canonical customer identifier,VARCHAR,20
+customer_name,Normalized customer display name,VARCHAR,120
+sales_organization_id,Normalized sales organization identifier,VARCHAR,10
+distribution_channel_id,Normalized distribution channel identifier,VARCHAR,10
+division_id,Normalized division identifier,VARCHAR,10
+customer_group_id,Normalized customer group identifier,VARCHAR,10
+sales_district_id,Normalized sales district identifier,VARCHAR,10
+shipping_condition_code,Shipping condition code,VARCHAR,10
+incoterm_code,Incoterms code,VARCHAR,10
+incoterm_location,Incoterms location,VARCHAR,80
+document_currency_code,Document currency code,VARCHAR,5
+payment_terms_id,Payment terms identifier,VARCHAR,10
+customer_pricing_procedure_code,Customer pricing procedure code,VARCHAR,10
+price_list_type_id,Price list type identifier,VARCHAR,10

@@ -1,0 +1,13 @@
+Column,Description,Type,Length
+MATNR,SAP ERP material number assigned in material master,VARCHAR,40
+BISMT,Old or legacy material number used before ERP harmonization,VARCHAR,40
+MTART,SAP material type such as FERT HALB or ROH,VARCHAR,10
+MATKL,SAP material group used for procurement and reporting,VARCHAR,20
+MAKTX,Material description short text,VARCHAR,120
+MEINS,Base unit of measure maintained in material master,VARCHAR,10
+BRGEW,Gross weight of the material,DECIMAL(10,3),
+NTGEW,Net weight of the material,DECIMAL(10,3),
+GEWEI,Weight unit code such as KG,VARCHAR,5
+ERSDA,Material creation date,DATE,
+XCHPF,Batch management indicator,BOOLEAN,
+LVORM,Deletion flag for the material,BOOLEAN,
