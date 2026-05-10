@@ -434,6 +434,125 @@ def _canonical_gap_stewardship_item_request(
     }
 
 
+def _canonical_gap_repeat_summary_rows(
+    candidates: list[dict] | None,
+    suggestions: dict[str, dict] | None = None,
+    console_states: dict[str, str] | None = None,
+    proposal_states: dict[str, str] | None = None,
+    stewardship_items: dict[str, dict] | None = None,
+) -> list[dict]:
+    observations: dict[str, dict[str, object]] = {}
+    seen_candidate_keys: set[str] = set()
+
+    for index, candidate in enumerate(candidates or []):
+        candidate_key = _canonical_gap_candidate_key(index, candidate)
+        seen_candidate_keys.add(candidate_key)
+        stewardship_item = (stewardship_items or {}).get(candidate_key) or {}
+        suggestion = (suggestions or {}).get(candidate_key) or {}
+        observations[candidate_key] = {
+            "source": _normalized_text(candidate.get("source") or stewardship_item.get("source")) or "unknown",
+            "target": _normalized_text(candidate.get("target") or stewardship_item.get("target")) or "unknown",
+            "concept_id": _normalized_text(suggestion.get("concept_id") or stewardship_item.get("concept_id")),
+            "status": _canonical_gap_effective_status(
+                candidate_key,
+                console_states,
+                proposal_states,
+                stewardship_item,
+            ),
+            "current_queue": True,
+            "updated_at": _normalized_text(stewardship_item.get("updated_at") or stewardship_item.get("created_at")),
+        }
+
+    for item_key, stewardship_item in (stewardship_items or {}).items():
+        if item_key in seen_candidate_keys:
+            continue
+        observations[item_key] = {
+            "source": _normalized_text(stewardship_item.get("source")) or "unknown",
+            "target": _normalized_text(stewardship_item.get("target")) or "unknown",
+            "concept_id": _normalized_text(stewardship_item.get("concept_id")),
+            "status": _canonical_gap_stewardship_status(stewardship_item) or "not_tracked",
+            "current_queue": False,
+            "updated_at": _normalized_text(stewardship_item.get("updated_at") or stewardship_item.get("created_at")),
+        }
+
+    grouped: dict[tuple[str, str], dict[str, object]] = {}
+    for observation in observations.values():
+        target = _normalized_text(observation.get("target")) or "unknown"
+        concept_id = _normalized_text(observation.get("concept_id"))
+        group_key = (target.lower(), concept_id.lower())
+        group = grouped.setdefault(
+            group_key,
+            {
+                "target": target,
+                "suggested_concept_id": concept_id,
+                "observations": 0,
+                "distinct_source_count": 0,
+                "current_queue_count": 0,
+                "new": 0,
+                "needs_review": 0,
+                "ready_for_approval": 0,
+                "approved": 0,
+                "ignored": 0,
+                "rejected": 0,
+                "promoted": 0,
+                "source_examples": [],
+                "latest_observed_at": "",
+                "_source_keys": set(),
+            },
+        )
+        group["observations"] = int(group["observations"]) + 1
+        source = _normalized_text(observation.get("source")) or "unknown"
+        source_key = source.lower()
+        source_keys = group["_source_keys"]
+        if isinstance(source_keys, set) and source_key not in source_keys:
+            source_keys.add(source_key)
+            group["distinct_source_count"] = int(group["distinct_source_count"]) + 1
+            source_examples = group["source_examples"]
+            if isinstance(source_examples, list) and len(source_examples) < 4:
+                source_examples.append(source)
+        if observation.get("current_queue"):
+            group["current_queue_count"] = int(group["current_queue_count"]) + 1
+        status = _normalized_text(observation.get("status"))
+        if status in {"new", "needs_review", "ready_for_approval", "approved", "ignored", "rejected", "promoted"}:
+            group[status] = int(group[status]) + 1
+        updated_at = _normalized_text(observation.get("updated_at"))
+        if updated_at and updated_at > _normalized_text(group.get("latest_observed_at")):
+            group["latest_observed_at"] = updated_at
+
+    rows: list[dict] = []
+    for group in grouped.values():
+        if int(group["observations"]) < 2:
+            continue
+        rows.append(
+            {
+                "target": group["target"],
+                "suggested_concept_id": group["suggested_concept_id"],
+                "observations": group["observations"],
+                "distinct_source_count": group["distinct_source_count"],
+                "current_queue_count": group["current_queue_count"],
+                "ready_for_approval": group["ready_for_approval"],
+                "needs_review": group["needs_review"],
+                "new": group["new"],
+                "ignored": group["ignored"],
+                "rejected": group["rejected"],
+                "approved": group["approved"],
+                "promoted": group["promoted"],
+                "source_examples": ", ".join(group["source_examples"]),
+                "latest_observed_at": group["latest_observed_at"],
+            }
+        )
+
+    return sorted(
+        rows,
+        key=lambda item: (
+            -int(item.get("observations", 0) or 0),
+            -int(item.get("distinct_source_count", 0) or 0),
+            _normalized_text(item.get("target")).lower(),
+            _normalized_text(item.get("suggested_concept_id")).lower(),
+        ),
+    )
+
+
 def _knowledge_stewardship_status_update_request(
     status: str,
     changed_by: str | None,
@@ -1738,6 +1857,13 @@ def render_canonical_console_panel(
         st.session_state.get("debug_knowledge_stewardship_items")
     )
     if canonical_gap_candidates:
+        repeated_gap_rows = _canonical_gap_repeat_summary_rows(
+            canonical_gap_candidates,
+            canonical_gap_suggestions,
+            canonical_gap_console_states,
+            canonical_gap_proposal_states,
+            canonical_gap_stewardship_items,
+        )
         queue_columns = st.columns(5)
         queue_columns[0].metric("Candidates", len(canonical_gap_candidates))
         queue_columns[1].metric(
@@ -1794,6 +1920,13 @@ def render_canonical_console_panel(
                 )
             ),
         )
+        if repeated_gap_rows:
+            st.write("**Repeated gap signals**")
+            st.caption(
+                "Aggregated target and suggested-concept patterns seen across the current queue and durable stewardship history. "
+                "Use this to spot glossary or overlay work that can eliminate multiple gap reviews at once."
+            )
+            st.dataframe(repeated_gap_rows, width="stretch", hide_index=True)
         available_stewardship_statuses = sorted(
             {
                 _canonical_gap_effective_status(

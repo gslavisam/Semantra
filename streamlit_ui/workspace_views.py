@@ -580,8 +580,6 @@ def render_workspace_tab(
                             st.rerun()
                     if codegen_block_reason:
                         st.caption(codegen_block_reason)
-                if output_block_reason:
-                    st.caption(output_block_reason)
         else:
             st.info("Generate mapping in Setup before preview or code generation.")
 

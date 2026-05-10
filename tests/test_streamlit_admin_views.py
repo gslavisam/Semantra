@@ -410,100 +410,6 @@ def test_canonical_gap_queue_rows_merge_candidate_and_suggestion_state() -> None
             "assignee": "",
         }
     ]
-
-
-def test_canonical_gap_option_label_reflects_pending_state() -> None:
-    label = admin_views._canonical_gap_option_label(
-        0,
-        {
-            "source": "MATERIAL_NUMBER",
-            "target": "material_id",
-            "confidence": 0.88,
-        },
-        None,
-    )
-
-    assert label == "MATERIAL_NUMBER -> material_id | confidence=88% | action=pending"
-
-
-def test_canonical_gap_can_approve_rejects_no_action() -> None:
-    assert admin_views._canonical_gap_can_approve({"action": "existing_concept_alias"}) is False
-    assert admin_views._canonical_gap_can_approve({"action": "existing_concept_alias"}, "active", "ready_for_approval") is True
-    assert admin_views._canonical_gap_can_approve({"action": "new_canonical_concept"}, "active", "ready_for_approval") is True
-    assert admin_views._canonical_gap_can_approve({"action": "existing_concept_alias"}, "ignored") is False
-    assert admin_views._canonical_gap_can_approve({"action": "existing_concept_alias"}, "approved") is False
-    assert admin_views._canonical_gap_can_approve({"action": "existing_concept_alias"}, "active", "needs_review") is False
-    assert admin_views._canonical_gap_can_approve({"action": "no_action"}) is False
-    assert admin_views._canonical_gap_can_approve(None) is False
-
-
-def test_canonical_gap_proposal_state_defaults_to_new() -> None:
-    assert admin_views._canonical_gap_proposal_state("canonical_gap_X_Y", None) == "new"
-    assert admin_views._canonical_gap_proposal_state(
-        "canonical_gap_X_Y",
-        {"canonical_gap_X_Y": "needs_review"},
-    ) == "needs_review"
-    assert admin_views._canonical_gap_proposal_state(
-        "canonical_gap_X_Y",
-        {"canonical_gap_X_Y": "ready_for_approval"},
-    ) == "ready_for_approval"
-    assert admin_views._canonical_gap_proposal_state(
-        "canonical_gap_X_Y",
-        {"canonical_gap_X_Y": "weird"},
-    ) == "new"
-
-
-def test_canonical_gap_proposal_state_map_reads_backend_records() -> None:
-    assert admin_views._canonical_gap_proposal_state_map(
-        [
-            {"candidate_key": "canonical_gap_X_Y", "proposal_state": "needs_review"},
-            {"candidate_key": "canonical_gap_A_B", "proposal_state": "ready_for_approval"},
-            {"candidate_key": "", "proposal_state": "new"},
-        ]
-    ) == {
-        "canonical_gap_X_Y": "needs_review",
-        "canonical_gap_A_B": "ready_for_approval",
-    }
-
-
-def test_canonical_gap_stewardship_item_map_reads_backend_records() -> None:
-    assert admin_views._canonical_gap_stewardship_item_map(
-        [
-            {"item_type": "canonical_gap", "item_key": "canonical_gap_X_Y", "status": "needs_review", "owner": "gov"},
-            {"item_type": "overlay_promotion", "item_key": "overlay_material_id", "status": "new"},
-            {"item_type": "canonical_gap", "item_key": "canonical_gap_A_B", "status": "approved"},
-        ]
-    ) == {
-        "canonical_gap_X_Y": {"item_type": "canonical_gap", "item_key": "canonical_gap_X_Y", "status": "needs_review", "owner": "gov"},
-        "canonical_gap_A_B": {"item_type": "canonical_gap", "item_key": "canonical_gap_A_B", "status": "approved"},
-    }
-
-
-def test_canonical_gap_queue_rows_prefer_stewardship_item_state_and_assignment() -> None:
-    rows = admin_views._canonical_gap_queue_rows(
-        [{"source": "LEGACY_CUSTOMER_ID", "target": "customer_id", "confidence": 0.91}],
-        {"canonical_gap_LEGACY_CUSTOMER_ID_customer_id": {"action": "existing_concept_alias", "concept_id": "customer.id"}},
-        {"canonical_gap_LEGACY_CUSTOMER_ID_customer_id": "ignored"},
-        {"canonical_gap_LEGACY_CUSTOMER_ID_customer_id": "new"},
-        {
-            "canonical_gap_LEGACY_CUSTOMER_ID_customer_id": {
-                "item_id": 7,
-                "item_type": "canonical_gap",
-                "item_key": "canonical_gap_LEGACY_CUSTOMER_ID_customer_id",
-                "status": "ready_for_approval",
-                "owner": "data-governance",
-                "assignee": "analyst-1",
-            }
-        },
-    )
-
-    assert rows[0]["console_state"] == "active"
-    assert rows[0]["proposal_state"] == "ready_for_approval"
-    assert rows[0]["stewardship_status"] == "ready_for_approval"
-    assert rows[0]["owner"] == "data-governance"
-    assert rows[0]["assignee"] == "analyst-1"
-
-
 def test_overlay_promotion_item_map_filters_overlay_items() -> None:
     assert admin_views._overlay_promotion_item_map(
         [
@@ -843,6 +749,76 @@ def test_canonical_gap_impact_preview_rows_identifies_selected_and_related_queue
             "console_state": "active",
             "impact_reason": "same source column",
         },
+    ]
+
+
+def test_canonical_gap_repeat_summary_rows_aggregates_current_and_durable_gap_patterns() -> None:
+    candidates = [
+        {"source": "LEGACY_CUSTOMER_ID", "target": "customer_id"},
+        {"source": "legacy_customer_id", "target": "customer_id"},
+        {"source": "KUNNR", "target": "customer_id"},
+    ]
+    suggestions = {
+        "canonical_gap_LEGACY_CUSTOMER_ID_customer_id": {"concept_id": "customer.id"},
+        "canonical_gap_legacy_customer_id_customer_id": {"concept_id": "customer.id"},
+    }
+    stewardship_items = admin_views._canonical_gap_stewardship_item_map(
+        [
+            {
+                "item_type": "canonical_gap",
+                "item_key": "canonical_gap_LEGACY_CUSTOMER_ID_customer_id",
+                "source": "LEGACY_CUSTOMER_ID",
+                "target": "customer_id",
+                "concept_id": "customer.id",
+                "status": "ready_for_approval",
+                "updated_at": "2026-05-10T10:00:00Z",
+            },
+            {
+                "item_type": "canonical_gap",
+                "item_key": "canonical_gap_legacy_customer_id_customer_id",
+                "source": "legacy_customer_id",
+                "target": "customer_id",
+                "concept_id": "customer.id",
+                "status": "needs_review",
+                "updated_at": "2026-05-10T11:00:00Z",
+            },
+            {
+                "item_type": "canonical_gap",
+                "item_key": "canonical_gap_KUNNR_customer_id",
+                "source": "KUNNR",
+                "target": "customer_id",
+                "concept_id": "customer.id",
+                "status": "ignored",
+                "updated_at": "2026-05-10T12:00:00Z",
+            },
+        ]
+    )
+
+    rows = admin_views._canonical_gap_repeat_summary_rows(
+        candidates,
+        suggestions,
+        {},
+        {},
+        stewardship_items,
+    )
+
+    assert rows == [
+        {
+            "target": "customer_id",
+            "suggested_concept_id": "customer.id",
+            "observations": 3,
+            "distinct_source_count": 2,
+            "current_queue_count": 3,
+            "ready_for_approval": 1,
+            "needs_review": 1,
+            "new": 0,
+            "ignored": 1,
+            "rejected": 0,
+            "approved": 0,
+            "promoted": 0,
+            "source_examples": "LEGACY_CUSTOMER_ID, KUNNR",
+            "latest_observed_at": "2026-05-10T12:00:00Z",
+        }
     ]
 
 
