@@ -58,6 +58,7 @@ class KnowledgeOverlayValidationService:
     ) -> KnowledgeOverlayValidationPreviewRow:
         entry_type = str(row.get("entry_type") or "").strip()
         canonical_term = str(row.get("canonical_term") or "").strip()
+        explicit_canonical_concept_id = str(row.get("canonical_concept_id") or "").strip() or None
         alias = str(row.get("alias") or "").strip()
         domain = str(row.get("domain") or "").strip() or None
         source_system = str(row.get("source_system") or "").strip() or None
@@ -94,8 +95,21 @@ class KnowledgeOverlayValidationService:
             )
 
         if entry_type == "concept_alias" and canonical_term:
-            canonical_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(canonical_term)
-            if canonical_concept_id is None:
+            resolved_canonical_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(canonical_term)
+            canonical_concept_id = explicit_canonical_concept_id or resolved_canonical_concept_id
+            if explicit_canonical_concept_id and resolved_canonical_concept_id and explicit_canonical_concept_id != resolved_canonical_concept_id:
+                issues.append(
+                    self._issue(
+                        row_number,
+                        "error",
+                        "canonical_concept_mismatch",
+                        (
+                            f"canonical_term '{canonical_term}' resolves to '{resolved_canonical_concept_id}', "
+                            f"but the row explicitly specifies '{explicit_canonical_concept_id}'."
+                        ),
+                    )
+                )
+            elif canonical_concept_id is None:
                 issues.append(
                     self._issue(
                         row_number,

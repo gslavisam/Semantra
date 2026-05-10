@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import httpx
+
 from streamlit_ui import catalog_views
+from streamlit_ui import governance
 
 
 def test_build_catalog_reuse_mapping_response_creates_workspace_shape() -> None:
@@ -60,5 +63,29 @@ def test_mapping_set_reuse_block_reason_requires_approved_status() -> None:
     assert catalog_views._mapping_set_reuse_block_reason("approved") == ""
     assert (
         catalog_views._mapping_set_reuse_block_reason("review")
-        == "Only approved mapping set versions can be reused in Workspace. Current status: review."
+        == "Only approved mapping sets can be reused in Workspace. Current status: review."
+    )
+
+
+def test_api_error_message_returns_backend_detail_for_governance_conflict() -> None:
+    request = httpx.Request("POST", "http://testserver/mapping/sets/7/apply")
+    response = httpx.Response(
+        409,
+        json={"detail": "Mapping set #7 is in status 'review' and cannot be applied."},
+        request=request,
+    )
+    error = httpx.HTTPStatusError("HTTP 409: blocked", request=request, response=response)
+
+    assert governance.api_error_message(error, default_prefix="Applying saved mapping set failed") == (
+        "Mapping set #7 is in status 'review' and cannot be applied."
+    )
+
+
+def test_api_error_message_keeps_context_for_non_governance_errors() -> None:
+    request = httpx.Request("POST", "http://testserver/mapping/sets/7/apply")
+    response = httpx.Response(500, json={"detail": "Server exploded"}, request=request)
+    error = httpx.HTTPStatusError("HTTP 500: Server exploded", request=request, response=response)
+
+    assert governance.api_error_message(error, default_prefix="Applying saved mapping set failed") == (
+        "Applying saved mapping set failed: HTTP 500: Server exploded"
     )

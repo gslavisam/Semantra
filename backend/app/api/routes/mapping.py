@@ -11,6 +11,7 @@ from app.models.mapping import (
     CanonicalMappingRequest,
     CodegenRequest,
     GeneratedArtifact,
+    MappingDecision,
     MappingSetApplyRequest,
     MappingSetAuditEntry,
     MappingSetCreateRequest,
@@ -43,6 +44,28 @@ from app.services.virtual_target_service import build_virtual_target_schema
 
 
 router = APIRouter(prefix="/mapping", tags=["mapping"])
+
+
+def _blocked_output_decision_statuses(mapping_decisions: list[MappingDecision]) -> list[str]:
+    return sorted(
+        {
+            (str(decision.status or "").strip().lower() or "needs_review")
+            for decision in mapping_decisions
+            if (str(decision.status or "").strip().lower() or "needs_review") != "accepted"
+        }
+    )
+
+
+def _require_accepted_output_decisions(mapping_decisions: list[MappingDecision], *, action_label: str) -> None:
+    blocked_statuses = _blocked_output_decision_statuses(mapping_decisions)
+    if blocked_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{action_label} is blocked until all active mapping decisions are accepted. "
+                f"Review statuses: {', '.join(blocked_statuses)}."
+            ),
+        )
 
 
 def append_mapping_set_audit(
@@ -162,6 +185,7 @@ async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
 
 @router.post("/codegen", response_model=GeneratedArtifact)
 async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
+    _require_accepted_output_decisions(request.mapping_decisions, action_label="Code generation")
     return generate_pandas_code(request.mapping_decisions)
 
 
@@ -275,6 +299,10 @@ async def get_transformation_templates() -> list[TransformationTemplate]:
 async def create_transformation_test_set(
     request: TransformationTestSetCreateRequest,
 ) -> TransformationTestSetRecord:
+    _require_accepted_output_decisions(
+        request.mapping_decisions,
+        action_label="Transformation test set save",
+    )
     return persistence_service.save_transformation_test_set(
         request.name,
         request.mapping_decisions,
@@ -313,6 +341,7 @@ async def execute_transformation_test_set(test_set_id: int) -> TransformationTes
         test_set = persistence_service.get_transformation_test_set(test_set_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    _require_accepted_output_decisions(test_set.mapping_decisions, action_label="Transformation test set run")
     return run_transformation_test_set(test_set)
 
 

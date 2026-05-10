@@ -35,6 +35,8 @@ def setup_function() -> None:
     persistence_service.clear_evaluation_runs()
     persistence_service.clear_transformation_test_sets()
     persistence_service.clear_knowledge_overlays()
+    persistence_service.clear_knowledge_stewardship_items()
+    persistence_service.clear_knowledge_audit_logs()
     mapping_job_store.clear()
     metadata_knowledge_service.refresh()
     settings.admin_api_token = ""
@@ -594,6 +596,16 @@ def test_knowledge_overlay_validate_create_activate_and_reload_flow() -> None:
     assert archive_response.status_code == 200
     assert archive_response.json()["status"] == "archived"
 
+    archive_again_response = client.post(f"/knowledge/overlays/{overlay_id}/archive")
+    assert archive_again_response.status_code == 409
+    assert archive_again_response.json()["detail"] == (
+        "Only validated or active knowledge overlays can be archived. Current status: archived."
+    )
+
+    archived_activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+    assert archived_activate_response.status_code == 409
+    assert archived_activate_response.json()["detail"] == "Only validated knowledge overlays can be activated. Current status: archived."
+
 
 def test_canonical_glossary_export_and_import_flow() -> None:
     glossary_path = Path(metadata_knowledge_service.canonical_glossary_path)
@@ -696,6 +708,18 @@ def test_canonical_gap_candidates_and_approve_endpoint_persist_overlay_alias() -
     candidates = candidates_response.json()["candidates"]
     assert len(candidates) == 1
 
+    proposal_state_response = client.post(
+        "/knowledge/canonical-gaps/proposal-state",
+        json={
+            "candidate_key": "canonical_gap_NTGEW_net_weight",
+            "candidate": candidates[0],
+            "proposal_state": "ready_for_approval",
+            "reviewed_by": "test-reviewer",
+        },
+    )
+
+    assert proposal_state_response.status_code == 200
+
     approve_response = client.post(
         "/knowledge/canonical-gaps/approve",
         json={
@@ -715,6 +739,55 @@ def test_canonical_gap_candidates_and_approve_endpoint_persist_overlay_alias() -
     assert approve_response.status_code == 200
     assert approve_response.json()["activated"] is True
     assert metadata_knowledge_service.resolve_canonical_concept_id("NTGEW") == "material.net_weight"
+
+
+def test_canonical_gap_approve_endpoint_blocks_without_ready_for_approval_state() -> None:
+    mapping_response = {
+        "mappings": [
+            {
+                "source": "NTGEW",
+                "target": "net_weight",
+                "confidence": 0.72,
+                "confidence_label": "medium_confidence",
+                "status": "needs_review",
+                "method": "multi_signal_heuristic",
+                "signals": {"name": 0.8, "semantic": 0.75},
+                "explanation": ["Name and semantic signals strongly align."],
+                "canonical_details": {"source_concepts": [], "target_concepts": [], "shared_concepts": []},
+            }
+        ],
+        "ranked_mappings": [],
+        "canonical_coverage": {},
+    }
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": mapping_response},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+
+    approve_response = client.post(
+        "/knowledge/canonical-gaps/approve",
+        json={
+            "candidate": candidate,
+            "suggestion": {
+                "action": "new_canonical_concept",
+                "concept_id": "material.net_weight",
+                "display_name": "Material Net Weight",
+                "aliases": ["NTGEW", "net_weight", "MARA-NTGEW"],
+                "confidence": 0.88,
+                "reasoning": ["SAP NTGEW and net_weight describe material net weight."],
+            },
+            "approved_by": "test",
+        },
+    )
+
+    assert approve_response.status_code == 409
+    assert approve_response.json()["detail"] == (
+        "Canonical gap approval is blocked until proposal triage is ready_for_approval. Current state: new."
+    )
 
 
 def test_canonical_concept_registry_and_detail_expose_usage_and_active_overlay_aliases() -> None:
@@ -845,6 +918,18 @@ def test_material_canonical_gap_suggest_approve_and_rerun_flow() -> None:
     suggestion = suggest_response.json()
     assert suggestion["action"] == "new_canonical_concept"
     assert suggestion["concept_id"] == "material.net_weight"
+
+    proposal_state_response = client.post(
+        "/knowledge/canonical-gaps/proposal-state",
+        json={
+            "candidate_key": "canonical_gap_NTGEW_net_weight",
+            "candidate": candidate,
+            "proposal_state": "ready_for_approval",
+            "reviewed_by": "test-reviewer",
+        },
+    )
+
+    assert proposal_state_response.status_code == 200
 
     approve_response = client.post(
         "/knowledge/canonical-gaps/approve",
@@ -1026,6 +1111,486 @@ def test_material_canonical_gap_ignore_persists_audit_event() -> None:
     )
 
 
+def test_material_canonical_gap_proposal_state_persists_latest_triage() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "material_source.csv",
+                csv_bytes("NTGEW\n10.5\n12.0\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "material_target.csv",
+                csv_bytes("net_weight,gross_weight\n10.5,11.0\n12.0,12.5\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    initial_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert initial_map_response.status_code == 200
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": initial_map_response.json()},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+    candidate_key = "canonical_gap_NTGEW_net_weight"
+
+    first_triage_response = client.post(
+        "/knowledge/canonical-gaps/proposal-state",
+        json={
+            "candidate_key": candidate_key,
+            "candidate": candidate,
+            "proposal_state": "needs_review",
+            "reviewed_by": "test-reviewer",
+            "note": "Need SME confirmation.",
+        },
+    )
+
+    assert first_triage_response.status_code == 200
+    assert first_triage_response.json()["proposal_state"] == "needs_review"
+
+    second_triage_response = client.post(
+        "/knowledge/canonical-gaps/proposal-state",
+        json={
+            "candidate_key": candidate_key,
+            "candidate": candidate,
+            "proposal_state": "ready_for_approval",
+            "reviewed_by": "test-reviewer",
+        },
+    )
+
+    assert second_triage_response.status_code == 200
+    triage_payload = second_triage_response.json()
+    assert triage_payload["candidate_key"] == candidate_key
+    assert triage_payload["proposal_state"] == "ready_for_approval"
+
+    proposal_states_response = client.get("/knowledge/canonical-gaps/proposal-states")
+    assert proposal_states_response.status_code == 200
+    assert proposal_states_response.json() == [
+        {
+            "candidate_key": candidate_key,
+            "source": "NTGEW",
+            "target": "net_weight",
+            "proposal_state": "ready_for_approval",
+            "reviewed_by": "test-reviewer",
+            "note": None,
+            "created_at": triage_payload["created_at"],
+        }
+    ]
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    assert any(
+        entry["action"] == "triage"
+        and "NTGEW -> net_weight" in entry["message"]
+        and "State=ready_for_approval." in entry["message"]
+        for entry in audit_response.json()
+    )
+
+
+def test_material_canonical_gap_stewardship_item_create_and_status_update() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "material_source.csv",
+                csv_bytes("NTGEW\n10.5\n12.0\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "material_target.csv",
+                csv_bytes("net_weight,gross_weight\n10.5,11.0\n12.0,12.5\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    initial_map_response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "target_dataset_id": upload_payload["target"]["dataset_id"],
+        },
+    )
+
+    assert initial_map_response.status_code == 200
+
+    candidates_response = client.post(
+        "/knowledge/canonical-gaps/candidates",
+        json={"mapping_response": initial_map_response.json()},
+    )
+
+    assert candidates_response.status_code == 200
+    candidate = candidates_response.json()["candidates"][0]
+    item_key = "canonical_gap_NTGEW_net_weight"
+
+    create_response = client.post(
+        "/knowledge/stewardship-items",
+        json={
+            "item_type": "canonical_gap",
+            "item_key": item_key,
+            "title": "NTGEW -> net_weight",
+            "status": "needs_review",
+            "source": "NTGEW",
+            "target": "net_weight",
+            "owner": "data-governance",
+            "assignee": "analyst-1",
+            "review_note": "Needs confirmation from material SME.",
+            "candidate_payload": candidate,
+            "created_by": "test-reviewer",
+            "changed_by": "test-reviewer",
+        },
+    )
+
+    assert create_response.status_code == 200
+    create_payload = create_response.json()
+    assert create_payload["item_key"] == item_key
+    assert create_payload["status"] == "needs_review"
+    assert create_payload["owner"] == "data-governance"
+    assert create_payload["candidate_payload"]["source"] == "NTGEW"
+
+    list_response = client.get("/knowledge/stewardship-items", params={"item_type": "canonical_gap"})
+    assert list_response.status_code == 200
+    assert list_response.json() == [
+        {
+            "item_id": create_payload["item_id"],
+            "item_type": "canonical_gap",
+            "item_key": item_key,
+            "title": "NTGEW -> net_weight",
+            "status": "needs_review",
+            "concept_id": None,
+            "source": "NTGEW",
+            "target": "net_weight",
+            "source_system": None,
+            "business_domain": None,
+            "owner": "data-governance",
+            "assignee": "analyst-1",
+            "review_note": "Needs confirmation from material SME.",
+            "created_by": "test-reviewer",
+            "changed_by": "test-reviewer",
+            "created_at": create_payload["created_at"],
+            "updated_at": create_payload["updated_at"],
+        }
+    ]
+
+    update_response = client.post(
+        f"/knowledge/stewardship-items/{create_payload['item_id']}/status",
+        json={
+            "status": "ready_for_approval",
+            "changed_by": "lead-reviewer",
+            "assignee": "mdm-lead",
+            "review_note": "Validated with material owner.",
+            "note": "Promote to approval-ready after SME confirmation.",
+        },
+    )
+
+    assert update_response.status_code == 200
+    update_payload = update_response.json()
+    assert update_payload["status"] == "ready_for_approval"
+    assert update_payload["assignee"] == "mdm-lead"
+    assert update_payload["review_note"] == "Validated with material owner."
+
+    detail_response = client.get(f"/knowledge/stewardship-items/{create_payload['item_id']}")
+    assert detail_response.status_code == 200
+    assert detail_response.json()["candidate_payload"]["target"] == "net_weight"
+    assert detail_response.json()["status"] == "ready_for_approval"
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    audit_entries = audit_response.json()
+    assert any(
+        entry["action"] == "stewardship"
+        and f"canonical_gap:{item_key}" in entry["message"]
+        and "Status=needs_review." in entry["message"]
+        for entry in audit_entries
+    )
+    assert any(
+        entry["action"] == "stewardship"
+        and f"canonical_gap:{item_key}" in entry["message"]
+        and "Status=ready_for_approval." in entry["message"]
+        for entry in audit_entries
+    )
+
+
+def test_overlay_promotion_stewardship_item_create_and_status_update() -> None:
+    overlay_response = client.post(
+        "/knowledge/overlays",
+        data={"name": "overlay-promotion-v1", "created_by": "demo-user"},
+        files={
+            "file": (
+                "knowledge_overlay.csv",
+                csv_bytes(
+                    "entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note\n"
+                    "concept_alias,Customer ID,customer.id,legacy_customer_identifier,master_data,LegacyERP,Promotion candidate\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+
+    assert overlay_response.status_code == 200
+    overlay_id = overlay_response.json()["version"]["overlay_id"]
+
+    activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+    assert activate_response.status_code == 200
+
+    detail_response = client.get(f"/knowledge/overlays/{overlay_id}")
+    assert detail_response.status_code == 200
+    entry = detail_response.json()["entries"][0]
+    item_key = f"overlay_promotion_{overlay_id}_{entry['entry_id']}"
+
+    create_response = client.post(
+        "/knowledge/stewardship-items",
+        json={
+            "item_type": "overlay_promotion",
+            "item_key": item_key,
+            "title": "Promote legacy_customer_identifier",
+            "status": "new",
+            "concept_id": "customer.id",
+            "source": "legacy_customer_identifier",
+            "target": "customer.id",
+            "source_system": "LegacyERP",
+            "business_domain": "master_data",
+            "owner": "master-data-governance",
+            "assignee": "canonical-model-owner",
+            "review_note": "Candidate for base glossary promotion.",
+            "overlay_entry_payload": {
+                **entry,
+                "overlay_id": overlay_id,
+                "overlay_name": "overlay-promotion-v1",
+            },
+            "created_by": "demo-user",
+            "changed_by": "demo-user",
+        },
+    )
+
+    assert create_response.status_code == 200
+    create_payload = create_response.json()
+    assert create_payload["item_type"] == "overlay_promotion"
+    assert create_payload["item_key"] == item_key
+    assert create_payload["overlay_entry_payload"]["alias"] == "legacy_customer_identifier"
+
+    list_response = client.get("/knowledge/stewardship-items", params={"item_type": "overlay_promotion"})
+    assert list_response.status_code == 200
+    assert list_response.json() == [
+        {
+            "item_id": create_payload["item_id"],
+            "item_type": "overlay_promotion",
+            "item_key": item_key,
+            "title": "Promote legacy_customer_identifier",
+            "status": "new",
+            "concept_id": "customer.id",
+            "source": "legacy_customer_identifier",
+            "target": "customer.id",
+            "source_system": "LegacyERP",
+            "business_domain": "master_data",
+            "owner": "master-data-governance",
+            "assignee": "canonical-model-owner",
+            "review_note": "Candidate for base glossary promotion.",
+            "created_by": "demo-user",
+            "changed_by": "demo-user",
+            "created_at": create_payload["created_at"],
+            "updated_at": create_payload["updated_at"],
+        }
+    ]
+
+    update_response = client.post(
+        f"/knowledge/stewardship-items/{create_payload['item_id']}/status",
+        json={
+            "status": "promoted",
+            "changed_by": "lead-reviewer",
+            "review_note": "Promoted after glossary governance review.",
+            "note": "Ready for export/import into stable glossary.",
+        },
+    )
+
+    assert update_response.status_code == 200
+    update_payload = update_response.json()
+    assert update_payload["status"] == "promoted"
+    assert update_payload["review_note"] == "Promoted after glossary governance review."
+
+    audit_response = client.get("/knowledge/audit")
+    assert audit_response.status_code == 200
+    assert any(
+        entry["action"] == "stewardship"
+        and f"overlay_promotion:{item_key}" in entry["message"]
+        and "Status=promoted." in entry["message"]
+        for entry in audit_response.json()
+    )
+
+
+def test_overlay_promotion_execute_to_canonical_glossary_updates_export_and_item_status() -> None:
+    glossary_path = Path(metadata_knowledge_service.canonical_glossary_path)
+    original_payload = glossary_path.read_text(encoding="utf-8")
+    try:
+        overlay_response = client.post(
+            "/knowledge/overlays",
+            data={"name": "overlay-promotion-execution", "created_by": "demo-user"},
+            files={
+                "file": (
+                    "knowledge_overlay.csv",
+                    csv_bytes(
+                        "entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note\n"
+                        "concept_alias,Customer ID,customer.id,legacy_customer_identifier,master_data,LegacyERP,Promotion execution candidate\n"
+                    ),
+                    "text/csv",
+                )
+            },
+        )
+        assert overlay_response.status_code == 200
+        overlay_id = overlay_response.json()["version"]["overlay_id"]
+
+        activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+        assert activate_response.status_code == 200
+
+        detail_response = client.get(f"/knowledge/overlays/{overlay_id}")
+        assert detail_response.status_code == 200
+        entry = detail_response.json()["entries"][0]
+        item_key = f"overlay_promotion_{overlay_id}_{entry['entry_id']}"
+
+        create_response = client.post(
+            "/knowledge/stewardship-items",
+            json={
+                "item_type": "overlay_promotion",
+                "item_key": item_key,
+                "title": "Promote legacy_customer_identifier",
+                "status": "ready_for_approval",
+                "concept_id": "customer.id",
+                "source": "legacy_customer_identifier",
+                "target": "customer.id",
+                "source_system": "LegacyERP",
+                "business_domain": "master_data",
+                "owner": "master-data-governance",
+                "assignee": "canonical-model-owner",
+                "review_note": "Ready for stable glossary promotion.",
+                "overlay_entry_payload": {**entry, "overlay_id": overlay_id, "overlay_name": "overlay-promotion-execution"},
+                "created_by": "demo-user",
+                "changed_by": "demo-user",
+            },
+        )
+        assert create_response.status_code == 200
+        item_id = create_response.json()["item_id"]
+
+        promote_response = client.post(
+            f"/knowledge/stewardship-items/{item_id}/promote-to-glossary",
+            json={"changed_by": "lead-reviewer", "note": "Approved stable glossary promotion."},
+        )
+        assert promote_response.status_code == 200
+        promote_payload = promote_response.json()
+        assert promote_payload["item"]["status"] == "promoted"
+        assert promote_payload["alias_added"] is True
+        assert "legacy customer identifier" in promote_payload["glossary_entry"]["aliases"]
+
+        export_response = client.get("/knowledge/canonical-glossary/export")
+        assert export_response.status_code == 200
+        assert "legacy customer identifier" in export_response.text
+
+        audit_response = client.get("/knowledge/audit")
+        assert audit_response.status_code == 200
+        assert any(
+            entry["action"] == "stewardship"
+            and f"overlay_promotion:{item_key}" in entry["message"]
+            and "into canonical glossary" in entry["message"]
+            and "Status=promoted." in entry["message"]
+            for entry in audit_response.json()
+        )
+    finally:
+        glossary_path.write_text(original_payload, encoding="utf-8")
+        metadata_knowledge_service.refresh()
+
+
+def test_overlay_promotion_execute_to_canonical_glossary_creates_new_base_concept_row() -> None:
+    glossary_path = Path(metadata_knowledge_service.canonical_glossary_path)
+    original_payload = glossary_path.read_text(encoding="utf-8")
+    try:
+        overlay_response = client.post(
+            "/knowledge/overlays",
+            data={"name": "overlay-promotion-new-concept", "created_by": "demo-user"},
+            files={
+                "file": (
+                    "knowledge_overlay.csv",
+                    csv_bytes(
+                        "entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note\n"
+                        "concept_alias,Customer Shadow ID,customer.shadow_id,legacy_shadow_customer_id,master_data,LegacyERP,New canonical concept candidate\n"
+                    ),
+                    "text/csv",
+                )
+            },
+        )
+        assert overlay_response.status_code == 200
+        overlay_id = overlay_response.json()["version"]["overlay_id"]
+
+        activate_response = client.post(f"/knowledge/overlays/{overlay_id}/activate")
+        assert activate_response.status_code == 200
+
+        detail_response = client.get(f"/knowledge/overlays/{overlay_id}")
+        assert detail_response.status_code == 200
+        entry = detail_response.json()["entries"][0]
+        item_key = f"overlay_promotion_{overlay_id}_{entry['entry_id']}"
+
+        create_response = client.post(
+            "/knowledge/stewardship-items",
+            json={
+                "item_type": "overlay_promotion",
+                "item_key": item_key,
+                "title": "Promote legacy_shadow_customer_id",
+                "status": "ready_for_approval",
+                "concept_id": "customer.shadow_id",
+                "source": "legacy_shadow_customer_id",
+                "target": "customer.shadow_id",
+                "source_system": "LegacyERP",
+                "business_domain": "master_data",
+                "owner": "master-data-governance",
+                "assignee": "canonical-model-owner",
+                "review_note": "Create a base canonical row from overlay-only concept.",
+                "overlay_entry_payload": {**entry, "overlay_id": overlay_id, "overlay_name": "overlay-promotion-new-concept"},
+                "created_by": "demo-user",
+                "changed_by": "demo-user",
+            },
+        )
+        assert create_response.status_code == 200
+        item_id = create_response.json()["item_id"]
+
+        promote_response = client.post(
+            f"/knowledge/stewardship-items/{item_id}/promote-to-glossary",
+            json={"changed_by": "lead-reviewer", "note": "Approved new base concept promotion."},
+        )
+        assert promote_response.status_code == 200
+        promote_payload = promote_response.json()
+        assert promote_payload["item"]["status"] == "promoted"
+        assert promote_payload["alias_added"] is True
+        assert promote_payload["concept_created"] is True
+        assert promote_payload["glossary_entry"]["concept_id"] == "customer.shadow_id"
+        assert promote_payload["glossary_entry"]["display_name"] == "Customer Shadow ID"
+        assert "legacy shadow customer id" in promote_payload["glossary_entry"]["aliases"]
+
+        export_response = client.get("/knowledge/canonical-glossary/export")
+        assert export_response.status_code == 200
+        assert "customer.shadow_id" in export_response.text
+        assert "legacy shadow customer id" in export_response.text
+    finally:
+        glossary_path.write_text(original_payload, encoding="utf-8")
+        metadata_knowledge_service.refresh()
+
+
 def test_preview_projects_rows_from_mapping_decisions() -> None:
     upload_payload = upload_example_datasets()
     preview_response = client.post(
@@ -1047,6 +1612,39 @@ def test_preview_projects_rows_from_mapping_decisions() -> None:
     assert payload["unresolved_targets"] == []
     assert payload["transformation_previews"][0]["status"] == "direct"
     assert payload["transformation_previews"][0]["classification"] == "direct"
+
+
+def test_preview_allows_non_accepted_mapping_decisions_but_codegen_still_blocks() -> None:
+    upload_payload = upload_example_datasets()
+
+    preview_response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "needs_review"},
+            ],
+        },
+    )
+    codegen_response = client.post(
+        "/mapping/codegen",
+        json={
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "needs_review"},
+            ]
+        },
+    )
+
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert len(preview_payload["preview"]) == 2
+    assert preview_payload["preview"][0]["values"]["customer_id"] == "1"
+    assert preview_payload["unresolved_targets"] == ["customer_id"]
+    assert codegen_response.status_code == 409
+    assert codegen_response.json()["detail"] == (
+        "Code generation is blocked until all active mapping decisions are accepted. "
+        "Review statuses: needs_review."
+    )
 
 
 def test_preview_applies_transformation_code_to_rows() -> None:
@@ -1645,6 +2243,76 @@ def test_catalog_concept_endpoint_returns_matching_integrations() -> None:
     ]
 
 
+def test_canonical_concept_registry_exposes_source_system_and_business_domain_facets() -> None:
+    settings.admin_api_token = "secret-token"
+
+    client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "integration_name": "Customer Master Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "canonical_concepts": ["customer.id"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer.id", "status": "accepted"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+    client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-lead-sync",
+            "integration_name": "Customer Lead Sync",
+            "source_system": "CRM",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "canonical_concepts": ["customer.id"],
+            "mapping_decisions": [
+                {"source": "lead_ref", "target": "customer.id", "status": "accepted"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+
+    response = client.get("/knowledge/canonical-concepts", headers=admin_headers())
+
+    assert response.status_code == 200
+    payload = response.json()
+    customer_id = next(item for item in payload if item["concept_id"] == "customer.id")
+    assert customer_id["source_systems"] == ["CRM", "SAP"]
+    assert customer_id["business_domains"] == ["Customer"]
+
+
+def test_canonical_concept_registry_filters_numeric_only_base_aliases_from_dirty_db() -> None:
+    settings.admin_api_token = "secret-token"
+
+    with persistence_service.connection() as connection:
+        row = connection.execute(
+            "SELECT aliases_json FROM canonical_concepts WHERE concept_id = ?",
+            ("purchase_order.id",),
+        ).fetchone()
+        assert row is not None
+        aliases = set(json.loads(row[0]))
+        aliases.update({"130", "140", "196"})
+        connection.execute(
+            "UPDATE canonical_concepts SET aliases_json = ? WHERE concept_id = ?",
+            (json.dumps(sorted(aliases)), "purchase_order.id"),
+        )
+
+    response = client.get("/knowledge/canonical-concepts", headers=admin_headers())
+
+    assert response.status_code == 200
+    payload = response.json()
+    purchase_order_id = next(item for item in payload if item["concept_id"] == "purchase_order.id")
+    assert "130" not in purchase_order_id["base_aliases"]
+    assert "140" not in purchase_order_id["base_aliases"]
+    assert "196" not in purchase_order_id["base_aliases"]
+    assert "ebeln" in purchase_order_id["base_aliases"]
+
+
 def test_catalog_search_endpoint_returns_metadata_and_concept_matches() -> None:
     settings.admin_api_token = "secret-token"
 
@@ -1849,6 +2517,85 @@ def test_transformation_test_set_run_reports_assertion_failures() -> None:
     assert "Expected output values ['Wrong Name']" in payload["case_results"][0]["failures"][0]
 
 
+def test_transformation_test_set_run_blocks_non_accepted_mapping_decisions() -> None:
+    create_response = client.post(
+        "/mapping/transformation/test-sets",
+        json={
+            "name": "customer-name-transform-review",
+            "mapping_decisions": [
+                {
+                    "source": "email",
+                    "target": "customer_name",
+                    "status": "needs_review",
+                    "transformation_code": 'df_target["customer_name"] = df_source["email"].str.title()',
+                }
+            ],
+            "cases": [
+                {
+                    "case_name": "blocked until review is closed",
+                    "source_rows": [{"email": "ana.markovic@example.com"}],
+                    "assertions": [
+                        {
+                            "target": "customer_name",
+                            "expected_status": "validated",
+                            "expected_classification": "safe",
+                            "expected_warning_codes": [],
+                            "expected_output_values": ["Ana.Markovic@Example.Com"],
+                        }
+                    ],
+                }
+            ],
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 409
+    assert create_response.json()["detail"] == (
+        "Transformation test set save is blocked until all active mapping decisions are accepted. "
+        "Review statuses: needs_review."
+    )
+
+
+def test_transformation_test_set_run_blocks_persisted_non_accepted_mapping_decisions() -> None:
+    persisted = persistence_service.save_transformation_test_set(
+        "customer-name-transform-review",
+        [
+            {
+                "source": "email",
+                "target": "customer_name",
+                "status": "needs_review",
+                "transformation_code": 'df_target["customer_name"] = df_source["email"].str.title()',
+            }
+        ],
+        [
+            {
+                "case_name": "blocked until review is closed",
+                "source_rows": [{"email": "ana.markovic@example.com"}],
+                "assertions": [
+                    {
+                        "target": "customer_name",
+                        "expected_status": "validated",
+                        "expected_classification": "safe",
+                        "expected_warning_codes": [],
+                        "expected_output_values": ["Ana.Markovic@Example.Com"],
+                    }
+                ],
+            }
+        ],
+    )
+
+    run_response = client.post(
+        f"/mapping/transformation/test-sets/{persisted.test_set_id}/run",
+        headers=admin_headers(),
+    )
+
+    assert run_response.status_code == 409
+    assert run_response.json()["detail"] == (
+        "Transformation test set run is blocked until all active mapping decisions are accepted. "
+        "Review statuses: needs_review."
+    )
+
+
 def test_transformation_generation_endpoint_returns_llm_generated_code() -> None:
     upload_response = client.post(
         "/upload",
@@ -2018,7 +2765,7 @@ def test_reusable_correction_rule_candidates_endpoint_groups_repeated_history() 
                 "source": "cust_ref",
                 "suggested_target": "customer_id",
                 "corrected_target": "account_id",
-                "status": "overridden",
+                "status": "accepted",
                 "note": "Prefer account id",
             }
         )
@@ -2028,9 +2775,9 @@ def test_reusable_correction_rule_candidates_endpoint_groups_repeated_history() 
     assert response.status_code == 200
     payload = response.json()
     assert payload[0]["source"] == "cust_ref"
-    assert payload[0]["status"] == "overridden"
+    assert payload[0]["status"] == "accepted"
     assert payload[0]["occurrence_count"] == 3
-    assert "Promote override rule" in payload[0]["recommendation"]
+    assert "Prefer target 'account_id'" in payload[0]["recommendation"]
 
 
 def test_reusable_correction_rule_promotion_endpoint_persists_rule_and_marks_candidate() -> None:
@@ -2042,7 +2789,7 @@ def test_reusable_correction_rule_promotion_endpoint_persists_rule_and_marks_can
                 "source": "cust_ref",
                 "suggested_target": "customer_id",
                 "corrected_target": "account_id",
-                "status": "overridden",
+                "status": "accepted",
                 "note": "Prefer account id",
             }
         )
@@ -2053,7 +2800,7 @@ def test_reusable_correction_rule_promotion_endpoint_persists_rule_and_marks_can
             "source": "cust_ref",
             "suggested_target": "customer_id",
             "corrected_target": "account_id",
-            "status": "overridden",
+            "status": "accepted",
             "occurrence_count": 3,
             "created_by": "demo-user",
             "note": "Promoted from repeated overrides",
@@ -2082,6 +2829,58 @@ def test_reusable_correction_rule_promotion_endpoint_persists_rule_and_marks_can
     assert candidates_response.status_code == 200
     assert candidates_response.json()[0]["already_promoted"] is True
     assert candidates_response.json()[0]["promoted_rule_id"] == promoted["rule_id"]
+
+
+def test_reusable_correction_rule_candidates_ignore_repeated_unclosed_override_history() -> None:
+    settings.admin_api_token = "secret-token"
+
+    for _ in range(3):
+        correction_store.append(
+            {
+                "source": "cust_ref",
+                "suggested_target": "customer_id",
+                "corrected_target": "account_id",
+                "status": "overridden",
+                "note": "Legacy unresolved override",
+            }
+        )
+
+    response = client.get("/observability/corrections/reusable-rules", headers=admin_headers())
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_reusable_correction_rule_promotion_rejects_unclosed_override_history() -> None:
+    settings.admin_api_token = "secret-token"
+
+    for _ in range(3):
+        correction_store.append(
+            {
+                "source": "cust_ref",
+                "suggested_target": "customer_id",
+                "corrected_target": "account_id",
+                "status": "overridden",
+                "note": "Legacy unresolved override",
+            }
+        )
+
+    promote_response = client.post(
+        "/observability/corrections/reusable-rules/promote",
+        json={
+            "source": "cust_ref",
+            "suggested_target": "customer_id",
+            "corrected_target": "account_id",
+            "status": "overridden",
+            "occurrence_count": 3,
+            "created_by": "demo-user",
+            "note": "Should be blocked",
+        },
+        headers=admin_headers(),
+    )
+
+    assert promote_response.status_code == 400
+    assert promote_response.json()["detail"] == "Reusable correction rules require closed review outcomes (accepted or rejected)."
 
 
 def test_runtime_config_endpoints_expose_and_reload_settings() -> None:
@@ -2161,7 +2960,7 @@ def test_saved_benchmark_correction_impact_reports_improvement_from_history() ->
                 "source": "cust_ref",
                 "suggested_target": "customer_id",
                 "corrected_target": "account_id",
-                "status": "overridden",
+                "status": "accepted",
                 "note": "Historical correction prefers account id",
             }
         )

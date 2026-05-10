@@ -2,764 +2,337 @@
 
 ## What Semantra Is
 
-Semantra is an explainable semantic mapping product slice for aligning source and target schemas under analyst control.
+Semantra is a semantic mapping and governance workbench for analyst-guided integration design.
 
-It is designed around a deterministic-first review loop:
-- ingest source and target structures
-- profile schemas and rank candidate mappings
-- enrich matching with metadata knowledge and custom overlays
-- use constrained AI only where it adds clear value
-- preview transformations before execution
-- persist feedback, reusable rules, mapping sets, and evaluation artifacts
+It is built around a deterministic-first loop:
 
-Semantra is already useful as a pilot-grade semantic mapping and review engine. It is not yet a full ETL platform, orchestration layer, or connector-heavy integration suite.
+1. ingest source and target structures
+2. profile schemas and rank mapping candidates
+3. enrich matching with metadata knowledge, canonical concepts, and prior review memory
+4. use bounded AI only where it adds explainable value
+5. review, refine, preview, and persist governed artifacts
+
+The current product is pilot-ready for controlled analyst and stewardship workflows. It is not yet a production ETL runtime, enterprise connector platform, or orchestration engine.
 
 ## Product Goal
 
 The goal of Semantra is to make schema mapping:
+
 - explainable
-- measurable
 - reviewable
-- improvable over time
+- measurable
+- reusable
+- improvable through governed feedback
 
-Instead of asking a free-form LLM to "map everything", Semantra keeps the core workflow deterministic and uses AI only in bounded, inspectable steps such as ambiguity resolution and transformation generation.
+The product does not treat LLMs as an autonomous mapper. Instead, it keeps the main inference path deterministic and uses AI only inside bounded, inspectable surfaces such as ambiguity review, transformation generation, and canonical-gap suggestion.
 
-## Current Scope
+## Product Shape Today
 
-Current MVP scope includes:
-- CSV, JSON, XML, and XLSX row-data upload for source and target datasets
-- CSV/XLSX schema-spec upload for source and target cases where each row describes one field rather than one business record
-- SQL schema snapshot upload plus table discovery and explicit table selection for multi-table snapshots
-- schema profiling with lexical, pattern, and statistical hints
-- multi-signal candidate ranking with top-k alternatives and one-to-one assignment
-- canonical business glossary matching with a file-backed glossary, canonical signal scoring, and source/target/project canonical coverage summaries
-- source-only canonical mapping against a virtual target schema synthesized from `canonical_glossary.csv`
-- explicit source -> concept -> target review support through canonical path details and grouped review tables
-- optional constrained LLM validation in ambiguity-band cases
-- prompt-driven pandas transformation generation for reviewed field pairs
-- transformation preview with syntax checks, dry-run execution, before/after samples, structured warnings, and generated code output
-- custom knowledge overlays layered on top of built-in metadata knowledge, including concept aliases that extend canonical concept matching
-- persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets
-- lightweight mapping-set status workflow with `draft`, `review`, `approved`, and `archived`, now extended by the first Epic 6 governance slice
-- internal Streamlit UI for `Standard` and `Canonical` setup flows, row-data/schema-spec upload modes, trust-layer review, canonical concept views, transformations, corrections, benchmarks, knowledge overlays, and admin/debug flows
+Semantra currently consists of:
 
-Out of scope for the current slice:
-- authentication and role-based access control
-- production-grade frontend
-- database connectors beyond the current flat-file workflow
-- distributed job orchestration
-- complex multi-table graph mapping
-- production writeback into destination systems
-- cross-project canonical governance and approval workflow
+- a FastAPI backend in `backend/app`
+- a Streamlit product UI in `streamlit_app.py` and `streamlit_ui/*`
+- a SQLite persistence layer in `backend/semantra.sqlite3`
+- file-backed canonical/metadata seed inputs with DB-first runtime loading when the persisted seed is current
 
-## Core Concept
+The main top-level UI areas are:
 
-Semantra treats data mapping as a multi-signal inference problem with explicit review surfaces.
+- `Workspace`
+- `Canonical Console`
+- `Catalog`
+- `Benchmarks`
+- `Admin / Debug`
 
-Each source field is compared against target fields using a blend of lexical, semantic, metadata, pattern, statistical, overlap, optional embedding, and historical feedback signals. The result is a ranked candidate list with explanations, not a blind one-shot guess.
+## Core Functional Areas
 
-The product then layers controlled trust mechanisms on top of that ranking:
-- knowledge overlays that can refine semantic matching without editing base assets
-- canonical business concepts that let the review surface reason over source -> concept -> target paths instead of only source -> target guesses
-- corrections and promoted reusable rules that improve future ranking behavior
-- transformation preview and generated-code validation before the analyst commits to an execution artifact
-- saved mapping sets and transformation test sets that make review and replay more structured
+### 1. Ingestion and schema profiling
 
-## Main Functional Areas
+Implemented today:
 
-### 1. Dataset Ingestion and Profiling
+- row-data upload for CSV, JSON, XML, and XLSX
+- SQL snapshot upload with explicit table selection for multi-table files
+- schema-spec upload where each row represents one field
+- source companion metadata enrichment over an existing uploaded dataset
 
 Purpose:
-- accept uploaded row-based files, field-per-row schema specifications, and schema snapshots
-- assign dataset identifiers
-- build the schema profile used by the mapping engine and trust layer
 
-Current behavior:
-- `Standard` mode uploads source and target datasets separately
-- `Canonical` mode uploads and profiles only the source side, while the target is synthesized later as a virtual canonical schema
-- row-based uploads support CSV, JSON, XML, and XLSX
-- spec uploads support field-per-row CSV/XLSX layouts through dedicated detection and parsing endpoints
-- SQL uploads remain schema-only and can require explicit table selection for multi-table snapshots
-- each upload produces a dataset handle and schema profile; preview rows exist only when row data is available
+- turn various source/target structure representations into a `SchemaProfile`
+- preserve row preview when row data exists
+- support schema-only mapping flows when sample rows do not exist yet
 
-Implementation anchors:
+Main anchors:
+
 - `backend/app/api/routes/upload.py`
-- `backend/app/services/spec_upload_service.py`
-- `backend/app/services/tabular_upload_service.py`
-- `backend/app/services/profiling_service.py`
 - `backend/app/services/upload_store.py`
+- `backend/app/services/spec_upload_service.py`
+- `backend/app/services/schema_snapshot_service.py`
 
-### 2. Mapping Engine
+### 2. Mapping engine
 
-Purpose:
-- generate explainable mapping candidates from a source schema to either a concrete target schema or a virtual canonical target
+Implemented today:
 
-Current behavior:
-- `POST /mapping/auto` computes source-target scores across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, optional embedding, correction, and optional LLM signals
-- `POST /mapping/canonical` reuses the same ranking stack against a virtual canonical target schema built from the glossary layer
-- return top-k ranked candidates per source field
-- apply a greedy global one-to-one assignment step for selected mappings
-- attach signal breakdowns, canonical concept details, and explanation lines to both selected mappings and ranked candidates
-- return source, target, and project-level canonical coverage summaries alongside the mapping payload
-- the canonical-only API is currently system-neutral and limited to `target_system="canonical"`; SAP, Workday, and QAD virtual targets remain future work
+- standard source-to-target mapping
+- canonical-only source-to-business-concept mapping
+- top-k candidate ranking with one-to-one assignment
+- signal fusion across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, embedding, correction, and optional LLM inputs
+- project/source/target canonical coverage reporting
+- async mapping jobs with progress polling
 
-Important implementation notes:
-- the weighted score is now normalized and clamped into the `0..1` range, but it remains a ranking heuristic rather than a calibrated probability
-- current confidence labels use thresholding over that normalized score: `high >= 0.85`, `medium >= 0.65`, otherwise `low`
-- correction signal now includes both raw feedback history and promoted reusable rules
-- the knowledge signal can be influenced by both built-in metadata assets and active knowledge overlays
-- the canonical signal is currently glossary-driven and file-backed; it is not yet a governed enterprise semantic model
+Important behavior:
 
-Implementation anchor:
+- confidence is a normalized ranking heuristic, not a calibrated probability
+- current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
+
+Detailed signal, score, and bounded LLM behavior is documented in `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
+
+Main anchors:
+
 - `backend/app/services/mapping_service.py`
-
-### 3. Constrained LLM Validation and Transformation Generation
-
-Purpose:
-- use AI in bounded, inspectable steps instead of handing over the full mapping workflow
-
-Current behavior:
-- ambiguity-band validation can re-rank only the closed candidate set or return `no_match`
-- prompt-driven transformation generation produces pandas-oriented code for a selected source-target pair
-- provider adapters currently cover OpenAI Responses API, OpenAI-compatible LM Studio endpoints, and Ollama
-
-Implementation anchors:
-- `backend/app/services/llm_service.py`
 - `backend/app/api/routes/mapping.py`
+- `backend/app/services/mapping_job_service.py`
 
-### 4. Transformation Safety, Preview, and Codegen
+### 3. Review and decisioning
 
-Purpose:
-- make reviewed transformations inspectable before they become code artifacts
+Implemented today:
 
-Current behavior:
-- preview executes reviewed `transformation_code` against sample rows
-- preview returns `before_samples`, `after_samples`, `status`, `classification`, and structured warnings
-- warnings cover syntax errors, runtime errors, missing source columns, null expansion, type coercion, and row-count mismatch
-- code generation emits Pandas starter code and now returns structured warning objects when it must skip or fall back
-- reusable transformation templates exist for common text cleanup and formatting patterns
-- transformation test sets can be saved and executed as lightweight regression cases
+- trust-layer explanations and signal breakdowns
+- source-to-concept and concept-to-target review views
+- manual target adjustment
+- decision export/import as JSON and Excel
+- reusable transformation templates and manual transformation editing
 
-Implementation anchors:
-- `backend/app/services/transformation_service.py`
+This turns the engine output into an analyst-controlled review surface rather than an opaque guess.
+
+Main anchors:
+
+- `streamlit_ui/workspace_review_views.py`
+- `streamlit_ui/workspace_decision_views.py`
+- `streamlit_ui/mapping_helpers.py`
+
+### 4. Preview, code generation, and transformation testing
+
+Implemented today:
+
+- advisory preview over active mapping decisions
+- Pandas code generation
+- LLM transformation generation when configured
+- structured transformation warnings and fallback behavior
+- transformation test set save/list/detail/run flows
+
+Important product contract:
+
+- preview is intentionally advisory and can run before all decisions are accepted
+- code generation and transformation test-set persistence/execution are governance-gated
+
+Detailed preview/codegen warning behavior and classification is documented in `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
+
+Detailed transformation test-set assertion and run behavior is documented in `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`.
+
+Main anchors:
+
 - `backend/app/services/preview_service.py`
 - `backend/app/services/codegen_service.py`
-- `backend/app/services/transformation_template_service.py`
 - `backend/app/services/transformation_test_service.py`
+- `backend/app/api/routes/mapping.py`
 
-### 5. Knowledge Overlay and Canonical Glossary Runtime
+### 5. Mapping-set governance and reuse
 
-Purpose:
-- let a team add project-specific aliases, abbreviations, and synonyms without editing base metadata files
-- maintain a canonical business glossary that can participate directly in mapping and trust-layer explanation
+Implemented today:
 
-Current behavior:
-- CSV overlays can be validated, saved, listed, inspected, activated, deactivated, rolled back, archived, and reloaded at runtime
-- overlay entries are merged into metadata-driven semantic expansion and explanation generation
-- `concept_alias` overlay entries validate against the canonical glossary and extend canonical concept matching at runtime
-- canonical glossary CSV can be imported/exported through admin-protected API endpoints and the Streamlit admin/debug surface
-- overlay lifecycle changes are audit logged
+- versioned mapping-set persistence
+- status workflow: `draft`, `review`, `approved`, `archived`
+- `owner`, `assignee`, and `review_note`
+- audit trail and version diff
+- approved-only apply/reuse back into Workspace
 
-Implementation anchors:
-- `backend/app/services/knowledge_overlay_service.py`
-- `backend/app/services/metadata_knowledge_service.py`
-- `backend/app/api/routes/knowledge.py`
+This is the first durable governance layer around reviewed mapping results.
 
-### 6. Correction Learning and Reusable Rules
+Main anchors:
 
-Purpose:
-- turn explicit analyst feedback into durable ranking improvements
+- `backend/app/api/routes/mapping.py`
+- `backend/app/services/persistence_service.py`
+- `streamlit_ui/workspace_decision_views.py`
 
-Current behavior:
-- corrections distinguish `accepted`, `rejected`, and `overridden`
-- correction history can boost corrected targets and penalize previously wrong suggestions
-- repeated history can be surfaced as reusable rule candidates
-- candidates can now be promoted into persisted reusable rules
-- promoted rules are stronger than raw history and appear in mapping explanations as an explicit influence
+### 6. Corrections and reusable learning
 
-Implementation anchors:
+Implemented today:
+
+- durable correction history
+- reviewed correction save flow in the UI
+- reusable-rule candidate generation and promotion
+- correction impact evaluation against saved benchmark datasets
+- correction-aware influence back into ranking
+
+Important current rule:
+
+- only closed review outcomes can become durable learning input
+
+Main anchors:
+
 - `backend/app/services/correction_service.py`
 - `backend/app/api/routes/observability.py`
 
-### 7. Mapping Sets and Lightweight Governance Slice
+### 7. Canonical layer and overlay lifecycle
 
-Purpose:
-- make reviewed mapping decisions persistable, replayable, and status-aware
+Implemented today:
 
-Current behavior:
-- mapping sets can be saved with versioning by name
-- each saved version carries `draft`, `review`, `approved`, or `archived` status
-- status changes are audit logged
-- saved sets can be reloaded back into the current Streamlit review state
-- mapping sets now also carry `owner`, `assignee`, and `review_note` metadata at the version level
-- applying a saved mapping set back into the active review state is audit logged
-- version diff views are available for comparing two versions of the same mapping set
-- stronger export/run gates are still planned under the remaining Epic 6 governance work
+- canonical glossary runtime
+- canonical glossary import/export
+- knowledge overlay validation, create, list, activate, deactivate, archive, rollback, reload, and reseed flows
+- canonical-gap candidate extraction and LLM-assisted suggestion
+- approve/reject/ignore/proposal-state handling for canonical-gap stewardship
+- overlay-promotion stewardship and explicit promotion to the stable glossary
 
-Implementation anchors:
-- `backend/app/api/routes/mapping.py`
-- `backend/app/services/persistence_service.py`
-- `streamlit_app.py`
-- `streamlit_ui/workspace_views.py`
-- `streamlit_ui/workspace_decision_views.py`
+Important current boundary:
 
-### 7A. Enterprise Integration Catalog
+- canonical runtime is DB-first at runtime, but canonical authoring still includes file-backed reseed inputs
 
-Purpose:
-- turn versioned mapping sets and canonical coverage into a searchable enterprise inventory of reviewed integrations
+Main anchors:
 
-Current implemented slice:
-- saved mapping sets now also populate a queryable catalog summary keyed by `integration_name`, source system, target system, business domain, owner, artifact type, canonical concepts, and unmatched sources
-- catalog APIs now expose list, detail, search, and canonical concept lookup flows over saved mapping versions
-- catalog detail now exposes similar integration suggestions based on shared canonical footprint and metadata overlap
-- Streamlit now includes a dedicated Catalog tab with search, filters, integration detail, mapping-set drilldown, audit/diff access, similar integration navigation, and `Reuse in Workspace`
+- `backend/app/api/routes/knowledge.py`
+- `backend/app/services/metadata_knowledge_service.py`
+- `backend/app/services/knowledge_overlay_service.py`
+- `backend/app/services/canonical_gap_service.py`
 
-Current remaining gap:
-- catalog identity is still grouped by `integration_name`, not yet by a separate long-lived `IntegrationAsset` entity
-- similarity is currently derived from shared canonical footprint and metadata overlap, not yet from explicit curated reuse links
-- catalog governance still reuses mapping-set lifecycle primitives instead of a separate catalog administration model
+Detailed canonical runtime, overlay lifecycle, and stewardship behavior is documented in `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
 
-Target model:
-- `IntegrationAsset` as the stable identity for one business integration or interface
-- `MappingSetVersion` as the reviewable version artifact already present in the current product
-- `CanonicalCoverageSnapshot` as the queryable semantic footprint of one saved version
-- `MappingActivityIndex` as searchable `source -> concept -> target` rows for reuse and audit
-- `ReuseLink` as an explicit or derived relation between similar integrations that share canonical paths
+### 8. Canonical Console
 
-Minimal MVP delivered today:
-- extend mapping-set metadata with `integration_name`, `source_system`, `target_system`, `business_domain`, and `interface_type`
-- persist a queryable summary of canonical concepts, unmatched fields, and artifact type (`standard` vs `canonical-only`)
-- add catalog discovery APIs and a Streamlit catalog view with search, filters, drilldown, similar integration discovery, and reuse into Workspace
-- support canonical-only artifacts so source-to-concept work becomes catalogable before a concrete target exists
+Implemented today:
 
-Current catalog endpoints:
-- `GET /catalog/integrations`
-- `GET /catalog/search?q=...`
-- `GET /catalog/integrations/{integration_name}`
-- `GET /catalog/concepts/{concept_id}`
+- top-level console for canonical concept registry and governance
+- concept detail with aliases, contexts, active overlay entries, catalog usage, and audit references
+- active overlay summary and lifecycle actions
+- mirrored canonical-gap queue from Workspace review
+- stewardship item detail for `canonical_gap` and `overlay_promotion`
+- explicit promote-to-glossary execution flow
 
-Reference:
-- see `docs/vision/INTEGRATION_CATALOG_VISION.md` for the fuller target model and MVP shape
+Current maturity:
 
-### 8. Evaluation and Benchmarking
+- the core happy-path canonical governance loop is pilot-complete
+- remaining work here is stabilization and wider productization rather than missing core flow
 
-Purpose:
-- measure mapping quality and learning effects with repeatable datasets
+Main anchors:
 
-Current behavior:
-- run the built-in benchmark fixture or custom ad hoc payloads
-- save benchmark datasets in SQLite and re-run them later
-- compare baseline vs correction-aware performance through correction-impact evaluation
-- persist evaluation run history for later inspection
+- `streamlit_ui/admin_views.py`
+- `backend/app/api/routes/knowledge.py`
 
-Implementation anchors:
+Detailed Canonical Console and stewardship behavior is documented in `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
+
+### 9. Enterprise Integration Catalog
+
+Implemented today:
+
+- integration list/search/detail APIs
+- concept-centric catalog detail
+- Streamlit Catalog browse/search/drilldown flows
+- reuse into Workspace from approved mapping-set artifacts
+
+Current boundary:
+
+- basic reuse discovery exists
+- richer concept/reuse visualization remains open
+
+Main anchors:
+
+- `backend/app/api/routes/catalog.py`
+- `streamlit_ui/catalog_views.py`
+
+Detailed catalog search, similarity, and reuse behavior is documented in `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
+
+### 10. Benchmarks and evaluation
+
+Implemented today:
+
+- built-in and custom benchmark run endpoints
+- saved benchmark dataset create/list/run flows
+- evaluation run history
+- correction-impact measurement
+
+Detailed benchmark metric and correction-impact interpretation is documented in `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`.
+
+Main anchors:
+
 - `backend/app/api/routes/evaluation.py`
 - `backend/app/services/evaluation_service.py`
-- `backend/tests/fixtures/mapping_gold.json`
-
-### 9. Streamlit Review UI
-
-Purpose:
-- provide a fast operator-facing surface for demo, pilot, and analyst review workflows
-
-Current behavior:
-- choose `Standard` or `Canonical` mapping mode in `Workspace > Setup`
-- upload source and target files in `Standard` mode, or source only in `Canonical` mode
-- choose `Row data` or `Schema spec` when the uploaded file looks like a field specification
-- review ranked candidates and trust-layer explanations
-- inspect explicit `Source -> Concept` and `Concept -> Target` tables plus grouped canonical concept summaries
-- edit mappings manually and attach transformations when a real target dataset exists
-- use canonical-only review and decision flows without preview/codegen until a later standard run supplies a real target
-- save corrections, promote reusable rules, manage knowledge overlays, import/export canonical glossary data, save mapping sets, inspect benchmarks, and use admin/debug tools
-
-Implementation anchor:
-- `streamlit_app.py`
-- `streamlit_ui/workspace_views.py`
-- `streamlit_ui/workspace_review_views.py`
-- `streamlit_ui/workspace_decision_views.py`
-- `streamlit_ui/admin_views.py`
 - `streamlit_ui/benchmark_views.py`
 
-## Main Workflows
+## Governance Model Today
 
-Semantra currently supports eight practical workflows.
+Semantra already enforces several concrete governance contracts, not just passive statuses.
 
-### Workflow 1. Upload, Detect Specs, and Generate Mapping
+Implemented backend-enforced rules include:
 
-Input:
-- source and target files, schema specs, or SQL schema snapshots
-- optional source-only canonical input when no real target file exists yet
+- only approved mapping sets can be applied or reused in Workspace flows
+- code generation requires accepted active mapping decisions
+- saving the current mapping as a benchmark requires accepted active decisions
+- reviewed corrections require closed review outcomes
+- reusable-rule promotion rejects unresolved review states
+- canonical-gap approval requires proposal state `ready_for_approval`
+- overlay activation requires `validated`
+- overlay archive allows only `validated` or `active`
+- transformation test-set save and run require accepted active decisions
 
-Process:
-- optionally detect field-per-row spec layouts
-- parse uploads into schema profiles
-- build schema profiles
-- score source-to-target or source-to-canonical candidate mappings
-- optionally invoke constrained LLM validation inside the ambiguity band
-- apply one-to-one assignment and return top-k ranked alternatives
+Intentional distinction:
 
-Result:
-- profiled datasets or a source-only canonical-ready upload context
-- selected mappings or canonical concept suggestions
-- ranked candidates with explanation and signal breakdowns
-- canonical concept details and canonical coverage for the active source/target or source/canonical pair
+- preview remains advisory so analysts can inspect behavior before final approval
+- durable artifact and execution-like surfaces remain governed
 
-Endpoints:
-- `POST /upload`
-- `POST /upload/sql/tables`
-- `POST /upload/spec/detect`
-- `POST /upload/spec`
-- `POST /mapping/auto`
-- `POST /mapping/canonical`
+## Architecture Notes
 
-### Workflow 2. Review, Transform, Preview, and Generate Code
+### Backend
 
-Input:
-- reviewed mapping decisions
-- optional custom or generated transformation code
+The FastAPI backend exposes six main API domains:
 
-Process:
-- preview transformed rows against sample source data
-- classify transformations as `direct`, `safe`, or `risky`
-- surface structured preview warnings
-- generate Pandas starter code for the reviewed mapping set
-
-Result:
-- preview rows
-- transformation previews with warnings and samples
-- generated Pandas artifact
-
-Note:
-- preview and code generation are currently available only in `Standard` mode with a real target dataset
-
-Endpoints:
-- `POST /mapping/preview`
-- `POST /mapping/codegen`
-- `GET /mapping/transformation/templates`
-- `POST /mapping/transformation/generate`
-
-### Workflow 3. Learn From Corrections
-
-Input:
-- user-reviewed decisions and correction notes
-
-Process:
-- persist correction history
-- aggregate repeated corrections into reusable rule candidates
-- promote stable patterns into persisted reusable rules
-- apply both raw history and promoted rules back into future ranking
-
-Result:
-- correction memory
-- promoted reusable rules
-- stronger explainable feedback signal in future runs
-
-Endpoints:
-- `GET /observability/corrections`
-- `POST /observability/corrections`
-- `GET /observability/corrections/reusable-rules`
-- `GET /observability/corrections/reusable-rules/active`
-- `POST /observability/corrections/reusable-rules/promote`
-
-### Workflow 4. Manage Knowledge Overlays
-
-Input:
-- overlay CSV files with aliases, abbreviations, and synonyms
-- optional canonical glossary CSV import/export actions
-
-Process:
-- validate uploaded rows
-- save a versioned overlay
-- inspect entries
-- activate, deactivate, rollback, archive, or reload runtime knowledge
-- import or export the canonical glossary CSV used by the canonical signal layer
-
-Result:
-- active project-specific knowledge layer on top of built-in metadata
-- active canonical glossary that can drive source -> concept -> target explanations and project-level coverage summaries
-- audit trail for knowledge lifecycle changes
-
-Endpoints:
-- `POST /knowledge/overlays/validate`
-- `POST /knowledge/overlays`
-- `GET /knowledge/overlays`
-- `GET /knowledge/overlays/{overlay_id}`
-- `POST /knowledge/overlays/{overlay_id}/activate`
-- `POST /knowledge/overlays/{overlay_id}/deactivate`
-- `POST /knowledge/overlays/{overlay_id}/archive`
-- `POST /knowledge/overlays/rollback`
-- `GET /knowledge/audit`
-- `GET /knowledge/canonical-concepts`
-- `GET /knowledge/canonical-concepts/{concept_id}`
-- `GET /knowledge/canonical-glossary/export`
-- `POST /knowledge/canonical-glossary/import`
-- `POST /knowledge/reload`
-
-### Workflow 5. Save and Version Mapping Sets
-
-Input:
-- current reviewed mapping decisions
-- optional author and note metadata
-
-Process:
-- save a versioned mapping set by name
-- update status across `draft`, `review`, `approved`, and `archived`
-- inspect audit history
-- reload a saved version into the current review state
-
-Result:
-- reusable mapping-set artifacts instead of session-only JSON exports
-- lightweight governance trail around create, status change, apply, and version diff review
-
-Endpoints:
-- `POST /mapping/sets`
-- `GET /mapping/sets`
-- `GET /mapping/sets/{mapping_set_id}`
-- `POST /mapping/sets/{mapping_set_id}/apply`
-- `POST /mapping/sets/{mapping_set_id}/status`
-- `GET /mapping/sets/{mapping_set_id}/audit`
-- `GET /mapping/sets/{mapping_set_id}/diff?against_id=<other_version_id>`
-
-### Workflow 6. Save and Run Transformation Test Sets
-
-Input:
-- reviewed mapping decisions
-- named transformation test cases with assertions
-
-Process:
-- persist named test sets
-- run them against preview logic
-- compare actual preview output and warning codes with expectations
-
-Result:
-- lightweight regression safety net for reviewed transformations
-
-Endpoints:
-- `POST /mapping/transformation/test-sets`
-- `GET /mapping/transformation/test-sets`
-- `GET /mapping/transformation/test-sets/{test_set_id}`
-- `POST /mapping/transformation/test-sets/{test_set_id}/run`
-
-### Workflow 7. Benchmark and Evaluate
-
-Input:
-- built-in fixtures, ad hoc evaluation cases, or saved benchmark datasets
-
-Process:
-- measure mapping accuracy
-- compare baseline vs correction-aware performance
-- persist evaluation runs for later inspection
-
-Result:
-- measurable quality outputs for heuristics and feedback loops
-
-Endpoints:
-- `GET /evaluation/benchmark`
-- `POST /evaluation/run`
-- `POST /evaluation/datasets`
-- `GET /evaluation/datasets`
-- `POST /evaluation/datasets/{dataset_id}/run`
-- `POST /evaluation/datasets/{dataset_id}/correction-impact`
-- `GET /evaluation/runs`
-
-### Workflow 8. Review in Streamlit UI
-
-Input:
-- uploaded source and target files
-- reviewed mappings, corrections, and optional benchmark or governance metadata
-
-Process:
-- run upload and review flows from a single operator surface
-- inspect explanations, canonical source/concept/target views, transformation previews, reusable rule candidates, knowledge overlays, benchmarks, saved mapping sets, and the catalog view over saved integrations
-- apply saved mapping-set versions back into the current review state either from Decisions or directly from Catalog via `Reuse in Workspace`
-
-Result:
-- fast analyst-friendly validation layer on top of the backend APIs, plus a reusable catalog surface for search, drilldown, and mapping-set reuse
-
-Implementation anchor:
-- `streamlit_app.py`
-- `streamlit_ui/workspace_views.py`
-- `streamlit_ui/workspace_review_views.py`
-- `streamlit_ui/workspace_decision_views.py`
-- `streamlit_ui/catalog_views.py`
-- `streamlit_ui/admin_views.py`
-- `streamlit_ui/benchmark_views.py`
-
-## Architecture
-
-Semantra uses a layered FastAPI backend plus a modular Streamlit review UI.
-
-### Application Layer
-
-Responsible for:
-- app bootstrap
-- middleware setup
-- router registration
-
-Key file:
-- `backend/app/main.py`
-
-### API Layer
-
-Responsible for:
-- request/response handling
-- lightweight validation
-- route-level orchestration
-
-Main route groups:
-- `mapping`
-- `observability`
-- `evaluation`
-- `knowledge`
 - `upload`
+- `mapping`
+- `knowledge`
+- `catalog`
+- `evaluation`
+- `observability`
 
-Location:
-- `backend/app/api/routes/`
+### UI
 
-### Core Layer
+The Streamlit UI has been decomposed into focused modules under `streamlit_ui/*`, while `streamlit_app.py` primarily acts as a composition root and navigation shell.
 
-Responsible for:
-- runtime settings
-- `.env` and environment variable loading
-- settings reload behavior
-- logging setup
+### Persistence
 
-Location:
-- `backend/app/core/`
+SQLite stores:
 
-### Domain Model Layer
+- mapping sets and audit logs
+- benchmark datasets and evaluation runs
+- transformation test sets
+- correction history and reusable rules
+- canonical and knowledge runtime data
+- stewardship items and knowledge audit logs
 
-Responsible for:
-- schema models
-- mapping models
-- evaluation models
-- observability models
+### Runtime limitations
 
-Location:
-- `backend/app/models/`
+Current known architectural boundaries:
 
-### Service Layer
+- background jobs are still in-memory/thread based
+- canonical authoring is not yet fully DB-only
+- some persistence models still use JSON-heavy storage patterns that are acceptable for pilot scope but not ideal for long-term scale
 
-Responsible for the main product logic:
-- upload store
-- profiling
-- mapping
-- embedding
-- llm validation
-- knowledge overlay and metadata runtime enrichment
-- preview
-- code generation
-- transformation templates and transformation tests
-- decision logging
-- correction handling
-- mapping-set persistence and lightweight governance state
-- persistence
-- evaluation
+## What Semantra Is Not Yet
 
-Location:
-- `backend/app/services/`
+Not yet in current scope:
 
-### Streamlit UI Layer
+- production scheduler or batch orchestration platform
+- connector-rich ingestion layer
+- destination-system writeback engine
+- multi-step RBAC enterprise workflow model
+- graph-native lineage platform
 
-Responsible for:
-- composition of the operator-facing review app
-- API client helpers and runtime status widgets
-- mapping-state helpers and trust-layer presentation helpers
-- workspace, decision, admin/debug, and benchmark tab rendering
+## Recommended Reading Order
 
-Current shape:
-- `streamlit_app.py` acts as the composition root and compatibility wrapper surface for focused AST-based tests
-- extracted UI responsibilities live in `streamlit_ui/api.py`, `streamlit_ui/shared_views.py`, `streamlit_ui/mapping_state.py`, `streamlit_ui/mapping_helpers.py`, `streamlit_ui/workspace_views.py`, `streamlit_ui/workspace_review_views.py`, `streamlit_ui/workspace_decision_views.py`, `streamlit_ui/admin_views.py`, and `streamlit_ui/benchmark_views.py`
+If you need the most grounded view first:
 
-### Utility Layer
+1. `project_docs/current_state.md`
+2. `README.md`
+3. `PROJECT_OVERVIEW.md`
+4. `project_docs/completed_slices.md`
+5. `project_docs/plan.md`
+6. `project_docs/epics.md`
 
-Responsible for:
-- name normalization
-- token enrichment
-- low-level similarity helpers
-
-Location:
-- `backend/app/utils/`
-
-### Storage Model
-
-Semantra currently uses two storage modes:
-
-1. In-memory storage
-   Used for active uploaded datasets during the current process lifetime.
-
-2. SQLite storage
-   Used for:
-   - decision logs
-   - user corrections
-   - reusable correction rules
-   - mapping sets
-   - mapping-set audit logs
-   - saved benchmark datasets
-   - saved evaluation runs
-   - transformation test sets
-   - knowledge overlay versions and entries
-   - knowledge audit logs
-
-## Current API Surface
-
-Semantra currently exposes these endpoint groups.
-
-Upload:
-- `POST /upload`
-- `POST /upload/sql/tables`
-
-Mapping and transformation:
-- `POST /mapping/auto`
-- `POST /mapping/preview`
-- `POST /mapping/codegen`
-- `GET /mapping/transformation/templates`
-- `POST /mapping/transformation/generate`
-- `POST /mapping/sets`
-- `GET /mapping/sets`
-- `GET /mapping/sets/{mapping_set_id}`
-- `POST /mapping/sets/{mapping_set_id}/status`
-- `GET /mapping/sets/{mapping_set_id}/audit`
-- `POST /mapping/transformation/test-sets`
-- `GET /mapping/transformation/test-sets`
-- `GET /mapping/transformation/test-sets/{test_set_id}`
-- `POST /mapping/transformation/test-sets/{test_set_id}/run`
-
-Observability and feedback:
-- `GET /observability/decision-logs`
-- `GET /observability/corrections`
-- `POST /observability/corrections`
-- `GET /observability/corrections/reusable-rules`
-- `GET /observability/corrections/reusable-rules/active`
-- `POST /observability/corrections/reusable-rules/promote`
-- `GET /observability/config`
-- `POST /observability/config/reload`
-
-Knowledge overlays:
-- `POST /knowledge/overlays/validate`
-- `POST /knowledge/overlays`
-- `GET /knowledge/overlays`
-- `GET /knowledge/overlays/{overlay_id}`
-- `POST /knowledge/overlays/{overlay_id}/activate`
-- `POST /knowledge/overlays/{overlay_id}/deactivate`
-- `POST /knowledge/overlays/{overlay_id}/archive`
-- `POST /knowledge/overlays/rollback`
-- `GET /knowledge/audit`
-- `GET /knowledge/canonical-glossary/export`
-- `POST /knowledge/canonical-glossary/import`
-- `POST /knowledge/reload`
-
-Evaluation:
-- `GET /evaluation/benchmark`
-- `POST /evaluation/run`
-- `POST /evaluation/datasets`
-- `GET /evaluation/datasets`
-- `POST /evaluation/datasets/{dataset_id}/run`
-- `POST /evaluation/datasets/{dataset_id}/correction-impact`
-- `GET /evaluation/runs`
-
-## Outputs the Project Produces
-
-The project currently produces the following categories of output:
-
-### Mapping Outputs
-- selected mapping decisions
-- top-k ranked alternatives
-- confidence labels
-- signal breakdowns
-- explanations
-- canonical concept paths and source/target/project coverage summaries
-- generated transformation suggestions and transformation mode
-- versioned mapping sets with status metadata
-
-### Execution Outputs
-- projected target preview rows
-- transformation previews with before/after samples and structured warnings
-- generated Pandas code
-- transformation test-set run results
-
-### Observability Outputs
-- decision logs
-- correction records
-- reusable rule candidates and promoted reusable rules
-- mapping-set audit trail
-- knowledge overlay audit trail
-- runtime config snapshot
-
-### Evaluation Outputs
-- benchmark metrics
-- saved benchmark dataset records
-- persisted evaluation run records
-
-## Current Milestone Status
-
-The current delivered baseline includes a completed canonical semantic layer MVP, completed Phase 1 cleanup, and completed Phase 2 Streamlit decomposition.
-
-The product now includes:
-- multi-format row-data upload plus SQL schema snapshots
-- explainable multi-signal mapping with constrained AI assistance
-- custom knowledge overlays with lifecycle actions and audit history
-- initial canonical semantic layer with a business glossary, canonical signal, concept-aware trust layer, explicit source -> concept -> target views, and project-level coverage metrics
-- correction learning with promoted reusable rules
-- transformation preview safety checks, templates, and transformation test sets
-- versioned mapping sets with lightweight status workflow and audit trail
-- persisted benchmarks and correction-impact evaluation
-- internal Streamlit review UI spanning upload, trust layer, corrections, knowledge, benchmarks, and admin/debug surfaces through a modular `streamlit_ui/*` layer
-
-What is not closed yet:
-- the hardening/debt package described as Phase 0 is still open and was not part of the recent delivery slice
-- deeper governance remains intentionally narrow for now; the remaining Epic 6 work is mainly the export/run status gate
-
-This puts Semantra in a strong internal-beta / pilot-ready state for controlled schema-mapping workflows.
-
-## Next Recommended Milestone
-
-The next planned milestone is to finish the remaining status-gate part of Epic 6 on top of the already extended mapping-set workflow.
-
-Most natural next steps inside that remaining slice are:
-- enforce clearer status gates for export and run flows so non-approved versions are blocked or explicitly flagged
-- tighten any follow-up tests around that gate without widening the workflow unnecessarily
-
-After that, the next refactor-heavy move remains Phase 3 decomposition of the mapping engine.
-
-## Result for the User
-
-From a user perspective, the result of using Semantra is not just a guessed field mapping.
-
-The result is a controlled semantic-mapping package made of:
-- dataset understanding
-- candidate ranking
-- final mapping decisions
-- explanation of why decisions were made
-- canonical concept paths and project-level semantic coverage for the active mapping context
-- reusable organizational knowledge from overlays and promoted rules
-- preview of transformed data
-- starter implementation code
-- transformation validation and transformation regression cases
-- audit trail of knowledge and mapping-set changes
-- reusable correction memory
-- measurable quality metrics
-
-## Current Technical Status
-
-At the current stage, Semantra is no longer just a scaffold. It contains:
-- a real mapping engine with multiple explainable signals
-- constrained LLM validation and transformation generation hooks
-- runtime metadata enrichment with custom knowledge overlays
-- canonical business glossary-driven matching with explicit canonical path payloads and import/export support
-- persisted correction learning plus promoted reusable rules
-- persisted mapping sets and transformation test sets
-- benchmark and correction-impact evaluation tooling
-- a working internal-beta Streamlit review UI with extracted `streamlit_ui/*` modules and `streamlit_app.py` reduced to composition/root orchestration
-- focused automated tests around backend services, API flows, and key Streamlit helpers
-
-The biggest remaining growth areas are now mostly P1 and beyond:
-- richer trust-layer explanations and analyst tooling
-- deeper governance features beyond the current minimal mapping-set and glossary workflow, starting with Epic 6
-- broader canonical business concept governance and reuse beyond the current glossary-driven MVP
-- stronger connector story beyond flat files and SQL snapshots
-- eventual execution and operationalization beyond preview/codegen
-
-## Short Summary
-
-Semantra is an explainable semantic mapping and review engine that profiles source and target schemas, ranks and validates mapping candidates, reasons over canonical business concepts, previews and tests reviewed transformations, learns from analyst feedback, and persists knowledge, reusable rules, mapping sets, and evaluation artifacts through a FastAPI backend and Streamlit review UI.
+For deeper strategy around catalog direction, see `docs/vision/INTEGRATION_CATALOG_VISION.md`.

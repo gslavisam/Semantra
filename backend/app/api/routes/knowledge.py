@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import json
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 
 from app.api.deps import require_admin
 from app.models.knowledge import (
     CanonicalConceptDetailResponse,
     CanonicalConceptFieldContext,
     CanonicalConceptOverlayEntry,
+    CanonicalGlossaryPromotionRequest,
+    CanonicalGlossaryPromotionResponse,
     CanonicalConceptSummary,
     CanonicalConceptUsageRecord,
     CanonicalGlossaryImportResponse,
     KnowledgeAuditEntry,
     KnowledgeOverlayEntry,
     KnowledgeOverlayCreateResponse,
+    KnowledgeStewardshipItemCreateRequest,
+    KnowledgeStewardshipItemDetail,
+    KnowledgeStewardshipItemRecord,
+    KnowledgeStewardshipItemStatusUpdateRequest,
     KnowledgeOverlayVersion,
     KnowledgeOverlayVersionEntriesResponse,
     KnowledgeOverlayValidationResult,
@@ -26,6 +33,8 @@ from app.models.mapping import (
     CanonicalGapApproveResponse,
     CanonicalGapCandidatesRequest,
     CanonicalGapCandidatesResponse,
+    CanonicalGapProposalStateRecord,
+    CanonicalGapProposalStateRequest,
     CanonicalGapRejectRequest,
     CanonicalGapSuggestion,
     CanonicalGapSuggestionRequest,
@@ -38,6 +47,7 @@ from app.services.canonical_gap_service import (
 from app.services.llm_service import build_provider_from_settings, call_canonical_gap_assistant
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.utils.knowledge_text import filter_canonical_aliases
 
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
@@ -53,6 +63,34 @@ def append_audit_entry(action: str, message: str, version: KnowledgeOverlayVersi
             created_at=datetime.now(UTC).isoformat(),
         )
     )
+
+
+def _canonical_gap_candidate_key(source: str | None, target: str | None) -> str:
+    normalized_source = str(source or "").strip() or "unknown"
+    normalized_target = str(target or "").strip() or "unknown"
+    return f"canonical_gap_{normalized_source}_{normalized_target}".replace(" ", "_")
+
+
+def _canonical_gap_proposal_state(candidate_key: str) -> str:
+    for record in _list_canonical_gap_proposal_state_records():
+        if record.candidate_key == candidate_key:
+            return record.proposal_state
+    return "new"
+
+
+def _require_canonical_gap_ready_for_approval(candidate: object) -> None:
+    source = getattr(candidate, "source", None)
+    target = getattr(candidate, "target", None)
+    candidate_key = _canonical_gap_candidate_key(source, target)
+    proposal_state = _canonical_gap_proposal_state(candidate_key)
+    if proposal_state != "ready_for_approval":
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Canonical gap approval is blocked until proposal triage is ready_for_approval. "
+                f"Current state: {proposal_state}."
+            ),
+        )
 
 
 def build_runtime_status() -> KnowledgeRuntimeStatus:
@@ -77,6 +115,61 @@ def build_runtime_status() -> KnowledgeRuntimeStatus:
     )
 
 
+def _list_canonical_gap_proposal_state_records() -> list[CanonicalGapProposalStateRecord]:
+    latest_by_candidate_key: dict[str, CanonicalGapProposalStateRecord] = {}
+    for item in persistence_service.list_knowledge_stewardship_items(item_type="canonical_gap"):
+        if item.status not in {"new", "needs_review", "ready_for_approval"}:
+            continue
+        record = CanonicalGapProposalStateRecord(
+            candidate_key=item.item_key,
+            source=item.source or "",
+            target=item.target or "",
+            proposal_state=item.status,
+            reviewed_by=item.changed_by or item.created_by,
+            note=item.review_note,
+            created_at=item.updated_at,
+        )
+        latest_by_candidate_key[record.candidate_key] = record
+    return sorted(
+        latest_by_candidate_key.values(),
+        key=lambda item: (item.source.lower(), item.target.lower(), item.candidate_key.lower()),
+    )
+
+
+def _canonical_gap_stewardship_request(
+    candidate_key: str,
+    candidate: object,
+    *,
+    suggestion: object | None = None,
+    status: str,
+    owner: str | None = None,
+    assignee: str | None = None,
+    review_note: str | None = None,
+    actor: str | None = None,
+) -> KnowledgeStewardshipItemCreateRequest:
+    candidate_payload = candidate.model_dump(mode="json") if hasattr(candidate, "model_dump") else dict(candidate)
+    suggestion_payload = (
+        suggestion.model_dump(mode="json") if hasattr(suggestion, "model_dump") else dict(suggestion or {})
+    )
+    concept_id = str(suggestion_payload.get("concept_id") or "").strip() or None
+    return KnowledgeStewardshipItemCreateRequest(
+        item_type="canonical_gap",
+        item_key=candidate_key,
+        title=f"{candidate_payload.get('source') or 'unknown'} -> {candidate_payload.get('target') or 'unknown'}",
+        status=status,
+        concept_id=concept_id,
+        source=str(candidate_payload.get("source") or "").strip() or None,
+        target=str(candidate_payload.get("target") or "").strip() or None,
+        owner=(owner or "").strip() or None,
+        assignee=(assignee or "").strip() or None,
+        review_note=(review_note or "").strip() or None,
+        candidate_payload=candidate_payload,
+        suggestion_payload=suggestion_payload,
+        created_by=(actor or "").strip() or None,
+        changed_by=(actor or "").strip() or None,
+    )
+
+
 def _active_canonical_overlay_entries() -> tuple[KnowledgeOverlayVersion | None, dict[str, list[KnowledgeOverlayEntry]]]:
     active_version = persistence_service.get_active_knowledge_overlay_version()
     if active_version is None or active_version.overlay_id is None:
@@ -93,6 +186,7 @@ def _active_canonical_overlay_entries() -> tuple[KnowledgeOverlayVersion | None,
 def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], dict[str, list[CanonicalConceptFieldContext]], KnowledgeOverlayVersion | None, dict[str, list[KnowledgeOverlayEntry]]]:
     _, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
     usage_counts = persistence_service.list_catalog_concept_usage_counts()
+    usage_facets = persistence_service.list_catalog_concept_usage_facets()
     active_overlay_version, overlay_entries_by_concept = _active_canonical_overlay_entries()
 
     contexts_by_concept: dict[str, list[CanonicalConceptFieldContext]] = {}
@@ -112,9 +206,21 @@ def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], d
     registry: dict[str, CanonicalConceptSummary] = {}
     for concept in canonical_dicts:
         concept_id = str(concept["concept_id"])
-        base_aliases = sorted({str(alias) for alias in concept.get("aliases", []) if str(alias).strip()})
+        base_aliases = sorted(filter_canonical_aliases(str(alias) for alias in concept.get("aliases", [])))
         overlay_entries = overlay_entries_by_concept.get(concept_id, [])
         overlay_aliases = sorted({entry.alias for entry in overlay_entries if entry.alias.strip()})
+        source_systems = set(usage_facets.get(concept_id, {}).get("source_systems", []))
+        source_systems.update(
+            str(entry.source_system).strip()
+            for entry in overlay_entries
+            if str(entry.source_system or "").strip()
+        )
+        business_domains = set(usage_facets.get(concept_id, {}).get("business_domains", []))
+        business_domains.update(
+            str(entry.domain).strip()
+            for entry in overlay_entries
+            if str(entry.domain or "").strip()
+        )
         source = "base_plus_active_overlay" if overlay_aliases else "base"
         registry[concept_id] = CanonicalConceptSummary(
             concept_id=concept_id,
@@ -130,6 +236,8 @@ def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], d
             field_context_count=len(contexts_by_concept.get(concept_id, [])),
             usage_count=usage_counts.get(concept_id, 0),
             active_overlay_entry_count=len(overlay_entries),
+            source_systems=sorted(source_systems),
+            business_domains=sorted(business_domains),
         )
 
     for concept_id, overlay_entries in overlay_entries_by_concept.items():
@@ -138,6 +246,20 @@ def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], d
         entity, _, attribute = concept_id.partition(".")
         overlay_aliases = sorted({entry.alias for entry in overlay_entries if entry.alias.strip()})
         display_name = next((entry.canonical_term for entry in overlay_entries if entry.canonical_term.strip()), concept_id)
+        source_systems = sorted(
+            {
+                str(entry.source_system).strip()
+                for entry in overlay_entries
+                if str(entry.source_system or "").strip()
+            }
+        )
+        business_domains = sorted(
+            {
+                str(entry.domain).strip()
+                for entry in overlay_entries
+                if str(entry.domain or "").strip()
+            }
+        )
         registry[concept_id] = CanonicalConceptSummary(
             concept_id=concept_id,
             entity=entity,
@@ -148,6 +270,8 @@ def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], d
             alias_count=len(overlay_aliases),
             usage_count=usage_counts.get(concept_id, 0),
             active_overlay_entry_count=len(overlay_entries),
+            source_systems=source_systems,
+            business_domains=business_domains,
         )
 
     return registry, contexts_by_concept, active_overlay_version, overlay_entries_by_concept
@@ -276,6 +400,161 @@ async def list_knowledge_audit_logs() -> list[KnowledgeAuditEntry]:
     return persistence_service.list_knowledge_audit_logs()
 
 
+@router.get("/stewardship-items", response_model=list[KnowledgeStewardshipItemRecord], dependencies=[Depends(require_admin)])
+async def list_knowledge_stewardship_items(
+    item_type: str | None = Query(None),
+    status: str | None = Query(None),
+    owner: str | None = Query(None),
+    assignee: str | None = Query(None),
+) -> list[KnowledgeStewardshipItemRecord]:
+    return persistence_service.list_knowledge_stewardship_items(
+        item_type=item_type,
+        status=status,
+        owner=owner,
+        assignee=assignee,
+    )
+
+
+@router.get("/stewardship-items/{item_id}", response_model=KnowledgeStewardshipItemDetail, dependencies=[Depends(require_admin)])
+async def get_knowledge_stewardship_item(item_id: int) -> KnowledgeStewardshipItemDetail:
+    try:
+        return persistence_service.get_knowledge_stewardship_item(item_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/stewardship-items", response_model=KnowledgeStewardshipItemDetail, dependencies=[Depends(require_admin)])
+async def upsert_knowledge_stewardship_item(request: KnowledgeStewardshipItemCreateRequest) -> KnowledgeStewardshipItemDetail:
+    existing = persistence_service.get_knowledge_stewardship_item_by_key(request.item_type, request.item_key)
+    saved = persistence_service.upsert_knowledge_stewardship_item(request)
+    action = "Created" if existing is None else "Updated"
+    message_parts = [
+        f"{action} stewardship item {saved.item_type}:{saved.item_key}.",
+        f"Status={saved.status}.",
+    ]
+    if saved.owner:
+        message_parts.append(f"Owner={saved.owner}.")
+    if saved.assignee:
+        message_parts.append(f"Assignee={saved.assignee}.")
+    if saved.review_note:
+        message_parts.append(f"Review note={saved.review_note}.")
+    if saved.changed_by or saved.created_by:
+        message_parts.append(f"Changed by={saved.changed_by or saved.created_by}.")
+    append_audit_entry("stewardship", " ".join(message_parts))
+    return saved
+
+
+@router.post("/stewardship-items/{item_id}/status", response_model=KnowledgeStewardshipItemDetail, dependencies=[Depends(require_admin)])
+async def update_knowledge_stewardship_item_status(
+    item_id: int,
+    request: KnowledgeStewardshipItemStatusUpdateRequest,
+) -> KnowledgeStewardshipItemDetail:
+    try:
+        updated = persistence_service.update_knowledge_stewardship_item_status(
+            item_id,
+            request.status,
+            changed_by=request.changed_by,
+            owner=request.owner,
+            assignee=request.assignee,
+            review_note=request.review_note,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    message_parts = [
+        f"Updated stewardship item {updated.item_type}:{updated.item_key}.",
+        f"Status={updated.status}.",
+    ]
+    if updated.owner:
+        message_parts.append(f"Owner={updated.owner}.")
+    if updated.assignee:
+        message_parts.append(f"Assignee={updated.assignee}.")
+    if updated.review_note:
+        message_parts.append(f"Review note={updated.review_note}.")
+    if request.note:
+        message_parts.append(f"Note={request.note.strip()}.")
+    if request.changed_by:
+        message_parts.append(f"Changed by={request.changed_by.strip()}.")
+    append_audit_entry("stewardship", " ".join(message_parts))
+    return updated
+
+
+@router.post(
+    "/stewardship-items/{item_id}/promote-to-glossary",
+    response_model=CanonicalGlossaryPromotionResponse,
+    dependencies=[Depends(require_admin)],
+)
+async def promote_knowledge_stewardship_item_to_glossary(
+    item_id: int,
+    request: CanonicalGlossaryPromotionRequest,
+) -> CanonicalGlossaryPromotionResponse:
+    try:
+        item = persistence_service.get_knowledge_stewardship_item(item_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    if item.item_type != "overlay_promotion":
+        raise HTTPException(status_code=400, detail="Only overlay_promotion stewardship items can be promoted to the canonical glossary.")
+    if item.status not in {"ready_for_approval", "promoted"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Overlay promotion item must be ready_for_approval before it can be promoted to the canonical glossary.",
+        )
+
+    overlay_payload = item.overlay_entry_payload or {}
+    concept_id = str(overlay_payload.get("canonical_concept_id") or item.concept_id or item.target or "").strip()
+    alias = str(overlay_payload.get("alias") or item.source or "").strip()
+    if not concept_id or not alias:
+        raise HTTPException(status_code=400, detail="Overlay promotion item is missing canonical concept or alias data.")
+
+    source_system = str(overlay_payload.get("source_system") or item.source_system or "").strip()
+    display_name = str(overlay_payload.get("canonical_term") or concept_id).strip() or concept_id
+    description = (
+        f"Overlay-promoted canonical concept sourced from {source_system}."
+        if source_system
+        else "Overlay-promoted canonical concept."
+    )
+
+    try:
+        glossary_entry, alias_added, concept_created = metadata_knowledge_service.promote_overlay_alias_to_canonical_glossary(
+            concept_id,
+            alias,
+            display_name=display_name,
+            description=description,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    updated = persistence_service.update_knowledge_stewardship_item_status(
+        item_id,
+        "promoted",
+        changed_by=request.changed_by,
+        owner=item.owner,
+        assignee=item.assignee,
+        review_note=item.review_note,
+    )
+    message_parts = [
+        f"Promoted stewardship item {updated.item_type}:{updated.item_key} into canonical glossary.",
+        f"Concept={glossary_entry.concept_id}.",
+        f"Alias={alias.strip()}.",
+        f"Alias added={str(alias_added).lower()}.",
+        f"Concept created={str(concept_created).lower()}.",
+        f"Status={updated.status}.",
+    ]
+    if request.note:
+        message_parts.append(f"Note={request.note.strip()}.")
+    if request.changed_by:
+        message_parts.append(f"Changed by={request.changed_by.strip()}.")
+    append_audit_entry("stewardship", " ".join(message_parts))
+    return CanonicalGlossaryPromotionResponse(
+        item=updated,
+        glossary_entry=glossary_entry,
+        alias_added=alias_added,
+        concept_created=concept_created,
+    )
+
+
 @router.get("/overlays/{overlay_id}", response_model=KnowledgeOverlayVersionEntriesResponse, dependencies=[Depends(require_admin)])
 async def get_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersionEntriesResponse:
     try:
@@ -292,6 +571,8 @@ async def activate_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion
         version = persistence_service.activate_knowledge_overlay_version(overlay_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     metadata_knowledge_service.refresh()
     append_audit_entry("activate", f"Activated knowledge overlay '{version.name}'.", version)
     return version
@@ -314,6 +595,8 @@ async def archive_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion:
         version = persistence_service.archive_knowledge_overlay_version(overlay_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     metadata_knowledge_service.refresh()
     append_audit_entry("archive", f"Archived knowledge overlay '{version.name}'.", version)
     return version
@@ -359,6 +642,7 @@ async def suggest_canonical_gap(request: CanonicalGapSuggestionRequest) -> Canon
 
 @router.post("/canonical-gaps/approve", response_model=CanonicalGapApproveResponse, dependencies=[Depends(require_admin)])
 async def approve_canonical_gap(request: CanonicalGapApproveRequest) -> CanonicalGapApproveResponse:
+    _require_canonical_gap_ready_for_approval(request.candidate)
     try:
         response = approve_canonical_gap_suggestion(
             request.candidate,
@@ -394,6 +678,45 @@ async def reject_canonical_gap(request: CanonicalGapRejectRequest) -> KnowledgeA
     if note:
         message_parts.append(f"Note={note}.")
     return append_audit_entry(audit_action, " ".join(message_parts))
+
+
+@router.get("/canonical-gaps/proposal-states", response_model=list[CanonicalGapProposalStateRecord], dependencies=[Depends(require_admin)])
+async def list_canonical_gap_proposal_states() -> list[CanonicalGapProposalStateRecord]:
+    return _list_canonical_gap_proposal_state_records()
+
+
+@router.post("/canonical-gaps/proposal-state", response_model=CanonicalGapProposalStateRecord, dependencies=[Depends(require_admin)])
+async def save_canonical_gap_proposal_state(request: CanonicalGapProposalStateRequest) -> CanonicalGapProposalStateRecord:
+    reviewed_by = (request.reviewed_by or "").strip() or "unknown"
+    note = (request.note or "").strip() or None
+    candidate_key = _canonical_gap_candidate_key(request.candidate.source, request.candidate.target)
+    saved = persistence_service.upsert_knowledge_stewardship_item(
+        _canonical_gap_stewardship_request(
+            candidate_key,
+            request.candidate,
+            status=request.proposal_state,
+            review_note=note,
+            actor=reviewed_by,
+        )
+    )
+    record = CanonicalGapProposalStateRecord(
+        candidate_key=saved.item_key,
+        source=saved.source or request.candidate.source,
+        target=saved.target or request.candidate.target,
+        proposal_state=saved.status,
+        reviewed_by=saved.changed_by or reviewed_by,
+        note=saved.review_note,
+        created_at=saved.updated_at,
+    )
+    message_parts = [
+        f"Updated canonical gap proposal triage for {record.source} -> {record.target}.",
+        f"State={record.proposal_state}.",
+        f"Reviewed by={reviewed_by}.",
+    ]
+    if note:
+        message_parts.append(f"Note={note}.")
+    append_audit_entry("triage", " ".join(message_parts))
+    return record.model_copy(update={"created_at": saved.updated_at})
 
 
 @router.post("/reload", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])

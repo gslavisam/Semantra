@@ -273,7 +273,9 @@ def build_pending_corrections(session_state: dict) -> list[dict]:
             continue
         if target == suggested_target:
             continue
-        correction_status = "accepted" if status == "accepted" else "overridden"
+        if status != "accepted":
+            continue
+        correction_status = "accepted"
         pending.append(
             {
                 "source": source,
@@ -283,6 +285,23 @@ def build_pending_corrections(session_state: dict) -> list[dict]:
             }
         )
     return pending
+
+
+def correction_governance_block_reason(session_state: dict) -> str:
+    blocked_statuses: set[str] = set()
+    for entry in session_state.get("mapping_editor_state", {}).values():
+        target = entry.get("target", "")
+        suggested_target = entry.get("suggested_target", "")
+        status = str(entry.get("status", "needs_review") or "needs_review").strip().lower() or "needs_review"
+        has_reviewed_change = status == "rejected" or (bool(target) and target != suggested_target)
+        if has_reviewed_change and status not in {"accepted", "rejected"}:
+            blocked_statuses.add(status)
+    if not blocked_statuses:
+        return ""
+    return (
+        "Saving reviewed corrections is blocked until pending corrections come from closed review outcomes "
+        f"(accepted or rejected). Review statuses: {', '.join(sorted(blocked_statuses))}."
+    )
 
 
 def persist_corrections(

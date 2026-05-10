@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -10,8 +10,10 @@ KnowledgeOverlayEntryType = Literal["abbreviation", "synonym", "field_alias", "c
 KnowledgeOverlayIssueSeverity = Literal["error", "warning"]
 KnowledgeOverlayRowStatus = Literal["valid", "invalid"]
 KnowledgeOverlayMode = Literal["base_only", "overlay_active"]
-KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore"]
+KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore", "triage", "stewardship"]
 CanonicalConceptSource = Literal["base", "overlay_only", "base_plus_active_overlay"]
+KnowledgeStewardshipItemType = Literal["canonical_gap", "overlay_promotion"]
+KnowledgeStewardshipStatus = Literal["new", "needs_review", "ready_for_approval", "approved", "rejected", "ignored", "promoted"]
 
 
 class KnowledgeOverlayVersion(BaseModel):
@@ -108,6 +110,18 @@ class CanonicalGlossaryImportResponse(BaseModel):
     source_filename: str | None = None
 
 
+class CanonicalGlossaryPromotionRequest(BaseModel):
+    changed_by: str | None = None
+    note: str | None = None
+
+
+class CanonicalGlossaryPromotionResponse(BaseModel):
+    item: KnowledgeStewardshipItemDetail
+    glossary_entry: CanonicalGlossaryEntry
+    alias_added: bool = False
+    concept_created: bool = False
+
+
 class KnowledgeAuditEntry(BaseModel):
     audit_id: int | None = None
     overlay_id: int | None = None
@@ -166,6 +180,8 @@ class CanonicalConceptSummary(BaseModel):
     field_context_count: int = 0
     usage_count: int = 0
     active_overlay_entry_count: int = 0
+    source_systems: list[str] = Field(default_factory=list)
+    business_domains: list[str] = Field(default_factory=list)
 
 
 class CanonicalConceptDetailResponse(BaseModel):
@@ -174,3 +190,58 @@ class CanonicalConceptDetailResponse(BaseModel):
     active_overlay_entries: list[CanonicalConceptOverlayEntry] = Field(default_factory=list)
     integrations: list[CanonicalConceptUsageRecord] = Field(default_factory=list)
     audit_entries: list[KnowledgeAuditEntry] = Field(default_factory=list)
+
+
+class KnowledgeStewardshipItemRecord(BaseModel):
+    item_id: int
+    item_type: KnowledgeStewardshipItemType = "canonical_gap"
+    item_key: str
+    title: str
+    status: KnowledgeStewardshipStatus = "new"
+    concept_id: str | None = None
+    source: str | None = None
+    target: str | None = None
+    source_system: str | None = None
+    business_domain: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None
+    created_by: str | None = None
+    changed_by: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class KnowledgeStewardshipItemDetail(KnowledgeStewardshipItemRecord):
+    candidate_payload: dict[str, Any] = Field(default_factory=dict)
+    suggestion_payload: dict[str, Any] = Field(default_factory=dict)
+    overlay_entry_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class KnowledgeStewardshipItemCreateRequest(BaseModel):
+    item_type: KnowledgeStewardshipItemType = "canonical_gap"
+    item_key: str
+    title: str
+    status: KnowledgeStewardshipStatus = "new"
+    concept_id: str | None = None
+    source: str | None = None
+    target: str | None = None
+    source_system: str | None = None
+    business_domain: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None
+    candidate_payload: dict[str, Any] = Field(default_factory=dict)
+    suggestion_payload: dict[str, Any] = Field(default_factory=dict)
+    overlay_entry_payload: dict[str, Any] = Field(default_factory=dict)
+    created_by: str | None = None
+    changed_by: str | None = None
+
+
+class KnowledgeStewardshipItemStatusUpdateRequest(BaseModel):
+    status: KnowledgeStewardshipStatus
+    changed_by: str | None = None
+    note: str | None = None
+    owner: str | None = None
+    assignee: str | None = None
+    review_note: str | None = None

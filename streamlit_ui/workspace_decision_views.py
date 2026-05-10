@@ -5,6 +5,15 @@ import json
 import httpx
 import streamlit as st
 
+from streamlit_ui.governance import api_error_message, mapping_set_workspace_block_reason
+
+
+def _saved_mapping_set_apply_block_reason(saved_mapping_set: dict) -> str:
+    return mapping_set_workspace_block_reason(
+        saved_mapping_set.get("status"),
+        action_label="applied back into Workspace",
+    )
+
 
 def render_manual_mapping_panel(
     mapping_response: dict,
@@ -240,12 +249,7 @@ def render_mapping_io_panel(
         )
         selected_mapping_set = saved_mapping_sets[mapping_set_labels.index(selected_mapping_set_label)]
         selected_mapping_set_id = selected_mapping_set["mapping_set_id"]
-        apply_block_reason = ""
-        if str(selected_mapping_set.get("status") or "").strip().lower() != "approved":
-            apply_block_reason = (
-                "Only approved mapping sets can be applied back into Workspace. "
-                f"Current status: {str(selected_mapping_set.get('status') or 'draft').strip() or 'draft'}."
-            )
+        apply_block_reason = _saved_mapping_set_apply_block_reason(selected_mapping_set)
         saved_mapping_set_actions = st.columns([2, 2])
         if saved_mapping_set_actions[0].button(
             "Apply saved mapping set",
@@ -277,7 +281,13 @@ def render_mapping_io_panel(
                     "message": f"Applied saved mapping set '{mapping_set_detail['name']}' version {mapping_set_detail['version']}.",
                 }
                 st.rerun()
-            except (httpx.HTTPError, json.JSONDecodeError, KeyError, UnicodeDecodeError) as error:
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Applying saved mapping set failed"),
+                }
+                st.rerun()
+            except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as error:
                 st.session_state["last_action"] = {
                     "level": "error",
                     "message": f"Applying saved mapping set failed: {error}",
@@ -416,11 +426,13 @@ def render_mapping_io_panel(
 def render_correction_panel(
     *,
     build_pending_corrections,
+    correction_block_reason,
     admin_token_required,
     api_request,
     persist_corrections,
 ) -> None:
     pending_corrections = build_pending_corrections()
+    block_reason = correction_block_reason()
     st.subheader("Save Corrections")
     if pending_corrections:
         st.dataframe(pending_corrections, width="stretch", hide_index=True)
@@ -480,7 +492,7 @@ def render_correction_panel(
 
     if st.button(
         "Save reviewed corrections",
-        disabled=(not pending_corrections) or (token_required and not admin_token),
+        disabled=(not pending_corrections) or bool(block_reason) or (token_required and not admin_token),
     ):
         try:
             saved_entries = persist_corrections(note)
@@ -495,6 +507,8 @@ def render_correction_panel(
                 "message": f"Saving corrections failed: {error}",
             }
             st.rerun()
+    if block_reason:
+        st.caption(block_reason)
 
     saved_corrections = st.session_state.get("saved_corrections")
     if saved_corrections:

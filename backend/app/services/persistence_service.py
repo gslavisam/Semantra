@@ -11,6 +11,9 @@ from app.models.knowledge import (
     KnowledgeAuditEntry,
     KnowledgeOverlayEntry,
     KnowledgeOverlayVersion,
+    KnowledgeStewardshipItemCreateRequest,
+    KnowledgeStewardshipItemDetail,
+    KnowledgeStewardshipItemRecord,
 )
 from app.models.mapping import (
     BenchmarkDatasetRecord,
@@ -208,6 +211,40 @@ class SQLitePersistenceService:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS knowledge_stewardship_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    item_type TEXT NOT NULL,
+                    item_key TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    concept_id TEXT,
+                    source TEXT,
+                    target TEXT,
+                    source_system TEXT,
+                    business_domain TEXT,
+                    owner TEXT,
+                    assignee TEXT,
+                    review_note TEXT,
+                    created_by TEXT,
+                    changed_by TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    UNIQUE(item_type, item_key)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_stewardship_type_status ON knowledge_stewardship_items (item_type, status)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_stewardship_owner ON knowledge_stewardship_items (owner)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_knowledge_stewardship_assignee ON knowledge_stewardship_items (assignee)"
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS knowledge_concepts (
                     concept_id   TEXT PRIMARY KEY,
                     domain       TEXT NOT NULL DEFAULT '',
@@ -332,6 +369,7 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM knowledge_overlay_entries")
             connection.execute("DELETE FROM knowledge_overlay_versions")
             connection.execute("DELETE FROM knowledge_audit_logs")
+            connection.execute("DELETE FROM knowledge_stewardship_items")
 
     def clear_decision_logs(self) -> None:
         with self.connection() as connection:
@@ -831,6 +869,34 @@ class SQLitePersistenceService:
                 "SELECT concept_id, COUNT(*) FROM mapping_catalog_concepts GROUP BY concept_id"
             ).fetchall()
         return {str(row[0]): int(row[1]) for row in rows}
+
+    def list_catalog_concept_usage_facets(self) -> dict[str, dict[str, list[str]]]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT concept_id, source_system, business_domain FROM mapping_catalog_concepts"
+            ).fetchall()
+
+        facets: dict[str, dict[str, set[str]]] = {}
+        for row in rows:
+            concept_id = str(row[0])
+            concept_facets = facets.setdefault(
+                concept_id,
+                {"source_systems": set(), "business_domains": set()},
+            )
+            source_system = str(row[1] or "").strip()
+            business_domain = str(row[2] or "").strip()
+            if source_system:
+                concept_facets["source_systems"].add(source_system)
+            if business_domain:
+                concept_facets["business_domains"].add(business_domain)
+
+        return {
+            concept_id: {
+                "source_systems": sorted(values["source_systems"]),
+                "business_domains": sorted(values["business_domains"]),
+            }
+            for concept_id, values in facets.items()
+        }
 
     def list_catalog_concept_usage_records(
         self,
@@ -1537,6 +1603,208 @@ class SQLitePersistenceService:
         with self.connection() as connection:
             connection.execute("DELETE FROM knowledge_audit_logs")
 
+    def _knowledge_stewardship_detail_from_row(self, row: sqlite3.Row | tuple) -> KnowledgeStewardshipItemDetail:
+        payload = json.loads(row[17])
+        return KnowledgeStewardshipItemDetail(
+            item_id=int(row[0]),
+            item_type=row[1],
+            item_key=row[2],
+            title=row[3],
+            status=row[4],
+            concept_id=row[5],
+            source=row[6],
+            target=row[7],
+            source_system=row[8],
+            business_domain=row[9],
+            owner=row[10],
+            assignee=row[11],
+            review_note=row[12],
+            created_by=row[13],
+            changed_by=row[14],
+            created_at=row[15],
+            updated_at=row[16],
+            candidate_payload=payload.get("candidate_payload") or {},
+            suggestion_payload=payload.get("suggestion_payload") or {},
+            overlay_entry_payload=payload.get("overlay_entry_payload") or {},
+        )
+
+    def list_knowledge_stewardship_items(
+        self,
+        *,
+        item_type: str | None = None,
+        status: str | None = None,
+        owner: str | None = None,
+        assignee: str | None = None,
+    ) -> list[KnowledgeStewardshipItemRecord]:
+        query = (
+            "SELECT id, item_type, item_key, title, status, concept_id, source, target, source_system, "
+            "business_domain, owner, assignee, review_note, created_by, changed_by, created_at, updated_at, payload "
+            "FROM knowledge_stewardship_items WHERE 1 = 1"
+        )
+        params: list[object] = []
+        if item_type:
+            query += " AND item_type = ?"
+            params.append(item_type)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+        if owner:
+            query += " AND owner = ?"
+            params.append(owner)
+        if assignee:
+            query += " AND assignee = ?"
+            params.append(assignee)
+        query += " ORDER BY updated_at DESC, id DESC"
+
+        with self.connection() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [KnowledgeStewardshipItemRecord.model_validate(self._knowledge_stewardship_detail_from_row(row).model_dump(mode="json")) for row in rows]
+
+    def get_knowledge_stewardship_item(self, item_id: int) -> KnowledgeStewardshipItemDetail:
+        with self.connection() as connection:
+            row = connection.execute(
+                (
+                    "SELECT id, item_type, item_key, title, status, concept_id, source, target, source_system, "
+                    "business_domain, owner, assignee, review_note, created_by, changed_by, created_at, updated_at, payload "
+                    "FROM knowledge_stewardship_items WHERE id = ?"
+                ),
+                (item_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown knowledge stewardship item id: {item_id}")
+        return self._knowledge_stewardship_detail_from_row(row)
+
+    def get_knowledge_stewardship_item_by_key(self, item_type: str, item_key: str) -> KnowledgeStewardshipItemDetail | None:
+        with self.connection() as connection:
+            row = connection.execute(
+                (
+                    "SELECT id, item_type, item_key, title, status, concept_id, source, target, source_system, "
+                    "business_domain, owner, assignee, review_note, created_by, changed_by, created_at, updated_at, payload "
+                    "FROM knowledge_stewardship_items WHERE item_type = ? AND item_key = ?"
+                ),
+                (item_type, item_key),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._knowledge_stewardship_detail_from_row(row)
+
+    def upsert_knowledge_stewardship_item(
+        self,
+        request: KnowledgeStewardshipItemCreateRequest,
+    ) -> KnowledgeStewardshipItemDetail:
+        existing = self.get_knowledge_stewardship_item_by_key(request.item_type, request.item_key)
+        now = datetime.now(UTC).isoformat()
+        created_at = existing.created_at if existing and existing.created_at else now
+        created_by = existing.created_by if existing and existing.created_by else request.created_by
+        payload_json = json.dumps(
+            {
+                "candidate_payload": request.candidate_payload,
+                "suggestion_payload": request.suggestion_payload,
+                "overlay_entry_payload": request.overlay_entry_payload,
+            }
+        )
+        title = (request.title or "").strip() or request.item_key
+        with self.connection() as connection:
+            if existing is None:
+                cursor = connection.execute(
+                    (
+                        "INSERT INTO knowledge_stewardship_items ("
+                        "item_type, item_key, title, status, concept_id, source, target, source_system, business_domain, "
+                        "owner, assignee, review_note, created_by, changed_by, created_at, updated_at, payload"
+                        ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    ),
+                    (
+                        request.item_type,
+                        request.item_key,
+                        title,
+                        request.status,
+                        request.concept_id,
+                        request.source,
+                        request.target,
+                        request.source_system,
+                        request.business_domain,
+                        request.owner,
+                        request.assignee,
+                        request.review_note,
+                        created_by,
+                        request.changed_by,
+                        created_at,
+                        now,
+                        payload_json,
+                    ),
+                )
+                item_id = int(cursor.lastrowid)
+            else:
+                item_id = existing.item_id
+                connection.execute(
+                    (
+                        "UPDATE knowledge_stewardship_items SET "
+                        "title = ?, status = ?, concept_id = ?, source = ?, target = ?, source_system = ?, business_domain = ?, "
+                        "owner = ?, assignee = ?, review_note = ?, created_by = ?, changed_by = ?, created_at = ?, updated_at = ?, payload = ? "
+                        "WHERE id = ?"
+                    ),
+                    (
+                        title,
+                        request.status,
+                        request.concept_id,
+                        request.source,
+                        request.target,
+                        request.source_system,
+                        request.business_domain,
+                        request.owner,
+                        request.assignee,
+                        request.review_note,
+                        created_by,
+                        request.changed_by,
+                        created_at,
+                        now,
+                        payload_json,
+                        item_id,
+                    ),
+                )
+        return self.get_knowledge_stewardship_item(item_id)
+
+    def update_knowledge_stewardship_item_status(
+        self,
+        item_id: int,
+        status: str,
+        *,
+        changed_by: str | None = None,
+        owner: str | None = None,
+        assignee: str | None = None,
+        review_note: str | None = None,
+    ) -> KnowledgeStewardshipItemDetail:
+        existing = self.get_knowledge_stewardship_item(item_id)
+        payload_json = json.dumps(
+            {
+                "candidate_payload": existing.candidate_payload,
+                "suggestion_payload": existing.suggestion_payload,
+                "overlay_entry_payload": existing.overlay_entry_payload,
+            }
+        )
+        with self.connection() as connection:
+            connection.execute(
+                (
+                    "UPDATE knowledge_stewardship_items SET status = ?, owner = ?, assignee = ?, review_note = ?, changed_by = ?, updated_at = ?, payload = ? "
+                    "WHERE id = ?"
+                ),
+                (
+                    status,
+                    existing.owner if owner is None else owner,
+                    existing.assignee if assignee is None else assignee,
+                    existing.review_note if review_note is None else review_note,
+                    changed_by,
+                    datetime.now(UTC).isoformat(),
+                    payload_json,
+                    item_id,
+                ),
+            )
+        return self.get_knowledge_stewardship_item(item_id)
+
+    def clear_knowledge_stewardship_items(self) -> None:
+        with self.connection() as connection:
+            connection.execute("DELETE FROM knowledge_stewardship_items")
+
     def save_knowledge_overlay_version(
         self,
         name: str,
@@ -1616,6 +1884,8 @@ class SQLitePersistenceService:
 
     def activate_knowledge_overlay_version(self, overlay_id: int) -> KnowledgeOverlayVersion:
         target = self.get_knowledge_overlay_version(overlay_id)
+        if target.status not in {"validated", "active"}:
+            raise ValueError(f"Only validated knowledge overlays can be activated. Current status: {target.status}.")
         activated_at = datetime.now(UTC).isoformat()
         with self.connection() as connection:
             rows = connection.execute("SELECT id, payload FROM knowledge_overlay_versions ORDER BY id ASC").fetchall()
@@ -1669,6 +1939,10 @@ class SQLitePersistenceService:
 
     def archive_knowledge_overlay_version(self, overlay_id: int) -> KnowledgeOverlayVersion:
         target = self.get_knowledge_overlay_version(overlay_id)
+        if target.status not in {"validated", "active"}:
+            raise ValueError(
+                f"Only validated or active knowledge overlays can be archived. Current status: {target.status}."
+            )
         payload = target.model_dump(mode="json")
         payload["status"] = "archived"
         payload["activated_at"] = None

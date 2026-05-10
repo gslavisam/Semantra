@@ -4,6 +4,8 @@ import httpx
 import streamlit as st
 import time
 
+from streamlit_ui.governance import api_error_message, mapping_output_block_reason
+
 
 def poll_mapping_job(
     *,
@@ -37,6 +39,30 @@ def poll_mapping_job(
         time.sleep(0.5)
 
     raise RuntimeError(f"Mapping job {job_id} did not finish before the timeout.")
+
+
+def _workspace_codegen_block_reason(mapping_decisions: list[dict]) -> str:
+    return mapping_output_block_reason(
+        mapping_decisions,
+        action_label="Pandas code generation",
+    )
+
+
+def _workspace_preview_advisory_message(mapping_decisions: list[dict]) -> str:
+    blocked_statuses = sorted(
+        {
+            (str(item.get("status") or "").strip().lower() or "needs_review")
+            for item in mapping_decisions
+            if (str(item.get("status") or "").strip().lower() or "needs_review") != "accepted"
+        }
+    )
+    if not blocked_statuses:
+        return ""
+    return (
+        "Preview is using active mapping decisions that are not fully approved yet. "
+        f"Review statuses: {', '.join(blocked_statuses)}. "
+        "Use it to inspect the current mapping before final approval."
+    )
 
 
 def should_show_table_selector(available_tables: list[str], upload_mode: str, *, is_sql: bool) -> bool:
@@ -494,13 +520,15 @@ def render_workspace_tab(
                 )
             else:
                 mapping_decisions = build_mapping_decisions()
+                codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions)
+                preview_advisory_message = _workspace_preview_advisory_message(mapping_decisions)
                 actions_left, actions_right = st.columns(2)
                 with actions_left:
                     if st.button("Generate preview"):
                         if not mapping_decisions:
                             st.session_state["last_action"] = {
                                 "level": "warning",
-                                "message": "Add at least one accepted or needs-review mapping before generating preview.",
+                                "message": "Add at least one active mapping before generating preview.",
                             }
                             st.rerun()
                         try:
@@ -520,15 +548,17 @@ def render_workspace_tab(
                         except httpx.HTTPError as error:
                             st.session_state["last_action"] = {
                                 "level": "error",
-                                "message": f"Preview failed: {error}",
+                                "message": api_error_message(error, default_prefix="Preview failed"),
                             }
                             st.rerun()
+                    if preview_advisory_message:
+                        st.caption(preview_advisory_message)
                 with actions_right:
-                    if st.button("Generate Pandas code"):
+                    if st.button("Generate Pandas code", disabled=bool(codegen_block_reason)):
                         if not mapping_decisions:
                             st.session_state["last_action"] = {
                                 "level": "warning",
-                                "message": "Add at least one accepted or needs-review mapping before generating code.",
+                                "message": "Add at least one active mapping before generating code.",
                             }
                             st.rerun()
                         try:
@@ -545,9 +575,13 @@ def render_workspace_tab(
                         except httpx.HTTPError as error:
                             st.session_state["last_action"] = {
                                 "level": "error",
-                                "message": f"Code generation failed: {error}",
+                                "message": api_error_message(error, default_prefix="Code generation failed"),
                             }
                             st.rerun()
+                    if codegen_block_reason:
+                        st.caption(codegen_block_reason)
+                if output_block_reason:
+                    st.caption(output_block_reason)
         else:
             st.info("Generate mapping in Setup before preview or code generation.")
 

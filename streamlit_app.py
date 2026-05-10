@@ -482,6 +482,12 @@ def build_pending_corrections() -> list[dict]:
     return _impl(st.session_state)
 
 
+def correction_governance_block_reason() -> str:
+    from streamlit_ui.mapping_state import correction_governance_block_reason as _impl
+
+    return _impl(st.session_state)
+
+
 def persist_corrections(note: str) -> list[dict]:
     from streamlit_ui.mapping_state import persist_corrections as _impl
 
@@ -519,6 +525,7 @@ def render_correction_panel() -> None:
 
     return _impl(
         build_pending_corrections=build_pending_corrections,
+        correction_block_reason=correction_governance_block_reason,
         admin_token_required=admin_token_required,
         api_request=api_request,
         persist_corrections=persist_corrections,
@@ -559,6 +566,7 @@ def render_benchmark_tab() -> None:
 
     return _impl(
         admin_token_required=admin_token_required,
+        build_mapping_decisions=build_mapping_decisions,
         build_current_benchmark_case=build_current_benchmark_case,
         api_request=api_request,
     )
@@ -599,6 +607,8 @@ def render_workspace_tab() -> None:
 
 # Application root
 
+TOP_LEVEL_AREAS = ["Workspace", "Canonical Console", "Catalog", "Benchmarks", "Admin / Debug"]
+
 def main() -> None:
     st.title("Semantra - Data Mapping Review and Benchmarking")
     st.caption("Upload CSV / JSON / XML / XLSX / SQL -> Select Tables -> Review Mapping")
@@ -616,23 +626,23 @@ def main() -> None:
             st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
             st.rerun()
 
-    workspace_tab, canonical_console_tab, catalog_tab, benchmark_tab, debug_tab = st.tabs(
-        ["Workspace", "Canonical Console", "Catalog", "Benchmarks", "Admin / Debug"]
+    selected_top_level_area = st.radio(
+        "Navigation",
+        TOP_LEVEL_AREAS,
+        key="active_top_level_area",
+        horizontal=True,
+        label_visibility="collapsed",
     )
 
-    with workspace_tab:
+    if selected_top_level_area == "Workspace":
         render_workspace_tab()
-
-    with canonical_console_tab:
+    elif selected_top_level_area == "Canonical Console":
         render_canonical_console_tab()
-
-    with catalog_tab:
+    elif selected_top_level_area == "Catalog":
         render_catalog_tab()
-
-    with debug_tab:
+    elif selected_top_level_area == "Admin / Debug":
         render_admin_debug_tab()
-
-    with benchmark_tab:
+    elif selected_top_level_area == "Benchmarks":
         render_benchmark_tab()
 # comment
 

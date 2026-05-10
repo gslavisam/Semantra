@@ -1,107 +1,161 @@
 # Semantra
 
-Semantra is an explainable semantic mapping workbench for source-to-target schemas.
+Semantra is a pilot-ready semantic integration workbench for analyst-guided schema mapping.
 
-In short, the project combines deterministic profiling and ranking with controlled AI assistance so a team can:
-- upload source and target datasets or SQL schema snapshots
-- rank mapping candidates with explainable multi-signal scoring
-- enrich matching with metadata knowledge, a canonical business glossary, custom knowledge overlays, correction history, and promoted reusable rules
-- inspect explicit source -> concept -> target paths and project-level canonical coverage in the trust layer
-- generate and review field-level pandas transformations
+It combines deterministic profiling and ranking with controlled AI assistance so a team can:
+
+- upload source and target structures from row data, schema specs, or SQL snapshots
+- generate explainable source-to-target or source-to-canonical mapping proposals
+- review explicit source -> concept -> target paths and canonical coverage
+- author and validate Pandas transformations
 - preview mapped output and generate starter Pandas code
-- persist mapping sets, transformation test sets, benchmark datasets, and evaluation history
+- persist governed mapping sets, benchmark datasets, transformation test sets, and review memory
+- manage canonical concepts, overlays, and stewardship workflows through a dedicated Canonical Console
+- search and reuse approved integration knowledge through the Catalog
 
-The current product shape is a FastAPI backend plus an internal Streamlit review UI. It is already useful for demos, pilot workflows, and controlled analyst review, but it is not a full ETL or orchestration platform yet.
+The current product shape is a FastAPI backend plus a Streamlit product UI. It is already useful for demos, pilot workflows, and controlled analyst/governance review. It is not yet a production ETL runtime, scheduler, or connector-heavy integration platform.
 
-## Run locally
+## Current Product Surface
 
-1. Create or activate a Python environment.
-2. Install dependencies from `requirements.txt` in the project root.
-3. Optionally copy `backend/.env.example` to `backend/.env` and set your provider values.
-4. Start the API:
+Top-level UI areas:
+
+- `Workspace`
+  - upload, profile, map, review, decide, preview, and codegen
+- `Canonical Console`
+  - canonical concept registry, overlay lifecycle, canonical-gap stewardship, and stable glossary promotion
+- `Catalog`
+  - searchable integration and concept reuse inventory based on saved mapping sets
+- `Benchmarks`
+  - benchmark dataset save/run flows, correction impact, and run history
+- `Admin / Debug`
+  - runtime config, observability, and supporting admin surfaces
+
+Core implemented capabilities:
+
+- CSV, JSON, XML, XLSX, SQL snapshot, and schema-spec ingestion
+- standard source-to-target mapping and canonical-only source-to-concept mapping
+- explainable multi-signal ranking with optional closed-set LLM validation
+- trust-layer review with canonical path visibility and coverage summaries
+- transformation generation, templates, preview validation, and Pandas code generation
+- governed mapping-set persistence with status, audit, diff, and approved-only reuse
+- correction persistence and reusable correction-rule promotion
+- canonical glossary import/export, knowledge overlays, and stewardship items
+- integration catalog search/detail/reuse flows
+- benchmark datasets, evaluation runs, and correction-impact measurement
+
+For the full grounded feature inventory, see `project_docs/current_state.md`.
+
+## Quick Start
+
+### 1. Install dependencies
+
+Use a Python environment and install the project requirements from the repo root.
 
 ```bash
-uvicorn app.main:app --reload --app-dir backend
+pip install -r requirements.txt
 ```
 
-5. Optionally start the Streamlit internal-beta UI:
+### 2. Configure optional runtime settings
+
+If needed, create `backend/.env` and set values such as:
+
+- `SEMANTRA_ADMIN_API_TOKEN`
+- `SEMANTRA_LLM_PROVIDER`
+- `SEMANTRA_LLM_MODEL`
+- `SEMANTRA_LMSTUDIO_BASE_URL`
+- `SEMANTRA_OPENAI_API_KEY`
+- `SEMANTRA_GEMINI_API_KEY`
+
+### 3. Start the app
+
+Windows-friendly launcher:
+
+```powershell
+./start_semantra.ps1
+```
+
+This starts:
+
+- API at `http://127.0.0.1:8000`
+- Streamlit UI at `http://127.0.0.1:8501`
+
+Manual start is also possible:
 
 ```bash
-streamlit run streamlit_app.py
+python -m uvicorn app.main:app --reload --app-dir backend --reload-dir backend
+python -m streamlit run streamlit_app.py
 ```
-
-## What It Covers
-
-The current product slice covers:
-- source and target upload from CSV, JSON, XML, XLSX, or SQL schema snapshots
-- schema profiling with lexical, semantic, pattern, and statistical hints
-- explainable auto-mapping with top-k ranked candidates per source field
-- canonical business glossary matching with concept-aware explanations, explicit source -> concept -> target review tables, and project-level canonical coverage
-- optional constrained LLM validation for ambiguous matches
-- prompt-driven pandas transformation generation for reviewed mappings
-- transformation preview with syntax/runtime validation, before/after samples, and structured warnings
-- custom knowledge overlays on top of the built-in metadata dictionary, including concept aliases bound to canonical business concepts
-- canonical glossary CSV import/export from the admin/debug surface
-- persisted user corrections, promoted reusable rules, benchmark datasets, evaluation runs, transformation test sets, and versioned mapping sets with lightweight governance metadata and version diff support
-- internal Streamlit review UI for trust-layer review, admin/debug flows, corrections, benchmarks, and saved mapping-set workflows
-
-## Project Shape
-
-Semantra currently runs as:
-- a FastAPI backend for upload, mapping, observability, knowledge, and evaluation APIs
-- a Streamlit internal review UI for analysts and pilot/demo workflows
-- a SQLite persistence layer for durable review memory and governance artifacts
-
-The Streamlit side was recently decomposed so `streamlit_app.py` now acts mainly as a composition root over the extracted `streamlit_ui/*` modules.
-
-Current roadmap note: canonical semantic layer MVP, Phase 1 cleanup, and Phase 2 Streamlit decomposition are done; Epic 6 Governance MVP has started with mapping-set owner/assignee/review-note metadata plus version diff and apply-audit support, while the separate Phase 0 hardening package remains open.
-
-This is already a strong internal-beta / pilot-grade mapping product slice. It is not yet a production orchestration platform, a connector-heavy ingestion platform, or a full semantic operating model.
-
-## Scoring Note
-
-The mapping confidence score is a normalized multi-signal heuristic, not a calibrated probability.
-
-- individual signals such as lexical, semantic, knowledge, pattern, overlap, optional embedding, historical correction, and optional LLM validation are combined into a weighted average
-- the final score is normalized and clamped to the `0..1` range
-- current confidence labels are threshold-based over that normalized score: `high_confidence >= 0.85`, `medium_confidence >= 0.65`, otherwise `low_confidence`
-
-This makes the thresholds operationally easier to read, but they should still be treated as review heuristics rather than statistical confidence guarantees.
 
 ## Runtime Notes
 
-If you want protected admin flows enabled, set `SEMANTRA_ADMIN_API_TOKEN` in `backend/.env`, then restart the API or call `POST /observability/config/reload` with the same token in the `X-Admin-Token` header.
+### Admin token
 
-For LM Studio or another OpenAI-compatible local runtime, configure these in `backend/.env`:
+If you want protected governance/admin flows enabled, set `SEMANTRA_ADMIN_API_TOKEN` in `backend/.env`, then restart the backend or call `POST /observability/config/reload` with the token in `X-Admin-Token`.
+
+### LLM providers
+
+The app supports bounded LLM use for validation, transformation generation, and canonical-gap assistance.
+
+Example for LM Studio:
+
 - `SEMANTRA_LLM_PROVIDER=lmstudio`
 - `SEMANTRA_LLM_MODEL=<model-identifier>`
-- `SEMANTRA_LMSTUDIO_BASE_URL=http://<host>:1234/v1/responses`
+- `SEMANTRA_LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1/chat/completions`
 
-To run a saved benchmark from the terminal and inspect recent run history:
+### Scoring note
 
-```bash
-cd backend
-python scripts/run_saved_benchmark.py --dataset-id 1 --with-llm
-```
+The mapping confidence score is a normalized multi-signal heuristic, not a calibrated probability.
 
-If you prefer the PowerShell wrapper that auto-loads `backend/.env`:
+- the final score is normalized into `0..1`
+- current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
+- treat the score as review prioritization, not as a guarantee that a mapping is correct
 
-```powershell
-cd Semantra/backend
-./scripts/run_saved_benchmark.ps1 -DatasetId 1 -WithLlm
-```
+For the detailed reference on signals, weights, confidence labels, and bounded LLM validation cases, see `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 
-## Project Docs
+For the detailed reference on benchmark metrics, confidence buckets, and correction-impact interpretation, see `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`.
 
-Use these docs with different intent:
-- `README.md`: quick project summary, local run instructions, and high-level capability list
-- `PROJECT_OVERVIEW.md`: broader product and technical architecture overview
-- `project_docs/plan.md`: strategic roadmap, technical phases, working order, and execution rules
-- `project_docs/epics.md`: epic backlog and scope catalog
-- `project_docs/implementation_checklists.md`: active MVP and release checklists
-- `project_docs/completed_slices.md`: delivered slices and completed technical phases
-- `docs/pilot/REAL_LIFE_PILOT_TEST_PLAN.md`: concrete pilot-validation plan for realistic source/target datasets before wider rollout or refactor
-- `docs/vision/INTEGRATION_CATALOG_VISION.md`: deeper product and architecture memo for the integration catalog direction
-- `docs/presentation/presentation.md`: presentation and demo narrative for stakeholder-facing walkthroughs
-- `help.md`: practical usage guide in Serbian for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs
-- `help.en.md`: practical usage guide in English for the Streamlit `Workspace`, `Benchmarks`, and `Admin / Debug` tabs
+## Product Boundaries
+
+Semantra today is:
+
+- a pilot-grade semantic mapping and governance workbench
+- deterministic-first, with bounded AI assistance
+- centered on reviewability, explainability, and reusable semantic knowledge
+
+Semantra today is not yet:
+
+- a production batch orchestration platform
+- a connector-heavy ingestion platform
+- a multi-step enterprise workflow engine
+- a DB-only canonical authoring platform without file-backed reseed inputs
+
+## Documentation Map
+
+Read the docs in this order:
+
+1. `project_docs/current_state.md`
+	- what the product actually supports today
+2. `PROJECT_OVERVIEW.md`
+	- broader product and architecture explanation
+3. `project_docs/completed_slices.md`
+	- chronological delivery history
+4. `project_docs/plan.md`
+	- forward-looking priorities and sequencing
+5. `project_docs/epics.md`
+	- backlog map and epic status
+6. `project_docs/implementation_checklists.md`
+	- active execution checklists
+7. `help.md` / `help.en.md`
+	- practical UI usage guides
+
+Supporting docs:
+
+- `docs/pilot/REAL_LIFE_PILOT_TEST_PLAN.md`
+- `docs/vision/INTEGRATION_CATALOG_VISION.md`
+- `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`
+- `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`
+- `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`
+- `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`
+- `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`
+- `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`
+- `docs/presentation/presentation.md`

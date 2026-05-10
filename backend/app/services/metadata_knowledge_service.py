@@ -18,7 +18,7 @@ from app.models.mapping import (
 )
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.persistence_service import persistence_service
-from app.utils.knowledge_text import normalize_alias_text, split_csv_values
+from app.utils.knowledge_text import filter_canonical_aliases, normalize_alias_text, normalize_canonical_alias_text, split_csv_values
 from app.utils.normalization import clear_normalization_overrides, configure_normalization_overrides
 
 
@@ -52,6 +52,10 @@ ALIAS_FIELDS = (
 
 def _normalize_alias(value: str) -> str:
     return normalize_alias_text(value)
+
+
+def _normalize_canonical_alias(value: str) -> str:
+    return normalize_canonical_alias_text(value)
 
 
 def _split_values(value: str) -> list[str]:
@@ -209,14 +213,91 @@ class MetadataKnowledgeService:
                 raise ValueError(f"Canonical glossary row {row_number} is missing concept_id.")
             if not display_name:
                 raise ValueError(f"Canonical glossary row {row_number} is missing display_name.")
-            parsed_rows.append({header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS})
+            parsed_row = {header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS}
+            parsed_row["aliases"] = ", ".join(filter_canonical_aliases(_split_values(parsed_row.get("aliases") or "")))
+            parsed_rows.append(parsed_row)
 
-        self.canonical_glossary_path.write_text(decoded, encoding="utf-8", newline="")
+        with self.canonical_glossary_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=CANONICAL_GLOSSARY_HEADERS)
+            writer.writeheader()
+            writer.writerows(parsed_rows)
         self.refresh()
         return CanonicalGlossaryImportResponse(
             imported_row_count=len(parsed_rows),
             canonical_concept_count=self.canonical_concept_count,
             source_filename=filename,
+        )
+
+    def promote_overlay_alias_to_canonical_glossary(
+        self,
+        concept_id: str,
+        alias: str,
+        *,
+        display_name: str | None = None,
+        description: str | None = None,
+        data_type: str | None = None,
+    ) -> tuple[CanonicalGlossaryEntry, bool, bool]:
+        normalized_concept_id = str(concept_id or "").strip()
+        normalized_alias = _normalize_canonical_alias(alias)
+        if not normalized_concept_id:
+            raise ValueError("Canonical glossary promotion requires concept_id.")
+        if not normalized_alias:
+            raise ValueError("Canonical glossary promotion requires a non-empty, non-numeric alias.")
+
+        if not self.canonical_glossary_path.exists():
+            raise KeyError("Canonical glossary file is not available.")
+
+        with self.canonical_glossary_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                raise ValueError("Canonical glossary CSV must include a header row.")
+            rows = [{header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS} for row in reader]
+
+        matching_row = next((row for row in rows if row.get("concept_id") == normalized_concept_id), None)
+        concept_created = matching_row is None
+        if matching_row is None:
+            matching_row = {
+                "concept_id": normalized_concept_id,
+                "entity": normalized_concept_id.split(".", 1)[0] if "." in normalized_concept_id else "general",
+                "attribute": normalized_concept_id.split(".", 1)[1] if "." in normalized_concept_id else normalized_concept_id,
+                "display_name": str(display_name or normalized_concept_id).strip() or normalized_concept_id,
+                "description": str(description or "").strip(),
+                "data_type": str(data_type or "").strip(),
+                "aliases": "",
+            }
+            rows.append(matching_row)
+
+        existing_aliases = {
+            normalized
+            for normalized in (_normalize_canonical_alias(value) for value in _split_values(matching_row.get("aliases") or ""))
+            if normalized
+        }
+        alias_added = normalized_alias not in existing_aliases
+        existing_aliases.add(normalized_alias)
+        matching_row["aliases"] = ", ".join(sorted(existing_aliases))
+
+        with self.canonical_glossary_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=CANONICAL_GLOSSARY_HEADERS)
+            writer.writeheader()
+            writer.writerows(rows)
+
+        self.refresh()
+
+        concept = self._canonical_concepts_by_id.get(normalized_concept_id)
+        if concept is None:
+            raise KeyError(f"Canonical concept '{normalized_concept_id}' was not available after glossary refresh.")
+        return (
+            CanonicalGlossaryEntry(
+                concept_id=concept.concept_id,
+                entity=concept.entity,
+                attribute=concept.attribute,
+                display_name=concept.display_name,
+                description=concept.description,
+                data_type=concept.data_type,
+                aliases=sorted(concept.aliases),
+            ),
+            alias_added,
+            concept_created,
         )
 
     def refresh(self) -> None:
@@ -643,7 +724,8 @@ class MetadataKnowledgeService:
         knowledge_dicts, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
 
         for d in canonical_dicts:
-            for alias in d["aliases"]:
+            canonical_aliases = frozenset(filter_canonical_aliases(d["aliases"]))
+            for alias in canonical_aliases:
                 self._canonical_alias_to_concepts.setdefault(alias, set()).add(d["concept_id"])
             self._canonical_concepts_by_id[d["concept_id"]] = CanonicalBusinessConcept(
                 concept_id=d["concept_id"],
@@ -652,7 +734,7 @@ class MetadataKnowledgeService:
                 display_name=d["display_name"],
                 description=d["description"],
                 data_type=d["data_type"],
-                aliases=frozenset(d["aliases"]),
+                aliases=canonical_aliases,
             )
 
         for d in knowledge_dicts:
@@ -743,15 +825,15 @@ class MetadataKnowledgeService:
                 if not concept_id:
                     continue
                 display_name = str(row.get("display_name") or concept_id).strip()
-                aliases = {
-                    normalized
-                    for normalized in (
-                        _normalize_alias(display_name),
-                        _normalize_alias(concept_id.replace(".", " ")),
-                        *(_normalize_alias(value) for value in _split_values(str(row.get("aliases") or ""))),
+                aliases = set(
+                    filter_canonical_aliases(
+                        (
+                            display_name,
+                            concept_id.replace(".", " "),
+                            *_split_values(str(row.get("aliases") or "")),
+                        )
                     )
-                    if normalized
-                }
+                )
                 self._register_canonical_concept(
                     concept_id=concept_id,
                     entity=str(row.get("entity") or "general").strip() or "general",
@@ -1186,7 +1268,7 @@ class MetadataKnowledgeService:
     ) -> None:
         existing = self._canonical_concepts_by_id.get(concept_id)
         merged_aliases = set(existing.aliases if existing else ())
-        merged_aliases.update(alias for alias in aliases if alias)
+        merged_aliases.update(filter_canonical_aliases(aliases))
         concept = CanonicalBusinessConcept(
             concept_id=concept_id,
             entity=existing.entity if existing else entity,

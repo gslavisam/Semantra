@@ -34,6 +34,10 @@ def _build_recommendation(
     return f"Promote override rule for source '{source}': use '{corrected_target}' instead of '{suggested_target}'."
 
 
+def _is_closed_review_status(status: str) -> bool:
+    return status in {"accepted", "rejected"}
+
+
 class UserCorrectionStore:
     def __init__(self) -> None:
         self._entries: list[UserCorrectionEntry] = []
@@ -69,6 +73,8 @@ class UserCorrectionStore:
         request: ReusableCorrectionRulePromotionRequest | dict,
     ) -> ReusableCorrectionRule:
         payload = request if isinstance(request, ReusableCorrectionRulePromotionRequest) else ReusableCorrectionRulePromotionRequest.model_validate(request)
+        if not _is_closed_review_status(payload.status):
+            raise ValueError("Reusable correction rules require closed review outcomes (accepted or rejected).")
         grouped = self._group_corrections()
         occurrence_count = grouped.get(
             _correction_signature(payload.source, payload.suggested_target, payload.corrected_target, payload.status),
@@ -117,29 +123,31 @@ class UserCorrectionStore:
         for entry in self.list_entries():
             if entry.source != source:
                 continue
+            if not _is_closed_review_status(entry.status):
+                continue
             if entry.corrected_target == target:
                 if entry.status == "accepted":
                     accepted_matches += 1
-                elif entry.status == "overridden":
-                    overridden_matches += 1
             if entry.suggested_target == target:
                 if entry.status == "rejected":
                     rejected_targets += 1
-                elif entry.status == "overridden" and entry.corrected_target != target:
+                elif entry.status == "accepted" and entry.corrected_target != target:
                     overridden_away += 1
 
         for rule in self.list_reusable_rules():
             if rule.source != source:
                 continue
-            if rule.corrected_target == target and rule.status in {"accepted", "overridden"}:
+            if not _is_closed_review_status(rule.status):
+                continue
+            if rule.corrected_target == target and rule.status == "accepted":
                 promoted_preferred_rules += 1
             if rule.suggested_target == target:
                 if rule.status == "rejected":
                     promoted_rejected_rules += 1
-                elif rule.status == "overridden" and rule.corrected_target != target:
+                elif rule.status == "accepted" and rule.corrected_target != target:
                     promoted_overridden_away_rules += 1
 
-        boost = min(0.2, (0.06 * accepted_matches) + (0.05 * overridden_matches))
+        boost = min(0.2, 0.06 * accepted_matches)
         penalty = min(0.2, (0.06 * rejected_targets) + (0.05 * overridden_away))
         rule_boost = min(0.3, 0.18 * promoted_preferred_rules)
         rule_penalty = min(0.3, 0.18 * (promoted_rejected_rules + promoted_overridden_away_rules))
@@ -183,6 +191,8 @@ class UserCorrectionStore:
         candidates: list[CorrectionRuleCandidate] = []
         for (source, suggested_target, corrected_target, status), occurrence_count in grouped.items():
             if occurrence_count < min_occurrences:
+                continue
+            if not _is_closed_review_status(status):
                 continue
             promoted_rule = promoted_rule_map.get((source, suggested_target, corrected_target, status))
             candidates.append(

@@ -6,6 +6,8 @@ from typing import Any
 import httpx
 import streamlit as st
 
+from streamlit_ui.governance import api_error_message, mapping_set_workspace_block_reason
+
 
 CATALOG_DETAIL_STATE_KEYS = (
     "catalog_integration_detail",
@@ -17,11 +19,7 @@ CATALOG_DETAIL_STATE_KEYS = (
 
 
 def _mapping_set_reuse_block_reason(status: str | None) -> str:
-    normalized_status = str(status or "").strip().lower()
-    if normalized_status == "approved":
-        return ""
-    current_status = normalized_status or "draft"
-    return f"Only approved mapping set versions can be reused in Workspace. Current status: {current_status}."
+    return mapping_set_workspace_block_reason(status, action_label="reused in Workspace")
 
 
 def _clear_catalog_mapping_set_context() -> None:
@@ -502,7 +500,7 @@ def render_catalog_tab(
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {
                     "level": "error",
-                    "message": f"Reusing mapping set in workspace failed: {error}",
+                    "message": api_error_message(error, default_prefix="Reusing mapping set in workspace failed"),
                 }
                 st.rerun()
         if reuse_block_reason:

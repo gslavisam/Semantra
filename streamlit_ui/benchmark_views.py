@@ -6,6 +6,8 @@ from typing import Any
 import httpx
 import streamlit as st
 
+from streamlit_ui.governance import mapping_benchmark_block_reason
+
 
 def benchmark_dataset_options() -> list[tuple[str, int]]:
     datasets = st.session_state.get("benchmark_datasets", [])
@@ -18,9 +20,14 @@ def benchmark_dataset_options() -> list[tuple[str, int]]:
     ]
 
 
+def _current_mapping_benchmark_block_reason(mapping_decisions: list[dict[str, Any]]) -> str:
+    return mapping_benchmark_block_reason(mapping_decisions)
+
+
 def render_benchmark_tab(
     *,
     admin_token_required: Callable[[], bool],
+    build_mapping_decisions: Callable[[], list[dict[str, Any]]],
     build_current_benchmark_case: Callable[[], dict | None],
     api_request: Callable[..., Any],
 ) -> None:
@@ -35,6 +42,8 @@ def render_benchmark_tab(
 
     st.subheader("Save Current Mapping As Benchmark")
     benchmark_case = build_current_benchmark_case()
+    current_mapping_decisions = build_mapping_decisions()
+    benchmark_block_reason = _current_mapping_benchmark_block_reason(current_mapping_decisions)
     benchmark_name = st.text_input(
         "Benchmark dataset name",
         value=st.session_state.get("benchmark_dataset_name", "mapping-review-benchmark"),
@@ -47,7 +56,7 @@ def render_benchmark_tab(
 
     if st.button(
         "Save current mapping as benchmark",
-        disabled=(benchmark_case is None) or (not benchmark_name.strip()),
+        disabled=(benchmark_case is None) or (not benchmark_name.strip()) or bool(benchmark_block_reason),
         width="stretch",
         key="benchmark_save_current_mapping",
     ):
@@ -68,6 +77,8 @@ def render_benchmark_tab(
                 "message": f"Saving benchmark dataset failed: {error}",
             }
             st.rerun()
+    if benchmark_block_reason:
+        st.caption(benchmark_block_reason)
 
     st.subheader("Saved Benchmark Datasets")
     list_columns = st.columns(2)

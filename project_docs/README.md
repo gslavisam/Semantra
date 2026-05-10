@@ -1,86 +1,47 @@
-# Semantra Project Docs Map
+# Semantra Project Docs
 
-Ovaj folder drži projektno-upravljačke dokumente za Semantru.
+Ovaj folder je sada sveden na mali skup dokumenata sa jasnim ulogama. Cilj je da se stanje projekta može pregledati bez preklapanja između roadmap-a, istorije isporuke i operativnih checklist-a.
 
-Koristi ih ovim redom:
+## Preporučeni red čitanja
 
-- `plan.md`: strateški roadmap, tehničke faze, preporučeni redosled rada i operativna pravila.
-- `epics.md`: backlog epika i njihov scope.
-- `implementation_checklists.md`: aktivne MVP checkliste, release gate-ovi i izvršni koraci.
-- `completed_slices.md`: isporučeni slice-ovi i završene tehničke faze.
+1. `current_state.md`
+	 - šta je danas stvarno implementirano i šta proizvod podržava
+2. `completed_slices.md`
+	 - hronologija isporučenih slice-ova i završenih faza
+3. `plan.md`
+	 - forward-looking prioriteti, redosled rada i tehničke teme
+4. `epics.md`
+	 - backlog mapa po epicima i njihov trenutni status
+5. `implementation_checklists.md`
+	 - aktivni izvršni checklist-i i release/hardening stavke
 
-## Kada koristiti koji dokument
+## Uloga svakog dokumenta
 
-Ako pitaš:
+- `current_state.md`
+	- primarni kontrolni dokument za današnje stanje proizvoda
+- `completed_slices.md`
+	- istorijski ledger; ovde ide ono što je završeno
+- `plan.md`
+	- ne opisuje istoriju i ne služi kao changelog; koristi se za sledeći redosled rada
+- `epics.md`
+	- backlog mapa; ne služi kao detaljna hronologija isporuke
+- `implementation_checklists.md`
+	- samo aktivne ili neposredno relevantne radne liste
 
-- "Kuda projekat ide?" -> `plan.md`
-- "Koje velike teme postoje?" -> `epics.md`
-- "Šta tačno radimo sledeće?" -> `implementation_checklists.md`
-- "Šta je već završeno?" -> `completed_slices.md`
+## Pravila za održavanje foldera
 
-## Procena ostalih važnih dokumenata
+- Novi "snapshot" ili "strategy review" dokument ne otvarati ako isti sadržaj može da stane u `current_state.md`, `plan.md` ili `completed_slices.md`.
+- Kada se feature završi, detaljna checklist stavka izlazi iz `implementation_checklists.md` i prelazi u `completed_slices.md`.
+- `epics.md` treba da ostane backlog mapa, ne mešavina retrospektive i aktivnih zadataka.
+- `current_state.md` je mesto gde prvo proveravamo šta proizvod danas podržava.
 
-Ovi dokumenti su i dalje korisni, ali nisu isti tip dokumentacije kao projektni backlog i plan, pa ih zato ne bih mešao u ovaj folder bez jasnog razloga.
+## Granica ovog foldera
 
-### `docs/pilot/REAL_LIFE_PILOT_TEST_PLAN.md`
+U `project_docs/` držimo samo projektno-upravljačke dokumente.
 
-Status: zadržati.
+Van ovog foldera ostaju:
 
-Zašto:
-
-- to je operativni pilot-validation dokument, ne backlog i ne roadmap
-- koristan je za real-data proveru i release/pilot stabilizaciju
-- ima dovoljno specifičnu namenu da ne treba da se utopi u `implementation_checklists.md`
-
-Preporuka:
-
-- ostaviti ga kao zaseban dokument
-- držati ga u `docs/pilot/` kao tematski pilot-validation dokument
-
-### `docs/vision/INTEGRATION_CATALOG_VISION.md`
-
-Status: zadržati.
-
-Zašto:
-
-- to je dubinski vision dokument za jednu važnu temu, ne opšti epic katalog
-- i dalje ima vrednost kao širi product/architecture memo iza `Epic 13`
-- dobar je kao objašnjenje "zašto" i "u kom smeru", dok `epics.md` ostaje kraći backlog dokument
-
-Preporuka:
-
-- ostaviti ga kao zaseban vision dokument
-- držati ga u `docs/vision/` kao vision/product memo
-
-### `docs/presentation/presentation.md`
-
-Status: verovatno zadržati, ali kao supporting artifact.
-
-Zašto:
-
-- nije planski dokument i nije backlog dokument
-- koristan je za stakeholder prezentacije, demo narativ i positioning
-- ne pomaže direktno dnevnom upravljanju backlog-om, ali jeste koristan poslovni artefakt
-
-Preporuka:
-
-- zadržati ga ako i dalje postoji potreba za prezentovanjem Semantre
-- ako prestane da se koristi, može kasnije da se arhivira
-- ako ostaje aktivan, prirodnije mu je mesto u `docs/presentation/` nego u `project_docs/`
-
-## Trenutna preporučena granica
-
-U `project_docs/` držati samo ove dokumente:
-
-- plan
-- epics
-- implementation checklists
-- completed slices
-
-Van `project_docs/` za sada ostaviti:
-
-- `docs/pilot/` dokumente
-- `docs/vision/` dokumente
-- `docs/presentation/` i demo artefakte
-
-To drži granicu čistom: `project_docs/` ostaje mesto za upravljanje projektom, a ostali dokumenti ostaju tematski ili izlazni artefakti.
+- `docs/vision/` za vision i product memo dokumente
+- `docs/reference/` za dublje tehničke reference kao što su scoring, warning/runtime behavior, benchmark metrike i correction-impact objašnjenja
+- `docs/pilot/` za pilot/test planove
+- `docs/presentation/` i slični stakeholder/demo artefakti

@@ -429,7 +429,6 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[Scori
         int(correction_feedback[key]) > 0
         for key in (
             "accepted_matches",
-            "overridden_matches",
             "rejected_targets",
             "overridden_away",
             "promoted_preferred_rules",
@@ -637,19 +636,20 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
         explanation.append(
             "Reusable rule penalized this candidate "
             f"(rejected_rules={correction_feedback['promoted_rejected_rules']}, "
-            f"overridden_away_rules={correction_feedback['promoted_overridden_away_rules']})."
+            f"alternative_away_rules={correction_feedback['promoted_overridden_away_rules']})."
         )
     if signals.correction > 0:
         explanation.append(
             "Similar past decision influenced this ranking "
             f"(historical confirmation strength {signals.correction:.2f}; "
-            f"accepted={correction_feedback['accepted_matches']}, overridden={correction_feedback['overridden_matches']})."
+            f"accepted={correction_feedback['accepted_matches']})."
         )
     elif signals.correction < 0:
         explanation.append(
             "Historical review history penalized this candidate "
             f"(historical confirmation strength {signals.correction:.2f}; "
-            f"rejected={correction_feedback['rejected_targets']}, overridden_away={correction_feedback['overridden_away']})."
+            f"rejected={correction_feedback['rejected_targets']}, "
+            f"alternative_away={correction_feedback['overridden_away']})."
         )
     if not explanation:
         explanation.append("Weak heuristic match; review recommended.")

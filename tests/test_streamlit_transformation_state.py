@@ -149,6 +149,45 @@ def test_build_pending_corrections_includes_rejected_review_decision() -> None:
     ]
 
 
+def test_build_pending_corrections_skips_needs_review_override() -> None:
+    fake_streamlit, [build_pending_corrections] = load_streamlit_functions("build_pending_corrections")
+
+    fake_streamlit.session_state.update(
+        {
+            "mapping_editor_state": {
+                "phone": {
+                    "target": "phone_number",
+                    "suggested_target": "contact_phone",
+                    "status": "needs_review",
+                }
+            }
+        }
+    )
+
+    assert build_pending_corrections() == []
+
+
+def test_correction_governance_block_reason_reports_unclosed_review_status() -> None:
+    fake_streamlit, [correction_governance_block_reason] = load_streamlit_functions("correction_governance_block_reason")
+
+    fake_streamlit.session_state.update(
+        {
+            "mapping_editor_state": {
+                "phone": {
+                    "target": "phone_number",
+                    "suggested_target": "contact_phone",
+                    "status": "needs_review",
+                }
+            }
+        }
+    )
+
+    assert correction_governance_block_reason() == (
+        "Saving reviewed corrections is blocked until pending corrections come from closed review outcomes "
+        "(accepted or rejected). Review statuses: needs_review."
+    )
+
+
 def test_materialize_transformation_template_replaces_source_and_target_placeholders() -> None:
     _, [materialize_transformation_template] = load_streamlit_functions("materialize_transformation_template")
 

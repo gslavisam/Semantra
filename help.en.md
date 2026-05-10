@@ -1,1362 +1,231 @@
-# Help: Workspace, Benchmarks, and Admin / Debug tabs
+# Help for the Semantra UI
 
-This document explains the purpose of the buttons and helper controls in the `Workspace`, `Benchmarks`, and `Admin / Debug` tabs of the Semantra Streamlit app.
+This document is a practical guide to the current Semantra Streamlit product surface. It is not a full button-by-button reference. Instead, it explains how the main workflows fit together.
 
-Notes:
+## Main navigation
 
-- Some actions require an admin token.
-- If the backend does not have `SEMANTRA_ADMIN_API_TOKEN` configured, the app may currently allow admin/debug and benchmark actions even without a token.
-- Most actions display the result immediately in the same tab, below the control that triggered the call.
+Semantra currently has five top-level areas:
 
-## Before you start
+- `Workspace`
+- `Canonical Console`
+- `Catalog`
+- `Benchmarks`
+- `Admin / Debug`
 
-Recommended order:
+Recommended order for a new session:
 
-1. In the `Workspace` tab, upload the source and target files.
-2. Run `Generate mapping`.
-3. Only then move to `Benchmarks` or `Admin / Debug`, because some functions are most useful once an active mapping result already exists.
+1. start in `Workspace`
+2. move to `Canonical Console` only if you need canonical governance or overlay work
+3. use `Catalog` when you want reuse or discovery
+4. use `Benchmarks` when you want repeatable quality measurement
+5. use `Admin / Debug` for runtime and observability support tasks
 
-## Global sidebar controls
-
-These controls are not tied to a single tab, but they affect the whole application flow.
+## Sidebar controls
 
 ### `API Base URL`
 
-The URL field for the backend API.
-
-Use it when:
-
-- the backend is not running on the default URL
-- you want to point the UI to another local or remote backend
-
-In most cases this stays on the local default value if the backend runs on the same machine.
+Use this when the backend is not running on the default local URL.
 
 ### `Admin Token`
 
-The field used to enter the admin token that the backend uses for protected observability, evaluation, and knowledge actions.
-
-Use it when:
-
-- the backend requires a token for benchmark, correction, mapping set, or knowledge actions
-- you want to use admin/debug functions without `403` errors
+Use this for protected governance, benchmark, catalog, and knowledge flows when the backend requires an admin token.
 
 ### `Reset flow`
 
-What it does:
+This clears the active Workspace session state and returns the UI to a clean starting point. Use it when you want to start a new scenario without any leftover review state.
 
-- clears the active UI flow state from session state
-- resets upload, mapping, preview, code generation, and related working data
+## Workspace
 
-When to use it:
+`Workspace` is the main analyst flow. It has four internal sub-tabs:
 
-- when you want to start over with a new source/target pair
-- when the UI state feels inconsistent after several experiments
+- `Setup`
+- `Review`
+- `Decisions`
+- `Output`
 
-What to expect after clicking:
+### `Setup`
 
-- the app returns to a clean initial state
-- you need to upload files again if you want to continue the review flow
+Use `Setup` for:
 
-## Workspace tab
-
-The purpose of this tab is to drive the full main workflow: upload, profiling, mapping generation, manual review, transformations, preview, code generation, decision import/export, mapping sets, and corrections.
-
-For readability, `Workspace` is organized into 4 internal sub-tabs:
-
-- `Setup` for upload, table selection, profiling, and starting the initial auto-mapping run
-- `Review` for the trust layer, candidate review, and manual review per column
-- `Decisions` for manual overrides, import/export, mapping sets, and corrections
-- `Output` for preview and Pandas code generation
-
-## Schema spec upload mode
-
-Semantra now supports files that are not row-data tables, but field-per-row specifications.
-
-Typical example:
-
-- the file columns are `Column`, `Description`, `Type`, `Length`
-- each row describes one field instead of one business record
-
-Use this when:
-
-- the source or target does not yet have real data, only a data dictionary or field catalog
-- you receive a SAP, Workday, or internal specification file with field descriptions
-- you want to map the schema before sample row data exists
-
-What to expect in the `Setup` tab:
-
-- after selecting a file, the app may show a hint that the file looks like a schema specification
-- `Source mode` or `Target mode` appears with a choice between `Row data` and `Schema spec`
-- if you keep `Schema spec`, the upload is parsed as a field-per-row schema instead of a regular dataset
-
-How to interpret the result:
-
-- `Columns` means the number of business fields extracted from the specification
-- `Rows` stays `0`, because the file does not contain business rows for preview
-- preview samples are not the point of this path; the goal is to build a `SchemaProfile` for mapping
-
-Important:
-
-- `.sql` uploads remain schema snapshots and do not use the `Schema spec` radio choice
-- you can use `Schema spec` on both source and target sides in `Standard` mode
-- in `Canonical` mode only the source file is used, but that source can still be a `Schema spec`
-
-## Canonical mapping mode
-
-`Canonical` mode is a source-only path for cases where you do not yet have a real target dataset and want to map source fields to canonical business concepts first.
-
-Use `Canonical` when:
-
-- you have a source schema or source spec, but no target file yet
-- you want a fast semantic normalization pass before a concrete system-to-system mapping run
-- you want to test whether the source fields have useful canonical coverage before deeper target review
+- choosing `Standard` or `Canonical` mode
+- uploading source and target files in standard mapping mode
+- uploading only the source in canonical-only mode
+- choosing `Row data` or `Schema spec` when a file looks like a field-per-row specification
+- selecting tables when an SQL snapshot contains multiple tables
+- optionally enriching the source dataset with companion metadata
 
 Use `Standard` when:
 
-- you have both a source and a target dataset or target spec
-- you want preview rows and Pandas code generation
-- you want a concrete source-to-target mapping instead of source-to-concept preparation
+- you have a real source and a real target
+- you want preview and Pandas code generation later
 
-What changes in the `Setup` tab:
+Use `Canonical` when:
 
-- `Target file` disappears
-- `Canonical target` appears
-- the current UI only exposes the `canonical` option
-- `Upload and profile` stores only the source handle plus the canonical target system
-- `Generate canonical mapping` calls the source-only canonical backend flow
+- you do not yet have a real target dataset
+- you want to normalize source fields to business concepts first
+- you want a semantic preparation pass before a concrete source-to-target run
 
-How to read the canonical result in the `Review` tab:
+### `Review`
 
-- `Source` remains the original source field
-- `Target` is the virtual canonical concept id, for example `customer.id`
-- the `Canonical concept` caption shows the business label of that concept
-- confidence and explanations remain heuristic signals, just like in the standard flow
-- `Source -> Concept View` and `Concept -> Target View` are especially useful because they show the canonical path, not just the final selected concept
+Use `Review` to inspect:
 
-Current limitations of the canonical-only UI flow:
+- trust-layer explanations
+- confidence and signal breakdown
+- LLM notes when validation was used
+- canonical path information
+- `Source -> Concept View`
+- `Concept -> Target View`
+- canonical-gap suggestion flows for rows that look semantically right but still have missing canonical coverage
 
-- transformations are intentionally disabled until a real target dataset exists
-- the `Output` tab does not run preview or code generation and instead explains that `Standard` mode is required
-- manual target additions and correction workflows stay limited to flows with a real target
-- benchmark case creation is skipped for canonical-only sessions because there is no real target schema payload
+This is the main place where you decide whether the engine output makes sense before you persist or generate artifacts.
 
-How to use the canonical result as preparation for a later `Standard` run:
+### `Decisions`
 
-1. In `Canonical` mode, upload source data or a source spec.
-2. Run `Generate canonical mapping` and review which source fields get meaningful canonical concepts.
-3. In the `Review` and `Decisions` tabs, confirm or reject the concept-level proposals and optionally export them as a JSON or Excel checkpoint.
-4. Click `Reset flow`, switch back to `Standard` mode, and upload the source plus a real target.
-5. Use the earlier canonical conclusions as guidance during the standard review flow, especially in the trust layer and manual review sections.
+Use `Decisions` for:
 
-## 1. Upload
+- manual target adjustments
+- exporting or importing mapping decisions as JSON or Excel
+- saving mapping-set versions
+- loading and applying previously saved mapping sets
+- correction history and reusable-learning flows
 
-### `Source file`
+Important current rules:
 
-The file uploader for the source dataset.
+- mapping-set reuse back into Workspace works only for `approved` mapping sets
+- corrections become durable only after the review outcome is closed
 
-Supported row-based formats include CSV, JSON, XML, and XLSX, as well as SQL schema snapshots when you are using a schema-only flow.
+### `Output`
 
-If the selected file looks like a field specification, the `Setup` tab shows an extra hint and a `Source mode` choice between `Row data` and `Schema spec`.
+Use `Output` for:
 
-### `Target file`
+- `Generate preview`
+- `Generate Pandas code`
 
-The file uploader for the target dataset.
+Important distinction:
 
-It works the same way as `Source file`, but for the destination model or schema you want to map into.
+- preview is advisory and can be used before final approval
+- code generation is governance-sensitive and requires accepted active decisions
 
-In `Canonical` mode, this field is not shown.
+If you are using transformations:
 
-## 2. Select Tables
+- you can enable a suggested transformation
+- generate transformation code with the LLM if the runtime is configured
+- use a reusable template
+- manually write your own code
+- only explicitly activated transformations are used by preview and code generation
 
-This section matters only when the uploaded SQL file contains multiple tables.
+## Canonical Console
 
-### `Source table`
+`Canonical Console` is the main canonical governance area.
 
-Dropdown for choosing the source table from the SQL snapshot.
+Use it to:
 
-It appears only when the backend detects multiple tables in the source SQL file.
-
-### `Target table`
-
-Dropdown for choosing the target table from the SQL snapshot.
-
-It appears only when the backend detects multiple tables in the target SQL file.
-
-### `Upload and profile`
-
-What it does:
-
-- sends the source and target files to the backend
-- includes the selected source and target tables when needed
-- builds schema profiles for both sides
-- stores dataset identifiers and preview data in the UI state
-
-When to use it:
-
-- immediately after selecting both the source and target file
-- every time you change a file or selected table and want a fresh profile
-
-Prerequisites:
-
-- both files must be selected
-
-What to expect after clicking:
-
-- summary sections for `Source` and `Target` appear
-- the app becomes ready for `Generate mapping`
-
-In `Canonical` mode:
-
-- only a source file is required
-- the source can be `Row data` or `Schema spec`
-- the summary shows only `Source`, while the canonical target stays virtual and is synthesized from the glossary layer
-
-## 3. Review Mapping
-
-### `Generate mapping`
-
-What it does:
-
-- calls the backend auto-mapping flow
-- generates ranked candidates and an initial selected target for each source column
-- initializes the manual review state in the UI
-
-When to use it:
-
-- after a successful upload and profiling step
-
-What to expect after clicking:
-
-- the trust layer, review tables, manual review, corrections, and preview/code generation actions become available
-
-In `Canonical` mode the button is called `Generate canonical mapping`, and the result is a source-to-canonical preparation flow without preview/code generation artifacts.
-
-Confidence score note:
-
-- the score is a normalized multi-signal heuristic, not a probability
-- the final result stays in the `0..1` range
-- current thresholds are `high_confidence >= 0.85`, `medium_confidence >= 0.65`, otherwise `low_confidence`
-- use it to prioritize review and understand the initial recommendation, not as a guarantee that the mapping is correct
-
-## Trust Layer and transformations
-
-For each source field you get a block with a target suggestion, a confidence display, and an expander section called `Details and Transformation`.
-
-### `Apply this transformation to data`
-
-Checkbox that activates the suggested transformation code if the system already generated one for that source-target pair.
-
-Use it when:
-
-- you want preview and later code generation to actually use the displayed suggested transformation
-
-### `Generate with LLM`
-
-What it does:
-
-- calls the runtime LLM to suggest a pandas transformation for the currently selected source-target pair
-
-When to use it:
-
-- when you know the mapping is correct but it needs a transformation
-- when you want a faster first draft of the transformation code
-
-Prerequisites:
-
-- an active target must exist for that source
-- the LLM runtime must be configured and available
-
-What to expect after clicking:
-
-- the generated transformation code is inserted into the manual code field
-- reasoning and warning messages may appear along with the suggestion
-
-### `Reusable template for <source>`
-
-Dropdown for selecting a ready-made transformation template.
-
-Use it when:
-
-- you want a standard text or formatting transformation without using the LLM
-
-### `Apply template`
-
-What it does:
-
-- takes the selected reusable template and materializes it for the concrete source-target pair
-
-When to use it:
-
-- when you know you need a standard transformation and do not want to generate new code
-
-What to expect after clicking:
-
-- the template code is inserted into the manual/custom transformation field
-
-### `Define pandas/Python transformation for <source> (optional)`
-
-Text area for manually writing custom transformation code.
-
-Use it when:
-
-- you want full control over the transformation
-- the LLM suggestion is not good enough
-- the template is not sufficient
-
-### `Apply generated/custom transformation`
-
-Checkbox that activates the manually entered or LLM/template-generated code.
-
-Use it when:
-
-- you want preview and code generation to use this exact custom/generated code
+- browse the canonical concept registry
+- filter concepts by name, alias, source system, business domain, and focus
+- open concept detail with aliases, contexts, active overlay entries, usage, and audit references
+- inspect active overlay summary and overlay lifecycle state
+- review the mirrored canonical-gap queue from Workspace
+- work with stewardship items for `canonical_gap` and `overlay_promotion`
+- promote an overlay alias into the stable glossary when the item is `ready_for_approval`
 
 Important:
 
-- entering code alone is not enough; the checkbox decides whether the transformation will actually be applied
+- this is no longer just a debug area; it is the main governance console for the canonical layer
+- LLMs may suggest, but persistence and promotion still require an explicit human action
+- some flows are protected by the admin token
 
-## Review tables and filters
+For the detailed reference on canonical runtime behavior, overlay lifecycle, stewardship states, and promote-to-glossary rules, see `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
 
-### `Filter by status`
+## Catalog
 
-Dropdown for filtering the `Selected Mapping` view by status.
+`Catalog` is the reuse and discovery surface over saved integration knowledge.
 
-### `Filter by confidence label`
+Use it to:
 
-Dropdown for filtering by confidence label.
-
-### `Filter by source`
-
-Dropdown for focusing on a single source column.
-
-These controls do not change backend state. They are only for inspection and focus during review.
-
-## Manual Review section
-
-For each source row, you can manually change the target and status.
-
-### `Target for <source>`
-
-Dropdown for manually selecting the target candidate for a given source.
-
-Use it when:
-
-- you want to replace the initially selected target with another proposal from the candidate list
-
-### `Status for <source>`
-
-Dropdown with the statuses `accepted`, `needs_review`, and `rejected`.
-
-Use it when:
-
-- you want to confirm the mapping
-- you want to leave the mapping for later review
-- you want to reject the mapping
-
-## Add Manual Mapping section
-
-This section is used to add or override a source-target pair that the auto-mapper did not propose or did not handle well.
-
-### `Manual source column`
-
-Dropdown for choosing the source column you want to add manually or override.
-
-### `Manual target column`
-
-Dropdown for manually selecting the target column.
-
-### `Manual status`
-
-Dropdown for the status of the manually added decision.
-
-### `Add mapping`
-
-What it does:
-
-- writes the manual source-target pair into the active review state
-
-When to use it:
-
-- when the auto-mapper did not propose the needed connection
-- when you want to extend the mapping with business knowledge
-
-What to expect after clicking:
-
-- the manual pair appears in the `Manual additions and overrides` table
-
-### `Remove manual mapping`
-
-Dropdown for choosing a manually added or overridden mapping that you want to remove.
-
-### `Remove`
-
-What it does:
-
-- removes the selected manual mapping from the active review state
-
-When to use it:
-
-- when you added the wrong manual pair
-- when you want to fall back to the system suggestion for that source
-
-## Active Decisions
-
-This table has no buttons, but it is important because it shows the currently active mapping decisions that will be used in preview, code generation, export, and save operations.
-
-If you do not see what you expect here, first fix the `Manual Review` or `Add Manual Mapping` section.
-
-## Export / Import Decisions
-
-### `Download mapping JSON`
-
-What it does:
-
-- exports the currently active mapping decisions as a JSON file
-
-When to use it:
-
-- for review-state backups
-- for moving mapping decisions across sessions
-- for manual editing outside the UI
-
-### `Import mapping JSON`
-
-File uploader for a JSON file with a `mapping_decisions` payload.
-
-### `Apply imported mapping`
-
-What it does:
-
-- loads mapping decisions from the uploaded JSON into the current review state
-
-When to use it:
-
-- when you want to restore a previously exported mapping
-- when you receive mapping decisions from another workflow
-
-What to expect after clicking:
-
-- the editor state is updated to match the imported payload
-
-## Mapping Set Versioning
-
-This section lets you save the current review state as a versioned mapping set on the backend and compare versions of the same mapping set through a lightweight governance flow.
-
-### `Mapping set name`
-
-The name of the mapping set you are saving.
-
-### `Mapping set created by`
-
-Optional identifier for the person or team saving the mapping set.
-
-### `Mapping set owner`
-
-Optional owner for the mapping set at the whole-version level.
-
-Use it when:
-
-- you want to mark the team or person who formally owns that mapping set
-- you want clearer governance context during later review
-
-### `Mapping set assignee`
-
-Optional current assignee or reviewer for that version.
-
-Use it when:
-
-- you want to track who is currently expected to review or finish the version
-
-### `Version note`
-
-Optional note attached to that mapping set version.
-
-### `Review note`
-
-Optional governance/review note for that version.
-
-Use it when:
-
-- you want to record why the version is moving into review, what is still pending, or what condition must be met next
-
-### `Save mapping set version`
-
-What it does:
-
-- saves the active mapping decisions as a new mapping set version
-- also saves `owner`, `assignee`, `version note`, and `review note` metadata with that version
-
-When to use it:
-
-- when you want a review snapshot that can be reloaded later
-- when you are creating versioned iterations of mapping work
-
-What to expect after clicking:
-
-- a success message with the name and version
-- the mapping set list may be refreshed immediately
-
-### `Load saved mapping sets`
-
-What it does:
-
-- loads all previously saved mapping set versions from the backend
-
-When to use it:
-
-- when you want to inspect and use older saved versions
-
-### `Select saved mapping set`
-
-Dropdown for selecting a concrete saved mapping set version.
-
-### `Apply saved mapping set`
-
-What it does:
-
-- loads the selected mapping set into the current review state
-- writes an `apply` audit event on the backend
-- the same apply flow is also used by `Catalog > Reuse in Workspace`
-
-When to use it:
-
-- when you want to continue earlier review work or test an older decision set
-
-## Catalog tab
-
-This section is used to search saved integrations, inspect existing mapping versions, drill into audit/diff context, and reuse a catalog entry back into the active Workspace review flow.
-
-### `Run catalog query`
-
-What it does:
-
-- runs text search across `integration_name`, source/target system, owner, business domain, and canonical concept
-- applies the active filters to the catalog records
-
-When to use it:
-
-- when you want to quickly find a similar or previously reviewed integration without manually browsing all saved mapping set versions
-
-### `Load all integrations`
-
-What it does:
-
-- loads all saved catalog integrations and their versions
-
-When to use it:
-
-- when you want a browse view of the full current catalog without typing a search query
-
-### `Load detail`
-
-What it does:
-
-- loads the grouped detail for the selected `integration_name`
-- shows versions, latest version, latest approved version, canonical concepts, unmatched sources, and similar integrations
-
-When to use it:
-
-- when you want to understand the full history of one integration before comparing or reusing it
-
-### `Catalog version drilldown`
-
-Dropdown for choosing a concrete mapping set version from the currently open integration detail view.
-
-### `Open selected version`
-
-What it does:
-
-- loads the concrete mapping set detail inside the Catalog tab
-
-When to use it:
-
-- when you want to inspect the exact reviewed version before audit, diff, or reuse
-
-### `Load selected audit`
-
-What it does:
-
-- loads the audit trail for the currently selected mapping set version from the Catalog detail view
-
-When to use it:
-
-- when you want lifecycle context without moving back into the Decisions section
-
-### `Reuse in Workspace`
-
-What it does:
-
-- calls the same backend `apply` flow as `Apply saved mapping set`
-- moves the selected mapping set version into the active Workspace review state
-- populates the `Review` and `Decisions` tabs with the mapping content taken from the catalog entry
-
-When to use it:
-
-- when you want to start from an existing cataloged integration instead of from a new auto-mapping pass
-
-### `Open approved version`
-
-What it does:
-
-- opens the latest approved mapping set version from the currently open integration
-
-When to use it:
-
-- when you want to inspect the governance-approved baseline instead of the latest draft
-
-### `Similar Integrations`
-
-What it shows:
-
-- integrations that share canonical footprint and part of the metadata signal with the currently open integration
-- an explainable similarity signal through shared concepts, source/target system, business domain, and artifact type
-
-When to use it:
-
-- when you want a reuse signal or a comparable previous implementation before creating a new mapping version
-
-### `Open similar integration`
-
-What it does:
-
-- opens the detail of the selected related integration directly from the Similar Integrations panel
-
-When to use it:
-
-- when you want to move quickly between related integrations without running a new catalog search
-
-### `Concept Lookup`
-
-What it does:
-
-- finds where a specific canonical concept already appears across saved integrations and versions
-
-When to use it:
-
-- when you want a concept-centric reuse view, for example for `customer.id` or another business concept
-
-### `Saved mapping set status`
-
-Dropdown for choosing the new status of the selected mapping set version.
-
-### `Update saved mapping set status`
-
-What it does:
-
-- changes the status of the selected mapping set version on the backend
-- can also refresh `owner`, `assignee`, and `review note`
-
-When to use it:
-
-- when a mapping set moves from draft into review or approved status
-
-### `Load selected mapping set audit`
-
-What it does:
-
-- loads the audit history for the selected mapping set
-
-When to use it:
-
-- when you want to inspect the lifecycle changes of that version
-
-### `Compare against version`
-
-Dropdown for selecting an older version of the same mapping set to compare against.
-
-It appears when at least two versions exist for the same `mapping set name`.
-
-### `Load mapping set diff`
-
-What it does:
-
-- loads the diff between the currently selected version and the chosen older version
-- shows an `Added`, `Removed`, and `Changed` summary
-- shows a table of changes per source column
-
-What counts as a change:
-
-- target column changed
-- decision status changed
-- transformation code changed
-
-When to use it:
-
-- when you want to see exactly what changed between two review iterations
-- when you want to check whether a newer version only adds fields or also changes already reviewed decisions
-
-## Save Corrections section
-
-This section is used to save the differences between the system suggestion and your final review decision, and to work with reusable rule candidates.
-
-### `Correction note`
-
-Optional note saved with each persisted correction.
-
-### `Load reusable rule candidates`
-
-What it does:
-
-- loads reusable correction rule candidates based on previous correction history
-
-When to use it:
-
-- when you want to see which user corrections repeat often enough to become rules
-
-### `Load promoted reusable rules`
-
-What it does:
-
-- loads already promoted reusable rules
-
-When to use it:
-
-- when you want to inspect which rules are already actively influencing ranking
-
-### `Save reviewed corrections`
-
-What it does:
-
-- persists the current review differences as corrections in the observability layer
-
-When to use it:
-
-- when you have finished manual review and want the system to remember those decisions
-
-What to expect after clicking:
-
-- a success message with the number of saved corrections
-- the `Last saved corrections` section gets new data
-
-### `Promote reusable rule candidate`
-
-Dropdown for selecting the candidate you want to turn into a reusable rule.
-
-### `Promote selected reusable rule`
-
-What it does:
-
-- promotes the selected correction candidate into a persistent reusable rule
-
-When to use it:
-
-- when you know a correction pattern repeats and should influence future ranking more strongly
-
-## Final actions in the Workspace tab
-
-### `Generate preview`
-
-What it does:
-
-- executes a preview of the active mapping decisions on source data
-- includes transformation preview when transformations are activated
-
-When to use it:
-
-- when you want to see what the result would look like before code generation or persistence
-
-Prerequisites:
-
-- at least one active mapping decision must exist
-
-What to expect after clicking:
-
-- the `Preview` section appears
-- unresolved targets and transformation validation details may appear
-
-### `Generate Pandas code`
-
-What it does:
-
-- generates Pandas code based on the active mapping decisions and activated transformations
-
-When to use it:
-
-- when you want a starter artifact for implementing the mapping
-
-Prerequisites:
-
-- at least one active mapping decision must exist
-
-What to expect after clicking:
-
-- the `Generated Pandas Code` section appears
-- warnings may appear if there are issues or fallback situations
-
-## Benchmarks tab
-
-The purpose of this tab is to save a realistic mapping scenario as a benchmark, run it again later, and measure the impact of correction learning.
-
-Note for canonical-only sessions:
-
-- benchmark saving currently expects a real source/target case
-- because of that, a canonical-only session does not auto-build the benchmark payload
-- if you want a benchmark, run a follow-up `Standard` mapping flow with a real target
-
-### Helper fields and controls
-
-#### `Benchmark dataset name`
-
-This is the name under which the current mapping scenario will be saved as a benchmark dataset.
-
-Use it when:
-
-- you want to distinguish multiple benchmark scenarios
-- you want versioning of benchmark sets by business domain or test iteration
-
-Examples:
-
-- `customer-master-clean-v1`
-- `erp-noisy-aliases-v1`
-- `pilot-scenario-2`
-
-#### The JSON view below the title `Save Current Mapping As Benchmark`
-
-This is not a button, but it is an important indicator. It shows exactly which benchmark case will be saved if you click `Save current mapping as benchmark`.
-
-If you do not see anything useful there yet, do not save the benchmark. Go back to the `Workspace` tab and make sure you have active mapping decisions.
-
-#### `Saved dataset`
-
-Dropdown list of previously saved benchmark datasets.
-
-Use it to choose which benchmark you want to run or which one you want to use for measuring correction impact.
-
-#### `Run selected benchmark with configured LLM`
-
-Checkbox that decides whether the benchmark should run heuristically only or with the active runtime LLM as well.
-
-Use it when:
-
-- you want to compare behavior without the LLM and with the LLM
-- you want to test whether the LLM truly improves the result or only introduces variation
-
-Do not enable this checkbox if:
-
-- the LLM runtime is not configured
-- you want a purely deterministic comparison across iterations
-
-### Buttons in the Benchmarks tab
-
-#### `Save current mapping as benchmark`
-
-What it does:
-
-- takes the current mapping scenario from the active review state
-- saves it as a benchmark dataset in the backend persistence layer
-
-When to use it:
-
-- when you create a scenario that you want to measure again later
-- when you want to save a real-life pilot example as a reference test
-
-Prerequisites:
-
-- at least one active mapping decision must exist
-- `Benchmark dataset name` must not be empty
-
-What to expect after clicking:
-
-- a success message with `dataset_id`, name, and version
-- the benchmark later appears in the list of saved datasets
-
-Best practice:
-
-- save small, representative benchmark scenarios instead of a single huge benchmark
-
-#### `Load saved benchmark datasets`
-
-What it does:
-
-- loads all previously saved benchmark datasets from the backend
-
-When to use it:
-
-- when you enter the `Benchmarks` tab for the first time
-- when you have just saved a new benchmark and want to refresh the list
-
-What to expect after clicking:
-
-- a table with benchmark datasets appears below
-- the `Saved dataset` dropdown gets new options
-
-#### `Load benchmark runs`
-
-What it does:
-
-- loads the history of earlier benchmark executions
-
-When to use it:
-
-- when you want to inspect previous results and compare iterations
-- when you want to check whether a refactor or overlay changed quality
-
-What to expect after clicking:
-
-- the `Benchmark Run History` table appears below
-
-#### `Run selected benchmark`
-
-What it does:
-
-- runs the selected benchmark dataset through the evaluation backend
-- uses heuristic only or heuristic + LLM, depending on the checkbox
-
-When to use it:
-
-- when you want to see the current system quality on a saved benchmark
-- when you are checking whether a new system change improves or degrades mapping quality
-
-What to expect after clicking:
-
-- `Last Benchmark Result` appears below
-- the result is shown as a JSON payload with metrics
-
-How to interpret it:
-
-- focus on accuracy, top-1 accuracy, and the total number of correct matches
-
-#### `Measure correction impact`
-
-What it does:
-
-- measures the difference between the baseline result and the correction-aware result
-- shows whether correction history and reusable rules are actually improving mapping quality
-
-When to use it:
-
-- when you already have saved corrections and want to see their effect
-- when you are evaluating whether the learning loop is worth developing further
-
-What to expect after clicking:
-
-- the `Correction Impact` table appears
-- it shows baseline accuracy, correction-aware accuracy, and the difference between them
-
-How to interpret it:
-
-- a positive `accuracy_delta` means correction history helps
-- a small or zero delta means there is still not enough high-quality feedback history or the rules are not targeted well enough
-
-## Admin / Debug tab
-
-The purpose of this tab is to load backend runtime state, the knowledge layer, audit trails, glossary state, and supporting diagnostic data.
-
-If you see a message saying that an admin token is required, first enter it in the sidebar field `Admin Token`.
-
-### Top button group
-
-#### `Load runtime config`
-
-What it does:
-
-- loads the backend runtime configuration through the observability endpoint
-
-When to use it:
-
-- when you want to check which LLM provider is active
-- when you want to check whether the admin token is configured
-- when you want to inspect gating thresholds and other active runtime settings
-
-What to expect after clicking:
-
-- the `Runtime Config` section appears below in JSON format
-
-#### `Load decision logs`
-
-What it does:
-
-- loads decision log records that the backend stores during mapping decisions
-
-When to use it:
-
-- when you want to inspect how the system made decisions
-- when you are investigating an unexpected mapping
-
-What to expect after clicking:
-
-- the `Decision Logs` table appears
-
-#### `Load saved corrections`
-
-What it does:
-
-- loads all saved user corrections from the system
-
-When to use it:
-
-- when you want to check whether correction history was actually stored
-- when you want to assess the quality of the learning data
-
-What to expect after clicking:
-
-- the `Saved Corrections` table appears
-
-#### `Load benchmark runs`
-
-What it does:
-
-- loads the history of evaluation runs from the backend
-
-When to use it:
-
-- when you want to view benchmark history from a debug perspective without leaving the `Benchmarks` tab
-
-What to expect after clicking:
-
-- the `Evaluation Runs` table appears
-
-### Knowledge Overlays section
-
-This section is used for inspecting and managing knowledge overlay versions.
-
-#### `Load knowledge overlays`
-
-What it does:
-
-- loads the list of all saved overlay versions
-
-When to use it:
-
-- when you want to see which overlay versions exist
-- when you plan to activate, deactivate, or inspect details
-
-What to expect after clicking:
-
-- a table of overlay versions appears below
-- the `Overlay version` dropdown gets options
-
-#### `Reload knowledge`
-
-What it does:
-
-- forces the backend to reload the knowledge runtime layer
-
-When to use it:
-
-- after activating or importing knowledge/glossary data
-- when you suspect the backend runtime was not refreshed
-
-What to expect after clicking:
-
-- a summary of `Knowledge mode`, the active overlay, and the number of active entities appears or refreshes
-
-#### `Load active knowledge status`
-
-What it does:
-
-- effectively loads the current active runtime state of the knowledge layer
-
-When to use it:
-
-- when you only care about runtime status, not the broader reload workflow with other actions
-
-Note:
-
-- it currently uses the same backend call as `Reload knowledge`, so the effect is similar
-
-#### `Load knowledge audit log`
-
-What it does:
-
-- loads the audit log for knowledge lifecycle actions
-
-When to use it:
-
-- when you want to see who performed create, activate, deactivate, archive, or import operations, and when
-
-What to expect after clicking:
-
-- the `Knowledge Audit Log` table appears
-
-### Controls for uploading a knowledge overlay file
-
-#### `Knowledge overlay CSV`
-
-File uploader for a CSV containing overlay entries.
-
-Use it when you want to import:
-
-- abbreviations
-- synonyms
-- field aliases
-- concept aliases
-
-#### `Overlay version name`
-
-The name of the new overlay version.
-
-Recommendation:
-
-- use a name that clearly describes the domain and version, for example `sales-domain-overlay-v1`
-
-#### `Created by`
-
-Optional field for recording who created the overlay.
-
-This is useful for auditability and team collaboration.
-
-#### `Validate knowledge CSV`
-
-What it does:
-
-- checks the CSV without saving it as a new overlay version
-
-When to use it:
-
-- always before `Save overlay version`, especially for larger CSV files
-
-What to expect after clicking:
-
-- a validation summary appears
-- a table of preview rows appears with status, normalization, and possible issues
-
-How to interpret it:
-
-- `valid` means the row is ready to save
-- `invalid` means there is an error that must be fixed in the CSV
-- conflicts and duplicates should be reviewed before saving
-
-#### `Save overlay version`
-
-What it does:
-
-- saves the uploaded knowledge CSV as a new overlay version
-
-When to use it:
-
-- when validation passed or when you intentionally want to save the content together with its validation result
-
-What to expect after clicking:
-
-- a success message with the version name and number of saved entries
-- the overlay version list is refreshed automatically
-- the validation result remains available for inspection
-
-### Canonical Glossary section
-
-This section is used to import and export the canonical glossary CSV file.
-
-#### `Canonical glossary CSV`
-
-File uploader for canonical glossary import.
-
-Use it when you want to load a new glossary version from CSV.
-
-#### `Load canonical glossary export`
-
-What it does:
-
-- loads the current glossary CSV from the backend into UI memory
-
-When to use it:
-
-- when you want to download the current glossary for review, backup, or editing
-
-What to expect after clicking:
-
-- the `Download canonical glossary CSV` button appears
-
-#### `Import canonical glossary`
-
-What it does:
-
-- imports the uploaded canonical glossary CSV into the backend
-- then refreshes the knowledge runtime
-
-When to use it:
-
-- when you want to replace or refresh the canonical glossary
-
-What to expect after clicking:
-
-- a success message appears
-- a summary with the number of imported rows and canonical concepts appears
-- the knowledge runtime status is refreshed
+- list and search integrations
+- open integration detail
+- inspect concept-centric catalog detail
+- load mapping-set detail, audit, and diff
+- reuse an approved mapping set back into Workspace
 
 Important:
 
-- this changes the file-backed canonical glossary, so use it carefully and preferably with a controlled CSV version
+- Catalog works over saved artifacts, not the live review state
+- reuse back into Workspace is governance-gated by mapping-set status
 
-#### `Download canonical glossary CSV`
+For the detailed reference on catalog search, similarity heuristics, and `Reuse in Workspace` behavior, see `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
-What it does:
+## Benchmarks
 
-- downloads the glossary that was previously loaded by clicking `Load canonical glossary export`
+`Benchmarks` is the quality measurement area.
 
-When to use it:
+Use it to:
 
-- for local backup
-- for manual glossary edits before a new import
+- save the current mapping as a benchmark dataset
+- load saved benchmark datasets
+- run a selected benchmark
+- measure correction impact
+- inspect benchmark run history
 
-### Overlay versions and lifecycle actions
+Important:
 
-These controls become useful once the overlay version list has already been loaded.
+- `Save current mapping as benchmark` requires accepted active decisions
+- this is for measuring quality and regression behavior, not for everyday mapping review itself
 
-#### `Overlay version`
+## Admin / Debug
 
-Dropdown for choosing the concrete overlay version you want to act on next.
+`Admin / Debug` is the operational support surface.
 
-#### `Load details`
+Use it for:
 
-What it does:
+- runtime config inspection
+- decision-log inspection
+- correction and reusable-rule inspection
+- other supporting observability and runtime checks that are not part of the main canonical governance flow
 
-- loads details of the selected overlay version, including its entries
+## Recommended workflows
 
-When to use it:
+### Standard mapping workflow
 
-- when you want to inspect the exact contents of a specific overlay version
+1. In `Workspace > Setup`, upload source and target.
+2. Select tables or `Schema spec` mode if needed.
+3. Click `Upload and profile`.
+4. Click `Generate mapping`.
+5. In `Review`, inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
+6. In `Decisions`, make manual edits, export a checkpoint, or save a mapping set.
+7. In `Output`, use preview first, then code generation when the decisions are accepted.
 
-What to expect after clicking:
+### Canonical-first workflow
 
-- an `Overlay detail` summary appears
-- a table with entries from that version appears
+1. In `Workspace > Setup`, switch to `Canonical` mode.
+2. Upload source row data or a source spec.
+3. Click `Upload and profile`, then `Generate canonical mapping`.
+4. In `Review`, inspect the source -> canonical path.
+5. If you find semantic gaps, continue the governance loop in `Canonical Console`.
 
-#### `Activate selected overlay`
+### Canonical governance workflow
 
-What it does:
+1. Open `Canonical Console`.
+2. Refresh the registry, overlay state, and stewardship queue if needed.
+3. Open the concept detail or stewardship item you care about.
+4. Review status, audit context, and impact preview.
+5. Approve, reject, ignore, or promote to glossary when the item is ready.
 
-- activates the selected overlay version as the runtime overlay
+## Short notes
 
-When to use it:
+- The confidence score is a review heuristic, not a probability.
+- Preview is intentionally advisory; it does not mean the mapping is fully approved.
+- Durable artifact and execution-like surfaces are governed more strictly than preview.
+- If the UI state feels inconsistent after multiple experiments, `Reset flow` is often the fastest recovery path.
 
-- when you want the mapping engine and trust layer to use that exact overlay version
+For the detailed reference on signals, score formula, confidence thresholds, and bounded LLM cases, see `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 
-What to expect after clicking:
+For the detailed reference on preview status, warning codes, classification, and fallback behavior, see `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
 
-- the runtime status shows the new active overlay
-- the overlay version list is refreshed
-- details of the selected version are reloaded
+For the detailed reference on benchmark metrics, confidence-bucket interpretation, and correction-impact deltas, see `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`.
 
-#### `Deactivate selected overlay`
+For the detailed reference on transformation test-set structure, assertion rules, and run-result interpretation, see `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`.
 
-What it does:
+For the detailed reference on Catalog reuse and similarity heuristics, see `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
-- deactivates the selected overlay version
-
-When to use it:
-
-- when you want to move back from an active overlay variant to a validated but inactive state
-
-What to expect after clicking:
-
-- runtime status is refreshed
-- the overlay is no longer active in the knowledge runtime
-
-#### `Archive selected overlay`
-
-What it does:
-
-- archives the selected overlay version
-
-When to use it:
-
-- when you no longer want to use an overlay operationally but still want it to remain in history
-
-What to expect after clicking:
-
-- the version status moves into an archived state
-- the list and details are refreshed
-
-Note:
-
-- archiving is not the same as deleting. It is a lifecycle status change.
-
-#### `Rollback active overlay`
-
-What it does:
-
-- moves the runtime knowledge layer back to the previously active overlay version
-- if there is no previous one, it may return the system to base-only mode
-
-When to use it:
-
-- when a newly activated overlay version makes mapping quality worse
-- when you want a fast rollback to an earlier stable state
-
-What to expect after clicking:
-
-- runtime status changes
-- the overlay version list is refreshed
-- details of the active version are reloaded
-
-### Diagnostic sections below the buttons
-
-These sections are not buttons, but they are important for interpreting results:
-
-#### `Knowledge mode ...`
-
-Shows:
-
-- whether the backend is running in `base_only` or `overlay_active` mode
-- which overlay is currently active
-- the number of active entries and the knowledge concept count
-
-#### `Validation summary`
-
-Shows:
-
-- the total number of rows from the uploaded CSV
-- how many are valid, invalid, duplicates, and conflicts
-
-#### `Canonical Coverage`
-
-This appears only if a `mapping_response` from the `Workspace` tab already exists.
-
-Use it to inspect:
-
-- source-side coverage
-- target-side coverage
-- project-level canonical coverage for the active mapping context
-
-#### `Knowledge and Canonical Match Insights`
-
-Helps you inspect:
-
-- the knowledge signal
-- the canonical signal
-- confidence
-- explanation details for each source-target pair
-
-## Recommended practical flows
-
-### Flow 1: Benchmark quality check
-
-1. In the `Workspace` tab, upload source and target.
-2. Click `Generate mapping`.
-3. Go to `Benchmarks`.
-4. Enter a name in `Benchmark dataset name`.
-5. Click `Save current mapping as benchmark`.
-6. Click `Load saved benchmark datasets`.
-7. Select a dataset from `Saved dataset`.
-8. Click `Run selected benchmark`.
-9. If needed, click `Measure correction impact`.
-
-### Flow 2: Import and activate a knowledge overlay
-
-1. Go to `Admin / Debug`.
-2. Upload a file using `Knowledge overlay CSV`.
-3. Click `Validate knowledge CSV`.
-4. Review `Validation summary` and the preview rows.
-5. Click `Save overlay version`.
-6. Click `Load knowledge overlays`.
-7. Select a version in `Overlay version`.
-8. Click `Activate selected overlay`.
-9. Click `Reload knowledge` or inspect runtime status.
-
-### Flow 3: Export and import the canonical glossary
-
-1. Click `Load canonical glossary export`.
-2. Click `Download canonical glossary CSV` to save the current state.
-3. Prepare the new CSV version.
-4. Upload it using `Canonical glossary CSV`.
-5. Click `Import canonical glossary`.
-6. Check the import summary and the knowledge runtime status.
-
-## Quick tips
-
-- Before doing benchmark work, always check that the expected overlay is active.
-- Before importing the canonical glossary, create an export as a backup.
-- Treat `Validate knowledge CSV` as a required step, not an optional one.
-- `Measure correction impact` only makes sense once the system already has saved corrections.
-- If results look strange, start with `Load runtime config`, `Load knowledge overlays`, and `Load active knowledge status` before doing deeper debugging.
+For the detailed reference on Canonical Console runtime behavior, overlay lifecycle, and stewardship rules, see `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.

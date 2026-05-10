@@ -52,312 +52,198 @@ Scope summary:
 
 ### Epic 4: Transformation Safety and Testing
 
-Status: open.
+# Semantra Epics
 
-Cilj: transformacije ne budu samo generisane, nego proverljive i bezbednije.
+Ovaj dokument je backlog mapa. Ne služi kao detaljan changelog niti kao opis današnjeg stanja po svim feature-ima.
 
-Scope summary:
+Koristi zajedno sa:
 
-- syntax i dry-run validacija
-- before/after preview po koloni
-- warnings za null expansion, type coercion i row-count mismatch
-- transformation test cases po mapping setu
-- reusable templates i jači error reporting
+- `current_state.md` za ono što proizvod danas stvarno podržava
+- `completed_slices.md` za istoriju isporuke
+- `implementation_checklists.md` za aktivne izvršne korake
+- `plan.md` za prioritetni redosled rada
 
-## P1 Epics
+## Implementirana ili pilot-complete baza
 
-### Epic 5: Canonical Semantic Layer
+Ove epike više nisu glavni backlog fokus, ali ostaju važne za razumevanje osnove proizvoda.
 
-Status: implemented MVP slice on 2026-05-02.
+- `Epic 1: Knowledge Overlay MVP`
+	- status: implemented MVP
+	- runtime overlay lifecycle, validation preview, versioning i audit postoje; veći sledeći korak je DB-only source-of-truth model
+- `Epic 2: Admin Upload UI`
+	- status: implemented MVP
+	- knowledge/canonical authoring i overlay lifecycle su dostupni kroz Canonical Console i Admin surface
+- `Epic 3: Learning From Corrections`
+	- status: implemented MVP with governance hardening
+	- correction history, reusable rules i correction-aware ranking postoje; dalji rad je više quality tuning nego osnovna implementacija
+- `Epic 4: Transformation Safety and Testing`
+	- status: implemented MVP
+	- preview warnings, codegen fallback, templates i transformation test sets postoje; dublji execution safety ostaje future hardening
+- `Epic 5: Canonical Semantic Layer`
+	- status: implemented MVP
+	- canonical concepts, canonical-only mapping i canonical coverage su baza proizvoda
+- `Epic 6: Governance and Versioning`
+	- status: MVP completed
+	- mapping-set governance i veći deo product-level enforcement discipline su uvedeni
+- `Epic 7: Explainability and Trust Layer Expansion`
+	- status: partially implemented
+	- trust layer već postoji, ali dublji why-not/simulator i strukturisani competitor UX ostaju otvoreni
+- `Epic 8: Benchmark and Quality Analytics`
+	- status: implemented MVP, advanced analytics open
+	- benchmark datasets, runs i correction impact postoje; dashboards i dublji KPI sloj su otvoreni
+- `Epic 11: Schema Specification Upload`
+	- status: completed
+- `Epic 12A: Canonical-only mapping`
+	- status: completed
 
-Cilj: mapiranje preko poslovnih koncepata, ne samo fizičkih kolona.
+## Aktivni epici
 
-Trenutni fokus posle MVP-a:
-
-- prelaz iz `DB-first runtime + file-based reseed source` modela u pravi `DB-only source-of-truth`
-- čuvanje canonical glossary i knowledge authoring state-a u normalizovanim SQLite tabelama
-- uklanjanje zavisnosti od lokalnih knowledge fajlova kao primarnog izvora istine
-
-Referenca: detalji isporučenog MVP slice-a su u `completed_slices.md`.
-
-### Epic 6: Governance and Versioning
-
-Status: MVP completed on 2026-05-09.
-
-Cilj: mapping rezultat postane reviewable i kontrolisan.
-
-Scope summary:
-
-- mapping set ownership, review metadata i status workflow
-- audit trail i diff između verzija
-- status gate za export/run putanje
-- reviewable workflow bez pune row-level governance složenosti u prvom koraku
-
-Referenca: radna checklist je u `implementation_checklists.md`.
-
-### Epic 7: Explainability and Trust Layer Expansion
-
-Status: open.
-
-Cilj: korisnik bolje razume zašto je sistem izabrao baš taj target.
-
-Scope summary:
-
-- top competing candidates i zašto nisu izabrani
-- strukturisani signal breakdown
-- `why not this target?` akcija
-- simulator promene weight-a ili knowledge uticaja
-- badge-evi za historical, knowledge-backed i pattern-backed match-eve
-
-### Epic 8: Benchmark and Quality Analytics
-
-Status: open.
-
-Cilj: svaka promena u heuristici ili knowledge sloju bude merljiva.
-
-Scope summary:
-
-- benchmark dashboards i regression snapshots
-- pre/post score za knowledge overlay promene
-- poređenje više weight konfiguracija
-- run history i ključni quality KPI-jevi
-
-## P2 Epics
-
-### Epic 9: Data Quality Intelligence
-
-Status: open.
-
-Cilj: alat ne mapira samo nazive, nego procenjuje i stvarnu kompatibilnost podataka.
-
-Scope summary:
-
-- candidate key detection
-- duplicate/null anomaly hints
-- unit/currency/date-format mismatch detekcija
-- referential hinting i schema drift signali
-- quality warnings u trust layer-u
-
-### Epic 10: Operationalization
-
-Status: open.
-
-Cilj: rezultat Semantre postane upotrebljiv u realnom delivery toku.
-
-Scope summary:
-
-- export u pandas, SQL i dbt-friendly artefakte
-- batch run i run history
-- webhook/API trigger za automation
-- packaging mapping + transformation + metadata u jedan release artifact
-- production-ready background jobs za duže mapping/batch procese: persistent queue, progress status, cancellation, retry policy i cleanup umesto samo in-memory lokalnog job store-a
-
-### Epic 11: Schema Specification Upload
-
-Status: completed on 2026-05-04.
-
-Cilj: podržati realne source/target specifikacije gde svaki red opisuje jedno polje, umesto row-data tabele.
-
-Aktuelni status:
-
-- feature slice je završen bez promene downstream mapping contract-a
-- `.sql` ostaje zaseban schema snapshot tok
-- schema-only rezultat nema business row preview i `Rows` ostaje `0`
-
-Referenca: isporučeni detalji su u `completed_slices.md`.
-
-### Epic 12: Canonical-First Mapping Mode
-
-Status: partially completed on 2026-05-04.
-
-Cilj: omogućiti source-only mapping ka canonical konceptima bez obaveznog target fajla, pa tek zatim opciono mapiranje ka konkretnom sistemu.
-
-#### Epic 12A: Canonical-only mapping
-
-Status: completed on 2026-05-04.
-
-Napomena:
-
-- canonical-only slice je završen i validiran
-- transformacije, preview i codegen su namerno isključeni bez realnog target dataseta
-- canonical-only LLM rescue treba dodatno auditovati kroz real-world primere
-
-#### Epic 12B: System-specific virtual targets
+### Epic 12B: System-specific virtual targets
 
 Status: planned.
 
-Scope summary:
+Cilj:
 
-- virtual target schema builder za `SAP`, `Workday`, `QAD`
-- `Source -> Canonical concept -> System field` rezultat tek kada je metadata kvalitet dovoljan
-- graceful degradation kada system-specific coverage nije dovoljna
-
-Pravilo izvođenja:
-
-- canonical-only reviewable rezultat ostaje baza
-- ne širiti canonical flow na transformation generation pre stabilnog system-target slice-a
-
-### Epic 13: Enterprise Integration Catalog
-
-Status: active since 2026-05-05.
-
-Cilj: pretvoriti sačuvane mapping setove i canonical footprint u searchable katalog postojećih integracija i reusable semantičkih mapiranja.
-
-Zašto postoji:
-
-- mapping set workflow već daje review i governance artefakte, ali još ne pravi pravi EA katalog
-- canonical-only artefakti treba da budu katalogizovani kao reusable asset-i
-- enterprise vrednost je u search/reuse/discovery sloju, ne samo u jednom review session-u
-
-#### Epic 13A: Catalog persistence and backend indexing
-
-Status: active, initial slice delivered.
-
-Cilj: queryable summary sloj nad mapping setovima.
-
-#### Epic 13B: Catalog read APIs
-
-Status: active, initial slice delivered.
-
-Cilj: list/detail/search/concept-centric discovery API sloj.
-
-#### Epic 13C: Streamlit catalog UI
-
-Status: active, initial slice delivered.
-
-Cilj: katalog dobija poseban search/browse/drilldown UI.
-
-#### Epic 13D: Concept and visual discovery
-
-Status: open.
-
-Cilj: concept-centric i vizuelni reuse signal iznad postojećeg kataloga.
-
-Referenca: otvorene checkliste su u `implementation_checklists.md`, a isporučeni slice-ovi u `completed_slices.md`.
-
-### Epic 14: Vectorized Signal Acceleration and LLM Signal Fusion
-
-Status: proposed on 2026-05-08.
-
-Cilj: ubrzati ranking tok i otvoriti put ka bogatijem AI pojačavanju signala bez gubitka explainability sloja.
+- dodati virtual target sheme za konkretne sisteme kada canonical coverage i metadata kvalitet to opravdaju
 
 Napomena:
 
-- postoje optional `embedding` i `llm` signali, ali bez persisted vector/cache sloja i bez signal-aware LLM fusion-a
-- epic ne pretpostavlja full vector DB od prvog dana
+- ne gurati ovo pre reuse discovery i operational hardening talasa
+
+### Epic 13: Enterprise Integration Catalog
+
+Status: active.
+
+Trenutno stanje:
+
+- `13A` persistence/backend indexing je isporučen
+- `13B` read API je isporučen
+- `13C` Streamlit catalog UI je isporučen
+- `13D` concept and visual discovery ostaje otvoren i predstavlja sledeći visoko-vredni product korak
+
+### Epic 13D: Concept and visual discovery
+
+Status: active next-step epic.
+
+Cilj:
+
+- reuse signal iznad postojećeg kataloga i canonical usage modela
+- concept-centric pregled kroz više integracija
+- vizuelni discovery sloj za reuse, coverage i slične integracije
+
+### Epic 14: Performance, vector/cache acceleration, and richer AI signal fusion
+
+Status: partially active.
+
+Napomena:
+
+- embedding i LLM signali postoje u engine-u, ali bez punog cache/precompute sloja i bez šireg signal fusion modela
 
 #### Epic 14A: Target vector cache
 
-Status: backend and initial UI read slice started on 2026-05-09.
+Status: started, not productized.
 
-Cilj: precomputed target embedding cache za brži similarity signal.
+Cilj:
+
+- keširan embedding/vector sloj za target stranu radi ubrzanja similarity rada
 
 #### Epic 14B: Stable signal precomputation
 
-Status: proposed.
+Status: planned.
 
-Cilj: izdvojiti stabilne i skupe signal delove u cache/precompute sloj.
+Cilj:
+
+- izdvojiti stabilne i skupe signalne delove iz request-time toka
 
 #### Epic 14C: LLM-assisted signal fusion
 
 Status: proposed.
 
-Cilj: proširiti LLM iz closed-set rerank validatora u reasoning sloj koji može kontrolisano da utiče na signal fusion.
+Cilj:
 
-#### Epic 14D: Description-aware LLM context and companion schema ingestion
+- proširiti LLM iz closed-set validatora u strogo kontrolisan reasoning/fusion sloj bez gubitka explainability discipline
 
-Status: source companion enrichment slice implemented and smoke-validated on 2026-05-09; deterministic score fusion remains deferred pending benchmark evidence.
+#### Epic 14D: Description-aware context and companion schema ingestion
 
-Cilj: poboljšati kvalitet mapiranja tako što LLM i scoring sloj dobijaju bogatiji field context od samog naziva kolone, naročito za kratke šifre, interne skraćenice i enterprise oznake.
+Status: implemented MVP, follow-up open.
 
-Napomena:
+Trenutno stanje:
 
-- `ColumnProfile` sada čuva first-class `description` i `declared_type`, a source companion metadata može da se nakači na već uploadovan dataset handle
-- spec upload sada upisuje description odvojeno od `normalized_name`
-- row-data upload sada ima tanak source-side companion schema/spec enrichment put bez promene osnovnog mapping contract-a
-- schema/spec i companion upload sada mogu da popune i `sample_values` kada spec fajl sadrži primer vrednosti
-- odluka trenutnog slice-a je da `description`/`declared_type` ostanu LLM/context input, a ne novi deterministic signal, dok benchmark ne pokaže jasan kvalitetni dobitak bez regressions
-
-Referenca: detaljna MVP i fajl-level checklist su u `implementation_checklists.md`.
+- source companion enrichment i description-aware LLM context su isporučeni
+- deterministic score fusion ostaje otvoren samo ako benchmark pokaže jasan dobitak bez regressions
 
 #### Epic 14E: Canonical Gap Assistant
 
-Status: initial MVP implemented on 2026-05-09; automated material-master validation completed, pending live UI/LLM validation.
+Status: implemented MVP.
 
-Cilj: pretvoriti prazne ili slabe `canonical_path` rezultate u kontrolisane predloge za canonical glossary/overlay rad, uz LLM kao assistant-a i human approval kao gate.
+Trenutno stanje:
 
-Scope summary:
+- candidate extraction, suggestion, approve/reject/ignore i rerun loop postoje
+- human-approved overlay-first canonical gap zatvaranje je implementirano
 
-- detektovati mapping redove gde je target izabran, confidence/knowledge/semantic signal je dovoljno jak, ali `canonical_path` ili `shared_concepts` nedostaju
-- generisati `canonical_gap_candidate` payload iz source field-a, target field-a, signal breakdown-a, sample values, detected patterns i najbližih postojećih canonical concepts
-- koristiti LLM samo kao predlagača za postojeći canonical concept, `concept_alias`, ili novi canonical concept proposal
-- prikazati predloge u UI kao review queue, sa jasnim reasoning-om i confidence-om
-- odobrene predloge upisivati prvo u overlay/canonical alias sloj, ne direktno u base dictionary
-- posle odobrenja omogućiti re-run mapping-a da se vidi popunjen `canonical_path`
+Otvoreno:
 
-MVP nije:
-
-- automatska promocija LLM predloga u stabilni `canonical_glossary_erp.csv`
-- free-form ontology generator bez closed-review koraka
-- zamena postojećeg deterministic canonical matching-a
-
-Referenca: detaljna MVP checklista je u `implementation_checklists.md`.
+- dodatni candidate enrichment i širi non-happy-path coverage
 
 #### Epic 14F: Canonical Concept Management Console
 
-Status: active, top-level Canonical Console tab with overlay summary, governance authoring UI, and persisted reject/ignore audit delivered on 2026-05-10.
+Status: pilot-complete core workflow.
 
-Cilj: pretvoriti Canonical Gap Assistant i postojeći Knowledge/Admin ekran u glavnu konzolu za upravljanje canonical konceptima, aliasima i governance odlukama. Ovo je ključni sloj za Enterprise Architecture, MDM i buduće integracije, jer canonical model postaje kontrolisani poslovni asset, ne samo pomoćni lookup fajl.
+Trenutno stanje:
 
-Zašto postoji:
+- top-level Canonical Console, registry/detail/read/write stewardship, overlay promotion i stable glossary execution postoje
+- happy-path governance loop je zatvoren za pilot
 
-- `canonical_path` i concept reuse su srce Semantra vrednosti za enterprise integracije
-- EA treba pregled poslovnih koncepata, sistema i integracija koje ih koriste
-- MDM treba kontrolisan lifecycle aliasa, koncepta, duplikata i semantic gap-ova
-- Canonical Gap Assistant generiše prirodan review queue, ali treba mu centralna konzola za dugoročno upravljanje
+Otvoreno:
 
-Scope summary:
+- stabilizacija, bulk-safe UX i dodatna non-happy-path productization pokrivenost
 
-- concept registry: searchable lista canonical concepts sa display name, entity, attribute, data type, aliases i statusom
-- concept detail page/panel: aliases, source/target field contexts, linked integrations, mapping set usage i audit trail
-- gap queue: predlozi iz mapping review-a, LLM-assisted suggestions, approve/reject/merge workflow
-- overlay management: aktivni overlay, staged overlay entries, promotion candidate-i za stable glossary
-- impact view: koje integracije i mapping setovi se menjaju ako se doda, spoji ili preimenuje concept/alias
-- stewardship metadata: owner, domain, status, review note i created/approved timestamps
+## Planirani i odloženi epici
 
-MVP nije:
+### Epic 9: Data Quality Intelligence
 
-- potpuni enterprise ontology editor
-- automatsko spajanje canonical concepts bez review-a
-- direktan write u base glossary bez promotion workflow-a
+Status: planned.
 
-Prvi praktični slice:
+Cilj:
 
-- izdvojiti `Canonical Console` kao zaseban Streamlit tab ili Admin subsection
-- prikazati concept registry iz runtime canonical glossary-ja
-- prikazati active overlay entries po concept-u
-- prikazati canonical gap suggestions kao read-only review queue mirror
-- omogućiti approve/reject i audit iz iste konzole, uz postojeći overlay-first persist pristup
+- kvalitet i kompatibilnost podataka kao dodatni review signal, ne samo naziv/knowledge matching
 
-Trenutno isporučeno:
+### Epic 10: Operationalization
 
-- `Canonical Console` kao zaseban top-level Streamlit tab, uz informativni fallback u `Admin / Debug`
-- active overlay summary metrics i concept focus filter direktno u konzoli
-- canonical glossary import/export i overlay lifecycle authoring UI premešteni iz `Admin / Debug` u konzolu
-- concept registry search/filter, tabela i detail panel
-- active overlay entries, field contexts, catalog usage i audit references po concept-u
-- read-only mirror `Canonical Gap Suggestions` queue-a iz Review taba, uključujući suggestion status, concept proposal i reasoning/risk detalje
-- approve akcija iz konzole za već generisane cached suggestion-e, uz refresh runtime/concept state-a
-- session-scoped `ignore/restore` stanje u konzoli za gap queue, bez brisanja Review tab suggestion state-a
-- persisted `reject` audit tok iz konzole preko `knowledge_audit_logs`, sa reviewer/note tragom
-- persisted `ignore` audit tok iz konzole preko `knowledge_audit_logs`, uz direktan gap audit reference prikaz u queue detail-u
+Status: partially implemented foundation, broader scope open.
 
-Trenutno isporučeno u prvom backend read slice-u:
+Već postoji:
 
-- `GET /knowledge/canonical-concepts`
-- `GET /knowledge/canonical-concepts/{concept_id}`
-- payload spaja base canonical glossary, active overlay aliases, field contexts, catalog usage count i knowledge audit reference gde postoji aktivni overlay
-- fokusirani backend smoke test potvrđuje registry/detail read bez promene runtime state-a
+- preview
+- Pandas codegen
+- transformation generation
+- transformation test sets
+- benchmark run history
+
+Otvoreno ostaje:
+
+- release artifacts
+- batch/runtime execution model
+- trigger/schedule sloj
+- persistent background execution infrastruktura
+
+### Epic 15: Graph Projection, Lineage, and Reuse Analysis
+
+Status: proposed.
+
+Cilj:
+
+- derived graph pogled nad canonical, catalog i usage podacima
+
+Pravilo:
+
+- ne otvarati ozbiljno pre stabilizacije canonical, catalog i discovery read modela
+
+## Pravila za ovaj backlog
+
+- `epics.md` drži backlog mapu i status po epicima, ne detaljnu hronologiju.
+- Kada epic dobije veliki isporučeni slice, istorijski detalji idu u `completed_slices.md`.
+- Kada epic ima aktivan izvršni rad, konkretni checkbox koraci žive u `implementation_checklists.md`.
 
 Trenutno isporučeno u početnom UI read slice-u:
 
@@ -365,6 +251,11 @@ Trenutno isporučeno u početnom UI read slice-u:
 - concept registry tabela sa osnovnim search/filter ponašanjem
 - concept detail panel za aliases, field contexts, active overlay entries, catalog usage i audit references
 - fokusirani Streamlit helper testovi potvrđuju filter i registry row prikaz
+
+Otvoreno posle ovog slice-a:
+
+- dalje 14F poliranje može da proširi bulk/safer promotion execution workflow kada se potvrdi governance model
+- sledeći viši nivo je concept-centric overlay stewardship poliranje preko više povezanih overlay verzija i eventualni batch execution UX
 
 ### Epic 15: Graph Projection, Lineage and Reuse Analysis
 

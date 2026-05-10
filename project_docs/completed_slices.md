@@ -1,130 +1,152 @@
 # Semantra Completed Slices
 
-Ovaj dokument drži isporučene slice-ove i završene tehničke faze.
+Ovaj dokument je strogo hronološki ledger isporučenih slice-ova i završenih tehničkih faza.
 
-Aktivni backlog je u `epics.md`.
-Plan i redosled rada su u `plan.md`.
-Otvorene checkliste su u `implementation_checklists.md`.
+Za današnje stanje proizvoda koristi `current_state.md`.
+Za plan i backlog koristi `plan.md` i `epics.md`.
 
-## Delivered Product Slices
+## 2026-05-02
 
-### 2026-05-02: Epic 5 MVP slice
+### Epic 5 MVP: Canonical semantic layer
 
-Canonical semantic layer MVP je isporučen.
+Isporučeno:
 
-- uveden `business concept` model i glossary
-- podržan `source -> concept` i `concept -> target` pregled
-- dodat concept-aware explanation i project-level concept coverage
-- knowledge aliasi mogu da se vežu za canonical concept
-- concept import/export je dodat
+- business concept model i canonical glossary runtime
+- `source -> concept` i `concept -> target` pregled
+- canonical-aware explanation i project-level coverage
+- povezivanje knowledge aliasa sa canonical konceptima
+- canonical import/export osnova
 
-Otvoreno ostaje dalji prelaz ka DB-only source-of-truth modelu za canonical i knowledge runtime.
+## 2026-05-03
 
-### 2026-05-09: Epic 6 governance MVP completed
+### Faza 1: Low-risk cleanup
 
-Epic 6 governance MVP je zatvoren kroz status enforcement nad mapping set workflow-om.
+Isporučeno:
 
-- metadata `owner`, `assignee`, `review_note`
-- eksplicitan status workflow
-- audit trail za create/status/apply
-- version diff između mapping set verzija
-- diff i audit prikaz u Streamlit UI
-- backend apply/reuse gate sada dozvoljava samo `approved` mapping set verzije
-- Workspace i Catalog UI eksplicitno blokiraju reuse/apply za neapproved verzije
+- shared helper izdvajanja za parsing i normalizaciju
+- konzistentniji utility sloj bez promene ponašanja
 
-Epic 6 MVP nema više otvorenih stavki; sledeći produktni fokus prelazi na canonical validation/governance redosled iz `plan.md`.
+### Faza 2: Streamlit monolith split
 
-### 2026-05-03: Additional hardening slice
+Isporučeno:
 
-Dodatni hardening završen uz governance rad.
+- izdvajanje UI/API/state helper-a iz `streamlit_app.py`
+- namenski moduli za workspace, benchmark, catalog i admin/canonical surface
+
+### Additional hardening slice
+
+Isporučeno:
 
 - score normalization na `0..1`
-- finalni clamp posle correction signala
-- preview warning scoping popravka
-- persistence-backed refresh za decision log i correction store read put
+- final clamp posle correction signala
+- preview warning scoping popravke
+- persistence-backed refresh za decision-log i correction read putanje
 
-### 2026-05-04: Epic 11 schema specification upload
+## 2026-05-04
 
-Spec upload je uveden bez promene downstream mapping contract-a.
+### Epic 11: Schema specification upload
+
+Isporučeno:
 
 - `POST /upload/spec/detect` i `POST /upload/spec`
-- parser field-per-row layout-a u `SchemaProfile`
-- Streamlit `Row data` vs `Schema spec` izbor u upload toku
-- kompatibilnost sa postojećim `POST /mapping/auto` tokom
+- field-per-row spec parser u `SchemaProfile`
+- Streamlit izbor između `Row data` i `Schema spec`
+- kompatibilnost sa postojećim mapping contract-om
 
-### 2026-05-04: Epic 12A canonical-only mapping
+### Epic 12A: Canonical-only mapping
 
-Canonical-first source-only slice je isporučen.
+Isporučeno:
 
-- source-only upload tok bez dummy target workaround-a
+- source-only canonical mapping bez dummy target workaround-a
 - `POST /mapping/canonical`
-- canonical-only Setup i Review UI tok
+- canonical-only Setup i Review tok
 - `Source -> Canonical concept` pregled sa confidence i unmatched signalima
 
-Otvoreno ostaje `Epic 12B` za system-specific virtual target-e.
+## 2026-05-05
 
-### 2026-05-05: Epic 13 initial catalog slices
+### Epic 13 initial slices: Enterprise Integration Catalog
 
-Prvi veliki katalog slice-ovi su isporučeni.
+Isporučeno:
 
-- 13A: queryable persistence/catalog summary sloj
-- 13B: detail/search/concept-centric read API početni sloj
-- 13C: Streamlit Catalog tab sa browse/search/drilldown/reuse tokom
+- `13A` queryable catalog persistence i summary sloj
+- `13B` list/search/detail/concept read API
+- `13C` Streamlit Catalog browse/search/drilldown tok
 
-Otvoren ostaje 13D concept and visual discovery slice.
+## 2026-05-09
 
-### 2026-05-09: Epic 14D description-aware context and companion enrichment slice
+### Epic 14D: Description-aware context and companion enrichment
 
-Isporučen je prvi praktični 14D slice koji povezuje schema metadata enrichment sa mapping tokom bez promene osnovnog API contract-a.
+Isporučeno:
 
-- `description` i `declared_type` uvedeni su kao first-class polja u `ColumnProfile`
-- spec upload više ne prepisuje `normalized_name` opisom kolone
-- LLM validator i transformation prompt sada dobijaju description/type/sample context uz guardrails
-- dodat je source-side companion metadata enrichment nad već uploadovanim dataset handle-om
-- companion/spec parser sada ume da popuni i `sample_values` kada fajl sadrži primer vrednosti
-- Streamlit Setup dobio je minimalistički source companion upload i summary o matched/unmatched kolonama
-- lokalni browser smoke potvrđen nad canonical Setup tokom: source row-data upload, companion enrichment `3/3`, pa uspešan rerun canonical mapping-a
+- `description` i `declared_type` kao first-class polja u `ColumnProfile`
+- source-side companion metadata enrichment nad postojećim dataset handle-om
+- description/type/sample context u LLM validator i transformation promptovima
+- companion/spec parser koji ume da popuni i `sample_values`
+- Streamlit Setup hook za companion upload i matched/unmatched summary
 
-Svesna odluka ovog slice-a je da description/type još ne ulaze u deterministic scoring. Trenutni `compute_signals()` ostaje nepromenjen dok ne postoji benchmark corpus koji pokazuje da description-aware score fusion poboljšava kvalitet bez regresije nad postojećim knowledge/canonical signalima.
+Napomena:
 
-### 2026-05-10: Epic 14F initial Canonical Console product slice
+- deterministic scoring nije proširen; description/type su ostali LLM/context sloj dok benchmark ne pokaže potrebu za širim fusion-om
 
-Isporučen je prvi upotrebljiv 14F Canonical Console slice kao zaseban top-level tok, uz fallback poruku u `Admin / Debug`.
+### Epic 14E: Canonical Gap Assistant initial MVP
 
-- dodat je `Canonical Console` top-level tab sa concept registry search/filter tabelom i detail panelom
-- dodat je active overlay summary sa runtime/version metricama i concept focus filter za overlay-centric pregled
-- canonical glossary import/export i overlay lifecycle authoring UI premešteni su iz `Admin / Debug` u Canonical Console
-- concept detail sada prikazuje aliases, field contexts, active overlay entries, catalog usage i knowledge audit reference
-- `Canonical Gap Suggestions` queue iz Review taba mirror-ovan je u konzolu radi concept-centric pregleda
-- konzola sada ume da approve-uje već generisan cached suggestion preko postojećeg overlay-first backend toka
-- konzola sada ima i session-scoped `ignore/restore` state za gap redove bez menjanja Review tab cached suggestion payload-a
-- konzola sada ume i da persistuje `reject` audit odluku za gap suggestion, uključujući reviewer i note
-- konzola sada ume i da persistuje `ignore` audit odluku i prikazuje vezane gap audit reference direktno u queue detail-u
-- posle approve akcije UI osvežava runtime status, concept registry/detail i overlay listu kada su učitani
+Isporučeno:
 
-Otvoreno ostaje dalje 14F poliranje: širi source-system/domain filter, impact preview pre approve-a, i jači concept-centric overlay/gap stewardship tok.
+- canonical-gap candidate extraction iz mapping rezultata
+- LLM-assisted suggestion tok sa controlled JSON contract-om
+- approve tok koji upisuje overlay-first canonical dopune
+- rerun flow za potvrdu popunjenog canonical path-a
+- reject/ignore/proposal-state osnova za governance review
 
-## Completed Technical Phases
+### Epic 6 MVP: Governance and versioning
 
-### 2026-05-03: Faza 1
+Isporučeno:
 
-Mali cleanup sa niskim rizikom je završen.
+- mapping-set ownership, assignee, review note i status workflow
+- audit trail za create/status/apply
+- version diff između mapping-set verzija
+- approved-only apply/reuse gate za mapping-set workflow
+- UI surfacing governance blokada u Workspace i Catalog toku
 
-- izdvojeni shared helper-i za nullish/tabular normalizaciju
-- bolja konzistentnost parsing/normalization pomoćnih funkcija
-- klasifikovan LLM warning/logging trag bez promene glavnog ponašanja
+## 2026-05-10
 
-### 2026-05-03: Faza 2
+### Epic 14F: Canonical Console pilot-complete workflow
 
-Streamlit monolit split je završen.
+Isporučeno:
 
-- API helpers izdvojeni u `streamlit_ui/api.py`
-- shared prikazi u `streamlit_ui/shared_views.py`
-- mapping state/helpers u namenskim modulima
-- workspace/admin/benchmark celine izdvojene iz `streamlit_app.py`
-- regression subset potvrđen fokusiranim testovima
+- top-level `Canonical Console` product area
+- concept registry, concept detail, overlay summary i usage faceti
+- canonical-gap queue mirror u konzoli
+- audit-backed proposal triage i stable `source/target` gap identity
+- `knowledge_stewardship_items` write model za `canonical_gap` i `overlay_promotion`
+- owner/assignee/review-note/status stewardship model u konzoli
+- overlay-promotion review i eksplicitni promote-to-glossary execution tok
+- support za promotion u postojeći glossary red i kreiranje novog base concept reda za overlay-only koncept
+- pilot hardening UX poboljšanja za bootstrap state, selection sync i console rerun ponašanje
 
-## Notes
+Ishod:
 
-- Završeni slice-ovi su namerno odvojeni od backlog-a da `epics.md` ostane planerski dokument, a ne hronologija isporuke.
-- Otvorene stavke iz ovih slice-ova su prebačene u `epics.md` i `implementation_checklists.md`.
+- core Canonical Console governance loop tretira se kao pilot-complete
+
+### Product-level governance hardening follow-through
+
+Isporučeno:
+
+- advisory preview uz accepted-only codegen
+- accepted-only save/run za transformation test sets
+- accepted-only save za `Save current mapping as benchmark`
+- closed-review-only save za corrections i reusable learning
+- `ready_for_approval` gate za canonical-gap approval
+- lifecycle gate za overlay activate/archive putanje
+
+### Canonical registry hardening
+
+Isporučeno:
+
+- filtriranje numeric-only canonical aliasa pri importu/promociji i pri čitanju registry-ja
+- cleanup postojećeg persisted canonical alias šuma kroz reseed
+
+## Napomena
+
+- Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.
+- Aktivni naredni rad treba da se vidi u `implementation_checklists.md`, a ne ovde.

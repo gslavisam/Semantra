@@ -4,6 +4,30 @@ import httpx
 import streamlit as st
 
 
+def _canonical_gap_candidate_key(candidate: dict) -> str:
+    source = str(candidate.get("source") or "").strip() or "unknown"
+    target = str(candidate.get("target") or "").strip() or "unknown"
+    return f"canonical_gap_{source}_{target}".replace(" ", "_")
+
+
+def _canonical_gap_proposal_state(candidate_key: str, proposal_states: dict[str, str] | None = None) -> str:
+    state = str((proposal_states or {}).get(candidate_key) or "").strip() or "new"
+    if state not in {"new", "needs_review", "ready_for_approval"}:
+        return "new"
+    return state
+
+
+def _canonical_gap_approval_block_reason(suggestion: dict | None, proposal_state: str) -> str:
+    if not suggestion or suggestion.get("action") == "no_action":
+        return "Generate a usable non-'no_action' canonical gap suggestion before approving."
+    if proposal_state != "ready_for_approval":
+        return (
+            "Move proposal triage to 'Ready for approval' before approving and persisting this canonical gap. "
+            f"Current state: {proposal_state}."
+        )
+    return ""
+
+
 def display_trust_layer(
     mapping_response: dict,
     *,
@@ -261,11 +285,22 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
         st.info("No canonical gap candidates loaded yet, or no high-confidence gaps were found.")
         return
 
+    try:
+        proposal_state_records = api_request("GET", "/knowledge/canonical-gaps/proposal-states")
+    except httpx.HTTPError:
+        proposal_state_records = []
+    proposal_states = {
+        str(record.get("candidate_key") or "").strip(): str(record.get("proposal_state") or "").strip()
+        for record in proposal_state_records
+        if str(record.get("candidate_key") or "").strip()
+    }
+
     suggestions = st.session_state.setdefault("canonical_gap_suggestions", {})
     for index, candidate in enumerate(candidates):
         source = candidate.get("source", "")
         target = candidate.get("target", "")
-        key = f"canonical_gap_{index}_{source}_{target}".replace(" ", "_")
+        key = _canonical_gap_candidate_key(candidate)
+        proposal_state = _canonical_gap_proposal_state(key, proposal_states)
         with st.container(border=True):
             columns = st.columns([3, 3, 2])
             columns[0].markdown(f"**Source:** {source}")
@@ -307,7 +342,8 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
             for line in suggestion.get("risk_notes") or []:
                 st.caption(f"Risk: {line}")
 
-            disabled = suggestion.get("action") == "no_action"
+            block_reason = _canonical_gap_approval_block_reason(suggestion, proposal_state)
+            disabled = bool(block_reason)
             if action_columns[1].button("Approve and persist", key=f"approve_{key}", disabled=disabled):
                 try:
                     response = api_request(
@@ -332,6 +368,8 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
                         "message": f"Canonical gap approval failed: {error}",
                     }
                 st.rerun()
+            if block_reason:
+                st.caption(block_reason)
 
 
 def render_mapping_review(

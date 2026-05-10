@@ -1,1362 +1,232 @@
-# Help: Workspace, Benchmarks i Admin / Debug tab
+# Pomoć za Semantra UI
 
-Ovaj dokument objašnjava upotrebu dugmadi i pomoćnih kontrola na `Workspace`, `Benchmarks` i `Admin / Debug` tabovima u Streamlit aplikaciji Semantra.
+Ovaj dokument je praktični vodič za top-level tokove u Semantra Streamlit aplikaciji. Nije iscrpan popis svakog dugmeta, već vodič kako se aplikacija koristi u stvarnom radu.
 
-Napomena:
+## Glavna navigacija
 
-- Neke akcije traže admin token.
-- Ako backend nema podešen `SEMANTRA_ADMIN_API_TOKEN`, aplikacija trenutno može dozvoliti admin/debug i benchmark akcije i bez tokena.
-- Većina akcija prikazuje rezultat odmah u istom tabu, ispod dugmeta koje je pokrenulo poziv.
+Semantra trenutno ima pet glavnih area:
 
-## Pre nego što kreneš
+- `Workspace`
+- `Canonical Console`
+- `Catalog`
+- `Benchmarks`
+- `Admin / Debug`
 
-Preporučeni redosled:
+Ako prvi put ulaziš u aplikaciju, kreni ovim redom:
 
-1. Na `Workspace` tabu uploaduj source i target fajlove.
-2. Pokreni `Generate mapping`.
-3. Tek onda idi na `Benchmarks` ili `Admin / Debug`, jer neke funkcije imaju najviše smisla tek kada već postoji aktivan mapping rezultat.
+1. `Workspace`
+2. `Canonical Console` samo ako radiš canonical governance ili overlay rad
+3. `Catalog` kada želiš reuse ili pregled postojećih integracija
+4. `Benchmarks` kada želiš da sačuvaš ili pustiš merenje
+5. `Admin / Debug` za runtime i observability pomoćne tokove
 
-## Globalne sidebar kontrole
-
-Ove kontrole nisu vezane samo za jedan tab, ali utiču na sve tokove u aplikaciji.
+## Sidebar kontrole
 
 ### `API Base URL`
 
-Polje za URL backend API-ja.
-
-Koristi kada:
-
-- backend ne radi na podrazumevanom URL-u
-- želiš da usmeriš UI na drugi lokalni ili mrežni backend
-
-Tipično ostaje na lokalnoj vrednosti ako backend radi na istoj mašini.
+Koristi kada backend nije na podrazumevanoj lokalnoj adresi.
 
 ### `Admin Token`
 
-Polje za unos admin tokena koji backend koristi za zaštićene observability, evaluation i knowledge akcije.
-
-Koristi kada:
-
-- backend traži token za benchmark, correction, mapping set ili knowledge akcije
-- želiš da radiš sa admin/debug funkcijama bez 403 grešaka
+Koristi za zaštićene governance, benchmark, catalog i knowledge tokove kada backend traži token.
 
 ### `Reset flow`
 
-Šta radi:
+Briše aktivni Workspace session state i vraća UI u početno stanje. Koristi kada želiš novi scenario bez ostatka starog review state-a.
 
-- briše aktivno stanje UI toka iz session state-a
-- resetuje upload, mapping, preview, codegen i povezane radne podatke
+## Workspace
 
-Kada koristiti:
+`Workspace` je glavni analystski tok i ima četiri pod-taba:
 
-- kada želiš da kreneš iz početka sa novim source/target parom
-- kada UI stanje deluje nedosledno posle više eksperimenata
+- `Setup`
+- `Review`
+- `Decisions`
+- `Output`
 
-Šta očekivati posle klika:
+### `Setup`
 
-- aplikacija se vraća u čisto početno stanje
-- potrebno je ponovo uploadovati fajlove ako želiš da nastaviš review
+Ovde radiš:
 
-## Workspace tab
+- izbor moda `Standard` ili `Canonical`
+- upload source i target fajlova kada radiš standardni mapping
+- source-only upload kada radiš canonical-only mapping
+- izbor `Row data` ili `Schema spec` kada fajl liči na field-per-row specifikaciju
+- izbor tabela kada SQL snapshot sadrži više tabela
+- opciono source companion metadata enrichment
 
-Svrha ovog taba je da vodi ceo glavni tok rada: upload, profilisanje, generisanje mapping-a, ručni review, transformacije, preview, code generation, import/export odluka, mapping setove i corrections.
+Kada koristiš `Standard`:
 
-Radi preglednosti, `Workspace` je organizovan u 4 unutrašnja pod-taba:
+- imaš realan source i realan target
+- kasnije možeš da radiš preview i Pandas code generation
 
-- `Setup` za upload, izbor tabela, profilisanje i pokretanje inicijalnog auto-mapping-a
-- `Review` za trust layer, candidate pregled i ručni review po kolonama
-- `Decisions` za manual overrides, import/export, mapping setove i corrections
-- `Output` za preview i generisanje Pandas koda
+Kada koristiš `Canonical`:
 
-## Schema spec upload mode
+- nemaš još realan target ili želiš prvo semantic normalization pass
+- rezultat je source -> canonical concept mapping
+- preview i codegen nisu cilj ovog moda
 
-Semantra sada podržava i fajlove koji nisu row-data tabele, već field-per-row specifikacije.
+### `Review`
 
-Tipičan primer:
+Ovde vidiš:
 
-- kolone u fajlu su `Column`, `Description`, `Type`, `Length`
-- svaki red opisuje jedno polje, a ne jedan poslovni zapis
+- trust-layer objašnjenja za izabrane predloge
+- confidence i signal breakdown
+- LLM napomene kada je validator korišćen
+- canonical path pregled
+- `Source -> Concept View`
+- `Concept -> Target View`
+- canonical gap suggestion tok za slučajeve gde mapping izgleda dobar, ali canonical path nije popunjen
 
-Ovo koristi kada:
+Ovo je mesto gde proveravaš da li sistemski predlog ima smisla pre nego što pređeš na persist ili output.
 
-- source ili target još nema realne podatke, već samo data dictionary ili field catalog
-- dobiješ SAP, Workday ili interni spec fajl sa opisom polja
-- želiš da mapiraš šemu pre nego što dobiješ sample row data
+### `Decisions`
 
-Šta očekivati u `Setup` tabu:
+Ovde radiš:
 
-- posle izbora fajla aplikacija može prikazati hint da fajl liči na schema specification
-- pojavljuje se `Source mode` ili `Target mode` sa izborom `Row data` ili `Schema spec`
-- ako ostaviš `Schema spec`, upload se parsira kao field-per-row šema umesto kao običan dataset
+- ručne izmene target izbora
+- import/export mapping odluka kao JSON ili Excel
+- čuvanje mapping set verzija
+- učitavanje i primenu prethodno sačuvanih mapping setova
+- corrections tok i reusable learning tok
 
-Kako tumačiti rezultat:
+Važna pravila:
 
-- `Columns` predstavlja broj detektovanih poslovnih polja iz specifikacije
-- `Rows` ostaje `0`, jer fajl ne sadrži poslovne redove za preview
-- preview uzorci nisu poenta ovog toka; cilj je dobijanje `SchemaProfile` objekta za mapping
+- mapping set reuse nazad u Workspace radi samo za `approved` mapping setove
+- corrections se čuvaju samo kada je review ishod zatvoren, ne dok je odluka još nerešena
+
+### `Output`
+
+Ovde radiš:
+
+- `Generate preview`
+- `Generate Pandas code`
+
+Važna razlika:
+
+- preview je advisory i možeš ga koristiti i pre finalnog odobravanja, da vidiš trenutno ponašanje mapping-a
+- code generation je governance-sensitive surface i traži accepted aktivne odluke
+
+Ako koristiš transformacije:
+
+- možeš uključiti suggested transformation
+- možeš generisati transformation code preko LLM-a kada je runtime podešen
+- možeš koristiti reusable template ili ručno uneti kod
+- preview i codegen koriste samo transformacije koje su eksplicitno aktivirane
+
+## Canonical Console
+
+`Canonical Console` je centralno mesto za canonical governance.
+
+Ovde možeš:
+
+- pregledati canonical concept registry
+- pretraživati koncepte po nazivu, aliasima, source system-u i business domain-u
+- otvoriti concept detail sa aliasima, field context-ima, active overlay entry-jima, usage kontekstom i audit referencama
+- pratiti active overlay summary i overlay lifecycle
+- pregledati canonical gap queue mirror iz Workspace review toka
+- raditi sa stewardship item-ima za `canonical_gap` i `overlay_promotion`
+- promovisati overlay alias u stable glossary kada je item `ready_for_approval`
 
 Važno:
 
-- `.sql` upload ostaje schema snapshot i ne koristi `Schema spec` radio izbor
-- `Schema spec` možeš koristiti i na source i na target strani u `Standard` modu
-- u `Canonical` modu koristi se samo source fajl, ali source i dalje može biti `Schema spec`
+- ovo više nije debug-only ekran, već glavna governance konzola za canonical sloj
+- LLM može da predloži, ali persist i promotion i dalje zahtevaju eksplicitnu ljudsku akciju
+- neke akcije su zaštićene admin tokenom
 
-## Canonical mapping mode
+Za detaljan opis canonical runtime-a, overlay lifecycle-a, stewardship stanja i promote-to-glossary pravila pogledaj `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
 
-`Canonical` mode je source-only tok za slučajeve kada još nemaš realan target dataset, već želiš da source polja prvo mapiraš na canonical business concepts.
+## Catalog
 
-Koristi `Canonical` kada:
+`Catalog` služi za pregled i reuse već sačuvanih integracija i njihovih canonical footprint-ova.
 
-- imaš source šemu ili source spec, ali nemaš target fajl
-- želiš brzu semantičku normalizaciju source polja pre konkretnog system-to-system mapping-a
-- želiš da proveriš da li source polja uopšte imaju dobar canonical pokrivač pre detaljnog target review-a
+Ovde možeš:
 
-Koristi `Standard` kada:
-
-- imaš i source i target dataset ili target spec
-- želiš preview redova i Pandas code generation
-- želiš konkretan source-to-target mapping umesto source-to-concept pripreme
-
-Šta se menja u `Setup` tabu:
-
-- `Target file` nestaje
-- pojavljuje se `Canonical target`
-- trenutno UI izlaže samo opciju `canonical`
-- `Upload and profile` čuva samo source handle i canonical target system
-- `Generate canonical mapping` poziva source-only canonical backend tok
-
-Kako čitati canonical rezultat u `Review` tabu:
-
-- `Source` ostaje originalno source polje
-- `Target` je virtualni canonical concept id, na primer `customer.id`
-- `Canonical concept` caption prikazuje business label tog koncepta
-- confidence i explanation i dalje ostaju heuristički signali, isto kao u standardnom flow-u
-- `Source -> Concept View` i `Concept -> Target View` su posebno korisni jer prikazuju canonical putanju, ne samo konačan izbor
-
-Ograničenja canonical-only toka u trenutnom UI-ju:
-
-- transformacije su namerno isključene dok ne postoji realan target dataset
-- `Output` tab ne radi preview i codegen, već samo objašnjava da je za to potreban `Standard` mode
-- ručno dodavanje target kolona i correction workflow su ograničeni na flow sa stvarnim target-om
-- benchmark case se ne gradi iz canonical-only sesije jer ne postoji realan target schema payload
-
-Kako koristiti canonical rezultat kao pripremu za kasniji `Standard` run:
-
-1. U `Canonical` modu uploaduj source data ili source spec.
-2. Pokreni `Generate canonical mapping` i pregledaj koje source kolone dobijaju smislene canonical koncepte.
-3. U `Review` i `Decisions` tabu potvrdi ili odbij konceptualne predloge i po potrebi eksportuj odluke kao JSON ili Excel checkpoint.
-4. Klikni `Reset flow`, vrati se na `Standard` mode i uploaduj source + realan target.
-5. Koristi ranije canonical zaključke kao vodič tokom standardnog review-a, posebno u trust layer i manual review sekcijama.
-
-## 1. Upload
-
-### `Source file`
-
-File uploader za source dataset.
-
-Podržani su row-based formati kao što su CSV, JSON, XML i XLSX, kao i SQL schema snapshot kada koristiš schema-only tok.
-
-Ako izabrani fajl liči na field specification, u `Setup` tabu ćeš dobiti dodatni hint i `Source mode` izbor između `Row data` i `Schema spec`.
-
-### `Target file`
-
-File uploader za target dataset.
-
-Koristi se isto kao i `Source file`, samo za odredišni model ili šemu prema kojoj mapiraš.
-
-U `Canonical` modu ovo polje se ne prikazuje.
-
-## 2. Select Tables
-
-Ova sekcija je važna samo kada uploadovani SQL fajl sadrži više tabela.
-
-### `Source table`
-
-Dropdown za izbor source tabele iz SQL snapshot-a.
-
-Pojavljuje se samo kada backend iz source SQL fajla otkrije više tabela.
-
-### `Target table`
-
-Dropdown za izbor target tabele iz SQL snapshot-a.
-
-Pojavljuje se samo kada backend iz target SQL fajla otkrije više tabela.
-
-### `Upload and profile`
-
-Šta radi:
-
-- šalje source i target fajlove backend-u
-- po potrebi uključuje izabrane source i target tabele
-- gradi schema profile za obe strane
-- čuva dataset identifikatore i preview podatke u UI stanju
-
-Kada koristiti:
-
-- odmah nakon izbora source i target fajla
-- svaki put kada promeniš fajl ili tabelu i želiš svež profil
-
-Preuslovi:
-
-- oba fajla moraju biti izabrana
-
-Šta očekivati posle klika:
-
-- pojavljuju se summary sekcije za `Source` i `Target`
-- aplikacija postaje spremna za `Generate mapping`
-
-U `Canonical` modu:
-
-- dovoljan je samo source fajl
-- source može biti `Row data` ili `Schema spec`
-- summary prikazuje samo `Source`, dok je canonical target virtualan i generiše se iz glossary sloja
-
-## 3. Review Mapping
-
-### `Generate mapping`
-
-Šta radi:
-
-- poziva backend auto-mapping tok
-- generiše rangirane kandidate i inicijalni odabrani target po source koloni
-- inicijalizuje ručno review stanje u UI-ju
-
-Kada koristiti:
-
-- posle uspešnog upload-a i profilisanja
-
-Šta očekivati posle klika:
-
-- pojavljuju se trust layer, review tabele, manual review, corrections i akcije za preview/codegen
-
-U `Canonical` modu dugme se zove `Generate canonical mapping` i rezultat predstavlja source-to-canonical pripremni mapping, bez preview/codegen artefakata.
-
-Napomena o confidence score-u:
-
-- score je normalizovan heuristički zbir više signala, ne verovatnoća
-- finalni rezultat ostaje u opsegu `0..1`
-- trenutni pragovi su: `high_confidence >= 0.85`, `medium_confidence >= 0.65`, inače `low_confidence`
-- score služi za prioritet review-a i automatski prvi predlog, ne kao garancija da je mapping ispravan
-
-## Trust Layer i transformacije
-
-Za svako source polje dobijaš blok sa target predlogom, confidence prikazom i expander sekcijom `Details and Transformation`.
-
-### `Apply this transformation to data`
-
-Checkbox koji aktivira predloženi transformation code ako ga je sistem već izgradio za dati source-target par.
-
-Koristi kada:
-
-- želiš da preview i kasniji codegen zaista koriste prikazani suggested transformation
-
-### `Generate with LLM`
-
-Šta radi:
-
-- poziva runtime LLM da predloži pandas transformaciju za trenutno izabrani source-target par
-
-Kada koristiti:
-
-- kada znaš da je mapiranje ispravno, ali zahteva transformaciju
-- kada želiš brži prvi draft transformacionog koda
-
-Preuslovi:
-
-- mora postojati aktivan target za taj source
-- LLM runtime mora biti podešen i dostupan
-
-Šta očekivati posle klika:
-
-- u polje za manuelni kod ulazi generisani transformation code
-- mogu se pojaviti reasoning i warning poruke uz taj predlog
-
-### `Reusable template for <source>`
-
-Dropdown za izbor gotovog transformation template-a.
-
-Koristi kada:
-
-- želiš standardnu tekstualnu ili formatersku transformaciju bez LLM-a
-
-### `Apply template`
-
-Šta radi:
-
-- uzima izabrani reusable template i materializuje ga za konkretan source-target par
-
-Kada koristiti:
-
-- kada znaš da ti treba standardna transformacija i ne želiš generisanje novog koda
-
-Šta očekivati posle klika:
-
-- template kod se ubacuje u polje za manuelni/custom transformation
-
-### `Define pandas/Python transformation for <source> (optional)`
-
-Text area za ručno pisanje custom transformation koda.
-
-Koristi kada:
-
-- želiš punu kontrolu nad transformacijom
-- LLM predlog nije dovoljno dobar
-- template nije dovoljan
-
-### `Apply generated/custom transformation`
-
-Checkbox koji aktivira ručno uneti ili LLM/template generisan kod.
-
-Koristi kada:
-
-- želiš da preview i codegen koriste baš ovaj custom/generisani kod
+- listati i pretraživati integracije
+- otvarati integration detail
+- gledati concept-centric detail iz kataloga
+- učitati mapping set detail, audit i diff
+- reuse-ovati odobren mapping set nazad u Workspace
 
 Važno:
 
-- sam unos koda nije dovoljan; checkbox odlučuje da li će se ta transformacija zaista primenjivati
+- Catalog radi nad sačuvanim mapping set i catalog projekcijama, nije zamena za live review tok
+- reuse nazad u Workspace je governance-gated i zavisi od statusa mapping seta
 
-## Review tabele i filteri
+Za detaljan opis catalog search-a, similarity heuristike i `Reuse in Workspace` ponašanja pogledaj `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
-### `Filter by status`
+## Benchmarks
 
-Dropdown za filtriranje `Selected Mapping` prikaza po statusu.
+`Benchmarks` služi za merljivo poređenje mapping kvaliteta.
 
-### `Filter by confidence label`
+Ovde možeš:
 
-Dropdown za filtriranje po confidence label-u.
-
-### `Filter by source`
-
-Dropdown za fokus na jednu source kolonu.
-
-Ove kontrole ne menjaju backend stanje; služe samo za pregled i fokus tokom review-a.
-
-## Manual Review sekcija
-
-Za svaki source red možeš ručno da menjaš target i status.
-
-### `Target for <source>`
-
-Dropdown za ručni izbor target kandidata za dati source.
-
-Koristi kada:
-
-- želiš da zameniš inicijalno odabrani target drugim predlogom iz kandidat liste
-
-### `Status for <source>`
-
-Dropdown sa statusima `accepted`, `needs_review` i `rejected`.
-
-Koristi kada:
-
-- želiš da potvrdiš mapping
-- želiš da ostaviš mapping za kasniji review
-- želiš da odbiješ mapping
-
-## Add Manual Mapping sekcija
-
-Ova sekcija služi za dodavanje ili override source-target para koji auto-mapper nije predložio ili ga nije dobro rešio.
-
-### `Manual source column`
-
-Dropdown za izbor source kolone koju želiš ručno da dodaš ili override-uješ.
-
-### `Manual target column`
-
-Dropdown za ručni izbor target kolone.
-
-### `Manual status`
-
-Dropdown za status ručno dodate odluke.
-
-### `Add mapping`
-
-Šta radi:
-
-- upisuje ručni source-target par u aktivno review stanje
-
-Kada koristiti:
-
-- kada auto-mapper nije predložio potrebnu vezu
-- kada želiš da dopuniš mapping iz poslovnog znanja
-
-Šta očekivati posle klika:
-
-- ručni par se pojavljuje u tabeli `Manual additions and overrides`
-
-### `Remove manual mapping`
-
-Dropdown za izbor ručno dodatog ili override mapiranja koje želiš da ukloniš.
-
-### `Remove`
-
-Šta radi:
-
-- uklanja izabrani ručni mapping iz aktivnog review stanja
-
-Kada koristiti:
-
-- kada si dodao pogrešan ručni par
-- kada želiš povratak na sistemski predlog za dati source
-
-## Active Decisions
-
-Ova tabela nema dugmad, ali je važna jer prikazuje trenutno aktivne mapping odluke koje će ići u preview, codegen, export i čuvanje.
-
-Ako ovde ne vidiš ono što očekuješ, prvo ispravi `Manual Review` ili `Add Manual Mapping` sekciju.
-
-## Export / Import Decisions
-
-### `Download mapping JSON`
-
-Šta radi:
-
-- eksportuje trenutno aktivne mapping odluke kao JSON fajl
-
-Kada koristiti:
-
-- za backup review stanja
-- za prenos mapping odluka između sesija
-- za ručno uređivanje van UI-ja
-
-### `Import mapping JSON`
-
-File uploader za JSON sa `mapping_decisions` payload-om.
-
-### `Apply imported mapping`
-
-Šta radi:
-
-- učitava mapping odluke iz uploadovanog JSON-a u trenutno review stanje
-
-Kada koristiti:
-
-- kada želiš da vratiš ranije eksportovan mapping
-- kada dobiješ mapping odluke iz drugog toka rada
-
-Šta očekivati posle klika:
-
-- editor state se ažurira prema importovanom payload-u
-
-## Mapping Set Versioning
-
-Ova sekcija služi da trenutno review stanje sačuvaš kao verzionisani mapping set na backend-u i da porediš verzije istog mapping seta kroz osnovni governance tok.
-
-### `Mapping set name`
-
-Naziv mapping seta koji čuvaš.
-
-### `Mapping set created by`
-
-Opcioni identifikator osobe ili tima koji čuva mapping set.
-
-### `Mapping set owner`
-
-Opcioni vlasnik mapping seta na nivou cele verzije.
-
-Koristi kada:
-
-- želiš da označiš tim ili osobu koja formalno poseduje taj mapping set
-- želiš jasniji governance kontekst za kasniji review
-
-### `Mapping set assignee`
-
-Opcioni trenutni nosilac rada ili reviewer za tu verziju.
-
-Koristi kada:
-
-- želiš da znaš ko trenutno treba da pogleda ili dovrši verziju
-
-### `Version note`
-
-Opciona beleška vezana za tu verziju mapping seta.
-
-### `Review note`
-
-Opciona governance/review beleška za tu verziju.
-
-Koristi kada:
-
-- želiš da zabeležiš zašto verzija ide u review, šta još čeka, ili pod kojim uslovom može dalje
-
-### `Save mapping set version`
-
-Šta radi:
-
-- čuva aktivne mapping odluke kao novu verziju mapping seta
-- čuva i `owner`, `assignee`, `version note` i `review note` metadata uz tu verziju
-
-Kada koristiti:
-
-- kada želiš review snapshot koji možeš kasnije ponovo učitati
-- kada praviš verzionisane iteracije mapping rada
-
-Šta očekivati posle klika:
-
-- success poruka sa imenom i verzijom
-- lista mapping setova može odmah biti osvežena
-
-### `Load saved mapping sets`
-
-Šta radi:
-
-- učitava sve sačuvane mapping set verzije iz backend-a
-
-Kada koristiti:
-
-- kada želiš da pregledaš i koristiš ranije sačuvane verzije
-
-### `Select saved mapping set`
-
-Dropdown za izbor konkretne sačuvane mapping set verzije.
-
-### `Apply saved mapping set`
-
-Šta radi:
-
-- učitava izabrani mapping set u trenutno review stanje
-- upisuje audit događaj za `apply` akciju na backend-u
-- isti apply tok koristi i `Catalog > Reuse in Workspace`
-
-Kada koristiti:
-
-- kada želiš da nastaviš raniji review ili testiraš staru verziju odluka
-
-## Catalog tab
-
-Ova sekcija služi za pretragu sačuvanih integracija, pregled postojećih mapping verzija, audit/diff drilldown i reuse iz kataloga nazad u aktivni Workspace review tok.
-
-### `Run catalog query`
-
-Šta radi:
-
-- pokreće tekstualnu pretragu kroz `integration_name`, source/target sistem, owner, business domain i canonical concept
-- primenjuje aktivne filtere nad catalog zapisima
-
-Kada koristiti:
-
-- kada želiš brzo da nađeš sličnu ili ranije obrađenu integraciju bez ručnog listanja svih mapping set verzija
-
-### `Load all integrations`
-
-Šta radi:
-
-- učitava sve sačuvane catalog integracije i njihove verzije
-
-Kada koristiti:
-
-- kada želiš browse pregled celog trenutnog kataloga bez tekstualne pretrage
-
-### `Load detail`
-
-Šta radi:
-
-- učitava grupisani detail za izabrani `integration_name`
-- prikazuje verzije, latest version, latest approved version, canonical concepts, unmatched sources i similar integrations
-
-Kada koristiti:
-
-- kada želiš da razumeš celu istoriju jedne integracije pre nego što je uporediš ili ponovo upotrebiš
-
-### `Catalog version drilldown`
-
-Dropdown za izbor konkretne mapping set verzije iz trenutno otvorenog integration detail prikaza.
-
-### `Open selected version`
-
-Šta radi:
-
-- učitava konkretan mapping set detail unutar Catalog taba
-
-Kada koristiti:
-
-- kada želiš da pregledaš tačnu verziju odluka pre audit/diff ili reuse koraka
-
-### `Load selected audit`
-
-Šta radi:
-
-- učitava audit istoriju za trenutno izabranu mapping set verziju iz Catalog detail prikaza
-
-Kada koristiti:
-
-- kada želiš lifecycle pregled bez prelaska u Decisions sekciju
-
-### `Reuse in Workspace`
-
-Šta radi:
-
-- poziva isti backend `apply` tok kao `Apply saved mapping set`
-- prebacuje izabranu mapping set verziju u aktivni Workspace review state
-- puni `Review` i `Decisions` tabove mapping sadržajem iz kataloga
-
-Kada koristiti:
-
-- kada želiš da kreneš od postojeće integracije iz kataloga umesto od novog auto-mapping prolaza
-
-### `Open approved version`
-
-Šta radi:
-
-- otvara latest approved mapping set verziju iz trenutno otvorene integracije
-
-Kada koristiti:
-
-- kada želiš da referentno pogledaš governance-approved baseline umesto najnovijeg draft-a
-
-### `Similar Integrations`
-
-Šta prikazuje:
-
-- integracije koje dele canonical footprint i deo metadata signala sa trenutno otvorenom integracijom
-- explainable similarity signal kroz shared concepts, source/target sistem, business domain i artifact type
-
-Kada koristiti:
-
-- kada tražiš reuse signal ili sličan prethodni rad pre nego što napraviš novu verziju mapiranja
-
-### `Open similar integration`
-
-Šta radi:
-
-- otvara detail izabrane srodne integracije direktno iz Similar Integrations panela
-
-Kada koristiti:
-
-- kada želiš brzo da prelaziš između srodnih integracija bez novog catalog search koraka
-
-### `Concept Lookup`
-
-Šta radi:
-
-- pronalazi gde se određeni canonical concept već pojavljuje kroz sačuvane integracije i verzije
-
-Kada koristiti:
-
-- kada želiš concept-centric reuse pregled, na primer za `customer.id` ili sličan poslovni pojam
-
-### `Saved mapping set status`
-
-Dropdown za izbor novog statusa izabrane mapping set verzije.
-
-### `Update saved mapping set status`
-
-Šta radi:
-
-- menja status izabrane mapping set verzije na backend-u
-- može istovremeno da osveži `owner`, `assignee` i `review note`
-
-Kada koristiti:
-
-- kada mapping set prelazi iz draft u review ili approved stanje
-
-### `Load selected mapping set audit`
-
-Šta radi:
-
-- učitava audit istoriju za izabrani mapping set
-
-Kada koristiti:
-
-- kada želiš da vidiš lifecycle promene te verzije
-
-### `Compare against version`
-
-Dropdown za izbor starije verzije istog mapping seta sa kojom želiš poređenje.
-
-Pojavljuje se kada postoje najmanje dve verzije istog `mapping set name`.
-
-### `Load mapping set diff`
-
-Šta radi:
-
-- učitava diff između trenutno izabrane verzije i odabrane starije verzije
-- prikazuje summary sa `Added`, `Removed` i `Changed`
-- prikazuje tabelu promena po source koloni
-
-Šta se smatra promenom:
-
-- promena target kolone
-- promena decision statusa
-- promena transformation koda
-
-Kada koristiti:
-
-- kada želiš da vidiš šta se tačno promenilo između dve iteracije review-a
-- kada proveravaš da li nova verzija samo dodaje polja ili menja već potvrđene odluke
-
-## Save Corrections sekcija
-
-Ova sekcija služi za snimanje razlika između sistemskog predloga i tvoje konačne review odluke, kao i za rad sa reusable rule kandidatima.
-
-### `Correction note`
-
-Opciona beleška koja se čuva uz svaku snimljenu korekciju.
-
-### `Load reusable rule candidates`
-
-Šta radi:
-
-- učitava kandidate za reusable correction pravila na osnovu ranije istorije korekcija
-
-Kada koristiti:
-
-- kada želiš da vidiš koje korisničke korekcije se dovoljno često ponavljaju da mogu postati pravila
-
-### `Load promoted reusable rules`
-
-Šta radi:
-
-- učitava već promovisana reusable pravila
-
-Kada koristiti:
-
-- kada želiš da proveriš koja pravila već aktivno utiču na ranking
-
-### `Save reviewed corrections`
-
-Šta radi:
-
-- snima trenutne review razlike kao corrections u observability sloj
-
-Kada koristiti:
-
-- kada si završio ručni review i želiš da sistem pamti te odluke
-
-Šta očekivati posle klika:
-
-- success poruka sa brojem sačuvanih korekcija
-- sekcija `Last saved corrections` dobija nove podatke
-
-### `Promote reusable rule candidate`
-
-Dropdown za izbor kandidata koji želiš da pretvoriš u reusable pravilo.
-
-### `Promote selected reusable rule`
-
-Šta radi:
-
-- promoviše izabrani correction candidate u trajno reusable pravilo
-
-Kada koristiti:
-
-- kada znaš da se određeni correction obrazac ponavlja i treba snažnije da utiče na buduće ranking odluke
-
-## Finalne akcije na Workspace tabu
-
-### `Generate preview`
-
-Šta radi:
-
-- izvršava preview aktivnih mapping odluka nad source podacima
-- uključuje transformation preview kada su transformacije aktivirane
-
-Kada koristiti:
-
-- kada želiš da vidiš kako bi rezultat izgledao pre codegen-a ili čuvanja
-
-Preuslovi:
-
-- mora postojati barem jedna aktivna mapping odluka
-
-Šta očekivati posle klika:
-
-- pojavljuje se sekcija `Preview`
-- mogu se pojaviti unresolved targets i transformation validation detalji
-
-### `Generate Pandas code`
-
-Šta radi:
-
-- generiše Pandas kod na osnovu aktivnih mapping odluka i aktiviranih transformacija
-
-Kada koristiti:
-
-- kada želiš starter artifact za implementaciju mapiranja
-
-Preuslovi:
-
-- mora postojati barem jedna aktivna mapping odluka
-
-Šta očekivati posle klika:
-
-- pojavljuje se sekcija `Generated Pandas Code`
-- ako postoje problemi ili fallback situacije, mogu se pojaviti warnings
-
-## Benchmarks tab
-
-Svrha ovog taba je da sačuvaš realan mapping scenario kao benchmark, da ga ponovo pokrećeš kasnije i da meriš uticaj correction learning-a.
-
-Napomena za canonical-only sesije:
-
-- benchmark save trenutno traži realan source/target case
-- zato canonical-only session ne puni benchmark payload automatski
-- ako želiš benchmark, uradi follow-up `Standard` run sa stvarnim target-om
-
-### Pomoćna polja i kontrole
-
-#### `Benchmark dataset name`
-
-Ovo je ime pod kojim će se trenutni mapping scenario sačuvati kao benchmark dataset.
-
-Koristi kada:
-
-- želiš da razlikuješ više benchmark scenarija
-- želiš verzionisanje benchmark skupova po poslovnom domenu ili test iteraciji
-
-Primeri:
-
-- `customer-master-clean-v1`
-- `erp-noisy-aliases-v1`
-- `pilot-scenario-2`
-
-#### JSON prikaz ispod naslova `Save Current Mapping As Benchmark`
-
-Ovo nije dugme, ali je važan indikator. Pokazuje tačno koji će benchmark case biti sačuvan ako klikneš `Save current mapping as benchmark`.
-
-Ako ovde ne vidiš ništa korisno, nemoj još čuvati benchmark. Vrati se na `Workspace` tab i proveri da li imaš aktivne mapping odluke.
-
-#### `Saved dataset`
-
-Dropdown lista sa prethodno sačuvanim benchmark datasetima.
-
-Koristi ga da izabereš koji benchmark želiš da pokreneš ili nad kojim želiš da meriš correction impact.
-
-#### `Run selected benchmark with configured LLM`
-
-Checkbox koji određuje da li benchmark treba pokretati samo heuristički ili uz aktivni runtime LLM.
-
-Koristi kada:
-
-- želiš da uporediš ponašanje bez LLM-a i sa LLM-om
-- želiš da proveriš da li LLM stvarno popravlja rezultat ili samo uvodi varijacije
-
-Nemoj uključivati ovaj checkbox ako:
-
-- LLM runtime nije podešen
-- želiš čisto determinističko poređenje između iteracija
-
-### Dugmad na Benchmarks tabu
-
-#### `Save current mapping as benchmark`
-
-Šta radi:
-
-- uzima trenutni mapping scenario iz aktivnog review stanja
-- čuva ga kao benchmark dataset u backend persistence sloju
-
-Kada koristiti:
-
-- kada napraviš scenario koji želiš kasnije ponovo da meriš
-- kada želiš da sačuvaš real-life pilot primer kao referentni test
-
-Preuslovi:
-
-- mora postojati barem jedna aktivna mapping odluka
-- `Benchmark dataset name` ne sme biti prazan
-
-Šta očekivati posle klika:
-
-- success poruka sa `dataset_id`, imenom i verzijom
-- benchmark se kasnije pojavljuje u listi sačuvanih datasetova
-
-Najbolja praksa:
-
-- čuvaj male, reprezentativne benchmark scenarije umesto jednog ogromnog benchmarka
-
-#### `Load saved benchmark datasets`
-
-Šta radi:
-
-- učitava sve ranije sačuvane benchmark datasete iz backend-a
-
-Kada koristiti:
-
-- kada prvi put ulaziš na `Benchmarks` tab
-- kada si upravo sačuvao novi benchmark i želiš da osvežiš listu
-
-Šta očekivati posle klika:
-
-- ispod se pojavljuje tabela sa benchmark datasetima
-- dropdown `Saved dataset` dobija nove opcije
-
-#### `Load benchmark runs`
-
-Šta radi:
-
-- učitava istoriju ranijih benchmark izvršavanja
-
-Kada koristiti:
-
-- kada želiš da pregledaš prethodne rezultate i porediš iteracije
-- kada želiš da proveriš da li je neki refactor ili overlay promenio kvalitet
-
-Šta očekivati posle klika:
-
-- ispod se pojavljuje tabela `Benchmark Run History`
-
-#### `Run selected benchmark`
-
-Šta radi:
-
-- pokreće izabrani benchmark dataset kroz evaluation backend
-- koristi heuristiku ili heuristiku + LLM, u zavisnosti od checkbox-a
-
-Kada koristiti:
-
-- kada želiš da vidiš trenutni kvalitet sistema na sačuvanom benchmarku
-- kada proveravaš da li nova promena u sistemu popravlja ili kvari mapping kvalitet
-
-Šta očekivati posle klika:
-
-- ispod se pojavljuje `Last Benchmark Result`
-- rezultat je prikazan kao JSON payload sa metrikama
-
-Kako tumačiti:
-
-- fokusiraj se na accuracy, top-1 accuracy i ukupni broj correct matches
-
-#### `Measure correction impact`
-
-Šta radi:
-
-- meri razliku između baseline rezultata i correction-aware rezultata
-- pokazuje da li istorija korekcija i reusable rules stvarno popravljaju mapping kvalitet
-
-Kada koristiti:
-
-- kada već imaš sačuvane corrections i želiš da vidiš njihov efekat
-- kada procenjuješ da li learning loop vredi dalje razvijati
-
-Šta očekivati posle klika:
-
-- pojavljuje se tabela `Correction Impact`
-- prikazuje baseline accuracy, correction-aware accuracy i razliku između njih
-
-Kako tumačiti:
-
-- pozitivan `accuracy_delta` znači da istorija korekcija pomaže
-- mali ili nulti pomak znači da još nema dovoljno kvalitetne feedback istorije ili da pravila nisu dobro pogođena
-
-## Admin / Debug tab
-
-Svrha ovog taba je da učita runtime stanje backend-a, knowledge sloj, audit tragove, glossary stanje i pomoćne dijagnostičke podatke.
-
-Ako vidiš poruku da je admin token obavezan, prvo ga unesi u sidebar polje `Admin Token`.
-
-### Gornji skup dugmadi
-
-#### `Load runtime config`
-
-Šta radi:
-
-- učitava runtime konfiguraciju backend-a preko observability endpointa
-
-Kada koristiti:
-
-- kada proveravaš koji LLM provider je aktivan
-- kada proveravaš da li je admin token podešen
-- kada proveravaš gate pragove i druge aktivne runtime postavke
-
-Šta očekivati posle klika:
-
-- ispod se pojavljuje sekcija `Runtime Config` u JSON formatu
-
-#### `Load decision logs`
-
-Šta radi:
-
-- učitava decision log zapise koje backend beleži tokom mapping odluka
-
-Kada koristiti:
-
-- kada želiš da pregledaš kako je sistem donosio odluke
-- kada istražuješ neočekivano mapiranje
-
-Šta očekivati posle klika:
-
-- pojavljuje se tabela `Decision Logs`
-
-#### `Load saved corrections`
-
-Šta radi:
-
-- učitava sve sačuvane user corrections iz sistema
-
-Kada koristiti:
-
-- kada proveravaš da li je correction history stvarno snimljen
-- kada želiš da proceniš kvalitet learning podataka
-
-Šta očekivati posle klika:
-
-- pojavljuje se tabela `Saved Corrections`
-
-#### `Load benchmark runs`
-
-Šta radi:
-
-- učitava istoriju evaluation run-ova iz backend-a
-
-Kada koristiti:
-
-- kada benchmark istoriju želiš da vidiš iz debug perspektive, bez odlaska na `Benchmarks` tab
-
-Šta očekivati posle klika:
-
-- pojavljuje se tabela `Evaluation Runs`
-
-### Knowledge Overlays sekcija
-
-Ova sekcija služi za pregled i upravljanje knowledge overlay verzijama.
-
-#### `Load knowledge overlays`
-
-Šta radi:
-
-- učitava listu svih sačuvanih overlay verzija
-
-Kada koristiti:
-
-- kada želiš da vidiš koje overlay verzije postoje
-- kada planiraš aktivaciju, deaktivaciju ili pregled detalja
-
-Šta očekivati posle klika:
-
-- ispod se pojavljuje tabela overlay verzija
-- dropdown `Overlay version` dobija opcije
-
-#### `Reload knowledge`
-
-Šta radi:
-
-- prisiljava backend da ponovo učita knowledge runtime sloj
-
-Kada koristiti:
-
-- posle aktivacije ili import-a knowledge/glossary podataka
-- kada sumnjaš da backend runtime nije osvežen
-
-Šta očekivati posle klika:
-
-- pojavljuje se ili osvežava summary o `Knowledge mode`, aktivnom overlay-u i broju aktivnih entiteta
-
-#### `Load active knowledge status`
-
-Šta radi:
-
-- praktično učitava trenutno aktivno runtime stanje knowledge sloja
-
-Kada koristiti:
-
-- kada te zanima samo status runtime-a, ne i kompletan reload workflow sa drugim akcijama
-
-Napomena:
-
-- trenutno koristi isti backend poziv kao `Reload knowledge`, pa je efekat sličan
-
-#### `Load knowledge audit log`
-
-Šta radi:
-
-- učitava audit log za knowledge lifecycle akcije
-
-Kada koristiti:
-
-- kada želiš da vidiš ko je i kada radio create, activate, deactivate, archive ili import operacije
-
-Šta očekivati posle klika:
-
-- pojavljuje se tabela `Knowledge Audit Log`
-
-### Kontrole za upload knowledge overlay fajla
-
-#### `Knowledge overlay CSV`
-
-File uploader za CSV sa overlay entry-jima.
-
-Koristi ga kada želiš da uneseš:
-
-- abbreviations
-- synonyms
-- field aliases
-- concept aliases
-
-#### `Overlay version name`
-
-Naziv nove overlay verzije.
-
-Preporuka:
-
-- koristi ime koje jasno opisuje domen i verziju, na primer `sales-domain-overlay-v1`
-
-#### `Created by`
-
-Opciono polje za evidenciju ko je napravio overlay.
-
-Korisno je za audit i timski rad.
-
-#### `Validate knowledge CSV`
-
-Šta radi:
-
-- proverava CSV bez čuvanja kao novu overlay verziju
-
-Kada koristiti:
-
-- uvek pre `Save overlay version`, posebno za veće CSV-ove
-
-Šta očekivati posle klika:
-
-- pojavljuje se validation summary
-- pojavljuje se tabela preview redova sa statusom, normalizacijom i eventualnim problemima
-
-Kako tumačiti:
-
-- `valid` znači da je red spreman za čuvanje
-- `invalid` znači da postoji greška koju treba ispraviti u CSV-u
-- conflicts i duplicates treba pregledati pre snimanja
-
-#### `Save overlay version`
-
-Šta radi:
-
-- čuva uploadovani knowledge CSV kao novu overlay verziju
-
-Kada koristiti:
-
-- kada je validacija prošla ili kada svesno želiš da sačuvaš sadržaj zajedno sa validation rezultatom
-
-Šta očekivati posle klika:
-
-- success poruka sa nazivom verzije i brojem sačuvanih entry-ja
-- automatski refresh liste overlay verzija
-- validation rezultat ostaje dostupan za pregled
-
-### Canonical Glossary sekcija
-
-Ova sekcija služi za import i export canonical glossary CSV fajla.
-
-#### `Canonical glossary CSV`
-
-File uploader za canonical glossary import.
-
-Koristi ga kada želiš da ubaciš novu glossary verziju iz CSV-a.
-
-#### `Load canonical glossary export`
-
-Šta radi:
-
-- učitava trenutni glossary CSV iz backend-a u memoriju UI-ja
-
-Kada koristiti:
-
-- kada želiš da preuzmeš aktuelni glossary za pregled, backup ili izmenu
-
-Šta očekivati posle klika:
-
-- pojavljuje se dugme `Download canonical glossary CSV`
-
-#### `Import canonical glossary`
-
-Šta radi:
-
-- importuje uploadovani canonical glossary CSV u backend
-- zatim osvežava knowledge runtime
-
-Kada koristiti:
-
-- kada želiš da zameniš ili osvežiš canonical glossary
-
-Šta očekivati posle klika:
-
-- success poruka
-- summary sa brojem importovanih redova i canonical concepts
-- osvežen knowledge runtime status
+- sačuvati trenutni mapping kao benchmark dataset
+- učitati ranije sačuvane benchmark datasetove
+- pustiti benchmark run
+- izmeriti correction impact
+- pregledati benchmark run history
 
 Važno:
 
-- ovo menja file-backed canonical glossary, zato koristi pažljivo i poželjno sa kontrolisanom CSV verzijom
+- `Save current mapping as benchmark` traži accepted aktivne odluke
+- benchmark surface je namenjen proveri kvaliteta, ne svakodnevnom review-u svake sesije
 
-#### `Download canonical glossary CSV`
+## Admin / Debug
 
-Šta radi:
+`Admin / Debug` je pomoćna administrativna i observability površina.
 
-- preuzima glossary koji je prethodno učitan klikom na `Load canonical glossary export`
+Ovde tipično proveravaš:
 
-Kada koristiti:
+- runtime config
+- decision logs
+- corrections i reusable rule stanje
+- pomoćne knowledge/runtime informacije koje nisu deo glavnog Canonical Console toka
 
-- za lokalni backup
-- za ručnu doradu glossary-ja pre novog import-a
+Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš glavni mapping ili canonical stewardship tok.
 
-### Overlay verzije i lifecycle akcije
+## Preporučeni tok rada
 
-Ove kontrole postaju korisne kada je lista overlay verzija već učitana.
+### Standard mapping tok
 
-#### `Overlay version`
+1. U `Workspace > Setup` uploaduj source i target.
+2. Po potrebi izaberi tabele ili `Schema spec` mod.
+3. Klikni `Upload and profile`.
+4. Klikni `Generate mapping`.
+5. U `Review` proveri trust layer, canonical path i eventualne canonical gap predloge.
+6. U `Decisions` unesi ručne izmene, eksportuj checkpoint ili sačuvaj mapping set.
+7. U `Output` koristi preview, pa zatim codegen kada su odluke accepted.
 
-Dropdown za izbor konkretne overlay verzije nad kojom radiš sledeću akciju.
+### Canonical-first tok
 
-#### `Load details`
+1. U `Workspace > Setup` pređi na `Canonical` mod.
+2. Uploaduj source row-data ili source spec.
+3. Klikni `Upload and profile`, pa `Generate canonical mapping`.
+4. U `Review` proveri source -> canonical path.
+5. Ako postoje semantic gap-ovi, po potrebi ih prebaci u canonical governance tok kroz `Canonical Console`.
 
-Šta radi:
+### Canonical governance tok
 
-- učitava detalje izabrane overlay verzije, uključujući njene entry-je
+1. Otvori `Canonical Console`.
+2. Učitaj ili osveži registry, overlay state i stewardship queue.
+3. Otvori concept detail ili gap/promotion item koji te zanima.
+4. Proveri status, audit i impact preview.
+5. Odradi approve/reject/ignore ili promote-to-glossary kada je item spreman.
 
-Kada koristiti:
+## Kratke napomene
 
-- kada želiš da proveriš tačan sadržaj određene overlay verzije
+- Confidence score je heuristika za review prioritet, ne verovatnoća.
+- Preview je namerno advisory; ne znači da je mapping finalno odobren.
+- Durable i execution-like površine su strože governed od samog preview-a.
+- Ako UI stanje deluje čudno posle više eksperimenata, `Reset flow` je često najbrži oporavak.
 
-Šta očekivati posle klika:
+Za detaljan opis signala, score formule, confidence pragova i bounded LLM slučajeva pogledaj `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 
-- pojavljuje se `Overlay detail` summary
-- pojavljuje se tabela sa entry-jima te verzije
+Za detaljan opis preview statusa, warning kodova, klasifikacija i fallback ponašanja pogledaj `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
 
-#### `Activate selected overlay`
+Za detaljan opis benchmark metrika, confidence bucket tumačenja i correction-impact delta pogledaj `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`.
 
-Šta radi:
+Za detaljan opis transformation test set strukture, assertion pravila i tumačenja run rezultata pogledaj `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`.
 
-- aktivira izabranu overlay verziju kao runtime overlay
+Za detaljan opis Catalog reuse i similarity heuristike pogledaj `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
-Kada koristiti:
-
-- kada želiš da mapping engine i trust layer koriste baš tu overlay verziju
-
-Šta očekivati posle klika:
-
-- runtime status pokazuje novi aktivni overlay
-- lista overlay verzija se osvežava
-- detalji izabrane verzije se ponovo učitavaju
-
-#### `Deactivate selected overlay`
-
-Šta radi:
-
-- deaktivira izabranu overlay verziju
-
-Kada koristiti:
-
-- kada želiš povratak sa aktivne overlay varijante na validated, ali neaktivno stanje
-
-Šta očekivati posle klika:
-
-- runtime status se osvežava
-- overlay više nije aktivan u knowledge runtime-u
-
-#### `Archive selected overlay`
-
-Šta radi:
-
-- arhivira izabranu overlay verziju
-
-Kada koristiti:
-
-- kada overlay više ne želiš da koristiš operativno, ali želiš da ostane u istoriji
-
-Šta očekivati posle klika:
-
-- status verzije prelazi u arhivirano stanje
-- lista i detalji se osvežavaju
-
-Napomena:
-
-- arhiviranje nije isto što i brisanje; to je lifecycle status promena
-
-#### `Rollback active overlay`
-
-Šta radi:
-
-- vraća runtime knowledge sloj na prethodno aktivnu overlay verziju
-- ako nema prethodne, može vratiti sistem na base-only režim
-
-Kada koristiti:
-
-- kada nova aktivna overlay verzija pogorša mapping rezultate
-- kada želiš brz povratak na ranije stabilno stanje
-
-Šta očekivati posle klika:
-
-- runtime status se menja
-- lista overlay verzija se osvežava
-- detalji aktivne verzije se ponovo učitavaju
-
-### Dijagnostičke sekcije ispod dugmadi
-
-Ove sekcije nisu dugmad, ali su važne za tumačenje rezultata:
-
-#### `Knowledge mode ...`
-
-Pokazuje:
-
-- da li backend radi u `base_only` ili `overlay_active` režimu
-- koji overlay je trenutno aktivan
-- broj aktivnih entry-ja i knowledge concept count
-
-#### `Validation summary`
-
-Pokazuje:
-
-- ukupan broj redova iz upload CSV-a
-- koliko je validnih, nevalidnih, duplikata i konflikata
-
-#### `Canonical Coverage`
-
-Pojavljuje se samo ako već postoji `mapping_response` iz `Workspace` taba.
-
-Koristi se da vidiš:
-
-- coverage source strane
-- coverage target strane
-- project-level canonical coverage za aktivni mapping context
-
-#### `Knowledge and Canonical Match Insights`
-
-Pomaže da pregledaš:
-
-- knowledge signal
-- canonical signal
-- confidence
-- explanation detalje za svaki source-target par
-
-## Preporučeni praktični tokovi
-
-### Tok 1: Provera benchmark kvaliteta
-
-1. Na `Workspace` tabu uploaduj source i target.
-2. Klikni `Generate mapping`.
-3. Idi na `Benchmarks`.
-4. Unesi ime u `Benchmark dataset name`.
-5. Klikni `Save current mapping as benchmark`.
-6. Klikni `Load saved benchmark datasets`.
-7. Izaberi dataset iz `Saved dataset`.
-8. Klikni `Run selected benchmark`.
-9. Po potrebi klikni `Measure correction impact`.
-
-### Tok 2: Uvoz i aktivacija knowledge overlay-a
-
-1. Idi na `Admin / Debug`.
-2. Uploaduj fajl kroz `Knowledge overlay CSV`.
-3. Klikni `Validate knowledge CSV`.
-4. Pregledaj `Validation summary` i preview redove.
-5. Klikni `Save overlay version`.
-6. Klikni `Load knowledge overlays`.
-7. Izaberi verziju u `Overlay version`.
-8. Klikni `Activate selected overlay`.
-9. Klikni `Reload knowledge` ili proveri runtime status.
-
-### Tok 3: Export i import canonical glossary-ja
-
-1. Klikni `Load canonical glossary export`.
-2. Klikni `Download canonical glossary CSV` da sačuvaš postojeće stanje.
-3. Pripremi novu CSV verziju.
-4. Uploaduj je kroz `Canonical glossary CSV`.
-5. Klikni `Import canonical glossary`.
-6. Proveri import summary i knowledge runtime status.
-
-## Brzi saveti
-
-- Pre benchmark rada uvek proveri da li je aktivan overlay koji očekuješ.
-- Pre import-a canonical glossary-ja napravi export kao backup.
-- `Validate knowledge CSV` koristi kao obavezan korak, ne kao opciju.
-- `Measure correction impact` ima smisla tek kad sistem već ima sačuvane corrections.
-- Ako rezultati deluju čudno, prvo koristi `Load runtime config`, `Load knowledge overlays` i `Load active knowledge status` pre dubljeg debug-a.
+Za detaljan opis Canonical Console runtime-a, overlay lifecycle-a i stewardship pravila pogledaj `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
