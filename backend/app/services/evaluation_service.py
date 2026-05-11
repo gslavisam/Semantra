@@ -81,6 +81,8 @@ def build_column_profile(column: dict) -> ColumnProfile:
     return ColumnProfile(
         name=column["name"],
         normalized_name=column.get("normalized_name", column["name"].replace("_", " ")),
+        description=column.get("description", ""),
+        declared_type=column.get("declared_type", ""),
         dtype=column.get("dtype", "object"),
         null_ratio=column.get("null_ratio", 0.0),
         unique_ratio=column.get("unique_ratio", 1.0),

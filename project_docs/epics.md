@@ -119,17 +119,24 @@ Trenutno stanje:
 - `13A` persistence/backend indexing je isporučen
 - `13B` read API je isporučen
 - `13C` Streamlit catalog UI je isporučen
-- `13D` concept and visual discovery ostaje otvoren i predstavlja sledeći visoko-vredni product korak
+- `13D` initial concept/reuse discovery slice je isporučen; šire proširenje ostaje otvoreno
 
 ### Epic 13D: Concept and visual discovery
 
-Status: active next-step epic.
+Status: initial slice completed, broader expansion open.
 
 Cilj:
 
 - reuse signal iznad postojećeg kataloga i canonical usage modela
 - concept-centric pregled kroz više integracija
 - vizuelni discovery sloj za reuse, coverage i slične integracije
+
+Trenutno stanje:
+
+- concept-centric reuse pregled postoji u Catalog concept lookup toku
+- source-system -> target-system discovery overview postoji nad catalog rezultatima
+- basic `similar approved integration exists` hint postoji u catalog result view-u
+- grouped unmatched/low-confidence review attention summary postoji u Workspace review toku
 
 ### Epic 14: Performance, vector/cache acceleration, and richer AI signal fusion
 

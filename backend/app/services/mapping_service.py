@@ -43,6 +43,10 @@ STRONG_CANONICAL_LLM_MARGIN = 0.05
 ProgressCallback = Callable[[str], None]
 
 
+class ProgressCallbackCancelled(RuntimeError):
+    pass
+
+
 @dataclass
 class CandidateScore:
     source: ColumnProfile
@@ -65,6 +69,7 @@ def generate_mapping_candidates(
 ) -> AutoMappingResponse:
     source_columns = list(source_schema.columns)
     target_columns = list(target_schema.columns)
+    target_embedding_cache: dict[str, list[float] | None] = {}
     _emit_progress(
         progress_callback,
         f"Loaded {len(source_columns)} source fields and {len(target_columns)} target fields for mapping.",
@@ -72,7 +77,11 @@ def generate_mapping_candidates(
     per_source_scores: dict[str, list[CandidateScore]] = {}
     for index, source_column in enumerate(source_columns, start=1):
         _emit_progress(progress_callback, f"Ranking {index}/{len(source_columns)}: {source_column.name}.")
-        per_source_scores[source_column.name] = rank_targets_for_source(source_column, target_columns)
+        per_source_scores[source_column.name] = rank_targets_for_source(
+            source_column,
+            target_columns,
+            target_embedding_cache=target_embedding_cache,
+        )
 
     _emit_progress(progress_callback, "Applying LLM validation gates." if llm_provider else "LLM validation disabled; using heuristic ranking only.")
     llm_decisions = apply_llm_validation(per_source_scores, llm_provider, progress_callback=progress_callback)
@@ -227,10 +236,19 @@ def generate_mapping_candidates(
     return response
 
 
-def rank_targets_for_source(source: ColumnProfile, targets: list[ColumnProfile]) -> list[CandidateScore]:
+def rank_targets_for_source(
+    source: ColumnProfile,
+    targets: list[ColumnProfile],
+    *,
+    target_embedding_cache: dict[str, list[float] | None] | None = None,
+) -> list[CandidateScore]:
     scored: list[CandidateScore] = []
     for target in targets:
-        signals, active_signal_names = compute_signals(source, target)
+        signals, active_signal_names = compute_signals(
+            source,
+            target,
+            target_embedding_cache=target_embedding_cache,
+        )
         final_score = compute_final_score(signals, active_signal_names)
         explanation = build_explanation(source, target, signals)
         scored.append(
@@ -331,6 +349,8 @@ def _emit_progress(progress_callback: ProgressCallback | None, message: str) -> 
         return
     try:
         progress_callback(message)
+    except ProgressCallbackCancelled:
+        raise
     except Exception:
         return
 
@@ -386,7 +406,12 @@ def is_canonical_target_name(target_name: str) -> bool:
     return metadata_knowledge_service.resolve_canonical_concept_id(target_name) == target_name
 
 
-def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[ScoringSignals, set[str]]:
+def compute_signals(
+    source: ColumnProfile,
+    target: ColumnProfile,
+    *,
+    target_embedding_cache: dict[str, list[float] | None] | None = None,
+) -> tuple[ScoringSignals, set[str]]:
     source_tokens = set(source.tokenized_name)
     target_tokens = set(target.tokenized_name)
     source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(source)
@@ -409,7 +434,11 @@ def compute_signals(source: ColumnProfile, target: ColumnProfile) -> tuple[Scori
         + score_distance(min(source.avg_length, 50) / 50, min(target.avg_length, 50) / 50)
     ) / 3
     overlap_signal = sample_overlap_score(source_values, target_values)
-    embedding_signal = embedding_similarity(source, target)
+    embedding_signal = embedding_similarity(
+        source,
+        target,
+        target_embedding_cache=target_embedding_cache,
+    )
     correction_feedback = correction_store.describe_feedback(source.name, target.name)
     correction_signal = float(correction_feedback["strength"])
 
@@ -501,11 +530,22 @@ def sample_overlap_score(source_values: set[str], target_values: set[str]) -> fl
     return len(source_values & target_values) / max(len(source_values), len(target_values), 1)
 
 
-def embedding_similarity(source: ColumnProfile, target: ColumnProfile) -> float:
+def embedding_similarity(
+    source: ColumnProfile,
+    target: ColumnProfile,
+    *,
+    target_embedding_cache: dict[str, list[float] | None] | None = None,
+) -> float:
     if not embedding_enabled():
         return 0.0
     source_embedding = get_embedding(source.normalized_name)
-    target_embedding = get_embedding(target.normalized_name)
+    if target_embedding_cache is None:
+        target_embedding = get_embedding(target.normalized_name)
+    else:
+        target_embedding = target_embedding_cache.get(target.normalized_name)
+        if target.normalized_name not in target_embedding_cache:
+            target_embedding = get_embedding(target.normalized_name)
+            target_embedding_cache[target.normalized_name] = target_embedding
     return cosine_similarity(source_embedding, target_embedding)
 
 

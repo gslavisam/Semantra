@@ -17,6 +17,24 @@ function Test-PortListening {
     }
 }
 
+function Wait-PortListening {
+    param(
+        [int]$Port,
+        [string]$ServiceName,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if (Test-PortListening -Port $Port) {
+            return
+        }
+        [System.Threading.Thread]::Sleep(250)
+    }
+
+    throw "$ServiceName did not start listening on http://127.0.0.1:$Port within $TimeoutSeconds seconds."
+}
+
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonExecutable = [System.IO.Path]::GetFullPath((Join-Path $scriptDir "..\.venv\Scripts\python.exe"))
 
@@ -43,6 +61,8 @@ else {
     }
 
     Write-Host "Starting backend on http://127.0.0.1:$ApiPort"
+    Wait-PortListening -Port $ApiPort -ServiceName "Backend"
+    Write-Host "Backend is ready on http://127.0.0.1:$ApiPort"
 }
 
 if (Test-PortListening -Port $UiPort) {
@@ -60,6 +80,8 @@ else {
     }
 
     Write-Host "Starting Streamlit on http://127.0.0.1:$UiPort"
+    Wait-PortListening -Port $UiPort -ServiceName "Streamlit UI"
+    Write-Host "Streamlit is ready on http://127.0.0.1:$UiPort"
 }
 
 Write-Host "Semantra endpoints: API=http://127.0.0.1:$ApiPort UI=http://127.0.0.1:$UiPort"

@@ -318,7 +318,7 @@ The primary regression anchors are:
 
 The following items remain outside the current pilot-complete scope:
 
-- persistent background job queue, retry, cancel, and cleanup semantics for long-running tasks
+- persistent background job queue/status backend for multi-user, restart-resilient, or materially longer-running tasks
 - DB-only canonical authoring and promotion model without file-backed reseed source inputs
 - richer concept/reuse visual discovery in the catalog (`Epic 13D`)
 - system-specific virtual targets beyond canonical-only mode (`Epic 12B`)

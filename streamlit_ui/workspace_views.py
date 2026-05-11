@@ -33,6 +33,8 @@ def poll_mapping_job(
             if not response:
                 raise RuntimeError("Mapping job completed without a response payload.")
             return response
+        if job_status.get("status") == "canceled":
+            raise RuntimeError("Mapping job was canceled.")
         if job_status.get("status") == "failed":
             raise RuntimeError(job_status.get("error") or "Mapping job failed.")
 
@@ -81,6 +83,13 @@ def companion_enrichment_message(result: dict | None) -> str:
             f"unmatched spec fields: {', '.join(unmatched_columns)}."
         )
     return f"Source companion metadata enriched {matched_columns} columns; all companion fields matched."
+
+
+def default_llm_validation_enabled(session_state: dict | None = None) -> bool:
+    state = session_state or {}
+    if "use_llm_validation" not in state:
+        return False
+    return bool(state.get("use_llm_validation"))
 
 
 def render_workspace_tab(
@@ -406,7 +415,7 @@ def render_workspace_tab(
             st.subheader("3. Review Mapping")
             use_llm = st.checkbox(
                 "Use LLM validation",
-                value=st.session_state.get("use_llm_validation", True),
+                value=default_llm_validation_enabled(st.session_state),
                 key="use_llm_validation",
                 help=(
                     "When enabled, Semantra calls the configured LLM provider for fields in the ambiguity band. "

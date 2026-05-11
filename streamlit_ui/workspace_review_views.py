@@ -28,6 +28,74 @@ def _canonical_gap_approval_block_reason(suggestion: dict | None, proposal_state
     return ""
 
 
+def _review_attention_summary_rows(selected_rows: list[dict] | None) -> list[dict]:
+    grouped: dict[tuple[str, str, str], dict[str, object]] = {}
+    for row in selected_rows or []:
+        target = str(row.get("target") or "").strip()
+        confidence_label = str(row.get("confidence_label") or "").strip()
+        issue_type = ""
+        if not target:
+            issue_type = "unmatched"
+        elif confidence_label == "low_confidence":
+            issue_type = "low_confidence"
+        if not issue_type:
+            continue
+
+        canonical_status = str(row.get("canonical_status_label") or row.get("canonical_status") or "").strip() or "Unknown"
+        focus = (
+            target
+            or str(row.get("shared_concepts") or "").strip()
+            or str(row.get("source_concepts") or "").strip()
+            or str(row.get("target_concepts") or "").strip()
+            or canonical_status
+        )
+        group_key = (issue_type, focus, canonical_status)
+        group = grouped.setdefault(
+            group_key,
+            {
+                "issue_type": issue_type,
+                "focus": focus,
+                "canonical_status": canonical_status,
+                "count": 0,
+                "source_examples": [],
+            },
+        )
+        group["count"] = int(group["count"]) + 1
+        source = str(row.get("source") or "").strip()
+        source_examples = group["source_examples"]
+        if source and isinstance(source_examples, list) and source not in source_examples and len(source_examples) < 4:
+            source_examples.append(source)
+
+    rows: list[dict] = []
+    for group in grouped.values():
+        issue_type = str(group["issue_type"])
+        canonical_status = str(group["canonical_status"])
+        follow_up = "Review target ranking or metadata context."
+        if canonical_status.lower() in {"no canonical match", "source-only canonical match", "target-only canonical match", "different canonical concepts"}:
+            follow_up = "Check glossary/knowledge coverage before forcing target decisions."
+        if issue_type == "unmatched":
+            follow_up = "Check missing glossary coverage or absent viable target candidates."
+        rows.append(
+            {
+                "issue_type": issue_type,
+                "focus": group["focus"],
+                "canonical_status": canonical_status,
+                "count": group["count"],
+                "source_examples": ", ".join(group["source_examples"]),
+                "follow_up": follow_up,
+            }
+        )
+
+    return sorted(
+        rows,
+        key=lambda item: (
+            item.get("issue_type") != "unmatched",
+            -int(item.get("count") or 0),
+            str(item.get("focus") or "").lower(),
+        ),
+    )
+
+
 def display_trust_layer(
     mapping_response: dict,
     *,
@@ -426,6 +494,14 @@ def render_mapping_review(
         }
         for row in canonical_mismatch_rows
     ]
+    attention_summary_rows = _review_attention_summary_rows(filtered_rows)
+
+    if attention_summary_rows:
+        st.subheader("Repeated Review Attention")
+        st.caption(
+            "Groups unmatched and low-confidence patterns in the current review set so repeated glossary, knowledge, or ranking gaps are visible before row-by-row triage."
+        )
+        st.dataframe(attention_summary_rows, width="stretch", hide_index=True)
 
     st.subheader("Selected Mapping")
     st.caption(

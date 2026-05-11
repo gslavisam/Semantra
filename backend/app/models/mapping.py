@@ -151,7 +151,7 @@ class AutoMappingResponse(BaseModel):
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
 
 
-MappingJobStatus = Literal["queued", "running", "completed", "failed"]
+MappingJobStatus = Literal["queued", "running", "cancel_requested", "completed", "failed", "canceled"]
 
 
 class MappingJobStartResponse(BaseModel):

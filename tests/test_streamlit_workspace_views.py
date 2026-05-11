@@ -1,4 +1,8 @@
+import pytest
+
 from streamlit_ui.workspace_views import (
+    poll_mapping_job,
+    default_llm_validation_enabled,
     _workspace_codegen_block_reason,
     _workspace_preview_advisory_message,
     companion_enrichment_message,
@@ -40,3 +44,37 @@ def test_workspace_preview_advisory_message_keeps_preview_available() -> None:
         "Preview is using active mapping decisions that are not fully approved yet. "
         "Review statuses: needs_review. Use it to inspect the current mapping before final approval."
     )
+
+
+def test_default_llm_validation_enabled_defaults_off_but_preserves_user_choice() -> None:
+    assert default_llm_validation_enabled({}) is False
+    assert default_llm_validation_enabled({"use_llm_validation": False}) is False
+    assert default_llm_validation_enabled({"use_llm_validation": True}) is True
+
+
+def test_poll_mapping_job_raises_on_canceled_status() -> None:
+    responses = iter(
+        [
+            {"job_id": "job-1", "status": "queued"},
+            {"job_id": "job-1", "status": "canceled", "activity": ["12:00:00 | Mapping job canceled."]},
+        ]
+    )
+
+    class StatusRecorder:
+        def __init__(self) -> None:
+            self.messages: list[str] = []
+
+        def write(self, message: str) -> None:
+            self.messages.append(message)
+
+    def api_request(method: str, path: str, **kwargs):
+        return next(responses)
+
+    with pytest.raises(RuntimeError, match="canceled"):
+        poll_mapping_job(
+            api_request=api_request,
+            start_path="/mapping/auto/jobs",
+            payload={"source_dataset_id": "source", "target_dataset_id": "target", "use_llm": False},
+            status=StatusRecorder(),
+            timeout_seconds=0.01,
+        )

@@ -214,7 +214,11 @@ def refresh_backend_reachability() -> None:
 def backend_is_reachable() -> bool:
     current_base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL)
     cached_base_url = st.session_state.get("backend_reachable_base_url")
-    if cached_base_url != current_base_url or "backend_reachable" not in st.session_state:
+    if (
+        cached_base_url != current_base_url
+        or "backend_reachable" not in st.session_state
+        or not bool(st.session_state.get("backend_reachable", False))
+    ):
         refresh_backend_reachability()
         st.session_state["backend_reachable_base_url"] = current_base_url
     return bool(st.session_state.get("backend_reachable", False))

@@ -156,6 +156,51 @@ def test_mapping_optional_embedding_signal_can_be_enabled() -> None:
         settings.embedding_provider = previous_provider
 
 
+def test_mapping_reuses_target_embeddings_within_single_run(monkeypatch) -> None:
+    previous_provider = settings.embedding_provider
+    settings.embedding_provider = "hash"
+
+    counts: dict[str, int] = {}
+
+    def fake_get_embedding(text: str) -> list[float]:
+        counts[text] = counts.get(text, 0) + 1
+        return [float(len(text)), 1.0]
+
+    monkeypatch.setattr("app.services.mapping_service.get_embedding", fake_get_embedding)
+
+    try:
+        source_schema = SchemaProfile(
+            dataset_id="source",
+            dataset_name="source.csv",
+            row_count=5,
+            columns=[
+                make_column("vendor_identifier", ["numeric_id"], ["1", "2", "3"]),
+                make_column("vendor_name", ["text"], ["Acme", "Contoso"]),
+                make_column("vendor_city", ["text"], ["Berlin", "London"]),
+            ],
+        )
+        target_schema = SchemaProfile(
+            dataset_id="target",
+            dataset_name="target.csv",
+            row_count=5,
+            columns=[
+                make_column("supplier_id", ["numeric_id"], ["1", "2", "3"]),
+                make_column("supplier_name", ["text"], ["Acme", "Contoso"]),
+                make_column("city_name", ["text"], ["Berlin", "London"]),
+                make_column("country_code", ["categorical"], ["DE", "GB"]),
+            ],
+        )
+
+        generate_mapping_candidates(source_schema, target_schema)
+
+        assert counts["supplier id"] == 1
+        assert counts["supplier name"] == 1
+        assert counts["city name"] == 1
+        assert counts["country code"] == 1
+    finally:
+        settings.embedding_provider = previous_provider
+
+
 def test_mapping_uses_user_correction_history_as_score_boost() -> None:
     correction_store.append(
         {

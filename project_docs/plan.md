@@ -35,7 +35,7 @@ Exit kriterijum:
 
 ### 2. Epic 13D: Concept and reuse discovery
 
-Sada kada katalog, canonical usage faceti i Canonical Console read modeli postoje, sledeći visoko-vredni product korak je jači reuse/discovery sloj.
+Početni 13D discovery talas je sada zatvoren kroz concept-centric reuse pregled, viši discovery overview, reuse hint-ove i surfacing ponavljanih review gap-ova.
 
 Fokus:
 
@@ -46,7 +46,7 @@ Fokus:
 
 ### 3. Operational hardening nad postojećim pilot površinama
 
-Pre daljeg feature širenja treba zatvarati release-grade rupe na već implementiranim tokovima.
+Ovo je sada sledeći glavni izvršni fokus pre daljeg feature širenja.
 
 Fokus:
 
@@ -103,6 +103,12 @@ SQLite ostaje prihvatljiv za trenutnu fazu, ali treba postepeno normalizovati qu
 ### Background job hardening
 
 Današnji in-memory/thread job store je dobar za lokalni dev i pilot. Za ozbiljniji multi-user ili dugotrajniji execution model biće potreban persistent queue/status sloj.
+
+Minimalni transition plan za tu tačku:
+
+- trigger za prelaz nije "lepa arhitektura" nego operativna potreba: više istovremenih korisnika, job-ovi koji treba da prežive restart procesa ili run-ovi koji redovno traju dovoljno dugo da cooperative local thread model više nije pouzdan
+- prvi korak ne treba da bude spoljašnji broker nego persistent job/status model u SQLite-u: job zapis, status tranzicije, retry_count, cancel_requested/canceled_at metadata i append-only progress/event log koji UI može da poll-uje kao i danas
+- tek posle toga uvoditi odvojeni worker lease/dequeue sloj, tako da Streamlit i API mogu da zadrže gotovo isti surface (`start job`, `get status`, `cancel job`), dok se backend izvršenje preseli iz process-memory modela u durable queue
 
 ### Repo i docs organizacija
 

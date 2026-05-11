@@ -128,6 +128,74 @@ Ishod:
 
 - core Canonical Console governance loop tretira se kao pilot-complete
 
+### Epic 13D: Initial concept and reuse discovery slice
+
+Isporučeno:
+
+- concept-centric reuse pregled u Catalog concept lookup toku
+- source-system -> target-system discovery overview nad catalog rezultatima
+- basic `similar approved integration exists` hint u catalog result prikazu
+- grouped unmatched/low-confidence review attention summary u Workspace review toku
+
+Ishod:
+
+- `13D` više nije samo planirana sledeća tema; osnovni discovery/reuse product sloj je sada isporučen i spreman za dalje hardening/proširenje
+
+### Operational hardening: Stable pilot regression baseline
+
+Isporučeno:
+
+- Workspace više ne pali `Use LLM validation` po default-u u novom pilot toku
+- fokusirani `pilot regression subset` dokumentovan u `docs/pilot/PILOT_REGRESSION_SUBSET.md`
+- dva realna showcase nalaza zabeležena u `docs/pilot/PILOT_EXECUTION_LOG_2026-05-10.md`
+- supplier master deterministic scenario potvrđen kao stabilan `preview ok / codegen blocked` baseline na svežem runtime-u
+- `start_semantra.ps1` sada čeka realnu backend/UI spremnost pre prijave endpoint-a, čime se smanjuje false-ready drift u lokalnim pilot prolazima
+- Streamlit backend reachability helper više ne lepi prethodni `False` rezultat za isti `api_base_url`, pa svež `8501` load sada uredno prikazuje zdrav runtime status kada se backend vrati
+- default `8000/8501` supplier deterministic flow potvrđen live do `Generate preview`, uz očekivani advisory preview i accepted-only codegen gate
+
+Ishod:
+
+- stabilni deterministic-first pilot path je sada jasnije definisan i proverljiv pre demo/pilot isporuke
+
+### Epic 14D follow-up: Description/type benchmark harness slice
+
+Isporučeno:
+
+- evaluation harness sada prenosi `description` i `declared_type` u `ColumnProfile` umesto da ih tiho odbaci
+- dodat je uski benchmark test za poređenje istog case-a sa metadata kontekstom i bez njega
+- dodat je per-run target embedding cache u mapping engine-u, potkrepljen fokusiranim testom koji pokazuje da se target embedding računa samo jednom po target koloni unutar većeg run-a
+
+Ishod:
+
+- trenutna benchmark-backed odluka je da `description` i `declared_type` za sada ostaju LLM/context signal, jer current deterministic engine daje iste metrike i sa i bez tih polja
+- target vector cache je opravdan i uveden u runtime jer merenje pokazuje stvarno uklanjanje redundantnih target embedding izračunavanja bez promene mapping ishoda
+
+### Mapping progress jobs hardening: in-memory lifecycle limits slice
+
+Isporučeno:
+
+- lokalni in-memory/thread job model je zadržan kao runtime za pilot režim, bez uvlačenja persistent queue sloja pre vremena
+- `MappingJobStore` sada odbacuje istekle završene jobove preko TTL pravila i ograničava koliko completed/failed statusa ostaje u memoriji
+- uveden je cap za broj aktivnih mapping job-ova, uz eksplicitan `429` odgovor na job start endpoint-ima kada je limit dostignut
+- dodati su fokusirani servisni i API testovi za active-limit, finished-job pruning i očuvan normalan progress polling tok
+
+Ishod:
+
+- lokalni mapping progress lifecycle je otporniji na pilot runtime akumulaciju i runaway background job stanje, ali bez prelaska na teži multi-user queue model dok za to ne postoji stvarna potreba
+
+### Mapping progress jobs hardening: cancel and retry semantics slice
+
+Isporučeno:
+
+- mapping job status model sada eksplicitno pokriva `cancel_requested` i `canceled`
+- dodat je `POST /mapping/jobs/{job_id}/cancel` endpoint za cooperative cancel u postojećem in-memory job modelu
+- mapping worker sada zaustavlja run na sledećem progress checkpoint-u kada cancel zahtev stigne, a Streamlit polling helper prepoznaje `canceled` status umesto da čeka timeout
+- retry je za trenutni pilot režim definisan kao pokretanje novog `/mapping/.../jobs` zahteva, bez posebnog replay endpoint-a
+
+Ishod:
+
+- lokalni job lifecycle sada ima eksplicitno operativno ponašanje i za overload i za operator interrupt scenario, bez uvlačenja kompleksnijeg queue/replay sloja prerano
+
 ### Product-level governance hardening follow-through
 
 Isporučeno:

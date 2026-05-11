@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +17,227 @@ CATALOG_DETAIL_STATE_KEYS = (
     "catalog_selected_mapping_set_audit",
     "catalog_selected_mapping_set_diff",
 )
+
+
+def _normalized_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _catalog_concept_reuse_summary(concept_detail: dict[str, Any] | None) -> dict[str, int]:
+    usage_records = (concept_detail or {}).get("integrations", [])
+    integration_names = {
+        _normalized_text(item.get("integration_name"))
+        for item in usage_records
+        if _normalized_text(item.get("integration_name"))
+    }
+    approved_integrations = {
+        _normalized_text(item.get("integration_name"))
+        for item in usage_records
+        if _normalized_text(item.get("integration_name")) and _normalized_text(item.get("status")) == "approved"
+    }
+    source_systems = {
+        _normalized_text(item.get("source_system"))
+        for item in usage_records
+        if _normalized_text(item.get("source_system"))
+    }
+    target_systems = {
+        _normalized_text(item.get("target_system"))
+        for item in usage_records
+        if _normalized_text(item.get("target_system"))
+    }
+    return {
+        "usage_count": int((concept_detail or {}).get("usage_count", len(usage_records)) or 0),
+        "integration_count": len(integration_names),
+        "approved_integration_count": len(approved_integrations),
+        "source_system_count": len(source_systems),
+        "target_system_count": len(target_systems),
+    }
+
+
+def _catalog_concept_reuse_rows(concept_detail: dict[str, Any] | None) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in (concept_detail or {}).get("integrations", []):
+        integration_name = _normalized_text(item.get("integration_name")) or "unknown"
+        group = grouped.setdefault(
+            integration_name,
+            {
+                "integration_name": integration_name,
+                "source_system": _normalized_text(item.get("source_system")),
+                "target_system": _normalized_text(item.get("target_system")),
+                "business_domain": _normalized_text(item.get("business_domain")),
+                "usage_versions": 0,
+                "latest_version": 0,
+                "latest_approved_version": 0,
+                "approved_versions": 0,
+                "artifact_types": set(),
+                "owners": set(),
+                "statuses": Counter(),
+            },
+        )
+        group["usage_versions"] = int(group["usage_versions"]) + 1
+        version = int(item.get("version") or 0)
+        if version > int(group["latest_version"]):
+            group["latest_version"] = version
+        status = _normalized_text(item.get("status")) or "unknown"
+        statuses = group["statuses"]
+        if isinstance(statuses, Counter):
+            statuses[status] += 1
+        if status == "approved":
+            group["approved_versions"] = int(group["approved_versions"]) + 1
+            if version > int(group["latest_approved_version"]):
+                group["latest_approved_version"] = version
+        artifact_type = _normalized_text(item.get("artifact_type"))
+        if artifact_type:
+            artifact_types = group["artifact_types"]
+            if isinstance(artifact_types, set):
+                artifact_types.add(artifact_type)
+        owner = _normalized_text(item.get("owner"))
+        if owner:
+            owners = group["owners"]
+            if isinstance(owners, set):
+                owners.add(owner)
+
+    rows: list[dict[str, Any]] = []
+    for group in grouped.values():
+        statuses = group["statuses"]
+        rows.append(
+            {
+                "integration_name": group["integration_name"],
+                "source_system": group["source_system"],
+                "target_system": group["target_system"],
+                "business_domain": group["business_domain"],
+                "usage_versions": group["usage_versions"],
+                "latest_version": group["latest_version"],
+                "latest_approved_version": group["latest_approved_version"] or None,
+                "approved_versions": group["approved_versions"],
+                "artifact_types": ", ".join(sorted(group["artifact_types"])),
+                "owners": ", ".join(sorted(group["owners"])),
+                "status_mix": ", ".join(
+                    f"{status}={count}"
+                    for status, count in sorted(statuses.items(), key=lambda pair: (pair[0] != "approved", pair[0]))
+                ),
+            }
+        )
+    return sorted(
+        rows,
+        key=lambda item: (
+            -int(item.get("approved_versions") or 0),
+            -int(item.get("usage_versions") or 0),
+            _normalized_text(item.get("integration_name")).lower(),
+        ),
+    )
+
+
+def _catalog_system_pair_matrix_rows(results: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    target_systems = sorted({_normalized_text(item.get("target_system")) or "-" for item in results or []})
+    grouped: dict[str, dict[str, Any]] = {}
+
+    for item in results or []:
+        source_system = _normalized_text(item.get("source_system")) or "-"
+        target_system = _normalized_text(item.get("target_system")) or "-"
+        integration_name = _normalized_text(item.get("integration_name")) or _normalized_text(item.get("name")) or "unknown"
+        group = grouped.setdefault(
+            source_system,
+            {
+                "source_system": source_system,
+                "integration_names": set(),
+                "approved_integration_names": set(),
+                "system_pairs": set(),
+                "concept_count": 0,
+                "target_integrations": {target: set() for target in target_systems},
+            },
+        )
+        group["integration_names"].add(integration_name)
+        group["system_pairs"].add(f"{source_system}->{target_system}")
+        if _normalized_text(item.get("status")) == "approved":
+            group["approved_integration_names"].add(integration_name)
+        group["concept_count"] = int(group["concept_count"]) + len(item.get("canonical_concepts", []))
+        target_integrations = group["target_integrations"]
+        target_integrations.setdefault(target_system, set()).add(integration_name)
+
+    rows: list[dict[str, Any]] = []
+    for payload in grouped.values():
+        row: dict[str, Any] = {
+            "source_system": payload["source_system"],
+            "integration_count": len(payload["integration_names"]),
+            "approved_integrations": len(payload["approved_integration_names"]),
+            "system_pair_count": len(payload["system_pairs"]),
+            "canonical_concept_hits": int(payload["concept_count"]),
+        }
+        for target_system in target_systems:
+            row[target_system] = len(payload["target_integrations"].get(target_system, set()))
+        rows.append(row)
+
+    return sorted(
+        rows,
+        key=lambda item: (-int(item.get("integration_count") or 0), _normalized_text(item.get("source_system")).lower()),
+    )
+
+
+def _catalog_result_reuse_hints(
+    results: list[dict[str, Any]] | None,
+    *,
+    min_shared_concepts: int = 2,
+) -> dict[str, str]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for item in results or []:
+        integration_name = _normalized_text(item.get("integration_name")) or _normalized_text(item.get("name"))
+        if not integration_name:
+            continue
+        group = grouped.setdefault(
+            integration_name,
+            {
+                "concepts": set(),
+                "has_approved": False,
+                "source_system": _normalized_text(item.get("source_system")),
+                "target_system": _normalized_text(item.get("target_system")),
+            },
+        )
+        group["concepts"].update(
+            _normalized_text(concept)
+            for concept in item.get("canonical_concepts", [])
+            if _normalized_text(concept)
+        )
+        if _normalized_text(item.get("status")) == "approved":
+            group["has_approved"] = True
+
+    hints: dict[str, str] = {}
+    for integration_name, payload in grouped.items():
+        concepts = payload["concepts"]
+        if not concepts:
+            continue
+        best_candidate: tuple[int, int, str, list[str]] | None = None
+        for candidate_name, candidate in grouped.items():
+            if candidate_name == integration_name or not candidate["has_approved"]:
+                continue
+            shared_concepts = sorted(concepts & candidate["concepts"])
+            shared_count = len(shared_concepts)
+            if shared_count < min_shared_concepts:
+                continue
+            same_system_pair = int(
+                bool(payload["source_system"])
+                and bool(payload["target_system"])
+                and payload["source_system"] == candidate["source_system"]
+                and payload["target_system"] == candidate["target_system"]
+            )
+            ranking = (same_system_pair, shared_count, candidate_name.lower(), shared_concepts[:3])
+            if best_candidate is None or ranking > best_candidate:
+                best_candidate = ranking
+        if best_candidate is None:
+            hints[integration_name] = ""
+            continue
+        same_system_pair, shared_count, candidate_name_lower, shared_examples = best_candidate
+        candidate_name = next(
+            name for name in grouped if name.lower() == candidate_name_lower
+        )
+        hint = f"Similar approved integration exists: {candidate_name} ({shared_count} shared concepts"
+        if shared_examples:
+            hint += f"; e.g. {', '.join(shared_examples)}"
+        hint += ")"
+        if same_system_pair:
+            hint += " | same system pair"
+        hints[integration_name] = hint
+    return hints
 
 
 def _mapping_set_reuse_block_reason(status: str | None) -> str:
@@ -382,6 +604,40 @@ def render_catalog_tab(
 
     results = st.session_state.get("catalog_results", [])
     if results:
+        discovery_rows = _catalog_system_pair_matrix_rows(results)
+        reuse_hints = _catalog_result_reuse_hints(results)
+        if discovery_rows:
+            st.subheader("Discovery Overview")
+            discovery_columns = st.columns(4)
+            unique_integrations = {
+                _normalized_text(item.get("integration_name"))
+                for item in results
+                if _normalized_text(item.get("integration_name"))
+            }
+            approved_integrations = {
+                _normalized_text(item.get("integration_name"))
+                for item in results
+                if _normalized_text(item.get("integration_name")) and _normalized_text(item.get("status")) == "approved"
+            }
+            system_pairs = {
+                f"{_normalized_text(item.get('source_system')) or '-'}->{_normalized_text(item.get('target_system')) or '-'}"
+                for item in results
+            }
+            distinct_concepts = {
+                _normalized_text(concept)
+                for item in results
+                for concept in item.get("canonical_concepts", [])
+                if _normalized_text(concept)
+            }
+            discovery_columns[0].metric("Integrations", len(unique_integrations))
+            discovery_columns[1].metric("Approved integrations", len(approved_integrations))
+            discovery_columns[2].metric("System pairs", len(system_pairs))
+            discovery_columns[3].metric("Distinct concepts", len(distinct_concepts))
+            st.caption(
+                "High-level discovery matrix over the current catalog result set. Cells show how many distinct integrations exist for each source-system to target-system path."
+            )
+            st.dataframe(discovery_rows, width="stretch", hide_index=True)
+
         st.subheader("Integration Results")
         st.dataframe(
             [
@@ -396,6 +652,7 @@ def render_catalog_tab(
                     "owner": item.get("owner"),
                     "decision_count": item.get("decision_count"),
                     "canonical_concepts": ", ".join(item.get("canonical_concepts", [])),
+                    "reuse_hint": reuse_hints.get(_normalized_text(item.get("integration_name")), ""),
                 }
                 for item in results
             ],
@@ -665,7 +922,46 @@ def render_catalog_tab(
 
     concept_detail = st.session_state.get("catalog_concept_detail")
     if concept_detail:
+        reuse_summary = _catalog_concept_reuse_summary(concept_detail)
+        reuse_rows = _catalog_concept_reuse_rows(concept_detail)
         st.caption(
-            f"Concept {concept_detail['concept_id']} appears in {concept_detail['usage_count']} saved mapping version(s)."
+            f"Concept {concept_detail['concept_id']} appears in {reuse_summary['usage_count']} saved mapping version(s)."
         )
+        summary_columns = st.columns(5)
+        summary_columns[0].metric("Usage versions", reuse_summary["usage_count"])
+        summary_columns[1].metric("Integrations", reuse_summary["integration_count"])
+        summary_columns[2].metric("Approved integrations", reuse_summary["approved_integration_count"])
+        summary_columns[3].metric("Source systems", reuse_summary["source_system_count"])
+        summary_columns[4].metric("Target systems", reuse_summary["target_system_count"])
+
+        if reuse_rows:
+            st.write("**Concept-centric reuse view**")
+            st.caption(
+                "Grouped view of how this canonical concept is reused across integrations, with latest and approved version signals."
+            )
+            st.dataframe(reuse_rows, width="stretch", hide_index=True)
+            integration_options = [row["integration_name"] for row in reuse_rows if _normalized_text(row.get("integration_name"))]
+            if integration_options:
+                concept_action_columns = st.columns([3, 1])
+                selected_concept_integration = concept_action_columns[0].selectbox(
+                    "Open integration from concept reuse view",
+                    integration_options,
+                    key="catalog_selected_concept_integration_name",
+                )
+                if concept_action_columns[1].button(
+                    "Open integration",
+                    width="stretch",
+                    key="catalog_open_concept_integration",
+                ):
+                    try:
+                        _load_catalog_integration_detail(selected_concept_integration, api_request=api_request)
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Loading integration from concept reuse view failed: {error}",
+                        }
+                        st.rerun()
+
+        st.write("**Version-level usage records**")
         st.dataframe(concept_detail.get("integrations", []), width="stretch", hide_index=True)

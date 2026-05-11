@@ -67,6 +67,189 @@ def test_mapping_set_reuse_block_reason_requires_approved_status() -> None:
     )
 
 
+def test_catalog_concept_reuse_rows_group_integrations_and_approval_state() -> None:
+    concept_detail = {
+        "concept_id": "customer.id",
+        "usage_count": 4,
+        "integrations": [
+            {
+                "integration_name": "Customer SAP to CRM",
+                "version": 3,
+                "status": "approved",
+                "artifact_type": "standard",
+                "source_system": "SAP",
+                "target_system": "CRM",
+                "business_domain": "Customer",
+                "owner": "team-a",
+            },
+            {
+                "integration_name": "Customer SAP to CRM",
+                "version": 2,
+                "status": "review",
+                "artifact_type": "standard",
+                "source_system": "SAP",
+                "target_system": "CRM",
+                "business_domain": "Customer",
+                "owner": "team-a",
+            },
+            {
+                "integration_name": "Customer Hub to Billing",
+                "version": 5,
+                "status": "approved",
+                "artifact_type": "canonical-only",
+                "source_system": "Hub",
+                "target_system": "Billing",
+                "business_domain": "Customer",
+                "owner": "team-b",
+            },
+            {
+                "integration_name": "Customer Hub to Billing",
+                "version": 4,
+                "status": "approved",
+                "artifact_type": "canonical-only",
+                "source_system": "Hub",
+                "target_system": "Billing",
+                "business_domain": "Customer",
+                "owner": "team-c",
+            },
+        ],
+    }
+
+    summary = catalog_views._catalog_concept_reuse_summary(concept_detail)
+    rows = catalog_views._catalog_concept_reuse_rows(concept_detail)
+
+    assert summary == {
+        "usage_count": 4,
+        "integration_count": 2,
+        "approved_integration_count": 2,
+        "source_system_count": 2,
+        "target_system_count": 2,
+    }
+    assert rows == [
+        {
+            "integration_name": "Customer Hub to Billing",
+            "source_system": "Hub",
+            "target_system": "Billing",
+            "business_domain": "Customer",
+            "usage_versions": 2,
+            "latest_version": 5,
+            "latest_approved_version": 5,
+            "approved_versions": 2,
+            "artifact_types": "canonical-only",
+            "owners": "team-b, team-c",
+            "status_mix": "approved=2",
+        },
+        {
+            "integration_name": "Customer SAP to CRM",
+            "source_system": "SAP",
+            "target_system": "CRM",
+            "business_domain": "Customer",
+            "usage_versions": 2,
+            "latest_version": 3,
+            "latest_approved_version": 3,
+            "approved_versions": 1,
+            "artifact_types": "standard",
+            "owners": "team-a",
+            "status_mix": "approved=1, review=1",
+        },
+    ]
+
+
+def test_catalog_system_pair_matrix_rows_builds_discovery_overview() -> None:
+    rows = catalog_views._catalog_system_pair_matrix_rows(
+        [
+            {
+                "integration_name": "Customer SAP to CRM",
+                "status": "approved",
+                "source_system": "SAP",
+                "target_system": "CRM",
+                "canonical_concepts": ["customer.id", "customer.name"],
+            },
+            {
+                "integration_name": "Customer SAP to CRM",
+                "status": "review",
+                "source_system": "SAP",
+                "target_system": "CRM",
+                "canonical_concepts": ["customer.id"],
+            },
+            {
+                "integration_name": "Vendor SAP to ERP",
+                "status": "approved",
+                "source_system": "SAP",
+                "target_system": "ERP",
+                "canonical_concepts": ["vendor.id"],
+            },
+            {
+                "integration_name": "CRM to Billing",
+                "status": "draft",
+                "source_system": "CRM",
+                "target_system": "Billing",
+                "canonical_concepts": ["customer.id"],
+            },
+        ]
+    )
+
+    assert rows == [
+        {
+            "source_system": "SAP",
+            "integration_count": 2,
+            "approved_integrations": 2,
+            "system_pair_count": 2,
+            "canonical_concept_hits": 4,
+            "Billing": 0,
+            "CRM": 1,
+            "ERP": 1,
+        },
+        {
+            "source_system": "CRM",
+            "integration_count": 1,
+            "approved_integrations": 0,
+            "system_pair_count": 1,
+            "canonical_concept_hits": 1,
+            "Billing": 1,
+            "CRM": 0,
+            "ERP": 0,
+        },
+    ]
+
+
+def test_catalog_result_reuse_hints_prefers_approved_peer_with_shared_concepts() -> None:
+    hints = catalog_views._catalog_result_reuse_hints(
+        [
+            {
+                "integration_name": "SAP Customer to CRM",
+                "status": "approved",
+                "source_system": "SAP",
+                "target_system": "CRM",
+                "canonical_concepts": ["customer.id", "customer.name", "customer.email"],
+            },
+            {
+                "integration_name": "Legacy Customer to CRM",
+                "status": "review",
+                "source_system": "LegacyERP",
+                "target_system": "CRM",
+                "canonical_concepts": ["customer.id", "customer.name", "customer.phone"],
+            },
+            {
+                "integration_name": "Vendor to ERP",
+                "status": "approved",
+                "source_system": "SAP",
+                "target_system": "ERP",
+                "canonical_concepts": ["vendor.id"],
+            },
+        ]
+    )
+
+    assert hints == {
+        "SAP Customer to CRM": "",
+        "Legacy Customer to CRM": (
+            "Similar approved integration exists: SAP Customer to CRM "
+            "(2 shared concepts; e.g. customer.id, customer.name)"
+        ),
+        "Vendor to ERP": "",
+    }
+
+
 def test_api_error_message_returns_backend_detail_for_governance_conflict() -> None:
     request = httpx.Request("POST", "http://testserver/mapping/sets/7/apply")
     response = httpx.Response(

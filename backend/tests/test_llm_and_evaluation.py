@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 from unittest.mock import patch
@@ -375,3 +376,54 @@ def test_evaluation_harness_reports_accuracy_and_bucket_metrics() -> None:
     assert metrics.total_fields == 4
     assert metrics.accuracy >= 0.75
     assert set(metrics.confidence_by_bucket.keys()) == {"high_confidence", "medium_confidence", "low_confidence"}
+
+
+def test_evaluation_harness_keeps_deterministic_metrics_same_with_or_without_description_context() -> None:
+    base_case = {
+        "source_columns": [
+            {
+                "name": "LIFNR",
+                "description": "Supplier account number",
+                "declared_type": "CHAR(10)",
+                "dtype": "object",
+                "sample_values": ["0000100001", "0000100002"],
+                "distinct_sample_values": ["0000100001", "0000100002"],
+                    "detected_patterns": ["numeric_id"],
+                "tokenized_name": ["vendor", "id"],
+            }
+        ],
+        "target_columns": [
+            {
+                "name": "supplier_id",
+                "description": "Unique supplier identifier",
+                "declared_type": "VARCHAR(10)",
+                "dtype": "object",
+                "sample_values": ["0000100001", "0000100002"],
+                "distinct_sample_values": ["0000100001", "0000100002"],
+                    "detected_patterns": ["numeric_id"],
+                "tokenized_name": ["supplier", "id"],
+            },
+            {
+                "name": "supplier_name",
+                "description": "Supplier display name",
+                "declared_type": "VARCHAR(80)",
+                "dtype": "object",
+                "sample_values": ["Acme GmbH", "Contoso LLC"],
+                "distinct_sample_values": ["Acme GmbH", "Contoso LLC"],
+                "detected_patterns": ["text"],
+                "tokenized_name": ["supplier", "name"],
+            },
+        ],
+        "ground_truth": {"LIFNR": "supplier_id"},
+    }
+    description_blind_case = copy.deepcopy(base_case)
+    for column in description_blind_case["source_columns"] + description_blind_case["target_columns"]:
+        column["description"] = ""
+        column["declared_type"] = ""
+
+    metrics_with_context = evaluate_cases([base_case])
+    metrics_without_context = evaluate_cases([description_blind_case])
+
+    assert metrics_with_context.accuracy == metrics_without_context.accuracy
+    assert metrics_with_context.top1_accuracy == metrics_without_context.top1_accuracy
+    assert metrics_with_context.correct_matches == metrics_without_context.correct_matches

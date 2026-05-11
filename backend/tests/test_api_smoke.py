@@ -12,11 +12,11 @@ from openpyxl import Workbook
 
 from app.core.config import settings
 from app.main import app
-from app.models.mapping import CanonicalGapSuggestion
+from app.models.mapping import CanonicalGapSuggestion, MappingJobStatusResponse
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.llm_service import StaticLLMProvider
-from app.services.mapping_job_service import mapping_job_store
+from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 from app.services.upload_store import dataset_store
@@ -388,6 +388,44 @@ def test_auto_map_accepts_every_row_format_pair(source_format: str, target_forma
     assert upload_response.status_code == 200
     payload = upload_response.json()
     assert payload["source"]["schema_profile"]["columns"][0]["name"] == "client_mail"
+
+
+def test_auto_map_job_returns_429_when_job_capacity_is_reached() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": (
+                "source.csv",
+                csv_bytes("client_mail,primary_phone\nana@example.com,0641234567\n"),
+                "text/csv",
+            ),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_email,phone_number\nana@example.com,0641234567\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+
+    with patch(
+        "app.api.routes.mapping.mapping_job_store.start",
+        side_effect=MappingJobCapacityError("Too many active mapping jobs (4/4). Try again after current jobs finish."),
+    ):
+        response = client.post(
+            "/mapping/auto/jobs",
+            json={
+                "source_dataset_id": payload["source"]["dataset_id"],
+                "target_dataset_id": payload["target"]["dataset_id"],
+                "use_llm": False,
+            },
+        )
+
+    assert response.status_code == 429
+    assert "Too many active mapping jobs" in response.json()["detail"]
+    assert response.headers["Retry-After"] == "5"
     assert payload["target"]["schema_profile"]["columns"][0]["name"] == "customer_email"
 
     map_response = client.post(
@@ -402,6 +440,24 @@ def test_auto_map_accepts_every_row_format_pair(source_format: str, target_forma
     mappings = {item["source"]: item["target"] for item in map_response.json()["mappings"]}
     assert mappings["client_mail"] == "customer_email"
     assert mappings["primary_phone"] == "phone_number"
+
+
+def test_cancel_mapping_job_endpoint_returns_cancel_requested_status() -> None:
+    with patch(
+        "app.api.routes.mapping.mapping_job_store.cancel",
+        return_value=MappingJobStatusResponse(
+            job_id="job-123",
+            status="cancel_requested",
+            activity=["12:00:00 | Cancellation requested; the current step will stop at the next progress checkpoint."],
+            response=None,
+            error=None,
+        ),
+    ):
+        response = client.post("/mapping/jobs/job-123/cancel")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancel_requested"
+    assert "Cancellation requested" in response.json()["activity"][0]
 
 
 def test_auto_map_accepts_multi_table_selection_on_both_sides() -> None:

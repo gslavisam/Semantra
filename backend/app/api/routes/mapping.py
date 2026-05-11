@@ -33,7 +33,7 @@ from app.models.mapping import (
 )
 from app.services.llm_service import build_provider_from_settings, call_transformation_generator
 from app.services.codegen_service import generate_pandas_code
-from app.services.mapping_job_service import mapping_job_store
+from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.persistence_service import persistence_service
 from app.services.preview_service import build_preview
@@ -120,7 +120,14 @@ async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResp
             progress_callback=progress_callback,
         )
 
-    job = mapping_job_store.start(worker)
+    try:
+        job = mapping_job_store.start(worker)
+    except MappingJobCapacityError as error:
+        raise HTTPException(
+            status_code=429,
+            detail=str(error),
+            headers={"Retry-After": "5"},
+        ) from error
     return MappingJobStartResponse(job_id=job.job_id, status=job.status)
 
 
@@ -161,7 +168,14 @@ async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJo
             progress_callback=progress_callback,
         )
 
-    job = mapping_job_store.start(worker)
+    try:
+        job = mapping_job_store.start(worker)
+    except MappingJobCapacityError as error:
+        raise HTTPException(
+            status_code=429,
+            detail=str(error),
+            headers={"Retry-After": "5"},
+        ) from error
     return MappingJobStartResponse(job_id=job.job_id, status=job.status)
 
 
@@ -169,6 +183,14 @@ async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJo
 async def get_mapping_job_status(job_id: str) -> MappingJobStatusResponse:
     try:
         return mapping_job_store.get_status(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=f"Mapping job not found: {job_id}") from error
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=MappingJobStatusResponse)
+async def cancel_mapping_job(job_id: str) -> MappingJobStatusResponse:
+    try:
+        return mapping_job_store.cancel(job_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=f"Mapping job not found: {job_id}") from error
 
