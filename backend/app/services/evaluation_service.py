@@ -1,9 +1,27 @@
 from __future__ import annotations
 
-from app.models.mapping import CorrectionImpactMetrics, EvaluationMetrics
+from contextlib import contextmanager
+
+from app.core.config import settings
+from app.models.mapping import CorrectionImpactMetrics, EvaluationMetrics, ScoringProfileComparisonResponse, ScoringProfileMetrics
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.correction_service import correction_store
-from app.services.mapping_service import generate_mapping_candidates
+from app.services.mapping_service import DEFAULT_SCORING_PROFILE, SCORING_PROFILES, generate_mapping_candidates, normalize_scoring_profile_name, resolve_scoring_weights
+
+
+@contextmanager
+def scoring_profile_context(profile_name: str, weight_overrides: dict[str, float] | None = None):
+    normalized_profile = normalize_scoring_profile_name(profile_name)
+    resolve_scoring_weights(normalized_profile, weight_overrides or {})
+    previous_profile = settings.scoring_profile
+    previous_overrides = dict(settings.scoring_weight_overrides)
+    try:
+        settings.scoring_profile = normalized_profile
+        settings.scoring_weight_overrides = dict(weight_overrides or {})
+        yield
+    finally:
+        settings.scoring_profile = previous_profile
+        settings.scoring_weight_overrides = previous_overrides
 
 
 def evaluate_cases(cases: list[dict], llm_provider=None) -> EvaluationMetrics:
@@ -74,6 +92,88 @@ def evaluate_correction_impact(cases: list[dict], llm_provider=None) -> Correcti
         accuracy_delta=round(correction_aware.accuracy - baseline.accuracy, 4),
         top1_accuracy_delta=round(correction_aware.top1_accuracy - baseline.top1_accuracy, 4),
         correct_matches_delta=correction_aware.correct_matches - baseline.correct_matches,
+    )
+
+
+def evaluate_cases_for_profile(
+    cases: list[dict],
+    profile_name: str,
+    *,
+    llm_provider=None,
+    weight_overrides: dict[str, float] | None = None,
+) -> EvaluationMetrics:
+    with scoring_profile_context(profile_name, weight_overrides):
+        return evaluate_cases(cases, llm_provider=llm_provider)
+
+
+def compare_scoring_profiles(
+    cases: list[dict],
+    *,
+    profile_names: list[str] | None = None,
+    llm_provider=None,
+) -> dict[str, EvaluationMetrics]:
+    resolved_profile_names = [normalize_scoring_profile_name(name) for name in (profile_names or list(SCORING_PROFILES.keys()))]
+    comparison: dict[str, EvaluationMetrics] = {}
+    for profile_name in resolved_profile_names:
+        comparison[profile_name] = evaluate_cases_for_profile(cases, profile_name, llm_provider=llm_provider)
+    return comparison
+
+
+def recommend_scoring_profile(comparison: dict[str, EvaluationMetrics]) -> tuple[str | None, str]:
+    if not comparison:
+        return None, "No scoring profiles were compared."
+
+    ranked_profiles = sorted(
+        comparison.items(),
+        key=lambda item: (
+            item[1].accuracy,
+            item[1].top1_accuracy,
+            item[1].correct_matches,
+            item[0] == DEFAULT_SCORING_PROFILE,
+        ),
+        reverse=True,
+    )
+    top_name, top_metrics = ranked_profiles[0]
+    ties = [
+        name
+        for name, metrics in ranked_profiles
+        if metrics.accuracy == top_metrics.accuracy
+        and metrics.top1_accuracy == top_metrics.top1_accuracy
+        and metrics.correct_matches == top_metrics.correct_matches
+    ]
+    if len(ties) == 1:
+        return top_name, f"Unique best profile on this benchmark: {top_name}."
+    if DEFAULT_SCORING_PROFILE in ties:
+        return DEFAULT_SCORING_PROFILE, (
+            "No decisive benchmark winner across compared profiles; keep balanced as the default because it ties "
+            "for best metrics and preserves existing behavior."
+        )
+    return None, "No decisive benchmark winner across compared profiles; choose based on scenario rather than fixture-only metrics."
+
+
+def build_scoring_profile_comparison_response(
+    cases: list[dict],
+    *,
+    profile_names: list[str] | None = None,
+    llm_provider=None,
+) -> ScoringProfileComparisonResponse:
+    comparison = compare_scoring_profiles(cases, profile_names=profile_names, llm_provider=llm_provider)
+    recommended_profile, recommendation_reason = recommend_scoring_profile(comparison)
+    return ScoringProfileComparisonResponse(
+        profiles=[
+            ScoringProfileMetrics(
+                profile=profile_name,
+                total_cases=metrics.total_cases,
+                total_fields=metrics.total_fields,
+                correct_matches=metrics.correct_matches,
+                top1_accuracy=metrics.top1_accuracy,
+                accuracy=metrics.accuracy,
+                confidence_by_bucket=dict(metrics.confidence_by_bucket),
+            )
+            for profile_name, metrics in comparison.items()
+        ],
+        recommended_profile=recommended_profile,
+        recommendation_reason=recommendation_reason,
     )
 
 

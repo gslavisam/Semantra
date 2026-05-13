@@ -10,7 +10,7 @@ import pytest
 from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.decision_log_service import decision_log_store
-from app.services.evaluation_service import evaluate_cases
+from app.services.evaluation_service import compare_scoring_profiles, evaluate_cases, evaluate_cases_for_profile
 from app.services.llm_service import (
     StaticLLMProvider,
     build_transformation_generator_prompt,
@@ -212,9 +212,16 @@ def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -
 
         result = generate_mapping_candidates(source_schema, target_schema, llm_provider=provider)
         logs = decision_log_store.list_entries()
+        breakdown = next(line for line in result.mappings[0].explanation if line.startswith("Signal breakdown:"))
+        proposition = result.mappings[0].llm_decision_proposition
 
         assert result.mappings[0].method == "llm_validated"
         assert any("LLM validator" in line for line in result.mappings[0].explanation)
+        assert "llm=0.76" in breakdown
+        assert proposition is not None
+        assert proposition.proposition_type == "confirm"
+        assert proposition.proposed_target == "phone_number"
+        assert proposition.applied_to_final_decision is True
         assert len(logs) == 1
         assert logs[0].used_llm is True
         assert logs[0].llm_result is not None
@@ -328,7 +335,7 @@ def test_llm_override_is_explained_when_global_assignment_picks_a_different_targ
         columns=[customer, customer_id, customer_segment],
     )
 
-    def fake_rankings(source_column, _targets):
+    def fake_rankings(source_column, _targets, target_embedding_cache=None):
         if source_column.name == "LEGACY_CUST":
             return [
                 CandidateScore(customer, customer, 0.6119, ScoringSignals(), [], set()),
@@ -360,6 +367,11 @@ def test_llm_override_is_explained_when_global_assignment_picks_a_different_targ
     assert purchaser.llm_consulted is True
     assert purchaser.llm_recommendation is not None
     assert purchaser.llm_recommendation.selected_target == "customer"
+    assert purchaser.llm_decision_proposition is not None
+    assert purchaser.llm_decision_proposition.proposition_type == "challenge"
+    assert purchaser.llm_decision_proposition.proposed_target == "customer"
+    assert purchaser.llm_decision_proposition.final_target == "customer_id"
+    assert purchaser.llm_decision_proposition.applied_to_final_decision is False
     assert any(
         "LLM validator preferred 'customer', but global one-to-one assignment selected this target instead." == line
         for line in purchaser.explanation
@@ -427,3 +439,31 @@ def test_evaluation_harness_keeps_deterministic_metrics_same_with_or_without_des
     assert metrics_with_context.accuracy == metrics_without_context.accuracy
     assert metrics_with_context.top1_accuracy == metrics_without_context.top1_accuracy
     assert metrics_with_context.correct_matches == metrics_without_context.correct_matches
+
+
+def test_evaluate_cases_for_profile_restores_global_scoring_settings() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "mapping_gold.json"
+    cases = json.loads(fixture_path.read_text(encoding="utf-8"))
+    previous_profile = settings.scoring_profile
+    previous_overrides = dict(settings.scoring_weight_overrides)
+    settings.scoring_profile = "balanced"
+    settings.scoring_weight_overrides = {"knowledge": 0.33}
+    try:
+        metrics = evaluate_cases_for_profile(cases, "canonical_first")
+
+        assert metrics.total_cases == 3
+        assert settings.scoring_profile == "balanced"
+        assert settings.scoring_weight_overrides == {"knowledge": 0.33}
+    finally:
+        settings.scoring_profile = previous_profile
+        settings.scoring_weight_overrides = previous_overrides
+
+
+def test_compare_scoring_profiles_returns_requested_profiles() -> None:
+    fixture_path = Path(__file__).parent / "fixtures" / "mapping_gold.json"
+    cases = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    comparison = compare_scoring_profiles(cases, profile_names=["balanced", "canonical_first"])
+
+    assert set(comparison) == {"balanced", "canonical_first"}
+    assert all(metrics.total_cases == 3 for metrics in comparison.values())

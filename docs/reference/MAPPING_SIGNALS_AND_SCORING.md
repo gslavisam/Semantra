@@ -57,9 +57,19 @@ The exposed signal fields are:
 - `correction`
 - `llm`
 
-## Score Weights
+## Score Profiles And Weights
 
-The current weight table is defined in `mapping_service.py` as:
+Semantra no longer relies on a single hardcoded global weight vector.
+
+The active profile is selected through `SEMANTRA_SCORING_PROFILE` in `backend/.env`.
+Available built-in profiles are:
+
+- `balanced`
+- `schema_only`
+- `data_rich`
+- `canonical_first`
+
+The default `balanced` profile preserves the original runtime behavior:
 
 | Signal | Weight |
 |---|---:|
@@ -74,7 +84,20 @@ The current weight table is defined in `mapping_service.py` as:
 | `correction` | `0.10` |
 | `llm` | `0.05` |
 
-These weights do not mean every signal is always active.
+Profile intent:
+
+- `balanced`: current general-purpose default for mixed source/target mapping
+- `schema_only`: emphasizes lexical, semantic, knowledge, and canonical evidence when instance-level data is sparse
+- `data_rich`: emphasizes value-shape, overlap, and statistical compatibility when representative samples exist
+- `canonical_first`: increases `knowledge` and `canonical` influence for concept-centric or canonical-heavy mapping programs
+
+Optional fine-tuning can be applied with `SEMANTRA_SCORING_WEIGHT_OVERRIDES` as a JSON object, for example:
+
+```json
+{"knowledge": 0.2, "canonical": 0.15}
+```
+
+These weights still do not mean every signal is always active.
 
 ## Signal Meanings
 

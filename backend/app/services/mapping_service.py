@@ -10,6 +10,7 @@ from app.models.mapping import (
     CandidateOption,
     CanonicalMappingDetails,
     DecisionLogEntry,
+    LLMDecisionProposition,
     LLMValidationResult,
     MappingCandidate,
     ScoringSignals,
@@ -25,21 +26,92 @@ from app.utils.normalization import semantic_token_set
 from app.utils.similarity import clamp_score, fuzzy_similarity, jaccard_similarity, score_distance
 
 
-WEIGHTS = {
-    "name": 0.20,
-    "semantic": 0.12,
-    "knowledge": 0.10,
-    "canonical": 0.05,
-    "pattern": 0.20,
-    "statistical": 0.15,
-    "overlap": 0.10,
-    "embedding": 0.12,
-    "correction": 0.10,
-    "llm": 0.05,
+DEFAULT_SCORING_PROFILE = "balanced"
+SCORING_PROFILES = {
+    "balanced": {
+        "name": 0.20,
+        "semantic": 0.12,
+        "knowledge": 0.10,
+        "canonical": 0.05,
+        "pattern": 0.20,
+        "statistical": 0.15,
+        "overlap": 0.10,
+        "embedding": 0.12,
+        "correction": 0.10,
+        "llm": 0.05,
+    },
+    "schema_only": {
+        "name": 0.22,
+        "semantic": 0.16,
+        "knowledge": 0.16,
+        "canonical": 0.10,
+        "pattern": 0.12,
+        "statistical": 0.08,
+        "overlap": 0.04,
+        "embedding": 0.14,
+        "correction": 0.10,
+        "llm": 0.05,
+    },
+    "data_rich": {
+        "name": 0.16,
+        "semantic": 0.10,
+        "knowledge": 0.10,
+        "canonical": 0.06,
+        "pattern": 0.20,
+        "statistical": 0.18,
+        "overlap": 0.16,
+        "embedding": 0.10,
+        "correction": 0.08,
+        "llm": 0.05,
+    },
+    "canonical_first": {
+        "name": 0.10,
+        "semantic": 0.12,
+        "knowledge": 0.22,
+        "canonical": 0.18,
+        "pattern": 0.12,
+        "statistical": 0.08,
+        "overlap": 0.05,
+        "embedding": 0.08,
+        "correction": 0.10,
+        "llm": 0.05,
+    },
 }
+WEIGHTS = SCORING_PROFILES[DEFAULT_SCORING_PROFILE]
+SIGNAL_WEIGHT_NAMES = tuple(WEIGHTS.keys())
+
+
+def normalize_scoring_profile_name(profile_name: str | None) -> str:
+    normalized = (profile_name or DEFAULT_SCORING_PROFILE).strip().lower().replace("-", "_")
+    return normalized or DEFAULT_SCORING_PROFILE
+
+
+def resolve_scoring_weights(
+    profile_name: str | None = None,
+    overrides: dict[str, float] | None = None,
+) -> dict[str, float]:
+    resolved_profile = normalize_scoring_profile_name(profile_name or settings.scoring_profile)
+    base_weights = SCORING_PROFILES.get(resolved_profile)
+    if base_weights is None:
+        available = ", ".join(sorted(SCORING_PROFILES))
+        raise ValueError(f"Unknown scoring profile '{resolved_profile}'. Available profiles: {available}.")
+
+    merged = dict(base_weights)
+    configured_overrides = overrides if overrides is not None else settings.scoring_weight_overrides
+    for signal_name, signal_weight in configured_overrides.items():
+        normalized_name = str(signal_name).strip().lower().replace("-", "_")
+        if normalized_name not in merged:
+            available = ", ".join(SIGNAL_WEIGHT_NAMES)
+            raise ValueError(f"Unknown scoring signal '{signal_name}' in overrides. Expected one of: {available}.")
+        merged[normalized_name] = float(signal_weight)
+        if merged[normalized_name] < 0:
+            raise ValueError(f"Scoring weight for '{normalized_name}' cannot be negative.")
+    return merged
+
 
 TOTAL_WEIGHT = sum(WEIGHTS.values())
 STRONG_CANONICAL_LLM_MARGIN = 0.05
+STRONG_IDENTIFIER_LLM_MIN_CONFIDENCE = 0.70
 ProgressCallback = Callable[[str], None]
 
 
@@ -126,6 +198,7 @@ def generate_mapping_candidates(
             continue
 
         if llm_result and llm_result.selected_target == "no_match":
+            considered_targets = [candidate.target.name for candidate in rankings[: settings.top_k_candidates]]
             selected = MappingCandidate(
                 source=source_column.name,
                 target=None,
@@ -142,6 +215,11 @@ def generate_mapping_candidates(
                 transformation_code=transformation_code,
                 llm_consulted=True,
                 llm_recommendation=llm_result,
+                llm_decision_proposition=build_llm_decision_proposition(
+                    llm_result,
+                    final_target=None,
+                    considered_targets=considered_targets,
+                ),
             )
             ranked_results.append(
                 SourceMappingResult(
@@ -170,6 +248,7 @@ def generate_mapping_candidates(
                 extra_explanation=extra_explanation,
                 alternatives=[candidate.target.name for candidate in rankings[1:settings.top_k_candidates]],
                 llm_result=llm_result,
+                considered_targets=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
             )
         else:
             extra_explanation: list[str] = []
@@ -192,6 +271,7 @@ def generate_mapping_candidates(
                     if candidate.target.name != selected_score.target.name
                 ],
                 llm_result=llm_result,
+                considered_targets=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
             )
         # Attach transformation_code if present
         if transformation_code:
@@ -332,6 +412,11 @@ def apply_llm_validation(
             candidate.score = compute_final_score(candidate.signals, candidate.active_signal_names)
             candidate.llm_result = llm_result
             candidate.llm_selected = True
+            refresh_signal_breakdown(candidate.explanation, candidate.signals)
+            if has_strong_identifier_consensus(candidate.signals, candidate.active_signal_names):
+                candidate.explanation.append(
+                    "Strong identifier consensus detected: business metadata, value behavior, and LLM confirmation all point to this target."
+                )
             candidate.explanation.extend(
                 ["LLM validator re-ranked this candidate within the closed candidate set."]
                 + [f"LLM: {reason}" for reason in llm_result.reasoning]
@@ -500,28 +585,57 @@ def is_strong_canonical_concept_match(target: ColumnProfile, knowledge_signal: f
 
 
 def compute_final_score(signals: ScoringSignals, active_signal_names: set[str] | None = None) -> float:
+    weights = resolve_scoring_weights()
     if active_signal_names is None:
         active_signal_names = {
             signal_name
-            for signal_name in WEIGHTS
+            for signal_name in weights
             if float(getattr(signals, signal_name, 0.0) or 0.0) != 0.0
         }
 
     raw_score = (
-        (signals.name * WEIGHTS["name"] if "name" in active_signal_names else 0.0)
-        + (signals.semantic * WEIGHTS["semantic"] if "semantic" in active_signal_names else 0.0)
-        + (signals.knowledge * WEIGHTS["knowledge"] if "knowledge" in active_signal_names else 0.0)
-        + (signals.canonical * WEIGHTS["canonical"] if "canonical" in active_signal_names else 0.0)
-        + (signals.pattern * WEIGHTS["pattern"] if "pattern" in active_signal_names else 0.0)
-        + (signals.statistical * WEIGHTS["statistical"] if "statistical" in active_signal_names else 0.0)
-        + (signals.overlap * WEIGHTS["overlap"] if "overlap" in active_signal_names else 0.0)
-        + (signals.embedding * WEIGHTS["embedding"] if "embedding" in active_signal_names else 0.0)
-        + (signals.correction * WEIGHTS["correction"] if "correction" in active_signal_names else 0.0)
-        + (signals.llm * WEIGHTS["llm"] if "llm" in active_signal_names else 0.0)
+        (signals.name * weights["name"] if "name" in active_signal_names else 0.0)
+        + (signals.semantic * weights["semantic"] if "semantic" in active_signal_names else 0.0)
+        + (signals.knowledge * weights["knowledge"] if "knowledge" in active_signal_names else 0.0)
+        + (signals.canonical * weights["canonical"] if "canonical" in active_signal_names else 0.0)
+        + (signals.pattern * weights["pattern"] if "pattern" in active_signal_names else 0.0)
+        + (signals.statistical * weights["statistical"] if "statistical" in active_signal_names else 0.0)
+        + (signals.overlap * weights["overlap"] if "overlap" in active_signal_names else 0.0)
+        + (signals.embedding * weights["embedding"] if "embedding" in active_signal_names else 0.0)
+        + (signals.correction * weights["correction"] if "correction" in active_signal_names else 0.0)
+        + (signals.llm * weights["llm"] if "llm" in active_signal_names else 0.0)
     )
-    active_total_weight = sum(WEIGHTS[signal_name] for signal_name in active_signal_names)
+    active_total_weight = sum(weights[signal_name] for signal_name in active_signal_names)
     normalized_score = raw_score / active_total_weight if active_total_weight else 0.0
+    if has_strong_identifier_consensus(signals, active_signal_names):
+        return 1.0
     return round(clamp_score(normalized_score), 4)
+
+
+def has_strong_identifier_consensus(
+    signals: ScoringSignals,
+    active_signal_names: set[str] | None = None,
+) -> bool:
+    if active_signal_names is None:
+        active_signal_names = {
+            signal_name
+            for signal_name in SIGNAL_WEIGHT_NAMES
+            if float(getattr(signals, signal_name, 0.0) or 0.0) != 0.0
+        }
+
+    has_business_consensus = (
+        ("knowledge" in active_signal_names and signals.knowledge >= 0.95)
+        or ("canonical" in active_signal_names and signals.canonical >= 0.75)
+    )
+    has_value_consensus = (
+        "overlap" in active_signal_names
+        and signals.overlap >= 0.95
+        and "statistical" in active_signal_names
+        and signals.statistical >= 0.95
+    )
+    has_pattern_consensus = "pattern" not in active_signal_names or signals.pattern >= 0.95
+    has_llm_consensus = "llm" in active_signal_names and signals.llm >= STRONG_IDENTIFIER_LLM_MIN_CONFIDENCE
+    return has_business_consensus and has_value_consensus and has_pattern_consensus and has_llm_consensus
 
 
 def sample_overlap_score(source_values: set[str], target_values: set[str]) -> float:
@@ -600,6 +714,7 @@ def build_selected_mapping(
     extra_explanation: list[str],
     alternatives: list[str],
     llm_result: LLMValidationResult | None = None,
+    considered_targets: list[str] | None = None,
 ) -> MappingCandidate:
     return MappingCandidate(
         source=source_name,
@@ -614,6 +729,51 @@ def build_selected_mapping(
         alternatives=alternatives,
         llm_consulted=llm_result is not None,
         llm_recommendation=llm_result,
+        llm_decision_proposition=build_llm_decision_proposition(
+            llm_result,
+            final_target=score.target.name,
+            considered_targets=considered_targets or [score.target.name],
+        ),
+    )
+
+
+def build_llm_decision_proposition(
+    llm_result: LLMValidationResult | None,
+    *,
+    final_target: str | None,
+    considered_targets: list[str],
+) -> LLMDecisionProposition | None:
+    if llm_result is None:
+        return None
+
+    proposed_target = None if llm_result.selected_target == "no_match" else llm_result.selected_target
+    aligns_with_final = proposed_target == final_target if proposed_target is not None else final_target is None
+    if llm_result.selected_target == "no_match":
+        proposition_type = "no_match"
+        summary = "LLM proposes that no candidate in the closed set should be selected."
+    elif aligns_with_final:
+        proposition_type = "confirm"
+        summary = f"LLM supports the final target '{final_target}'."
+    else:
+        proposition_type = "challenge"
+        summary = (
+            f"LLM proposed '{proposed_target}', but the final selected target is '{final_target}'."
+            if final_target
+            else f"LLM proposed '{proposed_target}', but no final target was selected."
+        )
+
+    rejected_targets = [target_name for target_name in considered_targets if target_name != proposed_target]
+    return LLMDecisionProposition(
+        proposition_type=proposition_type,
+        proposed_target=proposed_target,
+        final_target=final_target,
+        confidence=round(llm_result.confidence, 4),
+        reasoning=list(llm_result.reasoning),
+        considered_targets=list(considered_targets),
+        rejected_targets=rejected_targets,
+        aligns_with_final=aligns_with_final,
+        applied_to_final_decision=aligns_with_final,
+        summary=summary,
     )
 
 
@@ -634,6 +794,24 @@ def log_decision(
             used_llm=llm_result is not None,
         )
     )
+
+
+def format_signal_breakdown(signals: ScoringSignals) -> str:
+    label_overrides = {"statistical": "stat"}
+    parts = []
+    for signal_name, signal_value in signals.model_dump().items():
+        label = label_overrides.get(signal_name, signal_name)
+        parts.append(f"{label}={signal_value:.2f}")
+    return "Signal breakdown: " + ", ".join(parts) + "."
+
+
+def refresh_signal_breakdown(explanation: list[str], signals: ScoringSignals) -> None:
+    breakdown = format_signal_breakdown(signals)
+    for index, line in enumerate(explanation):
+        if line.startswith("Signal breakdown:"):
+            explanation[index] = breakdown
+            return
+    explanation.append(breakdown)
 
 
 def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: ScoringSignals) -> list[str]:
@@ -694,11 +872,7 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
     if not explanation:
         explanation.append("Weak heuristic match; review recommended.")
 
-    explanation.append(
-        "Signal breakdown: "
-        f"name={signals.name:.2f}, semantic={signals.semantic:.2f}, knowledge={signals.knowledge:.2f}, canonical={signals.canonical:.2f}, pattern={signals.pattern:.2f}, "
-        f"stat={signals.statistical:.2f}, overlap={signals.overlap:.2f}, embedding={signals.embedding:.2f}, correction={signals.correction:.2f}."
-    )
+    explanation.append(format_signal_breakdown(signals))
     explanation.append(f"Candidate target: {target.name}.")
     return explanation
 

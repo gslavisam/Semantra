@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
 from app.core.config import settings
-from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, CorrectionImpactMetrics, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest
-from app.services.evaluation_service import evaluate_cases, evaluate_correction_impact
+from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, CorrectionImpactMetrics, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest, ScoringProfileComparisonResponse
+from app.services.evaluation_service import build_scoring_profile_comparison_response, evaluate_cases, evaluate_correction_impact
 from app.services.llm_service import build_provider_from_settings
 from app.services.persistence_service import persistence_service
 
@@ -67,6 +67,21 @@ async def run_saved_benchmark_correction_impact(
         raise HTTPException(status_code=404, detail=str(error)) from error
     llm_provider = build_provider_from_settings() if with_configured_llm else None
     return evaluate_correction_impact(cases, llm_provider=llm_provider)
+
+
+@router.post("/datasets/{dataset_id}/compare-profiles", response_model=ScoringProfileComparisonResponse, dependencies=[Depends(require_admin)])
+async def compare_saved_benchmark_profiles(
+    dataset_id: int,
+    with_configured_llm: bool = Query(default=False),
+    profiles: str = Query(default=""),
+) -> ScoringProfileComparisonResponse:
+    try:
+        cases = persistence_service.get_benchmark_dataset_cases(dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    llm_provider = build_provider_from_settings() if with_configured_llm else None
+    profile_names = [item.strip() for item in profiles.split(",") if item.strip()] or None
+    return build_scoring_profile_comparison_response(cases, profile_names=profile_names, llm_provider=llm_provider)
 
 
 @router.get("/runs", response_model=list[EvaluationRunRecord], dependencies=[Depends(require_admin)])

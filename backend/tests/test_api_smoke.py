@@ -3007,6 +3007,55 @@ def test_benchmark_dataset_endpoints_save_list_and_run_custom_benchmark() -> Non
     assert runs_response.json()[0]["dataset_id"] == dataset_id
 
 
+def test_saved_benchmark_profile_comparison_returns_metrics_and_recommendation() -> None:
+    settings.admin_api_token = "secret-token"
+
+    create_response = client.post(
+        "/evaluation/datasets",
+        json={
+            "name": "email-case",
+            "cases": [
+                {
+                    "source_columns": [
+                        {
+                            "name": "client_mail",
+                            "sample_values": ["ana@example.com"],
+                            "distinct_sample_values": ["ana@example.com"],
+                            "detected_patterns": ["email"],
+                            "unique_ratio": 1.0,
+                            "tokenized_name": ["client", "mail"],
+                        }
+                    ],
+                    "target_columns": [
+                        {
+                            "name": "customer_email",
+                            "sample_values": ["ana@example.com"],
+                            "distinct_sample_values": ["ana@example.com"],
+                            "detected_patterns": ["email"],
+                            "unique_ratio": 1.0,
+                            "tokenized_name": ["customer", "email"],
+                        }
+                    ],
+                    "ground_truth": {"client_mail": "customer_email"},
+                }
+            ],
+        },
+        headers=admin_headers(),
+    )
+    dataset_id = create_response.json()["dataset_id"]
+
+    compare_response = client.post(
+        f"/evaluation/datasets/{dataset_id}/compare-profiles?profiles=balanced,canonical_first",
+        headers=admin_headers(),
+    )
+
+    assert compare_response.status_code == 200
+    payload = compare_response.json()
+    assert {item["profile"] for item in payload["profiles"]} == {"balanced", "canonical_first"}
+    assert all(item["accuracy"] == 1.0 for item in payload["profiles"])
+    assert "recommendation_reason" in payload
+
+
 def test_saved_benchmark_correction_impact_reports_improvement_from_history() -> None:
     settings.admin_api_token = "secret-token"
 

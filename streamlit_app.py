@@ -269,7 +269,9 @@ def llm_runtime_enabled() -> bool:
     config = st.session_state.get("runtime_config_snapshot")
     if not config:
         return False
-    return str(config.get("llm_provider", "none")).strip().lower() != "none"
+    if str(config.get("llm_provider", "none")).strip().lower() == "none":
+        return False
+    return str(config.get("llm_status", "configured")).strip().lower() not in {"unreachable", "misconfigured"}
 
 
 def materialize_transformation_template(template: dict | None, source: str, target: str) -> str:

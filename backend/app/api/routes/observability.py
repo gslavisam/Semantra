@@ -14,6 +14,7 @@ from app.models.mapping import (
 )
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
+from app.services.llm_service import summarize_llm_runtime
 from app.services.persistence_service import persistence_service
 
 
@@ -58,11 +59,15 @@ async def promote_reusable_correction_rule(
 
 @router.get("/config", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])
 async def get_runtime_config() -> RuntimeConfigSnapshot:
-    return RuntimeConfigSnapshot.model_validate(settings_snapshot())
+    snapshot = settings_snapshot()
+    snapshot.update(summarize_llm_runtime())
+    return RuntimeConfigSnapshot.model_validate(snapshot)
 
 
 @router.post("/config/reload", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])
 async def reload_runtime_config() -> RuntimeConfigSnapshot:
     reloaded = reload_settings()
     persistence_service.reconfigure(reloaded.sqlite_path)
-    return RuntimeConfigSnapshot.model_validate(settings_snapshot())
+    snapshot = settings_snapshot()
+    snapshot.update(summarize_llm_runtime())
+    return RuntimeConfigSnapshot.model_validate(snapshot)

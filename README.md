@@ -99,7 +99,7 @@ The app supports bounded LLM use for validation, transformation generation, and 
 Example for LM Studio:
 
 - `SEMANTRA_LLM_PROVIDER=lmstudio`
-- `SEMANTRA_LLM_MODEL=<model-identifier>`
+- `SEMANTRA_LLM_MODEL=<model-identifier>` or `SEMANTRA_LLM_MODEL=auto`
 - `SEMANTRA_LMSTUDIO_BASE_URL=http://127.0.0.1:1234/v1/chat/completions`
 
 ### Scoring note
@@ -109,6 +109,9 @@ The mapping confidence score is a normalized multi-signal heuristic, not a calib
 - the final score is normalized into `0..1`
 - current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
 - treat the score as review prioritization, not as a guarantee that a mapping is correct
+- the active score profile is configurable via `SEMANTRA_SCORING_PROFILE` (`balanced`, `schema_only`, `data_rich`, `canonical_first`)
+- the active profile can be fine-tuned with `SEMANTRA_SCORING_WEIGHT_OVERRIDES` as a JSON object in `backend/.env`
+- compare built-in scoring profiles locally with `backend/scripts/run_scoring_profile_benchmark.py`
 
 For the detailed reference on signals, weights, confidence labels, and bounded LLM validation cases, see `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 

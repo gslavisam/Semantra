@@ -9,7 +9,7 @@ from app.models.knowledge import KnowledgeAuditEntry, KnowledgeOverlayEntry
 from app.models.mapping import DecisionLogEntry, EvaluationMetrics, ReusableCorrectionRule, TransformationTestCase, UserCorrectionEntry
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
-from app.services.llm_service import LMStudioProvider, OllamaProvider, OpenAIResponsesProvider, build_provider_from_settings
+from app.services.llm_service import LMStudioProvider, OllamaProvider, OpenAIResponsesProvider, build_provider_from_settings, summarize_llm_runtime
 from app.services.persistence_service import persistence_service
 
 
@@ -42,6 +42,19 @@ class RequestCaptureResponse(FakeHTTPResponse):
             }
         )
         return self
+
+
+class SequencedURLopener:
+    def __init__(self, *responses) -> None:
+        self._responses = list(responses)
+
+    def __call__(self, http_request, timeout=None):
+        if not self._responses:
+            raise AssertionError("No more fake HTTP responses configured")
+        response = self._responses.pop(0)
+        if callable(response):
+            return response(http_request, timeout=timeout)
+        return response
 
 
 def setup_function() -> None:
@@ -98,6 +111,44 @@ def test_provider_factory_builds_lmstudio_openai_compatible_provider() -> None:
         assert provider.model == "local-model"
     finally:
         settings.llm_provider, settings.llm_model, settings.lmstudio_base_url, settings.openai_api_key = previous
+
+
+def test_lmstudio_provider_auto_discovers_model_when_configured_as_auto() -> None:
+    captured_requests: list[dict] = []
+    provider = LMStudioProvider(model="auto", base_url="http://127.0.0.1:1234/v1")
+
+    with patch(
+        "app.services.llm_service.request.urlopen",
+        new=SequencedURLopener(
+            FakeHTTPResponse({"data": [{"id": "nvidia/nemotron-3-nano-4b"}]}),
+            RequestCaptureResponse({"choices": [{"message": {"content": "OK"}}]}, captured_requests),
+        ),
+    ):
+        result = provider.generate("prompt", timeout_seconds=1.0)
+
+    assert result == "OK"
+    assert captured_requests
+    assert captured_requests[0]["full_url"] == "http://127.0.0.1:1234/v1/chat/completions"
+    assert '"model": "nvidia/nemotron-3-nano-4b"' in captured_requests[0]["body"]
+
+
+def test_summarize_llm_runtime_reports_missing_lmstudio_model() -> None:
+    previous = (settings.llm_provider, settings.llm_model, settings.lmstudio_base_url)
+    settings.llm_provider = "lmstudio"
+    settings.llm_model = "gemma-4-e2b-it"
+    settings.lmstudio_base_url = "http://127.0.0.1:1234/v1"
+    try:
+        with patch(
+            "app.services.llm_service.request.urlopen",
+            return_value=FakeHTTPResponse({"data": [{"id": "nvidia/nemotron-3-nano-4b"}]}),
+        ):
+            snapshot = summarize_llm_runtime()
+
+        assert snapshot["llm_status"] == "misconfigured"
+        assert snapshot["llm_reachable"] is True
+        assert snapshot["llm_resolved_model"] == "nvidia/nemotron-3-nano-4b"
+    finally:
+        settings.llm_provider, settings.llm_model, settings.lmstudio_base_url = previous
 
 
 def test_openai_compatible_provider_omits_authorization_when_api_key_is_empty() -> None:
@@ -507,18 +558,22 @@ def test_settings_can_be_loaded_from_dotenv_file() -> None:
     dotenv_path.write_text(
         "SEMANTRA_LLM_PROVIDER=ollama\n"
         "SEMANTRA_LLM_MODEL=gemma3\n"
+        "SEMANTRA_SCORING_PROFILE=canonical_first\n"
+        'SEMANTRA_SCORING_WEIGHT_OVERRIDES={"knowledge": 0.25, "canonical": 0.2}\n'
         "SEMANTRA_CORS_ORIGINS=http://localhost:3000,http://localhost:5173\n",
         encoding="utf-8",
     )
-    previous = (settings.llm_provider, settings.llm_model, list(settings.cors_origins))
+    previous = (settings.llm_provider, settings.llm_model, settings.scoring_profile, dict(settings.scoring_weight_overrides), list(settings.cors_origins))
     try:
         loaded = reload_settings(dotenv_path)
         assert loaded.llm_provider == "ollama"
         assert loaded.llm_model == "gemma3"
+        assert loaded.scoring_profile == "canonical_first"
+        assert loaded.scoring_weight_overrides == {"knowledge": 0.25, "canonical": 0.2}
         assert loaded.cors_origins == ["http://localhost:3000", "http://localhost:5173"]
     finally:
         dotenv_path.unlink(missing_ok=True)
-        settings.llm_provider, settings.llm_model, settings.cors_origins = previous
+        settings.llm_provider, settings.llm_model, settings.scoring_profile, settings.scoring_weight_overrides, settings.cors_origins = previous
 
 
 def test_benchmark_datasets_roundtrip_through_persistence() -> None:

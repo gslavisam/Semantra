@@ -152,9 +152,10 @@ def display_trust_layer(
         with col2:
             st.success(f"Target: **{mapping.get('target') or '—'}**")
             llm_recommendation = mapping.get("llm_recommendation") or {}
+            llm_decision_proposition = mapping.get("llm_decision_proposition") or {}
             if mapping.get("llm_consulted") and llm_recommendation:
                 llm_target = llm_recommendation.get("selected_target") or "unmapped"
-                llm_confidence = int(float(llm_recommendation.get("confidence", 0.0) or 0.0) * 100)
+                llm_confidence = round(float(llm_recommendation.get("confidence", 0.0) or 0.0) * 100)
                 if llm_target != (mapping.get("target") or ""):
                     st.caption(
                         f"LLM consulted: recommended {llm_target} ({llm_confidence}%), but the final target differs after global assignment."
@@ -171,7 +172,7 @@ def display_trust_layer(
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
         with col3:
             score = mapping.get("confidence", 0.0)
-            st.metric("Confidence", f"{int(score * 100)}%")
+            st.metric("Confidence", f"{round(float(score or 0.0) * 100)}%")
             st.progress(score)
         with st.expander(f"⚙️ Details and Transformation for {source}"):
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
@@ -185,11 +186,30 @@ def display_trust_layer(
             else:
                 st.write("No explanation provided.")
 
+            if mapping.get("llm_consulted") and llm_decision_proposition:
+                st.write("**LLM decision proposition:**")
+                st.write(f"- Summary: {llm_decision_proposition.get('summary') or 'LLM provided an additional decision proposition.'}")
+                st.write(f"- Proposition type: {llm_decision_proposition.get('proposition_type') or 'n/a'}")
+                st.write(
+                    f"- Proposed target: {llm_decision_proposition.get('proposed_target') or 'no_match'} | "
+                    f"Final target: {llm_decision_proposition.get('final_target') or 'unmapped'} | "
+                    f"Confidence: {round(float(llm_decision_proposition.get('confidence', 0.0) or 0.0) * 100)}%"
+                )
+                st.write(
+                    f"- Applied to final decision: {'yes' if llm_decision_proposition.get('applied_to_final_decision') else 'no'}"
+                )
+                considered_targets = llm_decision_proposition.get("considered_targets") or []
+                if considered_targets:
+                    st.write(f"- Considered targets: {', '.join(str(item) for item in considered_targets)}")
+                rejected_targets = llm_decision_proposition.get("rejected_targets") or []
+                if rejected_targets:
+                    st.write(f"- Rejected targets: {', '.join(str(item) for item in rejected_targets)}")
+
             if mapping.get("llm_consulted") and llm_recommendation:
                 st.write("**LLM review:**")
                 st.write(
                     f"- Recommended target: {llm_recommendation.get('selected_target') or 'unmapped'} "
-                    f"({int(float(llm_recommendation.get('confidence', 0.0) or 0.0) * 100)}%)"
+                    f"({round(float(llm_recommendation.get('confidence', 0.0) or 0.0) * 100)}%)"
                 )
                 for reason_line in llm_recommendation.get("reasoning", []) or []:
                     st.write(f"- LLM: {reason_line}")

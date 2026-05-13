@@ -78,13 +78,24 @@ def render_llm_runtime_status() -> None:
 
     llm_provider = str(config.get("llm_provider", "none")).strip() or "none"
     llm_model = str(config.get("llm_model", "")).strip() or "n/a"
+    llm_status = str(config.get("llm_status", "configured")).strip().lower() or "configured"
+    llm_status_detail = str(config.get("llm_status_detail", "")).strip()
+    resolved_model = str(config.get("llm_resolved_model", "")).strip() or llm_model
     gate_min = config.get("llm_gate_min_score", "?")
     gate_max = config.get("llm_gate_max_score", "?")
 
     if llm_provider.lower() == "none":
         st.warning("LLM is currently disabled.")
+    elif llm_status == "reachable":
+        st.success(f"LLM reachable: {llm_provider} / {resolved_model}")
+    elif llm_status == "misconfigured":
+        st.error(f"LLM reachable, but configured model is unavailable: {llm_provider} / {llm_model}")
+    elif llm_status == "unreachable":
+        st.error(f"LLM configured but unreachable: {llm_provider} / {llm_model}")
     else:
-        st.success(f"LLM active: {llm_provider} / {llm_model}")
+        st.info(f"LLM configured: {llm_provider} / {llm_model}")
+    if llm_status_detail:
+        st.caption(llm_status_detail)
     st.caption(f"Ambiguity gate: {gate_min} - {gate_max}")
 
 

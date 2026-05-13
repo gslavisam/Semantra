@@ -70,6 +70,19 @@ class LLMValidationResult(BaseModel):
     raw_response: str | None = None
 
 
+class LLMDecisionProposition(BaseModel):
+    proposition_type: Literal["confirm", "challenge", "no_match"]
+    proposed_target: str | None = None
+    final_target: str | None = None
+    confidence: float = 0.0
+    reasoning: list[str] = Field(default_factory=list)
+    considered_targets: list[str] = Field(default_factory=list)
+    rejected_targets: list[str] = Field(default_factory=list)
+    aligns_with_final: bool = False
+    applied_to_final_decision: bool = False
+    summary: str = ""
+
+
 class MappingCandidate(BaseModel):
     source: str
     target: str | None = None
@@ -84,6 +97,7 @@ class MappingCandidate(BaseModel):
     transformation_code: str | None = None
     llm_consulted: bool = False
     llm_recommendation: LLMValidationResult | None = None
+    llm_decision_proposition: LLMDecisionProposition | None = None
 
 
 class SourceMappingResult(BaseModel):
@@ -481,6 +495,11 @@ class RuntimeConfigSnapshot(BaseModel):
     llm_model: str
     llm_timeout_seconds: float
     lmstudio_base_url: str
+    scoring_profile: str = "balanced"
+    llm_status: str = "configured"
+    llm_reachable: bool | None = None
+    llm_status_detail: str = ""
+    llm_resolved_model: str = ""
     embedding_provider: str
     cors_origins: list[str] = Field(default_factory=list)
     sqlite_path: str
@@ -509,6 +528,22 @@ class EvaluationMetrics(BaseModel):
     top1_accuracy: float
     accuracy: float
     confidence_by_bucket: dict[str, float] = Field(default_factory=dict)
+
+
+class ScoringProfileMetrics(BaseModel):
+    profile: str
+    total_cases: int
+    total_fields: int
+    correct_matches: int
+    top1_accuracy: float
+    accuracy: float
+    confidence_by_bucket: dict[str, float] = Field(default_factory=dict)
+
+
+class ScoringProfileComparisonResponse(BaseModel):
+    profiles: list[ScoringProfileMetrics] = Field(default_factory=list)
+    recommended_profile: str | None = None
+    recommendation_reason: str = ""
 
 
 class CorrectionImpactMetrics(BaseModel):

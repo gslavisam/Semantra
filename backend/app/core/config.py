@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,8 @@ class Settings:
     top_k_candidates: int = 3
     embedding_provider: str = "none"
     embedding_dimensions: int = 24
+    scoring_profile: str = "balanced"
+    scoring_weight_overrides: dict[str, float] = field(default_factory=dict)
     llm_provider: str = "none"
     llm_model: str = "mock-validator"
     llm_timeout_seconds: float = 30.0
@@ -68,6 +71,7 @@ def settings_snapshot() -> dict[str, Any]:
         "llm_timeout_seconds": settings.llm_timeout_seconds,
         "lmstudio_base_url": settings.lmstudio_base_url,
         "embedding_provider": settings.embedding_provider,
+        "scoring_profile": settings.scoring_profile,
         "cors_origins": list(settings.cors_origins),
         "sqlite_path": settings.sqlite_path,
         "llm_gate_min_score": settings.llm_gate_min_score,
@@ -95,6 +99,25 @@ def coerce_value(raw_value: str, annotation: Any) -> Any:
     origin = get_origin(annotation)
     if origin is list:
         return [item.strip() for item in raw_value.split(",") if item.strip()]
+    if origin is dict:
+        if not raw_value.strip():
+            return {}
+        parsed = json.loads(raw_value)
+        if not isinstance(parsed, dict):
+            raise ValueError("Expected JSON object for dict setting")
+        _, value_type = get_args(annotation) or (str, Any)
+        coerced: dict[str, Any] = {}
+        for key, value in parsed.items():
+            normalized_key = str(key).strip()
+            if value_type is float:
+                coerced[normalized_key] = float(value)
+            elif value_type is int:
+                coerced[normalized_key] = int(value)
+            elif value_type is bool:
+                coerced[normalized_key] = bool(value)
+            else:
+                coerced[normalized_key] = value
+        return coerced
     if annotation is int:
         return int(raw_value)
     if annotation is float:

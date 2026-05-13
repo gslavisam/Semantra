@@ -4,7 +4,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
-from urllib import request
+from urllib import parse, request
 from urllib.error import URLError
 from typing import Callable, Protocol
 
@@ -89,19 +89,65 @@ class LMStudioProvider:
     Use this instead of OpenAIResponsesProvider which targets the newer /v1/responses API.
     """
 
-    model: str
+    model: str | None
     base_url: str
 
+    def _chat_url(self) -> str:
+        parsed_url = parse.urlparse(self.base_url)
+        path = parsed_url.path.rstrip("/")
+        if path.endswith("/chat/completions"):
+            chat_path = path
+        elif path.endswith("/v1"):
+            chat_path = f"{path}/chat/completions"
+        else:
+            chat_path = "/v1/chat/completions"
+        return parse.urlunparse(parsed_url._replace(path=chat_path, params="", query="", fragment=""))
+
+    def _models_url(self) -> str:
+        parsed_url = parse.urlparse(self.base_url)
+        models_path = parsed_url.path.rstrip("/")
+        if models_path.endswith("/chat/completions"):
+            models_path = models_path[: -len("/chat/completions")] + "/models"
+        elif models_path.endswith("/v1"):
+            models_path = f"{models_path}/models"
+        else:
+            models_path = "/v1/models"
+        return parse.urlunparse(parsed_url._replace(path=models_path, params="", query="", fragment=""))
+
+    def list_models(self, timeout_seconds: float) -> list[str]:
+        with request.urlopen(self._models_url(), timeout=timeout_seconds) as response:
+            body = json.loads(response.read().decode("utf-8"))
+
+        candidates = body.get("data") or []
+        model_ids: list[str] = []
+        for candidate in candidates:
+            model_id = str(candidate.get("id", "")).strip()
+            if model_id:
+                model_ids.append(model_id)
+
+        if model_ids:
+            return model_ids
+
+        raise ValueError("LM Studio did not return any available model IDs")
+
+    def _resolve_model(self, timeout_seconds: float) -> str:
+        configured_model = (self.model or "").strip()
+        if configured_model and configured_model.lower() != "auto":
+            return configured_model
+
+        return self.list_models(timeout_seconds)[0]
+
     def generate(self, prompt: str, timeout_seconds: float) -> str:
+        model = self._resolve_model(timeout_seconds)
         payload = json.dumps(
             {
-                "model": self.model,
+                "model": model,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0,
             }
         ).encode("utf-8")
         http_request = request.Request(
-            self.base_url,
+            self._chat_url(),
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST",
@@ -109,6 +155,77 @@ class LMStudioProvider:
         with request.urlopen(http_request, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
         return body["choices"][0]["message"]["content"]
+
+
+def summarize_llm_runtime() -> dict[str, object]:
+    provider_name = settings.llm_provider.strip().lower() or "none"
+    configured_model = settings.llm_model.strip() or "n/a"
+
+    snapshot: dict[str, object] = {
+        "llm_status": "disabled",
+        "llm_reachable": False,
+        "llm_status_detail": "LLM is disabled in backend configuration.",
+        "llm_resolved_model": configured_model,
+    }
+    if provider_name == "none":
+        return snapshot
+
+    snapshot.update(
+        {
+            "llm_status": "configured",
+            "llm_reachable": None,
+            "llm_status_detail": "LLM is configured, but live reachability is not verified for this provider.",
+        }
+    )
+
+    if provider_name != "lmstudio":
+        return snapshot
+
+    provider = LMStudioProvider(model=settings.llm_model, base_url=settings.lmstudio_base_url)
+    probe_timeout = max(0.5, min(settings.llm_timeout_seconds, 2.0))
+    try:
+        available_models = provider.list_models(probe_timeout)
+    except Exception as error:
+        snapshot.update(
+            {
+                "llm_status": "unreachable",
+                "llm_reachable": False,
+                "llm_status_detail": f"{classify_llm_error(error)}: {error}",
+            }
+        )
+        return snapshot
+
+    if not configured_model or configured_model.lower() == "auto":
+        snapshot.update(
+            {
+                "llm_status": "reachable",
+                "llm_reachable": True,
+                "llm_status_detail": "LM Studio is reachable and at least one model is available.",
+                "llm_resolved_model": available_models[0],
+            }
+        )
+        return snapshot
+
+    if configured_model in available_models:
+        snapshot.update(
+            {
+                "llm_status": "reachable",
+                "llm_reachable": True,
+                "llm_status_detail": "LM Studio is reachable and the configured model is available.",
+                "llm_resolved_model": configured_model,
+            }
+        )
+        return snapshot
+
+    snapshot.update(
+        {
+            "llm_status": "misconfigured",
+            "llm_reachable": True,
+            "llm_status_detail": f"Configured model '{configured_model}' is not currently reported by LM Studio.",
+            "llm_resolved_model": available_models[0],
+        }
+    )
+    return snapshot
 
 
 @dataclass

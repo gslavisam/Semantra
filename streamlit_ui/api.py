@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import time
+
 import httpx
 import streamlit as st
 from typing import Any
 
 
 DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
+RUNTIME_CONFIG_REFRESH_SECONDS = 5.0
 
 
 def api_request(
@@ -177,6 +180,7 @@ def refresh_admin_requirement() -> None:
         response.raise_for_status()
         payload = response.json()
         st.session_state["runtime_config_snapshot"] = payload
+        st.session_state["runtime_config_snapshot_refreshed_at"] = time.time()
         st.session_state["admin_requirement"] = {
             "requires_token": bool(payload.get("admin_api_token_configured", False)),
             "reachable": True,
@@ -184,6 +188,7 @@ def refresh_admin_requirement() -> None:
     except httpx.HTTPError:
         st.session_state["admin_requirement"] = {"requires_token": True, "reachable": False}
         st.session_state.pop("runtime_config_snapshot", None)
+        st.session_state.pop("runtime_config_snapshot_refreshed_at", None)
 
 
 def admin_token_required() -> bool:
@@ -193,7 +198,9 @@ def admin_token_required() -> bool:
     )
     cached_signature = st.session_state.get("admin_requirement_signature")
     requirement = st.session_state.get("admin_requirement", {"requires_token": True, "reachable": False})
-    if cached_signature != current_signature or not requirement.get("reachable", False):
+    last_refreshed_at = float(st.session_state.get("runtime_config_snapshot_refreshed_at", 0.0) or 0.0)
+    snapshot_stale = (time.time() - last_refreshed_at) >= RUNTIME_CONFIG_REFRESH_SECONDS
+    if cached_signature != current_signature or not requirement.get("reachable", False) or snapshot_stale:
         refresh_admin_requirement()
         st.session_state["admin_requirement_signature"] = current_signature
     requirement = st.session_state.get("admin_requirement", {"requires_token": True, "reachable": False})

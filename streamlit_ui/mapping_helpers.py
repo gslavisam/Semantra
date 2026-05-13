@@ -321,6 +321,7 @@ def trust_layer_rows(
                 "canonical_details": active_row.get("canonical_details", {}),
                 "llm_consulted": bool(selected_row.get("llm_consulted", False)) if use_selected_row else False,
                 "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
+                "llm_decision_proposition": selected_row.get("llm_decision_proposition") if use_selected_row else None,
                 "suggested_transformation_code": fallback_code,
                 "active_transformation_code": effective_transformation_code_func(source, session_state, fallback_code),
                 "transformation_mode": transformation_mode_func(source, session_state, fallback_code),

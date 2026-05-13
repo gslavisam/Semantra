@@ -2,7 +2,7 @@ from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
-from app.services.mapping_service import TOTAL_WEIGHT, compute_final_score, generate_mapping_candidates
+from app.services.mapping_service import TOTAL_WEIGHT, build_explanation, compute_final_score, generate_mapping_candidates, resolve_scoring_weights
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 from app.services.virtual_target_service import build_virtual_target_schema
@@ -78,6 +78,41 @@ def test_mapping_uses_synonym_enrichment_for_email_fields() -> None:
     assert result.mappings[0].target == "customer_email"
     assert any("Semantic tokens align" in line for line in result.mappings[0].explanation)
     assert any("Signal breakdown" in line for line in result.mappings[0].explanation)
+
+
+def test_signal_breakdown_lists_all_defined_signals() -> None:
+    source = make_column("kunnr", ["text"], ["C0001", "C0002"])
+    target = make_column("customer_id", ["text"], ["C0001", "C0002"])
+
+    explanation = build_explanation(
+        source,
+        target,
+        ScoringSignals(
+            name=0.15,
+            semantic=0.5,
+            knowledge=1.0,
+            canonical=0.8,
+            pattern=1.0,
+            statistical=1.0,
+            overlap=1.0,
+            embedding=0.0,
+            correction=0.0,
+            llm=0.73,
+        ),
+    )
+
+    breakdown = next(line for line in explanation if line.startswith("Signal breakdown:"))
+
+    assert "name=0.15" in breakdown
+    assert "semantic=0.50" in breakdown
+    assert "knowledge=1.00" in breakdown
+    assert "canonical=0.80" in breakdown
+    assert "pattern=1.00" in breakdown
+    assert "stat=1.00" in breakdown
+    assert "overlap=1.00" in breakdown
+    assert "embedding=0.00" in breakdown
+    assert "correction=0.00" in breakdown
+    assert "llm=0.73" in breakdown
 
 
 def test_mapping_assigns_distinct_targets_when_multiple_good_options_exist() -> None:
@@ -342,6 +377,62 @@ def test_compute_final_score_keeps_evaluated_zero_signals_in_active_denominator(
     )
 
     assert score == round(0.82 / 0.92, 4)
+
+
+def test_compute_final_score_uses_selected_scoring_profile() -> None:
+    previous_profile = settings.scoring_profile
+    previous_overrides = dict(settings.scoring_weight_overrides)
+    settings.scoring_profile = "canonical_first"
+    settings.scoring_weight_overrides = {}
+    try:
+        score = compute_final_score(
+            ScoringSignals(name=1.0, knowledge=0.0),
+            {"name", "knowledge"},
+        )
+
+        assert score == round(0.10 / 0.32, 4)
+    finally:
+        settings.scoring_profile = previous_profile
+        settings.scoring_weight_overrides = previous_overrides
+
+
+def test_compute_final_score_promotes_strong_identifier_consensus_to_full_confidence() -> None:
+    score = compute_final_score(
+        ScoringSignals(
+            name=0.15,
+            semantic=0.5,
+            knowledge=1.0,
+            canonical=0.8,
+            pattern=1.0,
+            statistical=1.0,
+            overlap=1.0,
+            embedding=0.0,
+            correction=0.0,
+            llm=0.73,
+        ),
+        {"name", "semantic", "knowledge", "canonical", "pattern", "statistical", "overlap", "llm"},
+    )
+
+    assert score == 1.0
+
+
+def test_scoring_weight_overrides_replace_profile_weights() -> None:
+    previous_profile = settings.scoring_profile
+    previous_overrides = dict(settings.scoring_weight_overrides)
+    settings.scoring_profile = "balanced"
+    settings.scoring_weight_overrides = {"knowledge": 0.40}
+    try:
+        weights = resolve_scoring_weights()
+        score = compute_final_score(
+            ScoringSignals(name=1.0, knowledge=0.0),
+            {"name", "knowledge"},
+        )
+
+        assert weights["knowledge"] == 0.40
+        assert score == round(0.20 / 0.60, 4)
+    finally:
+        settings.scoring_profile = previous_profile
+        settings.scoring_weight_overrides = previous_overrides
 
 
 def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None:
