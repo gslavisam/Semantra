@@ -8,6 +8,11 @@ from streamlit_ui import catalog_views
 from streamlit_ui import governance
 
 
+def test_section_label_appends_detail_only_when_present() -> None:
+    assert catalog_views._section_label("Integration Detail", "4 versions") == "Integration Detail · 4 versions"
+    assert catalog_views._section_label("Concept Usage Summary", "") == "Concept Usage Summary"
+
+
 def test_build_catalog_reuse_mapping_response_creates_workspace_shape() -> None:
     mapping_response = catalog_views._build_catalog_reuse_mapping_response(
         {
@@ -65,6 +70,85 @@ def test_mapping_set_reuse_block_reason_requires_approved_status() -> None:
         catalog_views._mapping_set_reuse_block_reason("review")
         == "Only approved mapping sets can be reused in Workspace. Current status: review."
     )
+
+
+def test_catalog_reuse_fit_workspace_context_reads_current_workspace(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "upload_response": {
+                "mapping_mode": "canonical",
+                "source": {"dataset_name": "sap_customer.csv"},
+                "target_system": "customer_canonical",
+            },
+            "mapping_response": {"ranked_mappings": [{"source": "KUNNR"}, {"source": "NAME1"}]},
+            "analysis_source_system": "SAP",
+            "analysis_target_system": "Canonical Customer",
+            "analysis_business_domain": "Customer",
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    assert catalog_views._catalog_reuse_fit_workspace_context() == {
+        "workspace_loaded": True,
+        "mapping_mode": "canonical",
+        "source_dataset_name": "sap_customer.csv",
+        "target_dataset_name": "customer_canonical",
+        "source_system": "SAP",
+        "target_system": "Canonical Customer",
+        "business_domain": "Customer",
+        "current_decision_count": 2,
+    }
+
+
+def test_catalog_reuse_fit_payload_wraps_mapping_set_and_workspace_context(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "upload_response": {
+                "mapping_mode": "standard",
+                "source": {"dataset_name": "sap_customer.csv"},
+                "target": {"dataset_name": "crm_customer.csv"},
+            },
+            "mapping_response": {"mappings": [{"source": "KUNNR"}]},
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    payload = catalog_views._catalog_reuse_fit_payload({"mapping_set_id": 7, "name": "customer-master"})
+
+    assert payload == {
+        "mapping_set_detail": {"mapping_set_id": 7, "name": "customer-master"},
+        "workspace_context": {
+            "workspace_loaded": True,
+            "mapping_mode": "standard",
+            "source_dataset_name": "sap_customer.csv",
+            "target_dataset_name": "crm_customer.csv",
+            "source_system": None,
+            "target_system": None,
+            "business_domain": None,
+            "current_decision_count": 1,
+        },
+    }
+
+
+def test_catalog_reuse_fit_label_formats_known_values() -> None:
+    assert catalog_views._catalog_reuse_fit_label("strong_fit") == "strong fit"
+    assert catalog_views._catalog_reuse_fit_label("partial_fit") == "partial fit"
+    assert catalog_views._catalog_reuse_fit_label("unknown") == "not generated"
+
+
+def test_catalog_reuse_fit_ready_for_selected_version_requires_matching_drilldown() -> None:
+    assert catalog_views._catalog_reuse_fit_ready_for_selected_version(
+        {"mapping_set_id": 7},
+        {"mapping_set_id": 7},
+    ) is True
+    assert catalog_views._catalog_reuse_fit_ready_for_selected_version(
+        {"mapping_set_id": 7},
+        {"mapping_set_id": 8},
+    ) is False
+    assert catalog_views._catalog_reuse_fit_ready_for_selected_version(
+        {"mapping_set_id": 7},
+        None,
+    ) is False
 
 
 def test_catalog_concept_reuse_rows_group_integrations_and_approval_state() -> None:

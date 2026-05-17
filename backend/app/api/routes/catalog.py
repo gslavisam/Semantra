@@ -3,7 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
-from app.models.mapping import CatalogConceptDetail, CatalogIntegrationDetail, CatalogIntegrationRecord
+from app.models.mapping import CatalogConceptDetail, CatalogIntegrationDetail, CatalogIntegrationRecord, CatalogReuseFitRequest, CatalogReuseFitResponse
+from app.services.catalog_reuse_fit_service import build_catalog_reuse_fit
+from app.services.llm_service import build_provider_from_settings
 from app.services.persistence_service import persistence_service
 
 
@@ -78,3 +80,9 @@ async def get_catalog_concept_detail(
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/reuse-fit", response_model=CatalogReuseFitResponse, dependencies=[Depends(require_admin)])
+async def explain_catalog_reuse_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitResponse:
+    provider = build_provider_from_settings()
+    return build_catalog_reuse_fit(request, provider=provider)

@@ -1,17 +1,19 @@
 # Semantra
 
-Semantra is a pilot-ready semantic integration workbench for analyst-guided schema mapping.
+Semantra is a pilot-ready semantic integration workbench for analyst-guided schema mapping, review, governance, and reuse.
 
-It combines deterministic profiling and ranking with controlled AI assistance so a team can:
+It combines deterministic profiling and ranking with bounded AI assistance so a team can:
 
 - upload source and target structures from row data, schema specs, or SQL snapshots
 - generate explainable source-to-target or source-to-canonical mapping proposals
 - review explicit source -> concept -> target paths and canonical coverage
-- author and validate Pandas transformations
-- preview mapped output and generate starter Pandas code
-- persist governed mapping sets, benchmark datasets, transformation test sets, and review memory
+- generate technical mapping analysis summaries and optional narration/audio
+- author transformations, preview output, and generate starter Pandas or PySpark artifacts
+- refine generated artifacts through controlled LLM prompts with accept/discard workflow
+- persist governed mapping sets, benchmark datasets, transformation test sets, and correction history
 - manage canonical concepts, overlays, and stewardship workflows through a dedicated Canonical Console
-- search and reuse approved integration knowledge through the Catalog
+- search, inspect, and reuse approved integration knowledge through the Catalog
+- measure quality through benchmark runs, profile comparison, correction impact, and explanation surfaces
 
 The current product shape is a FastAPI backend plus a Streamlit product UI. It is already useful for demos, pilot workflows, and controlled analyst/governance review. It is not yet a production ETL runtime, scheduler, or connector-heavy integration platform.
 
@@ -20,30 +22,47 @@ The current product shape is a FastAPI backend plus a Streamlit product UI. It i
 Top-level UI areas:
 
 - `Workspace`
-  - upload, profile, map, review, decide, preview, and codegen
+	- upload, profile, map, review, decide, preview, codegen, and artifact refinement
 - `Canonical Console`
-  - canonical concept registry, overlay lifecycle, canonical-gap stewardship, and stable glossary promotion
+	- canonical concept registry, overlay lifecycle, canonical-gap stewardship, and stable glossary promotion
 - `Catalog`
-  - searchable integration and concept reuse inventory based on saved mapping sets
+	- searchable integration inventory, concept-centric reuse views, and workspace-fit explanation for approved reuse candidates
 - `Benchmarks`
-  - benchmark dataset save/run flows, correction impact, and run history
+	- benchmark dataset save/run flows, scoring-profile comparison, correction impact, run history, and bounded explanation
 - `Admin / Debug`
-  - runtime config, observability, and supporting admin surfaces
+	- runtime config, observability, and supporting admin surfaces
 
 Core implemented capabilities:
 
 - CSV, JSON, XML, XLSX, SQL snapshot, and schema-spec ingestion
 - standard source-to-target mapping and canonical-only source-to-concept mapping
 - explainable multi-signal ranking with optional closed-set LLM validation
-- trust-layer review with canonical path visibility and coverage summaries
-- transformation generation, templates, preview validation, and Pandas code generation
+- Mapping Analysis Overview with optional narration/audio generation
+- Review Queue Plan and Gap Queue Summary for queue-level review guidance
+- transformation generation, templates, advisory preview, and Pandas/PySpark starter generation
+- LLM-based artifact refinement with split-view compare and accept/discard actions
 - governed mapping-set persistence with status, audit, diff, and approved-only reuse
 - correction persistence and reusable correction-rule promotion
-- canonical glossary import/export, knowledge overlays, and stewardship items
-- integration catalog search/detail/reuse flows
-- benchmark datasets, evaluation runs, and correction-impact measurement
+- canonical glossary import/export, knowledge overlays, stewardship items, and Canonical Console workflows
+- integration catalog search/detail/reuse flows with workspace reuse-fit assessment
+- benchmark datasets, evaluation runs, scoring-profile comparison, correction impact, and benchmark explanation
 
 For the full grounded feature inventory, see `project_docs/current_state.md`.
+
+## Guided AI Surfaces
+
+Semantra does not use LLMs as an autonomous mapper. The current bounded AI surfaces are:
+
+- closed-set mapping validation inside the ambiguity band
+- Mapping Analysis Overview, narration, and audio generation
+- transformation code generation
+- artifact refinement in `Workspace > Output`
+- review queue planning in `Workspace > Review`
+- canonical-gap suggestion and queue summary
+- benchmark explanation
+- catalog workspace reuse-fit explanation
+
+Each of these surfaces is optional, inspectable, and backed by deterministic fallback behavior where applicable.
 
 ## Quick Start
 
@@ -94,7 +113,7 @@ If you want protected governance/admin flows enabled, set `SEMANTRA_ADMIN_API_TO
 
 ### LLM providers
 
-The app supports bounded LLM use for validation, transformation generation, and canonical-gap assistance.
+The app supports bounded LLM use for validation, review guidance, transformation generation, artifact refinement, benchmark explanation, canonical-gap assistance, and reuse-fit assessment.
 
 Example for LM Studio:
 
@@ -131,25 +150,26 @@ Semantra today is not yet:
 - a connector-heavy ingestion platform
 - a multi-step enterprise workflow engine
 - a DB-only canonical authoring platform without file-backed reseed inputs
+- a durable multi-user job runtime with persistent queue semantics
 
 ## Documentation Map
 
 Read the docs in this order:
 
 1. `project_docs/current_state.md`
-	- what the product actually supports today
+	 - what the product actually supports today
 2. `PROJECT_OVERVIEW.md`
-	- broader product and architecture explanation
+	 - broader product, architecture, and governance explanation
 3. `project_docs/completed_slices.md`
-	- chronological delivery history
+	 - chronological delivery history
 4. `project_docs/plan.md`
-	- forward-looking priorities and sequencing
+	 - forward-looking priorities and sequencing
 5. `project_docs/epics.md`
-	- backlog map and epic status
+	 - backlog map and epic status
 6. `project_docs/implementation_checklists.md`
-	- active execution checklists
+	 - active execution checklists
 7. `help.md` / `help.en.md`
-	- practical UI usage guides
+	 - practical UI usage guides
 
 Supporting docs:
 
@@ -162,3 +182,12 @@ Supporting docs:
 - `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`
 - `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`
 - `docs/presentation/presentation.md`
+
+## Immediate Next Steps
+
+The next project focus is not more feature sprawl. It is:
+
+1. productizing the new bounded guidance surfaces so they are easier to discover and use consistently in pilot flows
+2. expanding catalog and concept-level reuse discovery beyond the initial slice
+3. continuing regression hardening and runtime discipline on the existing pilot surfaces
+4. separating persistence/runtime concerns where the current local model is starting to show strain

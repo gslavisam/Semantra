@@ -11,6 +11,11 @@ def _normalized_text(value: object) -> str:
     return str(value or "").strip()
 
 
+def _section_label(title: str, detail: str | None = None) -> str:
+    detail_text = str(detail or "").strip()
+    return f"{title} · {detail_text}" if detail_text else title
+
+
 def _filter_canonical_concepts(concepts: list[dict] | None, query: str | None = None) -> list[dict]:
     items = concepts or []
     normalized_query = _normalized_text(query).lower()
@@ -1059,18 +1064,21 @@ def render_canonical_console_panel(
         st.session_state.get("debug_knowledge_runtime"),
         st.session_state.get("debug_knowledge_overlays"),
     )
-    st.subheader("Overlay Summary")
-    overlay_summary_columns = st.columns(5)
-    overlay_summary_columns[0].metric("Active overlay", str(overlay_summary.get("active_overlay_name") or "none"))
-    overlay_summary_columns[1].metric("Active entries", int(overlay_summary.get("active_entry_count", 0) or 0))
-    overlay_summary_columns[2].metric("Concept aliases", int(overlay_summary.get("concept_alias_entries", 0) or 0))
-    overlay_summary_columns[3].metric("Versions", int(overlay_summary.get("total_versions", 0) or 0))
-    overlay_summary_columns[4].metric("Validated", int(overlay_summary.get("validated_versions", 0) or 0))
-    st.caption(
-        f"Mode={overlay_summary.get('mode') or 'base_only'} | "
-        f"active_versions={overlay_summary.get('active_versions', 0)} | "
-        f"archived_versions={overlay_summary.get('archived_versions', 0)}"
-    )
+    with st.expander(
+        _section_label("Overlay Summary", str(overlay_summary.get("active_overlay_name") or "none")),
+        expanded=False,
+    ):
+        overlay_summary_columns = st.columns(5)
+        overlay_summary_columns[0].metric("Active overlay", str(overlay_summary.get("active_overlay_name") or "none"))
+        overlay_summary_columns[1].metric("Active entries", int(overlay_summary.get("active_entry_count", 0) or 0))
+        overlay_summary_columns[2].metric("Concept aliases", int(overlay_summary.get("concept_alias_entries", 0) or 0))
+        overlay_summary_columns[3].metric("Versions", int(overlay_summary.get("total_versions", 0) or 0))
+        overlay_summary_columns[4].metric("Validated", int(overlay_summary.get("validated_versions", 0) or 0))
+        st.caption(
+            f"Mode={overlay_summary.get('mode') or 'base_only'} | "
+            f"active_versions={overlay_summary.get('active_versions', 0)} | "
+            f"archived_versions={overlay_summary.get('archived_versions', 0)}"
+        )
 
     st.subheader("Overlay Management")
     overlay_action_columns = st.columns(4)
@@ -1310,258 +1318,265 @@ def render_canonical_console_panel(
     if selected_overlay:
         version = selected_overlay.get("version", {})
         overlay_entry_counts: dict[str, int] = {}
-        for entry in selected_overlay.get("entries", []):
+        entries = selected_overlay.get("entries", [])
+        for entry in entries:
             entry_type = str(entry.get("entry_type") or "")
             if not entry_type:
                 continue
             overlay_entry_counts[entry_type] = overlay_entry_counts.get(entry_type, 0) + 1
-        st.caption(
-            f"Overlay detail: #{version.get('overlay_id')} | {version.get('name')} | status={version.get('status')} | created_by={version.get('created_by') or 'n/a'} | source={version.get('source_filename') or 'n/a'}"
-        )
-        if overlay_entry_counts:
-            st.caption(
-                "Overlay entry summary: "
-                + " | ".join(f"{entry_type}={count}" for entry_type, count in sorted(overlay_entry_counts.items()))
-            )
-        entries = selected_overlay.get("entries", [])
-        if entries:
-            st.dataframe(entries, width="stretch", hide_index=True)
-        else:
-            st.info("This overlay version does not contain any saved entries.")
-
         overlay_promotion_items = _overlay_promotion_item_map(st.session_state.get("debug_knowledge_stewardship_items"))
         promotable_entries = [
             entry
             for entry in entries
             if _normalized_text(entry.get("entry_type")) == "concept_alias" and entry.get("entry_id") is not None
         ]
+        with st.expander(
+            _section_label("Selected Overlay Detail", _normalized_text(version.get("name")) or "selected"),
+            expanded=False,
+        ):
+            st.caption(
+                f"Overlay detail: #{version.get('overlay_id')} | {version.get('name')} | status={version.get('status')} | created_by={version.get('created_by') or 'n/a'} | source={version.get('source_filename') or 'n/a'}"
+            )
+            if overlay_entry_counts:
+                st.caption(
+                    "Overlay entry summary: "
+                    + " | ".join(f"{entry_type}={count}" for entry_type, count in sorted(overlay_entry_counts.items()))
+                )
+            if entries:
+                st.dataframe(entries, width="stretch", hide_index=True)
+            else:
+                st.info("This overlay version does not contain any saved entries.")
+
         if promotable_entries:
-            st.write("**Overlay promotion candidates**")
-            st.caption(
-                "Track which active overlay aliases should be promoted into the stable canonical glossary later. "
-                "This does not write to the base glossary; it creates a durable stewardship candidate."
-            )
             promotion_rows = _overlay_promotion_entry_rows(promotable_entries, overlay_promotion_items, version)
-            promotion_metrics = st.columns(4)
-            promotion_metrics[0].metric("Promotable aliases", len(promotable_entries))
-            promotion_metrics[1].metric(
-                "Tracked",
-                sum(1 for row in promotion_rows if row.get("promotion_status") != "not_tracked"),
-            )
-            promotion_metrics[2].metric(
-                "Ready",
-                sum(1 for row in promotion_rows if row.get("promotion_status") == "ready_for_approval"),
-            )
-            promotion_metrics[3].metric(
-                "Promoted",
-                sum(1 for row in promotion_rows if row.get("promotion_status") == "promoted"),
-            )
-            st.dataframe(promotion_rows, width="stretch", hide_index=True)
-
-            promotion_options = {
-                _overlay_promotion_option_label(
-                    entry,
-                    overlay_promotion_items.get(_overlay_promotion_item_key(entry, version)),
-                ): entry
-                for entry in promotable_entries
-            }
-            selected_promotion_label = st.selectbox(
-                "Overlay promotion detail",
-                list(promotion_options.keys()),
-                key="debug_selected_overlay_promotion_label",
-            )
-            selected_promotion_entry = promotion_options[selected_promotion_label]
-            selected_promotion_key = _overlay_promotion_item_key(selected_promotion_entry, version)
-            selected_promotion_item = overlay_promotion_items.get(selected_promotion_key) or {}
-            selected_promotion_item_id = selected_promotion_item.get("item_id")
-            selected_promotion_status = _overlay_promotion_status(selected_promotion_item)
-
-            st.caption(
-                f"Promotion status: {_canonical_gap_proposal_state_label(selected_promotion_status)} | "
-                f"alias={_normalized_text(selected_promotion_entry.get('alias')) or 'n/a'} | "
-                f"concept={_normalized_text(selected_promotion_entry.get('canonical_concept_id')) or _normalized_text(selected_promotion_entry.get('canonical_term')) or 'n/a'}"
-            )
-            if selected_promotion_entry.get("note"):
-                st.caption(f"Overlay note: {_normalized_text(selected_promotion_entry.get('note'))}")
-
-            promotion_owner_columns = st.columns(2)
-            promotion_owner = promotion_owner_columns[0].text_input(
-                "Promotion owner",
-                value=_normalized_text(selected_promotion_item.get("owner")),
-                key=f"debug_overlay_promotion_owner_{selected_promotion_key}",
-                placeholder="Example: master-data-governance",
-            )
-            promotion_assignee = promotion_owner_columns[1].text_input(
-                "Promotion assignee",
-                value=_normalized_text(selected_promotion_item.get("assignee")),
-                key=f"debug_overlay_promotion_assignee_{selected_promotion_key}",
-                placeholder="Example: canonical-model-owner",
-            )
-            promotion_review_note = st.text_input(
-                "Promotion review note",
-                value=_normalized_text(selected_promotion_item.get("review_note")),
-                key=f"debug_overlay_promotion_review_note_{selected_promotion_key}",
-                placeholder="Why should this overlay alias be promoted to the stable glossary?",
-            )
-            promotion_status_options = ["new", "needs_review", "ready_for_approval", "ignored", "rejected"]
-            if selected_promotion_status == "promoted":
-                promotion_status_options.append("promoted")
-            promotion_status = st.selectbox(
-                "Promotion status",
-                options=promotion_status_options,
-                index=promotion_status_options.index(selected_promotion_status) if selected_promotion_status in promotion_status_options else 0,
-                key=f"debug_overlay_promotion_status_{selected_promotion_key}",
-                format_func=_canonical_gap_proposal_state_label,
-            )
-            promotion_save_disabled = _normalized_text(version.get("status")) != "active" and not selected_promotion_item_id
-            promotion_action_columns = st.columns(2)
-            if promotion_action_columns[0].button(
-                "Save promotion candidate",
-                width="stretch",
-                key=f"debug_save_overlay_promotion_{selected_promotion_key}",
-                disabled=promotion_save_disabled or selected_promotion_status == "promoted",
+            with st.expander(
+                _section_label("Overlay Promotion Candidates", f"{len(promotable_entries)} aliases"),
+                expanded=False,
             ):
-                try:
-                    api_request(
-                        "POST",
-                        "/knowledge/stewardship-items",
-                        json=_overlay_promotion_item_request(
-                            selected_promotion_entry,
-                            version,
-                            status=promotion_status,
-                            owner=promotion_owner,
-                            assignee=promotion_assignee,
-                            review_note=promotion_review_note,
-                            changed_by=st.session_state.get("admin_token"),
-                        ),
-                    )
-                    st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
-                    st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
-                        st.session_state.get("debug_knowledge_stewardship_items")
-                    )
-                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
-                    st.session_state["last_action"] = {
-                        "level": "info",
-                        "message": "Saved durable overlay promotion candidate for the selected alias.",
-                    }
-                except httpx.HTTPError as error:
-                    st.session_state["last_action"] = {
-                        "level": "error",
-                        "message": f"Saving overlay promotion candidate failed: {error}",
-                    }
-                st.rerun()
-            if promotion_action_columns[1].button(
-                "Promote to stable glossary",
-                width="stretch",
-                key=f"debug_execute_overlay_promotion_{selected_promotion_key}",
-                disabled=not _overlay_promotion_can_execute(selected_promotion_item),
-            ):
-                try:
-                    promotion_result = api_request(
-                        "POST",
-                        f"/knowledge/stewardship-items/{selected_promotion_item_id}/promote-to-glossary",
-                        json=_overlay_promotion_execution_request(
-                            st.session_state.get("admin_token"),
-                            note="Promoted from Canonical Console overlay detail.",
-                        ),
-                    )
-                    _refresh_canonical_console_knowledge_state(api_request=api_request)
-                    st.session_state["debug_selected_knowledge_overlay"] = api_request(
-                        "GET",
-                        f"/knowledge/overlays/{version.get('overlay_id')}",
-                    )
-                    if st.session_state.get("debug_canonical_concepts") is not None:
-                        st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
-                    promoted_concept_id = _normalized_text((promotion_result.get("glossary_entry") or {}).get("concept_id"))
-                    if promoted_concept_id and promoted_concept_id == _normalized_text(
-                        ((st.session_state.get("debug_canonical_concept_detail") or {}).get("concept") or {}).get("concept_id")
-                    ):
-                        st.session_state["debug_canonical_concept_detail"] = api_request(
-                            "GET",
-                            f"/knowledge/canonical-concepts/{promoted_concept_id}",
+                st.caption(
+                    "Track which active overlay aliases should be promoted into the stable canonical glossary later. "
+                    "This does not write to the base glossary; it creates a durable stewardship candidate."
+                )
+                promotion_metrics = st.columns(4)
+                promotion_metrics[0].metric("Promotable aliases", len(promotable_entries))
+                promotion_metrics[1].metric(
+                    "Tracked",
+                    sum(1 for row in promotion_rows if row.get("promotion_status") != "not_tracked"),
+                )
+                promotion_metrics[2].metric(
+                    "Ready",
+                    sum(1 for row in promotion_rows if row.get("promotion_status") == "ready_for_approval"),
+                )
+                promotion_metrics[3].metric(
+                    "Promoted",
+                    sum(1 for row in promotion_rows if row.get("promotion_status") == "promoted"),
+                )
+                st.dataframe(promotion_rows, width="stretch", hide_index=True)
+
+                promotion_options = {
+                    _overlay_promotion_option_label(
+                        entry,
+                        overlay_promotion_items.get(_overlay_promotion_item_key(entry, version)),
+                    ): entry
+                    for entry in promotable_entries
+                }
+                selected_promotion_label = st.selectbox(
+                    "Overlay promotion detail",
+                    list(promotion_options.keys()),
+                    key="debug_selected_overlay_promotion_label",
+                )
+                selected_promotion_entry = promotion_options[selected_promotion_label]
+                selected_promotion_key = _overlay_promotion_item_key(selected_promotion_entry, version)
+                selected_promotion_item = overlay_promotion_items.get(selected_promotion_key) or {}
+                selected_promotion_item_id = selected_promotion_item.get("item_id")
+                selected_promotion_status = _overlay_promotion_status(selected_promotion_item)
+
+                st.caption(
+                    f"Promotion status: {_canonical_gap_proposal_state_label(selected_promotion_status)} | "
+                    f"alias={_normalized_text(selected_promotion_entry.get('alias')) or 'n/a'} | "
+                    f"concept={_normalized_text(selected_promotion_entry.get('canonical_concept_id')) or _normalized_text(selected_promotion_entry.get('canonical_term')) or 'n/a'}"
+                )
+                if selected_promotion_entry.get("note"):
+                    st.caption(f"Overlay note: {_normalized_text(selected_promotion_entry.get('note'))}")
+
+                promotion_owner_columns = st.columns(2)
+                promotion_owner = promotion_owner_columns[0].text_input(
+                    "Promotion owner",
+                    value=_normalized_text(selected_promotion_item.get("owner")),
+                    key=f"debug_overlay_promotion_owner_{selected_promotion_key}",
+                    placeholder="Example: master-data-governance",
+                )
+                promotion_assignee = promotion_owner_columns[1].text_input(
+                    "Promotion assignee",
+                    value=_normalized_text(selected_promotion_item.get("assignee")),
+                    key=f"debug_overlay_promotion_assignee_{selected_promotion_key}",
+                    placeholder="Example: canonical-model-owner",
+                )
+                promotion_review_note = st.text_input(
+                    "Promotion review note",
+                    value=_normalized_text(selected_promotion_item.get("review_note")),
+                    key=f"debug_overlay_promotion_review_note_{selected_promotion_key}",
+                    placeholder="Why should this overlay alias be promoted to the stable glossary?",
+                )
+                promotion_status_options = ["new", "needs_review", "ready_for_approval", "ignored", "rejected"]
+                if selected_promotion_status == "promoted":
+                    promotion_status_options.append("promoted")
+                promotion_status = st.selectbox(
+                    "Promotion status",
+                    options=promotion_status_options,
+                    index=promotion_status_options.index(selected_promotion_status) if selected_promotion_status in promotion_status_options else 0,
+                    key=f"debug_overlay_promotion_status_{selected_promotion_key}",
+                    format_func=_canonical_gap_proposal_state_label,
+                )
+                promotion_save_disabled = _normalized_text(version.get("status")) != "active" and not selected_promotion_item_id
+                promotion_action_columns = st.columns(2)
+                if promotion_action_columns[0].button(
+                    "Save promotion candidate",
+                    width="stretch",
+                    key=f"debug_save_overlay_promotion_{selected_promotion_key}",
+                    disabled=promotion_save_disabled or selected_promotion_status == "promoted",
+                ):
+                    try:
+                        api_request(
+                            "POST",
+                            "/knowledge/stewardship-items",
+                            json=_overlay_promotion_item_request(
+                                selected_promotion_entry,
+                                version,
+                                status=promotion_status,
+                                owner=promotion_owner,
+                                assignee=promotion_assignee,
+                                review_note=promotion_review_note,
+                                changed_by=st.session_state.get("admin_token"),
+                            ),
                         )
-                    st.session_state["canonical_glossary_export_bytes"] = api_request_content(
-                        "GET",
-                        "/knowledge/canonical-glossary/export",
-                    )
-                    st.session_state["last_action"] = {
-                        "level": "success",
-                        "message": (
-                            "Promoted selected overlay alias into the stable canonical glossary."
-                            if promotion_result.get("alias_added", True)
-                            else "Selected overlay alias was already present in the stable canonical glossary; stewardship item marked as promoted."
-                        ),
-                    }
-                except httpx.HTTPError as error:
-                    st.session_state["last_action"] = {
-                        "level": "error",
-                        "message": f"Stable glossary promotion failed: {error}",
-                    }
-                st.rerun()
-            if selected_promotion_status == "ready_for_approval":
-                st.caption("Promotion execution writes the alias into the base canonical glossary and then marks the stewardship item as promoted.")
-            elif selected_promotion_status == "promoted":
-                st.caption("This alias has already been promoted to the stable canonical glossary.")
-            if _normalized_text(version.get("status")) != "active" and not selected_promotion_item_id:
-                st.caption("Activate this overlay before creating a new promotion candidate. Existing candidates can still be reviewed.")
+                        st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                        st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
+                            st.session_state.get("debug_knowledge_stewardship_items")
+                        )
+                        st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                        st.session_state["last_action"] = {
+                            "level": "info",
+                            "message": "Saved durable overlay promotion candidate for the selected alias.",
+                        }
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Saving overlay promotion candidate failed: {error}",
+                        }
+                    st.rerun()
+                if promotion_action_columns[1].button(
+                    "Promote to stable glossary",
+                    width="stretch",
+                    key=f"debug_execute_overlay_promotion_{selected_promotion_key}",
+                    disabled=not _overlay_promotion_can_execute(selected_promotion_item),
+                ):
+                    try:
+                        promotion_result = api_request(
+                            "POST",
+                            f"/knowledge/stewardship-items/{selected_promotion_item_id}/promote-to-glossary",
+                            json=_overlay_promotion_execution_request(
+                                st.session_state.get("admin_token"),
+                                note="Promoted from Canonical Console overlay detail.",
+                            ),
+                        )
+                        _refresh_canonical_console_knowledge_state(api_request=api_request)
+                        st.session_state["debug_selected_knowledge_overlay"] = api_request(
+                            "GET",
+                            f"/knowledge/overlays/{version.get('overlay_id')}",
+                        )
+                        if st.session_state.get("debug_canonical_concepts") is not None:
+                            st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
+                        promoted_concept_id = _normalized_text((promotion_result.get("glossary_entry") or {}).get("concept_id"))
+                        if promoted_concept_id and promoted_concept_id == _normalized_text(
+                            ((st.session_state.get("debug_canonical_concept_detail") or {}).get("concept") or {}).get("concept_id")
+                        ):
+                            st.session_state["debug_canonical_concept_detail"] = api_request(
+                                "GET",
+                                f"/knowledge/canonical-concepts/{promoted_concept_id}",
+                            )
+                        st.session_state["canonical_glossary_export_bytes"] = api_request_content(
+                            "GET",
+                            "/knowledge/canonical-glossary/export",
+                        )
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                "Promoted selected overlay alias into the stable canonical glossary."
+                                if promotion_result.get("alias_added", True)
+                                else "Selected overlay alias was already present in the stable canonical glossary; stewardship item marked as promoted."
+                            ),
+                        }
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Stable glossary promotion failed: {error}",
+                        }
+                    st.rerun()
+                if selected_promotion_status == "ready_for_approval":
+                    st.caption("Promotion execution writes the alias into the base canonical glossary and then marks the stewardship item as promoted.")
+                elif selected_promotion_status == "promoted":
+                    st.caption("This alias has already been promoted to the stable canonical glossary.")
+                if _normalized_text(version.get("status")) != "active" and not selected_promotion_item_id:
+                    st.caption("Activate this overlay before creating a new promotion candidate. Existing candidates can still be reviewed.")
 
-    st.subheader("Canonical Glossary")
-    canonical_glossary_upload = st.file_uploader(
-        "Canonical glossary CSV",
-        type=["csv"],
-        key="canonical_glossary_file",
-        help="Import or export the canonical business concept glossary as CSV.",
-    )
-    canonical_glossary_columns = st.columns(2)
-    if canonical_glossary_columns[0].button(
-        "Load canonical glossary export",
-        width="stretch",
-        key="canonical_console_export_canonical_glossary",
-    ):
-        try:
-            st.session_state["canonical_glossary_export_bytes"] = api_request_content("GET", "/knowledge/canonical-glossary/export")
-            st.session_state["last_action"] = {"level": "success", "message": "Loaded canonical glossary export."}
-        except httpx.HTTPError as error:
-            st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary export failed: {error}"}
-        st.rerun()
-
-    if canonical_glossary_columns[1].button(
-        "Import canonical glossary",
-        width="stretch",
-        key="canonical_console_import_canonical_glossary",
-        disabled=canonical_glossary_upload is None,
-    ):
-        try:
-            st.session_state["debug_canonical_glossary_import"] = api_request(
-                "POST",
-                "/knowledge/canonical-glossary/import",
-                files=upload_file_to_request_files(canonical_glossary_upload),
-            )
-            _refresh_canonical_console_knowledge_state(api_request=api_request)
-            if st.session_state.get("debug_canonical_concepts") is not None:
-                st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
-            st.session_state["last_action"] = {"level": "success", "message": "Imported canonical glossary CSV."}
-        except httpx.HTTPError as error:
-            st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary import failed: {error}"}
-        st.rerun()
-
-    canonical_glossary_export_bytes = st.session_state.get("canonical_glossary_export_bytes")
-    if canonical_glossary_export_bytes:
-        st.download_button(
-            "Download canonical glossary CSV",
-            data=canonical_glossary_export_bytes,
-            file_name="canonical_glossary.csv",
-            mime="text/csv",
+    with st.expander("Canonical Glossary", expanded=False):
+        canonical_glossary_upload = st.file_uploader(
+            "Canonical glossary CSV",
+            type=["csv"],
+            key="canonical_glossary_file",
+            help="Import or export the canonical business concept glossary as CSV.",
+        )
+        canonical_glossary_columns = st.columns(2)
+        if canonical_glossary_columns[0].button(
+            "Load canonical glossary export",
             width="stretch",
-        )
+            key="canonical_console_export_canonical_glossary",
+        ):
+            try:
+                st.session_state["canonical_glossary_export_bytes"] = api_request_content("GET", "/knowledge/canonical-glossary/export")
+                st.session_state["last_action"] = {"level": "success", "message": "Loaded canonical glossary export."}
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary export failed: {error}"}
+            st.rerun()
 
-    canonical_glossary_import = st.session_state.get("debug_canonical_glossary_import")
-    if canonical_glossary_import:
-        st.caption(
-            "Canonical glossary import: "
-            f"rows={canonical_glossary_import.get('imported_row_count', 0)}, "
-            f"concepts={canonical_glossary_import.get('canonical_concept_count', 0)}."
-        )
+        if canonical_glossary_columns[1].button(
+            "Import canonical glossary",
+            width="stretch",
+            key="canonical_console_import_canonical_glossary",
+            disabled=canonical_glossary_upload is None,
+        ):
+            try:
+                st.session_state["debug_canonical_glossary_import"] = api_request(
+                    "POST",
+                    "/knowledge/canonical-glossary/import",
+                    files=upload_file_to_request_files(canonical_glossary_upload),
+                )
+                _refresh_canonical_console_knowledge_state(api_request=api_request)
+                if st.session_state.get("debug_canonical_concepts") is not None:
+                    st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
+                st.session_state["last_action"] = {"level": "success", "message": "Imported canonical glossary CSV."}
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {"level": "error", "message": f"Canonical glossary import failed: {error}"}
+            st.rerun()
+
+        canonical_glossary_export_bytes = st.session_state.get("canonical_glossary_export_bytes")
+        if canonical_glossary_export_bytes:
+            st.download_button(
+                "Download canonical glossary CSV",
+                data=canonical_glossary_export_bytes,
+                file_name="canonical_glossary.csv",
+                mime="text/csv",
+                width="stretch",
+            )
+
+        canonical_glossary_import = st.session_state.get("debug_canonical_glossary_import")
+        if canonical_glossary_import:
+            st.caption(
+                "Canonical glossary import: "
+                f"rows={canonical_glossary_import.get('imported_row_count', 0)}, "
+                f"concepts={canonical_glossary_import.get('canonical_concept_count', 0)}."
+            )
 
     canonical_concepts = st.session_state.get("debug_canonical_concepts") or []
     if canonical_concepts:
@@ -1700,150 +1715,154 @@ def render_canonical_console_panel(
             concept,
             st.session_state.get("debug_knowledge_stewardship_items"),
         )
-        summary_columns = st.columns(5)
-        summary_columns[0].metric("Usage", int(concept.get("usage_count", 0) or 0))
-        summary_columns[1].metric("Field contexts", int(concept.get("field_context_count", 0) or 0))
-        summary_columns[2].metric("Active overlay aliases", int(concept.get("active_overlay_entry_count", 0) or 0))
-        summary_columns[3].metric("Pending proposals", len(concept_pending_rows))
-        summary_columns[4].metric("Overlay promotions", len(concept_overlay_promotion_items))
-        st.caption(
-            f"{concept.get('concept_id') or 'unknown'} | {concept.get('display_name') or 'n/a'} | "
-            f"entity={concept.get('entity') or '-'} | attribute={concept.get('attribute') or '-'} | "
-            f"source={concept.get('source') or 'base'}"
-        )
-        if concept.get("description"):
-            st.write(concept.get("description"))
-        if concept.get("base_aliases") or concept.get("active_overlay_aliases"):
+        with st.expander(
+            _section_label("Canonical Concept Detail", _normalized_text(concept.get("concept_id")) or "selected"),
+            expanded=False,
+        ):
+            summary_columns = st.columns(5)
+            summary_columns[0].metric("Usage", int(concept.get("usage_count", 0) or 0))
+            summary_columns[1].metric("Field contexts", int(concept.get("field_context_count", 0) or 0))
+            summary_columns[2].metric("Active overlay aliases", int(concept.get("active_overlay_entry_count", 0) or 0))
+            summary_columns[3].metric("Pending proposals", len(concept_pending_rows))
+            summary_columns[4].metric("Overlay promotions", len(concept_overlay_promotion_items))
             st.caption(
-                "Aliases: "
-                + " | ".join(
-                    part
-                    for part in [
-                        (
-                            "base=" + ", ".join(concept.get("base_aliases") or [])
-                            if concept.get("base_aliases")
-                            else ""
-                        ),
-                        (
-                            "active_overlay=" + ", ".join(concept.get("active_overlay_aliases") or [])
-                            if concept.get("active_overlay_aliases")
-                            else ""
-                        ),
-                    ]
-                    if part
+                f"{concept.get('concept_id') or 'unknown'} | {concept.get('display_name') or 'n/a'} | "
+                f"entity={concept.get('entity') or '-'} | attribute={concept.get('attribute') or '-'} | "
+                f"source={concept.get('source') or 'base'}"
+            )
+            if concept.get("description"):
+                st.write(concept.get("description"))
+            if concept.get("base_aliases") or concept.get("active_overlay_aliases"):
+                st.caption(
+                    "Aliases: "
+                    + " | ".join(
+                        part
+                        for part in [
+                            (
+                                "base=" + ", ".join(concept.get("base_aliases") or [])
+                                if concept.get("base_aliases")
+                                else ""
+                            ),
+                            (
+                                "active_overlay=" + ", ".join(concept.get("active_overlay_aliases") or [])
+                                if concept.get("active_overlay_aliases")
+                                else ""
+                            ),
+                        ]
+                        if part
+                    )
                 )
-            )
-        if concept.get("source_systems") or concept.get("business_domains"):
-            st.caption(
-                "Discovery facets: "
-                + " | ".join(
-                    part
-                    for part in [
-                        (
-                            "source_systems=" + ", ".join(concept.get("source_systems") or [])
-                            if concept.get("source_systems")
-                            else ""
-                        ),
-                        (
-                            "business_domains=" + ", ".join(concept.get("business_domains") or [])
-                            if concept.get("business_domains")
-                            else ""
-                        ),
-                    ]
-                    if part
+            if concept.get("source_systems") or concept.get("business_domains"):
+                st.caption(
+                    "Discovery facets: "
+                    + " | ".join(
+                        part
+                        for part in [
+                            (
+                                "source_systems=" + ", ".join(concept.get("source_systems") or [])
+                                if concept.get("source_systems")
+                                else ""
+                            ),
+                            (
+                                "business_domains=" + ", ".join(concept.get("business_domains") or [])
+                                if concept.get("business_domains")
+                                else ""
+                            ),
+                        ]
+                        if part
+                    )
                 )
-            )
-        st.caption(f"Alias count: {int(concept.get('alias_count', 0) or 0)}")
+            st.caption(f"Alias count: {int(concept.get('alias_count', 0) or 0)}")
 
-        if concept_pending_rows:
-            st.write("**Pending queue proposals for this concept**")
-            st.caption(
-                "Current active gap suggestions that would extend this concept through the console approve flow."
-            )
-            st.dataframe(concept_pending_rows, width="stretch", hide_index=True)
-        else:
-            st.caption("No active queue proposals currently target this concept.")
+            if concept_pending_rows:
+                st.write("**Pending queue proposals for this concept**")
+                st.caption(
+                    "Current active gap suggestions that would extend this concept through the console approve flow."
+                )
+                st.dataframe(concept_pending_rows, width="stretch", hide_index=True)
+            else:
+                st.caption("No active queue proposals currently target this concept.")
 
-        if concept_overlay_promotion_items:
-            st.write("**Overlay promotion stewardship**")
-            st.caption(
-                "Durable overlay alias candidates already linked to this canonical concept, including execution-ready items."
-            )
-            st.dataframe(concept_overlay_promotion_rows, width="stretch", hide_index=True)
-            concept_promotion_options = {
-                _overlay_promotion_item_record_label(item): item for item in concept_overlay_promotion_items
-            }
-            selected_concept_promotion_label = st.selectbox(
-                "Concept overlay promotion detail",
-                list(concept_promotion_options.keys()),
-                key=f"debug_concept_overlay_promotion_{_normalized_text(concept.get('concept_id')) or 'unknown'}",
-            )
-            selected_concept_promotion_item = concept_promotion_options[selected_concept_promotion_label]
-            st.caption(
-                f"Promotion status: {_canonical_gap_proposal_state_label(_overlay_promotion_status(selected_concept_promotion_item))} | "
-                f"alias={_normalized_text(selected_concept_promotion_item.get('source')) or 'n/a'} | "
-                f"source_system={_normalized_text(selected_concept_promotion_item.get('source_system')) or 'n/a'} | "
-                f"business_domain={_normalized_text(selected_concept_promotion_item.get('business_domain')) or 'n/a'}"
-            )
-            if _normalized_text(selected_concept_promotion_item.get("review_note")):
-                st.caption(f"Review note: {_normalized_text(selected_concept_promotion_item.get('review_note'))}")
-            if st.button(
-                "Promote selected concept candidate",
-                width="stretch",
-                key=f"debug_execute_concept_overlay_promotion_{selected_concept_promotion_item.get('item_id')}",
-                disabled=not _overlay_promotion_can_execute(selected_concept_promotion_item),
-            ):
-                try:
-                    promotion_result = api_request(
-                        "POST",
-                        f"/knowledge/stewardship-items/{selected_concept_promotion_item.get('item_id')}/promote-to-glossary",
-                        json=_overlay_promotion_execution_request(
-                            st.session_state.get("admin_token"),
-                            note="Promoted from Canonical Console concept detail.",
-                        ),
-                    )
-                    _refresh_canonical_console_knowledge_state(api_request=api_request)
-                    st.session_state["debug_canonical_concept_detail"] = api_request(
-                        "GET",
-                        f"/knowledge/canonical-concepts/{_normalized_text(concept.get('concept_id'))}",
-                    )
-                    st.session_state["canonical_glossary_export_bytes"] = api_request_content(
-                        "GET",
-                        "/knowledge/canonical-glossary/export",
-                    )
-                    st.session_state["last_action"] = {
-                        "level": "success",
-                        "message": (
-                            "Promoted selected concept-linked overlay alias into the stable canonical glossary."
-                            if promotion_result.get("alias_added", True) or promotion_result.get("concept_created", False)
-                            else "Selected concept-linked overlay alias was already present in the stable canonical glossary; stewardship item marked as promoted."
-                        ),
-                    }
-                except httpx.HTTPError as error:
-                    st.session_state["last_action"] = {
-                        "level": "error",
-                        "message": f"Concept-linked stable glossary promotion failed: {error}",
-                    }
-                st.rerun()
-            if _overlay_promotion_status(selected_concept_promotion_item) == "ready_for_approval":
-                st.caption("This concept-linked promotion item can now write into the stable canonical glossary.")
-            elif _overlay_promotion_status(selected_concept_promotion_item) == "promoted":
-                st.caption("This concept-linked overlay alias has already been promoted.")
-        else:
-            st.caption("No overlay promotion stewardship items currently target this concept.")
+            if concept_overlay_promotion_items:
+                st.write("**Overlay promotion stewardship**")
+                st.caption(
+                    "Durable overlay alias candidates already linked to this canonical concept, including execution-ready items."
+                )
+                st.dataframe(concept_overlay_promotion_rows, width="stretch", hide_index=True)
+                concept_promotion_options = {
+                    _overlay_promotion_item_record_label(item): item for item in concept_overlay_promotion_items
+                }
+                selected_concept_promotion_label = st.selectbox(
+                    "Concept overlay promotion detail",
+                    list(concept_promotion_options.keys()),
+                    key=f"debug_concept_overlay_promotion_{_normalized_text(concept.get('concept_id')) or 'unknown'}",
+                )
+                selected_concept_promotion_item = concept_promotion_options[selected_concept_promotion_label]
+                st.caption(
+                    f"Promotion status: {_canonical_gap_proposal_state_label(_overlay_promotion_status(selected_concept_promotion_item))} | "
+                    f"alias={_normalized_text(selected_concept_promotion_item.get('source')) or 'n/a'} | "
+                    f"source_system={_normalized_text(selected_concept_promotion_item.get('source_system')) or 'n/a'} | "
+                    f"business_domain={_normalized_text(selected_concept_promotion_item.get('business_domain')) or 'n/a'}"
+                )
+                if _normalized_text(selected_concept_promotion_item.get("review_note")):
+                    st.caption(f"Review note: {_normalized_text(selected_concept_promotion_item.get('review_note'))}")
+                if st.button(
+                    "Promote selected concept candidate",
+                    width="stretch",
+                    key=f"debug_execute_concept_overlay_promotion_{selected_concept_promotion_item.get('item_id')}",
+                    disabled=not _overlay_promotion_can_execute(selected_concept_promotion_item),
+                ):
+                    try:
+                        promotion_result = api_request(
+                            "POST",
+                            f"/knowledge/stewardship-items/{selected_concept_promotion_item.get('item_id')}/promote-to-glossary",
+                            json=_overlay_promotion_execution_request(
+                                st.session_state.get("admin_token"),
+                                note="Promoted from Canonical Console concept detail.",
+                            ),
+                        )
+                        _refresh_canonical_console_knowledge_state(api_request=api_request)
+                        st.session_state["debug_canonical_concept_detail"] = api_request(
+                            "GET",
+                            f"/knowledge/canonical-concepts/{_normalized_text(concept.get('concept_id'))}",
+                        )
+                        st.session_state["canonical_glossary_export_bytes"] = api_request_content(
+                            "GET",
+                            "/knowledge/canonical-glossary/export",
+                        )
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                "Promoted selected concept-linked overlay alias into the stable canonical glossary."
+                                if promotion_result.get("alias_added", True) or promotion_result.get("concept_created", False)
+                                else "Selected concept-linked overlay alias was already present in the stable canonical glossary; stewardship item marked as promoted."
+                            ),
+                        }
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Concept-linked stable glossary promotion failed: {error}",
+                        }
+                    st.rerun()
+                if _overlay_promotion_status(selected_concept_promotion_item) == "ready_for_approval":
+                    st.caption("This concept-linked promotion item can now write into the stable canonical glossary.")
+                elif _overlay_promotion_status(selected_concept_promotion_item) == "promoted":
+                    st.caption("This concept-linked overlay alias has already been promoted.")
+            else:
+                st.caption("No overlay promotion stewardship items currently target this concept.")
 
-        if canonical_concept_detail.get("field_contexts"):
-            st.write("**Field contexts**")
-            st.dataframe(canonical_concept_detail.get("field_contexts"), width="stretch", hide_index=True)
-        if canonical_concept_detail.get("active_overlay_entries"):
-            st.write("**Active overlay entries**")
-            st.dataframe(canonical_concept_detail.get("active_overlay_entries"), width="stretch", hide_index=True)
-        if canonical_concept_detail.get("integrations"):
-            st.write("**Catalog usage**")
-            st.dataframe(canonical_concept_detail.get("integrations"), width="stretch", hide_index=True)
-        if canonical_concept_detail.get("audit_entries"):
-            st.write("**Knowledge audit references**")
-            st.dataframe(canonical_concept_detail.get("audit_entries"), width="stretch", hide_index=True)
+            if canonical_concept_detail.get("field_contexts"):
+                st.write("**Field contexts**")
+                st.dataframe(canonical_concept_detail.get("field_contexts"), width="stretch", hide_index=True)
+            if canonical_concept_detail.get("active_overlay_entries"):
+                st.write("**Active overlay entries**")
+                st.dataframe(canonical_concept_detail.get("active_overlay_entries"), width="stretch", hide_index=True)
+            if canonical_concept_detail.get("integrations"):
+                st.write("**Catalog usage**")
+                st.dataframe(canonical_concept_detail.get("integrations"), width="stretch", hide_index=True)
+            if canonical_concept_detail.get("audit_entries"):
+                st.write("**Knowledge audit references**")
+                st.dataframe(canonical_concept_detail.get("audit_entries"), width="stretch", hide_index=True)
 
     st.write("**Canonical gap review queue**")
     st.caption(
@@ -1921,12 +1940,15 @@ def render_canonical_console_panel(
             ),
         )
         if repeated_gap_rows:
-            st.write("**Repeated gap signals**")
-            st.caption(
-                "Aggregated target and suggested-concept patterns seen across the current queue and durable stewardship history. "
-                "Use this to spot glossary or overlay work that can eliminate multiple gap reviews at once."
-            )
-            st.dataframe(repeated_gap_rows, width="stretch", hide_index=True)
+            with st.expander(
+                _section_label("Repeated gap signals", f"{len(repeated_gap_rows)} patterns"),
+                expanded=False,
+            ):
+                st.caption(
+                    "Aggregated target and suggested-concept patterns seen across the current queue and durable stewardship history. "
+                    "Use this to spot glossary or overlay work that can eliminate multiple gap reviews at once."
+                )
+                st.dataframe(repeated_gap_rows, width="stretch", hide_index=True)
         available_stewardship_statuses = sorted(
             {
                 _canonical_gap_effective_status(
@@ -2056,407 +2078,108 @@ def render_canonical_console_panel(
             selected_stewardship_item,
         )
 
-        detail_columns = st.columns([3, 3, 2])
-        detail_columns[0].markdown(f"**Source:** {_normalized_text(selected_candidate.get('source')) or 'n/a'}")
-        detail_columns[1].markdown(f"**Target:** {_normalized_text(selected_candidate.get('target')) or 'n/a'}")
-        detail_columns[2].metric("Confidence", f"{int(float(selected_candidate.get('confidence', 0.0) or 0.0) * 100)}%")
-        st.caption(f"Console state: {selected_console_state}")
-        st.caption(f"Proposal triage: {_canonical_gap_proposal_state_label(selected_proposal_state)}")
-        st.caption(f"Stewardship status: {_canonical_gap_proposal_state_label(selected_effective_status)}")
-        if selected_candidate.get("reason"):
-            st.caption(selected_candidate.get("reason"))
-        if selected_candidate.get("explanation"):
-            st.caption("Signals: " + " | ".join(selected_candidate.get("explanation") or []))
-
-        stewardship_columns = st.columns(2)
-        stewardship_owner = stewardship_columns[0].text_input(
-            "Owner",
-            value=_normalized_text(selected_stewardship_item.get("owner")),
-            key=f"debug_stewardship_owner_{selected_gap_index}",
-            placeholder="Example: data-governance",
-        )
-        stewardship_assignee = stewardship_columns[1].text_input(
-            "Assignee",
-            value=_normalized_text(selected_stewardship_item.get("assignee")),
-            key=f"debug_stewardship_assignee_{selected_gap_index}",
-            placeholder="Example: analyst-on-duty",
-        )
-
-        review_note = st.text_input(
-            "Review note",
-            value=_normalized_text(selected_stewardship_item.get("review_note")),
-            key=f"debug_review_note_{selected_gap_index}",
-            placeholder="Why is this gap being ignored, rejected, or ready for approval?",
-        )
-
-        save_stewardship_disabled = (
-            bool(selected_stewardship_item_id)
-            and _normalized_text(selected_stewardship_item.get("owner")) == _normalized_text(stewardship_owner)
-            and _normalized_text(selected_stewardship_item.get("assignee")) == _normalized_text(stewardship_assignee)
-            and _normalized_text(selected_stewardship_item.get("review_note")) == _normalized_text(review_note)
-            and _canonical_gap_stewardship_status(selected_stewardship_item) == selected_effective_status
-        )
-        if st.button(
-            "Save stewardship fields",
-            width="stretch",
-            key=f"debug_save_stewardship_item_{selected_gap_index}",
-            disabled=save_stewardship_disabled,
+        with st.expander(
+            _section_label("Selected Gap Detail", _canonical_gap_proposal_state_label(selected_effective_status)),
+            expanded=True,
         ):
-            try:
-                api_request(
-                    "POST",
-                    "/knowledge/stewardship-items",
-                    json=_canonical_gap_stewardship_item_request(
-                        selected_candidate_key,
-                        selected_candidate,
-                        selected_suggestion or None,
-                        status=selected_effective_status,
-                        owner=stewardship_owner,
-                        assignee=stewardship_assignee,
-                        review_note=review_note,
-                        changed_by=st.session_state.get("admin_token"),
-                    ),
-                )
-                st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
-                st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
-                    st.session_state.get("debug_knowledge_stewardship_items")
-                )
-                st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
-                st.session_state["last_action"] = {
-                    "level": "info",
-                    "message": "Saved durable stewardship owner, assignee, and review note for the selected canonical gap.",
-                }
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Saving stewardship fields failed: {error}",
-                }
-            st.rerun()
+            detail_columns = st.columns([3, 3, 2])
+            detail_columns[0].markdown(f"**Source:** {_normalized_text(selected_candidate.get('source')) or 'n/a'}")
+            detail_columns[1].markdown(f"**Target:** {_normalized_text(selected_candidate.get('target')) or 'n/a'}")
+            detail_columns[2].metric("Confidence", f"{int(float(selected_candidate.get('confidence', 0.0) or 0.0) * 100)}%")
+            st.caption(f"Console state: {selected_console_state}")
+            st.caption(f"Proposal triage: {_canonical_gap_proposal_state_label(selected_proposal_state)}")
+            st.caption(f"Stewardship status: {_canonical_gap_proposal_state_label(selected_effective_status)}")
+            if selected_candidate.get("reason"):
+                st.caption(selected_candidate.get("reason"))
+            if selected_candidate.get("explanation"):
+                st.caption("Signals: " + " | ".join(selected_candidate.get("explanation") or []))
 
-        triage_columns = st.columns([2, 1])
-        triage_selection = triage_columns[0].selectbox(
-            "Proposal triage",
-            options=["new", "needs_review", "ready_for_approval"],
-            index=["new", "needs_review", "ready_for_approval"].index(selected_proposal_state),
-            key=f"debug_proposal_state_{selected_gap_index}",
-            format_func=_canonical_gap_proposal_state_label,
-        )
-        if triage_columns[1].button(
-            "Update triage",
-            width="stretch",
-            key=f"debug_update_proposal_state_{selected_gap_index}",
-            disabled=triage_selection == selected_proposal_state,
-        ):
-            try:
-                if selected_stewardship_item_id:
-                    api_request(
-                        "POST",
-                        f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
-                        json=_knowledge_stewardship_status_update_request(
-                            triage_selection,
-                            st.session_state.get("admin_token"),
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                        ),
-                    )
-                else:
-                    api_request(
-                        "POST",
-                        "/knowledge/stewardship-items",
-                        json=_canonical_gap_stewardship_item_request(
-                            selected_candidate_key,
-                            selected_candidate,
-                            selected_suggestion or None,
-                            status=triage_selection,
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                            changed_by=st.session_state.get("admin_token"),
-                        ),
-                    )
-                st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
-                st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
-                    st.session_state.get("debug_knowledge_stewardship_items")
-                )
-                st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
-                st.session_state["last_action"] = {
-                    "level": "info",
-                    "message": (
-                        f"Updated proposal triage to '{_canonical_gap_proposal_state_label(triage_selection)}' for "
-                        f"{_normalized_text(selected_candidate.get('source')) or 'selected gap'}."
-                    ),
-                }
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Updating proposal triage failed: {error}",
-                }
-            st.rerun()
+            stewardship_columns = st.columns(2)
+            stewardship_owner = stewardship_columns[0].text_input(
+                "Owner",
+                value=_normalized_text(selected_stewardship_item.get("owner")),
+                key=f"debug_stewardship_owner_{selected_gap_index}",
+                placeholder="Example: data-governance",
+            )
+            stewardship_assignee = stewardship_columns[1].text_input(
+                "Assignee",
+                value=_normalized_text(selected_stewardship_item.get("assignee")),
+                key=f"debug_stewardship_assignee_{selected_gap_index}",
+                placeholder="Example: analyst-on-duty",
+            )
 
-        state_action_columns = st.columns(3)
-        if state_action_columns[0].button(
-            "Ignore with audit",
-            width="stretch",
-            key=f"debug_ignore_canonical_gap_{selected_gap_index}",
-            disabled=not _canonical_gap_can_ignore(selected_console_state),
-        ):
-            try:
-                api_request(
-                    "POST",
-                    "/knowledge/canonical-gaps/reject",
-                    json=_canonical_gap_rejection_request(
-                        selected_candidate,
-                        selected_suggestion or None,
-                        st.session_state.get("admin_token"),
-                        review_note,
-                        disposition="ignored",
-                    ),
-                )
-                canonical_gap_console_states[selected_candidate_key] = "ignored"
-                if selected_stewardship_item_id:
-                    api_request(
-                        "POST",
-                        f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
-                        json=_knowledge_stewardship_status_update_request(
-                            "ignored",
-                            st.session_state.get("admin_token"),
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                            note=review_note,
-                        ),
-                    )
-                else:
-                    api_request(
-                        "POST",
-                        "/knowledge/stewardship-items",
-                        json=_canonical_gap_stewardship_item_request(
-                            selected_candidate_key,
-                            selected_candidate,
-                            selected_suggestion or None,
-                            status="ignored",
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                            changed_by=st.session_state.get("admin_token"),
-                        ),
-                    )
-                st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
-                st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
-                    st.session_state.get("debug_knowledge_stewardship_items")
-                )
-                st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
-                st.session_state["last_action"] = {
-                    "level": "info",
-                    "message": "Ignored canonical gap suggestion and persisted an audit entry.",
-                }
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Canonical gap ignore failed: {error}",
-                }
-            st.rerun()
+            review_note = st.text_input(
+                "Review note",
+                value=_normalized_text(selected_stewardship_item.get("review_note")),
+                key=f"debug_review_note_{selected_gap_index}",
+                placeholder="Why is this gap being ignored, rejected, or ready for approval?",
+            )
 
-        if state_action_columns[1].button(
-            "Restore to queue",
-            width="stretch",
-            key=f"debug_restore_canonical_gap_{selected_gap_index}",
-            disabled=not _canonical_gap_can_restore(selected_console_state),
-        ):
-            canonical_gap_console_states.pop(selected_candidate_key, None)
-            if selected_stewardship_item_id:
+            save_stewardship_disabled = (
+                bool(selected_stewardship_item_id)
+                and _normalized_text(selected_stewardship_item.get("owner")) == _normalized_text(stewardship_owner)
+                and _normalized_text(selected_stewardship_item.get("assignee")) == _normalized_text(stewardship_assignee)
+                and _normalized_text(selected_stewardship_item.get("review_note")) == _normalized_text(review_note)
+                and _canonical_gap_stewardship_status(selected_stewardship_item) == selected_effective_status
+            )
+            if st.button(
+                "Save stewardship fields",
+                width="stretch",
+                key=f"debug_save_stewardship_item_{selected_gap_index}",
+                disabled=save_stewardship_disabled,
+            ):
                 try:
                     api_request(
                         "POST",
-                        f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
-                        json=_knowledge_stewardship_status_update_request(
-                            "needs_review",
-                            st.session_state.get("admin_token"),
+                        "/knowledge/stewardship-items",
+                        json=_canonical_gap_stewardship_item_request(
+                            selected_candidate_key,
+                            selected_candidate,
+                            selected_suggestion or None,
+                            status=selected_effective_status,
                             owner=stewardship_owner,
                             assignee=stewardship_assignee,
                             review_note=review_note,
+                            changed_by=st.session_state.get("admin_token"),
                         ),
                     )
                     st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
                     st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
                         st.session_state.get("debug_knowledge_stewardship_items")
                     )
+                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                    st.session_state["last_action"] = {
+                        "level": "info",
+                        "message": "Saved durable stewardship owner, assignee, and review note for the selected canonical gap.",
+                    }
                 except httpx.HTTPError as error:
                     st.session_state["last_action"] = {
                         "level": "error",
-                        "message": f"Restoring stewardship status failed: {error}",
+                        "message": f"Saving stewardship fields failed: {error}",
                     }
-                    st.rerun()
-            st.session_state["last_action"] = {
-                "level": "info",
-                "message": "Restored canonical gap to the active console queue. Existing ignore audit entries remain in history.",
-            }
-            st.rerun()
+                st.rerun()
 
-        if state_action_columns[2].button(
-            "Reject with audit",
-            width="stretch",
-            key=f"debug_reject_canonical_gap_{selected_gap_index}",
-            disabled=not _canonical_gap_can_reject(selected_console_state),
-        ):
-            try:
-                api_request(
-                    "POST",
-                    "/knowledge/canonical-gaps/reject",
-                    json=_canonical_gap_rejection_request(
-                        selected_candidate,
-                        selected_suggestion or None,
-                        st.session_state.get("admin_token"),
-                        review_note,
-                    ),
-                )
-                canonical_gap_console_states[selected_candidate_key] = "rejected"
-                if selected_stewardship_item_id:
-                    api_request(
-                        "POST",
-                        f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
-                        json=_knowledge_stewardship_status_update_request(
-                            "rejected",
-                            st.session_state.get("admin_token"),
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                            note=review_note,
-                        ),
-                    )
-                else:
-                    api_request(
-                        "POST",
-                        "/knowledge/stewardship-items",
-                        json=_canonical_gap_stewardship_item_request(
-                            selected_candidate_key,
-                            selected_candidate,
-                            selected_suggestion or None,
-                            status="rejected",
-                            owner=stewardship_owner,
-                            assignee=stewardship_assignee,
-                            review_note=review_note,
-                            changed_by=st.session_state.get("admin_token"),
-                        ),
-                    )
-                st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
-                st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
-                    st.session_state.get("debug_knowledge_stewardship_items")
-                )
-                st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
-                st.session_state["last_action"] = {
-                    "level": "info",
-                    "message": "Rejected canonical gap suggestion and persisted an audit entry.",
-                }
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Canonical gap rejection failed: {error}",
-                }
-            st.rerun()
-
-        related_gap_audit_entries = _canonical_gap_related_audit_entries(
-            st.session_state.get("debug_knowledge_audit_logs"),
-            selected_candidate,
-        )
-        if related_gap_audit_entries:
-            st.write("**Gap audit references**")
-            st.dataframe(related_gap_audit_entries, width="stretch", hide_index=True)
-
-        if selected_suggestion:
-            st.write(
-                f"Action: **{selected_suggestion.get('action', 'no_action')}** | "
-                f"Concept: **{selected_suggestion.get('concept_id') or 'n/a'}** - {selected_suggestion.get('display_name') or 'n/a'}"
+            triage_columns = st.columns([2, 1])
+            triage_selection = triage_columns[0].selectbox(
+                "Proposal triage",
+                options=["new", "needs_review", "ready_for_approval"],
+                index=["new", "needs_review", "ready_for_approval"].index(selected_proposal_state),
+                key=f"debug_proposal_state_{selected_gap_index}",
+                format_func=_canonical_gap_proposal_state_label,
             )
-            if selected_suggestion.get("aliases"):
-                st.caption("Aliases: " + ", ".join(selected_suggestion.get("aliases") or []))
-            for line in selected_suggestion.get("reasoning") or []:
-                st.caption(f"Reason: {line}")
-            for line in selected_suggestion.get("risk_notes") or []:
-                st.caption(f"Risk: {line}")
-
-            impact_preview_rows = _canonical_gap_impact_preview_rows(
-                selected_gap_index,
-                selected_candidate,
-                selected_suggestion,
-                canonical_gap_candidates,
-                canonical_gap_suggestions,
-                canonical_gap_console_states,
-            )
-            suggested_concept_id = _normalized_text(selected_suggestion.get("concept_id"))
-            suggested_concept_summary = next(
-                (
-                    concept
-                    for concept in st.session_state.get("debug_canonical_concepts") or []
-                    if _normalized_text(concept.get("concept_id")) == suggested_concept_id
-                ),
-                None,
-            )
-            if impact_preview_rows or suggested_concept_summary:
-                st.write("**Impact preview**")
-                impact_metrics = st.columns(3)
-                impact_metrics[0].metric("Potential queue rows", len(impact_preview_rows))
-                impact_metrics[1].metric("Additional rows", max(0, len(impact_preview_rows) - 1))
-                impact_metrics[2].metric(
-                    "Saved usages",
-                    int((suggested_concept_summary or {}).get("usage_count", 0) or 0),
-                )
-                if suggested_concept_summary and (
-                    suggested_concept_summary.get("source_systems") or suggested_concept_summary.get("business_domains")
-                ):
-                    st.caption(
-                        "Concept facets: "
-                        + " | ".join(
-                            part
-                            for part in [
-                                (
-                                    "source_systems=" + ", ".join(suggested_concept_summary.get("source_systems") or [])
-                                    if suggested_concept_summary.get("source_systems")
-                                    else ""
-                                ),
-                                (
-                                    "business_domains=" + ", ".join(suggested_concept_summary.get("business_domains") or [])
-                                    if suggested_concept_summary.get("business_domains")
-                                    else ""
-                                ),
-                            ]
-                            if part
-                        )
-                    )
-                if impact_preview_rows:
-                    st.dataframe(impact_preview_rows, width="stretch", hide_index=True)
-                else:
-                    st.caption("No additional current queue rows match this proposed concept/alias pattern yet.")
-
-            approve_ready = _canonical_gap_can_approve(
-                selected_suggestion,
-                selected_console_state,
-                selected_proposal_state,
-            )
-            if st.button(
-                "Approve from console",
+            if triage_columns[1].button(
+                "Update triage",
                 width="stretch",
-                key=f"debug_approve_canonical_gap_{selected_gap_index}",
-                disabled=not approve_ready,
+                key=f"debug_update_proposal_state_{selected_gap_index}",
+                disabled=triage_selection == selected_proposal_state,
             ):
                 try:
-                    response = api_request(
-                        "POST",
-                        "/knowledge/canonical-gaps/approve",
-                        json=_canonical_gap_approval_request(
-                            selected_candidate,
-                            selected_suggestion,
-                            st.session_state.get("admin_token"),
-                        ),
-                    )
-                    canonical_gap_console_states[selected_candidate_key] = "approved"
                     if selected_stewardship_item_id:
                         api_request(
                             "POST",
                             f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
                             json=_knowledge_stewardship_status_update_request(
-                                "approved",
+                                triage_selection,
                                 st.session_state.get("admin_token"),
                                 owner=stewardship_owner,
                                 assignee=stewardship_assignee,
@@ -2470,62 +2193,365 @@ def render_canonical_console_panel(
                             json=_canonical_gap_stewardship_item_request(
                                 selected_candidate_key,
                                 selected_candidate,
-                                selected_suggestion,
-                                status="approved",
+                                selected_suggestion or None,
+                                status=triage_selection,
                                 owner=stewardship_owner,
                                 assignee=stewardship_assignee,
                                 review_note=review_note,
                                 changed_by=st.session_state.get("admin_token"),
                             ),
                         )
-                    st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
-                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
                     st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
                     st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
                         st.session_state.get("debug_knowledge_stewardship_items")
                     )
-                    if st.session_state.get("debug_canonical_concepts") is not None:
-                        st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
-                    approved_concept_id = _normalized_text(selected_suggestion.get("concept_id"))
-                    if approved_concept_id:
-                        st.session_state["debug_canonical_concept_detail"] = api_request(
-                            "GET",
-                            f"/knowledge/canonical-concepts/{approved_concept_id}",
-                        )
-                    if st.session_state.get("debug_knowledge_overlays") is not None:
-                        st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
                     st.session_state["last_action"] = {
-                        "level": "success",
+                        "level": "info",
                         "message": (
-                            f"Approved canonical gap into overlay '{response.get('overlay_name')}'. "
-                            "Regenerate mapping to see the canonical path filled."
+                            f"Updated proposal triage to '{_canonical_gap_proposal_state_label(triage_selection)}' for "
+                            f"{_normalized_text(selected_candidate.get('source')) or 'selected gap'}."
                         ),
                     }
                 except httpx.HTTPError as error:
                     st.session_state["last_action"] = {
                         "level": "error",
-                        "message": f"Canonical gap approval failed: {error}",
+                        "message": f"Updating proposal triage failed: {error}",
                     }
                 st.rerun()
-            elif selected_console_state == "ignored":
-                st.caption("This gap is currently ignored in the console. Restore it to the active queue before approving.")
-            elif selected_console_state == "approved":
-                st.caption("This gap was already approved from the console in this session.")
-            elif selected_console_state == "rejected":
-                st.caption("This gap was rejected from the console and the decision was persisted to the audit log.")
-            elif selected_proposal_state != "ready_for_approval":
-                st.caption(
-                    "Move proposal triage to 'Ready for approval' before approving from the console."
+
+            state_action_columns = st.columns(3)
+            if state_action_columns[0].button(
+                "Ignore with audit",
+                width="stretch",
+                key=f"debug_ignore_canonical_gap_{selected_gap_index}",
+                disabled=not _canonical_gap_can_ignore(selected_console_state),
+            ):
+                try:
+                    api_request(
+                        "POST",
+                        "/knowledge/canonical-gaps/reject",
+                        json=_canonical_gap_rejection_request(
+                            selected_candidate,
+                            selected_suggestion or None,
+                            st.session_state.get("admin_token"),
+                            review_note,
+                            disposition="ignored",
+                        ),
+                    )
+                    canonical_gap_console_states[selected_candidate_key] = "ignored"
+                    if selected_stewardship_item_id:
+                        api_request(
+                            "POST",
+                            f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
+                            json=_knowledge_stewardship_status_update_request(
+                                "ignored",
+                                st.session_state.get("admin_token"),
+                                owner=stewardship_owner,
+                                assignee=stewardship_assignee,
+                                review_note=review_note,
+                                note=review_note,
+                            ),
+                        )
+                    else:
+                        api_request(
+                            "POST",
+                            "/knowledge/stewardship-items",
+                            json=_canonical_gap_stewardship_item_request(
+                                selected_candidate_key,
+                                selected_candidate,
+                                selected_suggestion or None,
+                                status="ignored",
+                                owner=stewardship_owner,
+                                assignee=stewardship_assignee,
+                                review_note=review_note,
+                                changed_by=st.session_state.get("admin_token"),
+                            ),
+                        )
+                    st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                    st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
+                        st.session_state.get("debug_knowledge_stewardship_items")
+                    )
+                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                    st.session_state["last_action"] = {
+                        "level": "info",
+                        "message": "Ignored canonical gap suggestion and persisted an audit entry.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Canonical gap ignore failed: {error}",
+                    }
+                st.rerun()
+
+            if state_action_columns[1].button(
+                "Restore to queue",
+                width="stretch",
+                key=f"debug_restore_canonical_gap_{selected_gap_index}",
+                disabled=not _canonical_gap_can_restore(selected_console_state),
+            ):
+                canonical_gap_console_states.pop(selected_candidate_key, None)
+                if selected_stewardship_item_id:
+                    try:
+                        api_request(
+                            "POST",
+                            f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
+                            json=_knowledge_stewardship_status_update_request(
+                                "needs_review",
+                                st.session_state.get("admin_token"),
+                                owner=stewardship_owner,
+                                assignee=stewardship_assignee,
+                                review_note=review_note,
+                            ),
+                        )
+                        st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                        st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
+                            st.session_state.get("debug_knowledge_stewardship_items")
+                        )
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Restoring stewardship status failed: {error}",
+                        }
+                        st.rerun()
+                st.session_state["last_action"] = {
+                    "level": "info",
+                    "message": "Restored canonical gap to the active console queue. Existing ignore audit entries remain in history.",
+                }
+                st.rerun()
+
+            if state_action_columns[2].button(
+                "Reject with audit",
+                width="stretch",
+                key=f"debug_reject_canonical_gap_{selected_gap_index}",
+                disabled=not _canonical_gap_can_reject(selected_console_state),
+            ):
+                try:
+                    api_request(
+                        "POST",
+                        "/knowledge/canonical-gaps/reject",
+                        json=_canonical_gap_rejection_request(
+                            selected_candidate,
+                            selected_suggestion or None,
+                            st.session_state.get("admin_token"),
+                            review_note,
+                        ),
+                    )
+                    canonical_gap_console_states[selected_candidate_key] = "rejected"
+                    if selected_stewardship_item_id:
+                        api_request(
+                            "POST",
+                            f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
+                            json=_knowledge_stewardship_status_update_request(
+                                "rejected",
+                                st.session_state.get("admin_token"),
+                                owner=stewardship_owner,
+                                assignee=stewardship_assignee,
+                                review_note=review_note,
+                                note=review_note,
+                            ),
+                        )
+                    else:
+                        api_request(
+                            "POST",
+                            "/knowledge/stewardship-items",
+                            json=_canonical_gap_stewardship_item_request(
+                                selected_candidate_key,
+                                selected_candidate,
+                                selected_suggestion or None,
+                                status="rejected",
+                                owner=stewardship_owner,
+                                assignee=stewardship_assignee,
+                                review_note=review_note,
+                                changed_by=st.session_state.get("admin_token"),
+                            ),
+                        )
+                    st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                    st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
+                        st.session_state.get("debug_knowledge_stewardship_items")
+                    )
+                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                    st.session_state["last_action"] = {
+                        "level": "info",
+                        "message": "Rejected canonical gap suggestion and persisted an audit entry.",
+                    }
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Canonical gap rejection failed: {error}",
+                    }
+                st.rerun()
+
+            related_gap_audit_entries = _canonical_gap_related_audit_entries(
+                st.session_state.get("debug_knowledge_audit_logs"),
+                selected_candidate,
+            )
+            if related_gap_audit_entries:
+                st.write("**Gap audit references**")
+                st.dataframe(related_gap_audit_entries, width="stretch", hide_index=True)
+
+            if selected_suggestion:
+                st.write(
+                    f"Action: **{selected_suggestion.get('action', 'no_action')}** | "
+                    f"Concept: **{selected_suggestion.get('concept_id') or 'n/a'}** - {selected_suggestion.get('display_name') or 'n/a'}"
                 )
-            elif not approve_ready:
-                st.caption("This suggestion is not approve-ready. Generate a usable non-`no_action` suggestion from the Review tab first.")
-        else:
-            if selected_console_state == "rejected":
-                st.caption("This gap was rejected without a cached suggestion payload. The audit decision is persisted.")
-            elif selected_console_state == "ignored":
-                st.caption("This gap was ignored with audit. Restore it locally if you want to reconsider it in the queue.")
+                if selected_suggestion.get("aliases"):
+                    st.caption("Aliases: " + ", ".join(selected_suggestion.get("aliases") or []))
+                for line in selected_suggestion.get("reasoning") or []:
+                    st.caption(f"Reason: {line}")
+                for line in selected_suggestion.get("risk_notes") or []:
+                    st.caption(f"Risk: {line}")
+
+                impact_preview_rows = _canonical_gap_impact_preview_rows(
+                    selected_gap_index,
+                    selected_candidate,
+                    selected_suggestion,
+                    canonical_gap_candidates,
+                    canonical_gap_suggestions,
+                    canonical_gap_console_states,
+                )
+                suggested_concept_id = _normalized_text(selected_suggestion.get("concept_id"))
+                suggested_concept_summary = next(
+                    (
+                        concept
+                        for concept in st.session_state.get("debug_canonical_concepts") or []
+                        if _normalized_text(concept.get("concept_id")) == suggested_concept_id
+                    ),
+                    None,
+                )
+                if impact_preview_rows or suggested_concept_summary:
+                    st.write("**Impact preview**")
+                    impact_metrics = st.columns(3)
+                    impact_metrics[0].metric("Potential queue rows", len(impact_preview_rows))
+                    impact_metrics[1].metric("Additional rows", max(0, len(impact_preview_rows) - 1))
+                    impact_metrics[2].metric(
+                        "Saved usages",
+                        int((suggested_concept_summary or {}).get("usage_count", 0) or 0),
+                    )
+                    if suggested_concept_summary and (
+                        suggested_concept_summary.get("source_systems") or suggested_concept_summary.get("business_domains")
+                    ):
+                        st.caption(
+                            "Concept facets: "
+                            + " | ".join(
+                                part
+                                for part in [
+                                    (
+                                        "source_systems=" + ", ".join(suggested_concept_summary.get("source_systems") or [])
+                                        if suggested_concept_summary.get("source_systems")
+                                        else ""
+                                    ),
+                                    (
+                                        "business_domains=" + ", ".join(suggested_concept_summary.get("business_domains") or [])
+                                        if suggested_concept_summary.get("business_domains")
+                                        else ""
+                                    ),
+                                ]
+                                if part
+                            )
+                        )
+                    if impact_preview_rows:
+                        st.dataframe(impact_preview_rows, width="stretch", hide_index=True)
+                    else:
+                        st.caption("No additional current queue rows match this proposed concept/alias pattern yet.")
+
+                approve_ready = _canonical_gap_can_approve(
+                    selected_suggestion,
+                    selected_console_state,
+                    selected_proposal_state,
+                )
+                if st.button(
+                    "Approve from console",
+                    width="stretch",
+                    key=f"debug_approve_canonical_gap_{selected_gap_index}",
+                    disabled=not approve_ready,
+                ):
+                    try:
+                        response = api_request(
+                            "POST",
+                            "/knowledge/canonical-gaps/approve",
+                            json=_canonical_gap_approval_request(
+                                selected_candidate,
+                                selected_suggestion,
+                                st.session_state.get("admin_token"),
+                            ),
+                        )
+                        canonical_gap_console_states[selected_candidate_key] = "approved"
+                        if selected_stewardship_item_id:
+                            api_request(
+                                "POST",
+                                f"/knowledge/stewardship-items/{selected_stewardship_item_id}/status",
+                                json=_knowledge_stewardship_status_update_request(
+                                    "approved",
+                                    st.session_state.get("admin_token"),
+                                    owner=stewardship_owner,
+                                    assignee=stewardship_assignee,
+                                    review_note=review_note,
+                                ),
+                            )
+                        else:
+                            api_request(
+                                "POST",
+                                "/knowledge/stewardship-items",
+                                json=_canonical_gap_stewardship_item_request(
+                                    selected_candidate_key,
+                                    selected_candidate,
+                                    selected_suggestion,
+                                    status="approved",
+                                    owner=stewardship_owner,
+                                    assignee=stewardship_assignee,
+                                    review_note=review_note,
+                                    changed_by=st.session_state.get("admin_token"),
+                                ),
+                            )
+                        st.session_state["debug_knowledge_runtime"] = api_request("POST", "/knowledge/reload")
+                        st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                        st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                        st.session_state["debug_canonical_gap_proposal_states"] = _canonical_gap_proposal_state_map(
+                            st.session_state.get("debug_knowledge_stewardship_items")
+                        )
+                        if st.session_state.get("debug_canonical_concepts") is not None:
+                            st.session_state["debug_canonical_concepts"] = api_request("GET", "/knowledge/canonical-concepts")
+                        approved_concept_id = _normalized_text(selected_suggestion.get("concept_id"))
+                        if approved_concept_id:
+                            st.session_state["debug_canonical_concept_detail"] = api_request(
+                                "GET",
+                                f"/knowledge/canonical-concepts/{approved_concept_id}",
+                            )
+                        if st.session_state.get("debug_knowledge_overlays") is not None:
+                            st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                f"Approved canonical gap into overlay '{response.get('overlay_name')}'. "
+                                "Regenerate mapping to see the canonical path filled."
+                            ),
+                        }
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Canonical gap approval failed: {error}",
+                        }
+                    st.rerun()
+                elif selected_console_state == "ignored":
+                    st.caption("This gap is currently ignored in the console. Restore it to the active queue before approving.")
+                elif selected_console_state == "approved":
+                    st.caption("This gap was already approved from the console in this session.")
+                elif selected_console_state == "rejected":
+                    st.caption("This gap was rejected from the console and the decision was persisted to the audit log.")
+                elif selected_proposal_state != "ready_for_approval":
+                    st.caption(
+                        "Move proposal triage to 'Ready for approval' before approving from the console."
+                    )
+                elif not approve_ready:
+                    st.caption("This suggestion is not approve-ready. Generate a usable non-`no_action` suggestion from the Review tab first.")
             else:
-                st.info("No cached LLM suggestion for this gap yet. Generate it from the Review tab.")
+                if selected_console_state == "rejected":
+                    st.caption("This gap was rejected without a cached suggestion payload. The audit decision is persisted.")
+                elif selected_console_state == "ignored":
+                    st.caption("This gap was ignored with audit. Restore it locally if you want to reconsider it in the queue.")
+                else:
+                    st.info("No cached LLM suggestion for this gap yet. Generate it from the Review tab.")
     else:
         st.info("Canonical gap review queue is empty. Use the Review tab to find high-confidence gaps first.")
 

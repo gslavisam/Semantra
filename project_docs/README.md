@@ -1,6 +1,8 @@
 # Semantra Project Docs
 
-Ovaj folder je sada sveden na mali skup dokumenata sa jasnim ulogama. Cilj je da se stanje projekta može pregledati bez preklapanja između roadmap-a, istorije isporuke i operativnih checklist-a.
+Ovaj folder drži mali skup projektnih dokumenata sa jasnim ulogama. Cilj je da stanje proizvoda, istorija isporuke, sledeći prioriteti i izvršne checkliste budu pregledni bez međusobnog preklapanja.
+
+Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-17.
 
 ## Preporučeni red čitanja
 
@@ -34,6 +36,7 @@ Ovaj folder je sada sveden na mali skup dokumenata sa jasnim ulogama. Cilj je da
 - Kada se feature završi, detaljna checklist stavka izlazi iz `implementation_checklists.md` i prelazi u `completed_slices.md`.
 - `epics.md` treba da ostane backlog mapa, ne mešavina retrospektive i aktivnih zadataka.
 - `current_state.md` je mesto gde prvo proveravamo šta proizvod danas podržava.
+- Kada se završi veći execution wave, `plan.md` mora da se prepiše tako da sledeći koraci budu jasni, a ne da zadržava jučerašnje prioritete.
 
 ## Granica ovog foldera
 
@@ -42,6 +45,6 @@ U `project_docs/` držimo samo projektno-upravljačke dokumente.
 Van ovog foldera ostaju:
 
 - `docs/vision/` za vision i product memo dokumente
-- `docs/reference/` za dublje tehničke reference kao što su scoring, warning/runtime behavior, benchmark metrike i correction-impact objašnjenja
+- `docs/reference/` za dublje tehničke reference kao što su scoring, warning/runtime behavior, benchmark metrike, correction-impact i canonical/catalog reference
 - `docs/pilot/` za pilot/test planove
 - `docs/presentation/` i slični stakeholder/demo artefakti

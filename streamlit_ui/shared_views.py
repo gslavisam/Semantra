@@ -81,9 +81,16 @@ def render_llm_runtime_status() -> None:
     llm_status = str(config.get("llm_status", "configured")).strip().lower() or "configured"
     llm_status_detail = str(config.get("llm_status_detail", "")).strip()
     resolved_model = str(config.get("llm_resolved_model", "")).strip() or llm_model
+    llm_endpoint = str(config.get("lmstudio_base_url", "")).strip()
     gate_min = config.get("llm_gate_min_score", "?")
     gate_max = config.get("llm_gate_max_score", "?")
+    tts_provider = str(config.get("tts_provider", "none")).strip() or "none"
+    tts_timeout = config.get("tts_timeout_seconds", "?")
+    tts_endpoint = str(config.get("lmstudio_tts_base_url", "")).strip()
+    tts_model = str(config.get("lmstudio_orpheus_model", "")).strip() or "n/a"
+    tts_voice = str(config.get("lmstudio_orpheus_voice", "")).strip() or "n/a"
 
+    st.write("**LLM**")
     if llm_provider.lower() == "none":
         st.warning("LLM is currently disabled.")
     elif llm_status == "reachable":
@@ -96,7 +103,21 @@ def render_llm_runtime_status() -> None:
         st.info(f"LLM configured: {llm_provider} / {llm_model}")
     if llm_status_detail:
         st.caption(llm_status_detail)
+    if llm_provider.lower() == "lmstudio" and llm_endpoint:
+        st.caption(f"LLM endpoint: {llm_endpoint}")
     st.caption(f"Ambiguity gate: {gate_min} - {gate_max}")
+
+    st.write("**TTS**")
+    if tts_provider.lower() == "none":
+        st.info("TTS is currently disabled.")
+    elif tts_provider.lower().startswith("lmstudio"):
+        st.success(f"TTS configured: {tts_provider} / {tts_model}")
+    else:
+        st.info(f"TTS configured: {tts_provider}")
+    if tts_provider.lower() != "none":
+        if tts_provider.lower().startswith("lmstudio") and tts_endpoint:
+            st.caption(f"TTS endpoint: {tts_endpoint}")
+        st.caption(f"TTS voice: {tts_voice} | timeout={tts_timeout}s")
 
 
 def render_dataset_summary(label: str, handle: dict) -> None:

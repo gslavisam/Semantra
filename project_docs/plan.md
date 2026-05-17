@@ -11,60 +11,74 @@ Za to služe:
 
 ## Trenutna pozicija proizvoda
 
-Semantra je stigla do pilot-ready faze za glavni analyst + governance tok:
+Semantra je stigla do pilot-ready faze za glavni analyst + governance tok i zatvorila je još jedan execution wave oko bounded guidance površina:
 
 - upload i schema profiling rade kroz više ulaznih formata
 - mapping review, trust layer i transformation authoring su upotrebljivi
+- `Mapping Analysis Overview`, `Review Queue Plan`, `Gap Queue Summary`, `Benchmark Explanation` i `Workspace Reuse Fit` postoje kao kontrolisane guidance površine
 - mapping set governance postoji i backend ga stvarno enforce-uje
 - canonical layer i knowledge overlay lifecycle postoje kao product surface, ne samo kao interni runtime
 - Canonical Console je pilot-complete za glavni stewardship happy path
+- dokumentacija je ponovo usklađena sa realnim stanjem proizvoda
 
-Sledeći korak nije širenje u mnogo pravaca odjednom, već konsolidacija, reuse discovery i hardening najvrednijih putanja.
+Sledeći korak nije širenje u mnogo pravaca odjednom, već produktizacija novih guidance tokova, reuse discovery i hardening najvrednijih putanja.
 
 ## Prioritetni redosled rada
 
-### 1. Dokumentaciona i release narativ usklađenost
+### 1. Produktizacija bounded guidance površina
 
-Prvo usaglasiti `project_docs`, a zatim i spoljne dokumente (`README`, `help`, `PROJECT_OVERVIEW`) sa stvarnim stanjem proizvoda.
-
-Exit kriterijum:
-
-- postoji jedan jasan opis šta je implementirano
-- backlog, plan i hronologija su razdvojeni
-- pilot-complete i active/open statusi su konzistentni kroz dokumentaciju
-
-### 2. Epic 13D: Concept and reuse discovery
-
-Početni 13D discovery talas je sada zatvoren kroz concept-centric reuse pregled, viši discovery overview, reuse hint-ove i surfacing ponavljanih review gap-ova.
+Prvi sledeći fokus je da novi bounded AI/guidance layer izgleda kao konzistentna porodica funkcija, a ne kao skup izdvojenih eksperimenata.
 
 Fokus:
 
-- concept-centric reuse pregled kroz više integracija
-- osnovni vizuelni discovery prikaz
-- hint-ovi tipa `similar approved integration exists`
-- surfacovanje ponavljanih gap-ova kao input za canonical i knowledge rad
+- uskladiti naming, unlock poruke i expected user journey između `Workspace`, `Benchmarks` i `Catalog`
+- potvrditi kroz realne tokove gde korisnik stvarno dobija vrednost od `Mapping Analysis Overview`, `Review Queue Plan`, `Gap Queue Summary`, `Benchmark Explanation` i `Workspace Reuse Fit`
+- izbeći semantičko preklapanje između postojećeg trust layer-a i novih queue/explanation panela
+- zadržati pravilo da nijedna od ovih površina ne radi auto-apply ili auto-approval
+
+### 2. Epic 13D: Concept and reuse discovery expansion
+
+Početni 13D discovery talas je zatvoren kroz concept-centric reuse pregled, viši discovery overview, reuse hint-ove i surfacing ponavljanih review gap-ova. Sada sledi širenje tog sloja.
+
+Fokus:
+
+- bogatiji concept-centric reuse pregled kroz više integracija
+- bolji compare/drilldown između sličnih integracija i mapping set verzija
+- povezivanje Catalog reuse discovery signala sa Workspace review i canonical gap radom
+- jači reuse narativ pre samog `Reuse in Workspace` koraka
 
 ### 3. Operational hardening nad postojećim pilot površinama
 
-Ovo je sada sledeći glavni izvršni fokus pre daljeg feature širenja.
+Ovo ostaje stalni paralelni fokus pre većeg feature širenja.
 
 Fokus:
 
 - stabilniji regression subset za glavne product surface-ove
+- browser-level proveru najvažnijih pilot tokova, ne samo helper testove
 - dalji governance enforcement tamo gde još postoje advisory ili implicitni prolazi
-- pilot/readiness docs i UX poliranje zasnovano na realnim tokovima
+- UX poliranje zasnovano na realnim pilot prolazima
 
-### 4. Epic 14A i 14B: performance i signal precomputation
+### 4. Persistence i runtime separation hardening
 
-Kada product narrative i reuse discovery budu stabilni, sledeći racionalan korak je ubrzanje i rasterećenje ranking toka.
+Ovo je sledeći arhitekturni fokus kada product surface ostane mirniji.
 
 Fokus:
 
-- target vector cache
+- postepeno razdvajanje canonical authoring/read modela od runtime matching sloja
+- SQLite read/write normalizacija samo tamo gde je discovery/governance zaista traže
+- jasni okidači za prelaz sa local in-memory job modela na durable job/status backend
+
+### 5. Epic 14A i 14B: performance i signal precomputation
+
+Kada reuse discovery i bounded guidance produktizacija budu stabilni, sledeći racionalan korak je ubrzanje i rasterećenje ranking toka.
+
+Fokus:
+
+- dalje produktizovanje target vector cache pristupa
 - stabilni precomputed signali
 - jasna granica između runtime scoring-a i keširanih slojeva
 
-### 5. Epic 12B: system-specific virtual targets
+### 6. Epic 12B: system-specific virtual targets
 
 Ovaj pravac ima smisla tek kada canonical coverage i governance disciplina budu dovoljno stabilni.
 
@@ -73,11 +87,11 @@ Pravilo:
 - canonical-only ostaje baza
 - system-specific virtual target ne sme da zamagli current canonical-first model
 
-### 6. Epic 9: data quality intelligence
+### 7. Epic 9: data quality intelligence
 
 Ovo ostaje važna, ali sledeća liga prioriteta. Treba ga uvoditi tek kada reuse i operational hardening budu dovoljno zatvoreni.
 
-### 7. Epic 15: derived graph layer
+### 8. Epic 15: derived graph layer
 
 Graph projekcija ostaje kasniji derived sloj. Ne uvoditi je pre nego što canonical, catalog i usage modeli sazru dovoljno da graf ima stabilan izvor.
 
@@ -112,7 +126,7 @@ Minimalni transition plan za tu tačku:
 
 ### Repo i docs organizacija
 
-Nastaviti disciplinu: malo dokumenata sa jasnim ulogama, bez novih snapshot fajlova koji dupliraju plan ili current-state sadržaj.
+Nastaviti disciplinu: malo dokumenata sa jasnim ulogama, bez novih snapshot fajlova koji dupliraju plan ili current-state sadržaj. Posle svakog većeg execution wave-a ažurirati `current_state.md`, `completed_slices.md` i `plan.md` u istom talasu.
 
 ## Operativna pravila
 

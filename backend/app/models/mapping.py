@@ -16,6 +16,7 @@ TransformationPreviewStatus = Literal["direct", "validated", "fallback"]
 TransformationPreviewClassification = Literal["direct", "safe", "risky", "custom"]
 TransformationIssueStage = Literal["preview", "codegen"]
 TransformationIssueSeverity = Literal["warning", "error"]
+CodegenMode = Literal["pandas", "pyspark"]
 TransformationWarningCode = Literal[
     "syntax_error",
     "runtime_error",
@@ -24,6 +25,7 @@ TransformationWarningCode = Literal[
     "type_coercion",
     "row_count_mismatch",
     "skipped_rejected_mapping",
+    "untranslated_custom_transformation",
 ]
 
 
@@ -165,6 +167,180 @@ class AutoMappingResponse(BaseModel):
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
 
 
+MappingAnalysisAudience = Literal["technical_implementor"]
+MappingAnalysisOverallRisk = Literal["low", "medium", "high"]
+MappingAnalysisCoverageStrength = Literal["low", "moderate", "strong"]
+MappingAnalysisTransformationRisk = Literal["low", "medium", "high"]
+
+
+class MappingAnalysisWorkspaceContext(BaseModel):
+    mapping_mode: Literal["standard", "canonical"] = "standard"
+    source_dataset_name: str = "Source dataset"
+    target_dataset_name: str = "Target dataset"
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    integration_name: str | None = None
+
+
+class MappingAnalysisOptions(BaseModel):
+    audience: MappingAnalysisAudience = "technical_implementor"
+    include_narration_seed: bool = True
+
+
+class MappingAnalysisRequest(BaseModel):
+    mapping_response: AutoMappingResponse
+    workspace: MappingAnalysisWorkspaceContext = Field(default_factory=MappingAnalysisWorkspaceContext)
+    options: MappingAnalysisOptions = Field(default_factory=MappingAnalysisOptions)
+
+
+class MappingAnalysisOverallMappingHealth(BaseModel):
+    summary: str = ""
+    accepted_count: int = 0
+    needs_review_count: int = 0
+    rejected_count: int = 0
+    unmatched_count: int = 0
+    high_confidence_count: int = 0
+    medium_confidence_count: int = 0
+    low_confidence_count: int = 0
+    overall_risk: MappingAnalysisOverallRisk = "low"
+
+
+class MappingAnalysisConfidenceDistribution(BaseModel):
+    high_confidence_count: int = 0
+    medium_confidence_count: int = 0
+    low_confidence_count: int = 0
+    high_confidence_ratio: float = 0.0
+    medium_confidence_ratio: float = 0.0
+    low_confidence_ratio: float = 0.0
+    interpretation: str = ""
+
+
+class MappingAnalysisStrongestMatch(BaseModel):
+    source: str
+    target: str
+    confidence: float = 0.0
+    why_it_is_strong: str = ""
+    supporting_signals: list[str] = Field(default_factory=list)
+    canonical_path: str = ""
+
+
+class MappingAnalysisNeedsReviewItem(BaseModel):
+    source: str
+    proposed_target: str = ""
+    confidence: float = 0.0
+    review_reason: str = ""
+    competing_targets: list[str] = Field(default_factory=list)
+    canonical_status: str = ""
+    recommended_check: str = ""
+
+
+class MappingAnalysisUnmatchedSource(BaseModel):
+    source: str
+    reason: str = ""
+    recommended_follow_up: str = ""
+
+
+class MappingAnalysisCanonicalCoverageSummary(BaseModel):
+    source_coverage: float = 0.0
+    target_coverage: float = 0.0
+    project_coverage: float = 0.0
+    shared_concepts: list[str] = Field(default_factory=list)
+    source_only_concepts: list[str] = Field(default_factory=list)
+    target_only_concepts: list[str] = Field(default_factory=list)
+    coverage_strength: MappingAnalysisCoverageStrength = "low"
+    coverage_interpretation: str = ""
+
+
+class MappingAnalysisTransformationHotspot(BaseModel):
+    source: str
+    target: str = ""
+    transformation_required: bool = False
+    transformation_risk: MappingAnalysisTransformationRisk = "low"
+    reason: str = ""
+
+
+class MappingAnalysisGenerationMetadata(BaseModel):
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class MappingAnalysisSummaryResponse(BaseModel):
+    title: str = ""
+    audience: MappingAnalysisAudience = "technical_implementor"
+    mapping_mode: Literal["standard", "canonical"] = "standard"
+    overall_mapping_health: MappingAnalysisOverallMappingHealth = Field(
+        default_factory=MappingAnalysisOverallMappingHealth
+    )
+    confidence_distribution: MappingAnalysisConfidenceDistribution = Field(
+        default_factory=MappingAnalysisConfidenceDistribution
+    )
+    strongest_matches: list[MappingAnalysisStrongestMatch] = Field(default_factory=list)
+    needs_review_items: list[MappingAnalysisNeedsReviewItem] = Field(default_factory=list)
+    unmatched_sources: list[MappingAnalysisUnmatchedSource] = Field(default_factory=list)
+    canonical_coverage_summary: MappingAnalysisCanonicalCoverageSummary = Field(
+        default_factory=MappingAnalysisCanonicalCoverageSummary
+    )
+    transformation_hotspots: list[MappingAnalysisTransformationHotspot] = Field(default_factory=list)
+    implementation_risks: list[str] = Field(default_factory=list)
+    recommended_next_actions: list[str] = Field(default_factory=list)
+    narration_script_seed: str = ""
+    generation_metadata: MappingAnalysisGenerationMetadata = Field(default_factory=MappingAnalysisGenerationMetadata)
+
+
+class MappingAnalysisNarrationRequest(BaseModel):
+    summary: MappingAnalysisSummaryResponse
+
+
+class MappingAnalysisNarrationResponse(BaseModel):
+    spoken_script: str = ""
+    generation_metadata: MappingAnalysisGenerationMetadata = Field(default_factory=MappingAnalysisGenerationMetadata)
+
+
+class MappingAnalysisAudioRequest(BaseModel):
+    spoken_script: str
+    voice: str | None = None
+    model: str | None = None
+
+
+ReviewPlanPriority = Literal["high", "medium", "low"]
+
+
+class ReviewPlanGenerationMetadata(BaseModel):
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class ReviewPlanCluster(BaseModel):
+    issue_type: str = ""
+    focus: str = ""
+    canonical_status: str = ""
+    priority: ReviewPlanPriority = "medium"
+    count: int = 0
+    source_examples: list[str] = Field(default_factory=list)
+    summary: str = ""
+    recommended_follow_up: str = ""
+
+
+class ReviewPlanRequest(BaseModel):
+    filtered_rows: list[dict[str, Any]] = Field(default_factory=list)
+    attention_summary_rows: list[dict[str, Any]] = Field(default_factory=list)
+    filters: dict[str, str] = Field(default_factory=dict)
+
+
+class ReviewPlanResponse(BaseModel):
+    title: str = ""
+    queue_summary: str = ""
+    clusters: list[ReviewPlanCluster] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    generation_metadata: ReviewPlanGenerationMetadata = Field(default_factory=ReviewPlanGenerationMetadata)
+
+
 MappingJobStatus = Literal["queued", "running", "cancel_requested", "completed", "failed", "canceled"]
 
 
@@ -261,6 +437,41 @@ class CanonicalGapProposalStateRecord(BaseModel):
     reviewed_by: str | None = None
     note: str | None = None
     created_at: str | None = None
+
+
+class CanonicalGapTriageGenerationMetadata(BaseModel):
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class CanonicalGapTriageGroup(BaseModel):
+    priority: Literal["high", "medium", "low"] = "medium"
+    focus: str = ""
+    count: int = 0
+    suggestion_action: str = ""
+    proposal_state: str = ""
+    source_examples: list[str] = Field(default_factory=list)
+    summary: str = ""
+    recommended_follow_up: str = ""
+
+
+class CanonicalGapTriageSummaryRequest(BaseModel):
+    candidates: list[CanonicalGapCandidate] = Field(default_factory=list)
+    suggestions: dict[str, CanonicalGapSuggestion] = Field(default_factory=dict)
+    proposal_states: dict[str, CanonicalGapProposalState] = Field(default_factory=dict)
+
+
+class CanonicalGapTriageSummaryResponse(BaseModel):
+    title: str = ""
+    summary: str = ""
+    groups: list[CanonicalGapTriageGroup] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    generation_metadata: CanonicalGapTriageGenerationMetadata = Field(
+        default_factory=CanonicalGapTriageGenerationMetadata
+    )
 
 
 class DecisionLogEntry(BaseModel):
@@ -440,6 +651,42 @@ class CatalogConceptDetail(BaseModel):
     integrations: list[CatalogConceptUsageRecord] = Field(default_factory=list)
 
 
+CatalogReuseFitAssessment = Literal["strong_fit", "partial_fit", "low_fit"]
+
+
+class CatalogReuseFitGenerationMetadata(BaseModel):
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class CatalogReuseFitWorkspaceContext(BaseModel):
+    workspace_loaded: bool = False
+    mapping_mode: str = ""
+    source_dataset_name: str = ""
+    target_dataset_name: str = ""
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    current_decision_count: int = 0
+
+
+class CatalogReuseFitRequest(BaseModel):
+    mapping_set_detail: MappingSetDetail
+    workspace_context: CatalogReuseFitWorkspaceContext = Field(default_factory=CatalogReuseFitWorkspaceContext)
+
+
+class CatalogReuseFitResponse(BaseModel):
+    title: str = ""
+    fit_assessment: CatalogReuseFitAssessment = "partial_fit"
+    summary: str = ""
+    key_matches: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    generation_metadata: CatalogReuseFitGenerationMetadata = Field(default_factory=CatalogReuseFitGenerationMetadata)
+
+
 class MappingSetStatusUpdateRequest(BaseModel):
     status: MappingSetStatus
     changed_by: str | None = None
@@ -495,6 +742,11 @@ class RuntimeConfigSnapshot(BaseModel):
     llm_model: str
     llm_timeout_seconds: float
     lmstudio_base_url: str
+    tts_provider: str = "none"
+    tts_timeout_seconds: float = 0.0
+    lmstudio_tts_base_url: str = ""
+    lmstudio_orpheus_model: str = ""
+    lmstudio_orpheus_voice: str = ""
     scoring_profile: str = "balanced"
     llm_status: str = "configured"
     llm_reachable: bool | None = None
@@ -552,6 +804,31 @@ class CorrectionImpactMetrics(BaseModel):
     accuracy_delta: float = 0.0
     top1_accuracy_delta: float = 0.0
     correct_matches_delta: int = 0
+
+
+class BenchmarkExplanationGenerationMetadata(BaseModel):
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class BenchmarkExplanationRequest(BaseModel):
+    dataset_name: str = ""
+    benchmark_result: EvaluationMetrics | None = None
+    correction_impact: CorrectionImpactMetrics | None = None
+    profile_comparison: ScoringProfileComparisonResponse | None = None
+
+
+class BenchmarkExplanationResponse(BaseModel):
+    title: str = ""
+    summary: str = ""
+    key_findings: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    next_actions: list[str] = Field(default_factory=list)
+    generation_metadata: BenchmarkExplanationGenerationMetadata = Field(
+        default_factory=BenchmarkExplanationGenerationMetadata
+    )
 
 
 class EvaluationRunRecord(BaseModel):
@@ -663,12 +940,29 @@ class TransformationTestSetRunResponse(BaseModel):
 
 class CodegenRequest(BaseModel):
     mapping_decisions: list[MappingDecision]
+    mode: CodegenMode = "pandas"
 
 
 class GeneratedArtifact(BaseModel):
-    language: Literal["python-pandas"] = "python-pandas"
+    language: Literal["python-pandas", "python-pyspark"] = "python-pandas"
     code: str
     warnings: list[TransformationPreviewWarning] = Field(default_factory=list)
+
+
+class ArtifactRefinementRequest(BaseModel):
+    mapping_decisions: list[MappingDecision] = Field(default_factory=list)
+    mode: CodegenMode = "pandas"
+    current_code: str = Field(min_length=1)
+    instruction: str = Field(min_length=1)
+    edge_cases: str = ""
+    reference_excerpt: str = ""
+
+
+class ArtifactRefinementResponse(BaseModel):
+    language: Literal["python-pandas", "python-pyspark"]
+    code: str
+    reasoning: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class TransformationGenerationRequest(BaseModel):

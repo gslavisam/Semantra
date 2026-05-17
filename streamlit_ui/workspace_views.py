@@ -43,10 +43,46 @@ def poll_mapping_job(
     raise RuntimeError(f"Mapping job {job_id} did not finish before the timeout.")
 
 
-def _workspace_codegen_block_reason(mapping_decisions: list[dict]) -> str:
+def _workspace_codegen_action_label(mode: str) -> str:
+    return "PySpark code generation" if str(mode).strip().lower() == "pyspark" else "Pandas code generation"
+
+
+def _workspace_codegen_button_label(mode: str) -> str:
+    return "Generate PySpark code" if str(mode).strip().lower() == "pyspark" else "Generate Pandas code"
+
+
+def _workspace_generated_artifact_header(language: str | None) -> str:
+    normalized = str(language or "").strip().lower()
+    if normalized == "python-pyspark":
+        return "Generated PySpark Code"
+    return "Generated Pandas Code"
+
+
+def _workspace_output_section_label(title: str, detail: str | None = None) -> str:
+    detail_text = str(detail or "").strip()
+    return f"{title} · {detail_text}" if detail_text else title
+
+
+def _workspace_llm_refinement_enabled() -> bool:
+    config = st.session_state.get("runtime_config_snapshot") or {}
+    provider = str(config.get("llm_provider", "none")).strip().lower() or "none"
+    status = str(config.get("llm_status", "configured")).strip().lower() or "configured"
+    return provider != "none" and status not in {"disabled", "misconfigured", "unreachable"}
+
+
+def _workspace_refinement_source_response(
+    codegen_response: dict | None,
+    codegen_refinement_response: dict | None,
+) -> dict | None:
+    if isinstance(codegen_refinement_response, dict) and str(codegen_refinement_response.get("code") or "").strip():
+        return codegen_refinement_response
+    return codegen_response
+
+
+def _workspace_codegen_block_reason(mapping_decisions: list[dict], mode: str = "pandas") -> str:
     return mapping_output_block_reason(
         mapping_decisions,
-        action_label="Pandas code generation",
+        action_label=_workspace_codegen_action_label(mode),
     )
 
 
@@ -103,12 +139,16 @@ def render_workspace_tab(
     uploaded_file_bytes,
     render_dataset_summary,
     initialize_mapping_editor_state,
+    render_mapping_analysis_panel,
     display_trust_layer,
     render_mapping_review,
     render_mapping_editor,
+    render_canonical_gap_assistant,
+    render_canonical_concept_summary,
     render_manual_mapping_panel,
     render_mapping_decision_summary,
     render_mapping_io_panel,
+    render_mapping_set_versions_panel,
     render_correction_panel,
     build_mapping_decisions,
 ) -> None:
@@ -135,6 +175,7 @@ def render_workspace_tab(
     mapping_response = st.session_state.get("mapping_response")
     preview_response = st.session_state.get("preview_response")
     codegen_response = st.session_state.get("codegen_response")
+    codegen_refinement_response = st.session_state.get("codegen_refinement_response")
 
     with setup_tab:
         st.subheader("1. Upload")
@@ -297,8 +338,21 @@ def render_workspace_tab(
                     )
                 st.session_state["upload_response"] = payload
                 st.session_state.pop("mapping_response", None)
+                st.session_state.pop("mapping_analysis_summary", None)
+                st.session_state.pop("mapping_analysis_error", None)
+                st.session_state.pop("mapping_analysis_spoken_script", None)
+                st.session_state.pop("mapping_analysis_audio_bytes", None)
+                st.session_state.pop("mapping_analysis_audio_mime_type", None)
+                st.session_state.pop("mapping_analysis_audio_error", None)
+                st.session_state.pop("review_plan_summary", None)
+                st.session_state.pop("review_plan_error", None)
+                st.session_state.pop("canonical_gap_candidates", None)
+                st.session_state.pop("canonical_gap_suggestions", None)
+                st.session_state.pop("canonical_gap_triage_summary", None)
+                st.session_state.pop("canonical_gap_triage_error", None)
                 st.session_state.pop("preview_response", None)
                 st.session_state.pop("codegen_response", None)
+                st.session_state.pop("codegen_refinement_response", None)
                 st.session_state.pop("mapping_editor_state", None)
                 st.session_state["last_action"] = {
                     "level": "success",
@@ -396,8 +450,21 @@ def render_workspace_tab(
                         "unmatched_columns": enrichment_result.get("unmatched_columns", []),
                     }
                     st.session_state.pop("mapping_response", None)
+                    st.session_state.pop("mapping_analysis_summary", None)
+                    st.session_state.pop("mapping_analysis_error", None)
+                    st.session_state.pop("mapping_analysis_spoken_script", None)
+                    st.session_state.pop("mapping_analysis_audio_bytes", None)
+                    st.session_state.pop("mapping_analysis_audio_mime_type", None)
+                    st.session_state.pop("mapping_analysis_audio_error", None)
+                    st.session_state.pop("review_plan_summary", None)
+                    st.session_state.pop("review_plan_error", None)
+                    st.session_state.pop("canonical_gap_candidates", None)
+                    st.session_state.pop("canonical_gap_suggestions", None)
+                    st.session_state.pop("canonical_gap_triage_summary", None)
+                    st.session_state.pop("canonical_gap_triage_error", None)
                     st.session_state.pop("preview_response", None)
                     st.session_state.pop("codegen_response", None)
+                    st.session_state.pop("codegen_refinement_response", None)
                     st.session_state.pop("mapping_editor_state", None)
                     st.session_state["last_action"] = {
                         "level": "success",
@@ -461,9 +528,22 @@ def render_workspace_tab(
                                 )
                             status.write("Initializing review state.")
                             st.session_state["mapping_response"] = mapping_response
+                            st.session_state.pop("mapping_analysis_summary", None)
+                            st.session_state.pop("mapping_analysis_error", None)
+                            st.session_state.pop("mapping_analysis_spoken_script", None)
+                            st.session_state.pop("mapping_analysis_audio_bytes", None)
+                            st.session_state.pop("mapping_analysis_audio_mime_type", None)
+                            st.session_state.pop("mapping_analysis_audio_error", None)
+                            st.session_state.pop("review_plan_summary", None)
+                            st.session_state.pop("review_plan_error", None)
+                            st.session_state.pop("canonical_gap_candidates", None)
+                            st.session_state.pop("canonical_gap_suggestions", None)
+                            st.session_state.pop("canonical_gap_triage_summary", None)
+                            st.session_state.pop("canonical_gap_triage_error", None)
                             initialize_mapping_editor_state(mapping_response)
                             st.session_state.pop("preview_response", None)
                             st.session_state.pop("codegen_response", None)
+                            st.session_state.pop("codegen_refinement_response", None)
                             st.session_state["last_action"] = {
                                 "level": "success",
                                 "message": (
@@ -498,8 +578,11 @@ def render_workspace_tab(
             if (upload_response or {}).get("mapping_mode") == "canonical":
                 st.caption("Canonical-only review treats canonical concept IDs as virtual targets built from the glossary.")
             display_trust_layer(mapping_response)
+            render_mapping_analysis_panel(mapping_response)
             render_mapping_review(mapping_response)
             render_mapping_editor(mapping_response)
+            render_canonical_gap_assistant(mapping_response)
+            render_canonical_concept_summary(mapping_response)
         else:
             if (upload_response or {}).get("mapping_mode") == "canonical":
                 st.info("Generate canonical mapping in Setup to populate trust, candidate review, and manual review controls.")
@@ -508,14 +591,15 @@ def render_workspace_tab(
 
     with decisions_tab:
         if mapping_response:
+            render_mapping_decision_summary()
             if (upload_response or {}).get("mapping_mode") != "canonical":
                 render_manual_mapping_panel(mapping_response)
             else:
                 st.info(
                     "Canonical-only mode currently keeps manual target additions and correction workflows disabled until a real target dataset exists."
                 )
-            render_mapping_decision_summary()
             render_mapping_io_panel()
+            render_mapping_set_versions_panel()
             if (upload_response or {}).get("mapping_mode") != "canonical":
                 render_correction_panel()
         else:
@@ -525,11 +609,20 @@ def render_workspace_tab(
         if mapping_response:
             if (upload_response or {}).get("mapping_mode") == "canonical":
                 st.info(
-                    "Canonical-only mode stops at review and decision export for now. Preview rows and Pandas code generation become available after you switch back to Standard mode with a real target dataset."
+                    "Canonical-only mode stops at review and decision export for now. Preview rows and Pandas/PySpark code generation become available after you switch back to Standard mode with a real target dataset."
                 )
             else:
                 mapping_decisions = build_mapping_decisions()
-                codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions)
+                st.subheader("Artifact Generation")
+                codegen_mode = st.radio(
+                    "Artifact format",
+                    options=["pandas", "pyspark"],
+                    index=0 if st.session_state.get("output_codegen_mode", "pandas") == "pandas" else 1,
+                    key="output_codegen_mode",
+                    horizontal=True,
+                    format_func=lambda value: "Pandas starter" if value == "pandas" else "PySpark starter",
+                )
+                codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions, codegen_mode)
                 preview_advisory_message = _workspace_preview_advisory_message(mapping_decisions)
                 actions_left, actions_right = st.columns(2)
                 with actions_left:
@@ -563,7 +656,7 @@ def render_workspace_tab(
                     if preview_advisory_message:
                         st.caption(preview_advisory_message)
                 with actions_right:
-                    if st.button("Generate Pandas code", disabled=bool(codegen_block_reason)):
+                    if st.button(_workspace_codegen_button_label(codegen_mode), disabled=bool(codegen_block_reason)):
                         if not mapping_decisions:
                             st.session_state["last_action"] = {
                                 "level": "warning",
@@ -574,11 +667,12 @@ def render_workspace_tab(
                             st.session_state["codegen_response"] = api_request(
                                 "POST",
                                 "/mapping/codegen",
-                                json={"mapping_decisions": mapping_decisions},
+                                json={"mapping_decisions": mapping_decisions, "mode": codegen_mode},
                             )
+                            st.session_state.pop("codegen_refinement_response", None)
                             st.session_state["last_action"] = {
                                 "level": "success",
-                                "message": "Generated Pandas code from the active mapping decisions.",
+                                "message": f"Generated {_workspace_codegen_action_label(codegen_mode).lower()} from the active mapping decisions.",
                             }
                             st.rerun()
                         except httpx.HTTPError as error:
@@ -593,56 +687,178 @@ def render_workspace_tab(
             st.info("Generate mapping in Setup before preview or code generation.")
 
         if preview_response is not None:
-            st.subheader("Preview")
             preview_rows = [row["values"] for row in preview_response["preview"]]
-            if preview_rows:
-                st.dataframe(preview_rows, width="stretch", hide_index=True)
-            else:
-                st.info("Preview is empty. This is expected for schema-only SQL uploads.")
-            if preview_response.get("unresolved_targets"):
-                st.warning(f"Needs review: {', '.join(preview_response['unresolved_targets'])}")
+            unresolved_targets = preview_response.get("unresolved_targets") or []
             transformation_previews = preview_response.get("transformation_previews") or []
-            if transformation_previews:
-                st.caption("Transformation validation")
-                st.dataframe(
-                    [
-                        {
-                            "source": item.get("source"),
-                            "target": item.get("target"),
-                            "classification": item.get("classification"),
-                            "mode": item.get("mode"),
-                            "status": item.get("status"),
-                            "warning_codes": " | ".join(warning.get("code", "") for warning in item.get("warnings", [])),
-                            "warning_count": len(item.get("warnings", [])),
-                        }
-                        for item in transformation_previews
-                    ],
-                    width="stretch",
-                    hide_index=True,
-                )
-                for item in transformation_previews:
-                    with st.expander(f"Transformation details: {item.get('source')} -> {item.get('target')}"):
-                        st.caption(
-                            f"Classification: {item.get('classification')} | Mode: {item.get('mode')} | Status: {item.get('status')}"
-                        )
-                        st.write("Before samples:", item.get("before_samples", []))
-                        st.write("After samples:", item.get("after_samples", []))
-                        warnings = item.get("warnings", [])
-                        if warnings:
-                            for warning in warnings:
-                                st.warning(f"{warning.get('code')}: {warning.get('message')}")
+            preview_detail = f"{len(preview_rows)} rows"
+            if unresolved_targets:
+                preview_detail += f", {len(unresolved_targets)} unresolved"
+            with st.expander(_workspace_output_section_label("Preview Result", preview_detail), expanded=True):
+                if preview_rows:
+                    st.dataframe(preview_rows, width="stretch", hide_index=True)
+                else:
+                    st.info("Preview is empty. This is expected for schema-only SQL uploads.")
+                if unresolved_targets:
+                    st.warning(f"Needs review: {', '.join(unresolved_targets)}")
+                if transformation_previews:
+                    st.caption("Transformation validation")
+                    st.dataframe(
+                        [
+                            {
+                                "source": item.get("source"),
+                                "target": item.get("target"),
+                                "classification": item.get("classification"),
+                                "mode": item.get("mode"),
+                                "status": item.get("status"),
+                                "warning_codes": " | ".join(warning.get("code", "") for warning in item.get("warnings", [])),
+                                "warning_count": len(item.get("warnings", [])),
+                            }
+                            for item in transformation_previews
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+                    for item in transformation_previews:
+                        with st.expander(f"Transformation details: {item.get('source')} -> {item.get('target')}"):
+                            st.caption(
+                                f"Classification: {item.get('classification')} | Mode: {item.get('mode')} | Status: {item.get('status')}"
+                            )
+                            st.write("Before samples:", item.get("before_samples", []))
+                            st.write("After samples:", item.get("after_samples", []))
+                            warnings = item.get("warnings", [])
+                            if warnings:
+                                for warning in warnings:
+                                    st.warning(f"{warning.get('code')}: {warning.get('message')}")
 
         if codegen_response is not None:
-            st.subheader("Generated Pandas Code")
-            st.code(codegen_response["code"], language="python")
-            if codegen_response.get("warnings"):
-                for warning in codegen_response["warnings"]:
-                    if isinstance(warning, dict):
-                        prefix = warning.get("code") or "warning"
-                        details = warning.get("details") or {}
-                        suffix = ""
-                        if details.get("line") is not None and details.get("column") is not None:
-                            suffix = f" (line {details['line']}, col {details['column']})"
-                        st.warning(f"{prefix}: {warning.get('message', '')}{suffix}")
+            warnings = codegen_response.get("warnings") or []
+            artifact_header = _workspace_generated_artifact_header(codegen_response.get("language"))
+            artifact_detail = codegen_response.get("language") or "python"
+            if warnings:
+                artifact_detail = f"{artifact_detail}, {len(warnings)} warnings"
+            if codegen_refinement_response is not None:
+                artifact_detail = f"{artifact_detail}, refinement pending"
+            with st.expander(_workspace_output_section_label(artifact_header, artifact_detail), expanded=True):
+                original_col, refined_col = st.columns(2)
+                with original_col:
+                    st.caption("Original generated code")
+                    st.code(codegen_response["code"], language="python")
+                    if warnings:
+                        for warning in warnings:
+                            if isinstance(warning, dict):
+                                prefix = warning.get("code") or "warning"
+                                details = warning.get("details") or {}
+                                suffix = ""
+                                if details.get("line") is not None and details.get("column") is not None:
+                                    suffix = f" (line {details['line']}, col {details['column']})"
+                                st.warning(f"{prefix}: {warning.get('message', '')}{suffix}")
+                            else:
+                                st.warning(str(warning))
+                with refined_col:
+                    st.caption("Refined code")
+                    if codegen_refinement_response is not None:
+                        st.code(codegen_refinement_response["code"], language="python")
+                        reasoning = codegen_refinement_response.get("reasoning") or []
+                        if reasoning:
+                            st.caption("Refinement reasoning")
+                            for line in reasoning:
+                                st.write(f"- {line}")
+                        refinement_warnings = codegen_refinement_response.get("warnings") or []
+                        if refinement_warnings:
+                            for warning in refinement_warnings:
+                                if isinstance(warning, dict):
+                                    prefix = warning.get("code") or "warning"
+                                    details = warning.get("details") or {}
+                                    suffix = ""
+                                    if details.get("line") is not None and details.get("column") is not None:
+                                        suffix = f" (line {details['line']}, col {details['column']})"
+                                    st.warning(f"{prefix}: {warning.get('message', '')}{suffix}")
+                                else:
+                                    st.warning(str(warning))
                     else:
-                        st.warning(str(warning))
+                        st.info("Refined version will appear here after you run Refine with LLM.")
+
+                if codegen_refinement_response is not None:
+                    accept_col, discard_col = st.columns(2)
+                    with accept_col:
+                        if st.button("Accept refined version", key="output_accept_refinement"):
+                            st.session_state["codegen_response"] = codegen_refinement_response
+                            st.session_state.pop("codegen_refinement_response", None)
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": "Accepted the refined artifact as the current generated code.",
+                            }
+                            st.rerun()
+                    with discard_col:
+                        if st.button("Discard refinement", key="output_discard_refinement"):
+                            st.session_state.pop("codegen_refinement_response", None)
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": "Discarded the pending refinement and kept the original generated code.",
+                            }
+                            st.rerun()
+
+                st.divider()
+                st.caption("Refine generated code")
+                refinement_instruction = st.text_area(
+                    "What should change?",
+                    key="output_refinement_instruction",
+                    placeholder="Example: Preserve the current scaffold, but normalize phone_number, trim emails, and keep null-safe behavior.",
+                )
+                refinement_edge_cases = st.text_area(
+                    "Business rules / edge cases",
+                    key="output_refinement_edge_cases",
+                    placeholder="Example: Empty strings should stay null; phone values may start with +381 or 06; emails should be lowercase.",
+                )
+                refinement_reference = st.text_area(
+                    "Reference excerpt",
+                    key="output_refinement_reference",
+                    placeholder="Paste a short excerpt from a spec, mapping note, or business rule document.",
+                )
+                if st.button(
+                    "Refine with LLM",
+                    key="output_refine_codegen",
+                    disabled=(not _workspace_llm_refinement_enabled())
+                    or (
+                        not str(
+                            (_workspace_refinement_source_response(codegen_response, codegen_refinement_response) or {}).get(
+                                "code",
+                                "",
+                            )
+                        ).strip()
+                    ),
+                ):
+                    if not refinement_instruction.strip():
+                        st.session_state["last_action"] = {
+                            "level": "warning",
+                            "message": "Describe what should change before refining the generated artifact.",
+                        }
+                        st.rerun()
+                    try:
+                        refinement_source = _workspace_refinement_source_response(codegen_response, codegen_refinement_response) or {}
+                        st.session_state["codegen_refinement_response"] = api_request(
+                            "POST",
+                            "/mapping/codegen/refine",
+                            json={
+                                "mapping_decisions": build_mapping_decisions(),
+                                "mode": "pyspark" if refinement_source.get("language") == "python-pyspark" else "pandas",
+                                "current_code": refinement_source["code"],
+                                "instruction": refinement_instruction.strip(),
+                                "edge_cases": refinement_edge_cases.strip(),
+                                "reference_excerpt": refinement_reference.strip(),
+                            },
+                            timeout=90.0,
+                        )
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": "Generated a refinement candidate from the provided instructions.",
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": api_error_message(error, default_prefix="Artifact refinement failed"),
+                        }
+                        st.rerun()
+                if not _workspace_llm_refinement_enabled():
+                    st.caption("LLM refinement is unavailable until a reachable runtime provider is configured.")

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from app.models.mapping import GeneratedArtifact, MappingDecision
 from app.services.transformation_service import build_transformation_statement, build_transformation_warning
 
@@ -55,3 +57,68 @@ def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedA
         lines.extend(statement.splitlines())
 
     return GeneratedArtifact(code="\n".join(lines), warnings=warnings)
+
+
+def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
+    warnings = []
+    custom_code = (decision.transformation_code or "").strip()
+    if not custom_code:
+        return f'F.col("{decision.source}").alias("{decision.target}")', warnings
+
+    statement = build_transformation_statement(decision)
+    simple_direct_patterns = [
+        rf'^df_target\["{re.escape(decision.target)}"\]\s*=\s*df_source\["{re.escape(decision.source)}"\]\s*$',
+        rf'^df_source\["{re.escape(decision.source)}"\]\s*$',
+    ]
+    if any(re.match(pattern, statement) for pattern in simple_direct_patterns):
+        return f'F.col("{decision.source}").alias("{decision.target}")', warnings
+
+    warnings.append(
+        build_transformation_warning(
+            code="untranslated_custom_transformation",
+            message=(
+                f"PySpark code generation could not translate custom transformation for {decision.source} -> {decision.target}. "
+                "Direct mapping was emitted instead."
+            ),
+            source=decision.source,
+            target=decision.target,
+            stage="codegen",
+            fallback_applied=True,
+            details={"statement": statement, "requested_runtime": "python-pyspark"},
+        )
+    )
+    return f'F.col("{decision.source}").alias("{decision.target}")', warnings
+
+
+def generate_pyspark_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+    lines = [
+        "from pyspark.sql import functions as F",
+        "",
+        "df_target = df_source.select(",
+    ]
+    warnings = []
+    select_lines: list[str] = []
+
+    for decision in mapping_decisions:
+        if decision.status == "rejected":
+            warnings.append(
+                build_transformation_warning(
+                    code="skipped_rejected_mapping",
+                    message=f"Skipped rejected mapping: {decision.source} -> {decision.target}",
+                    source=decision.source,
+                    target=decision.target,
+                    stage="codegen",
+                    details={"decision_status": decision.status},
+                )
+            )
+            continue
+
+        expression, decision_warnings = _pyspark_column_expression(decision)
+        warnings.extend(decision_warnings)
+        select_lines.append(f"    {expression},")
+
+    if select_lines:
+        lines.extend(select_lines)
+    lines.append(")")
+
+    return GeneratedArtifact(language="python-pyspark", code="\n".join(lines), warnings=warnings)

@@ -153,15 +153,37 @@ def api_request_content(method: str, path: str, files: dict | None = None, data:
 
     base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
     with httpx.Client(timeout=60.0) as client:
+        response = client.request(method, f"{base_url}{path}", headers=headers, files=files, data=data)
+    response.raise_for_status()
+    return response.content
+
+
+def api_request_bytes(
+    method: str,
+    path: str,
+    *,
+    files: dict | None = None,
+    data: dict | None = None,
+    json: dict | None = None,
+    timeout: float = 120.0,
+) -> tuple[bytes, str]:
+    headers = {}
+    admin_token = st.session_state.get("admin_token", "").strip()
+    if admin_token:
+        headers["X-Admin-Token"] = admin_token
+
+    base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
+    with httpx.Client(timeout=timeout) as client:
         response = client.request(
             method,
             f"{base_url}{path}",
             headers=headers,
             files=files,
             data=data,
+            json=json,
         )
     response.raise_for_status()
-    return response.content
+    return response.content, response.headers.get("content-type", "application/octet-stream")
 
 
 def refresh_admin_requirement() -> None:
@@ -250,6 +272,97 @@ def request_llm_transformation_suggestion(source: str, target: str, instruction:
             "target_column": target,
             "instruction": instruction.strip(),
         },
+    )
+
+
+def request_mapping_analysis_summary() -> dict:
+    upload_response = st.session_state.get("upload_response")
+    mapping_response = st.session_state.get("mapping_response")
+    if not upload_response or not mapping_response:
+        raise ValueError("Generate mapping results before requesting an analysis overview.")
+
+    mapping_mode = str(upload_response.get("mapping_mode") or "standard").strip().lower() or "standard"
+    source_handle = upload_response.get("source") or {}
+    target_handle = upload_response.get("target") or {}
+    workspace_payload = {
+        "mapping_mode": mapping_mode,
+        "source_dataset_name": source_handle.get("dataset_name") or "Source dataset",
+        "target_dataset_name": (
+            upload_response.get("target_system")
+            if mapping_mode == "canonical"
+            else (target_handle.get("dataset_name") or "Target dataset")
+        )
+        or "Target dataset",
+        "source_system": st.session_state.get("analysis_source_system") or None,
+        "target_system": st.session_state.get("analysis_target_system") or None,
+        "business_domain": st.session_state.get("analysis_business_domain") or None,
+        "integration_name": st.session_state.get("analysis_integration_name") or None,
+    }
+    return api_request(
+        "POST",
+        "/mapping/analysis/summary",
+        json={
+            "mapping_response": mapping_response,
+            "workspace": workspace_payload,
+            "options": {
+                "audience": "technical_implementor",
+                "include_narration_seed": True,
+            },
+        },
+        timeout=90.0,
+    )
+
+
+def request_review_plan_summary(
+    filtered_rows: list[dict],
+    attention_summary_rows: list[dict],
+    *,
+    status_filter: str,
+    confidence_filter: str,
+    source_filter: str,
+) -> dict:
+    mapping_response = st.session_state.get("mapping_response")
+    if not mapping_response:
+        raise ValueError("Generate mapping results before requesting a review plan.")
+
+    return api_request(
+        "POST",
+        "/mapping/review-plan",
+        json={
+            "filtered_rows": filtered_rows,
+            "attention_summary_rows": attention_summary_rows,
+            "filters": {
+                "status": status_filter,
+                "confidence_label": confidence_filter,
+                "source": source_filter,
+            },
+        },
+        timeout=90.0,
+    )
+
+
+def request_mapping_analysis_narration() -> dict:
+    summary = st.session_state.get("mapping_analysis_summary")
+    if not summary:
+        raise ValueError("Generate the mapping analysis overview before requesting narration.")
+
+    return api_request(
+        "POST",
+        "/mapping/analysis/narration",
+        json={"summary": summary},
+        timeout=90.0,
+    )
+
+
+def request_mapping_analysis_audio(spoken_script: str) -> tuple[bytes, str]:
+    if not spoken_script.strip():
+        raise ValueError("Spoken script is empty; generate narration before requesting audio.")
+
+    return api_request_bytes(
+        "POST",
+        "/mapping/analysis/audio",
+        json={"spoken_script": spoken_script},
+        timeout=300.0,
     )
 
 

@@ -9,7 +9,7 @@ from urllib.error import URLError
 from typing import Callable, Protocol
 
 from app.core.config import settings
-from app.models.mapping import LLMValidationResult, TransformationGenerationResponse
+from app.models.mapping import ArtifactRefinementResponse, LLMValidationResult, TransformationGenerationResponse
 from app.models.mapping import CanonicalGapCandidate, CanonicalGapSuggestion
 
 
@@ -529,6 +529,54 @@ def call_transformation_generator(
     return None
 
 
+def call_artifact_refinement(
+    *,
+    mapping_decisions: list[dict],
+    mode: str,
+    current_code: str,
+    instruction: str,
+    edge_cases: str,
+    reference_excerpt: str,
+    provider: LLMProvider | None,
+    max_retries: int | None = None,
+    timeout_seconds: float | None = None,
+) -> ArtifactRefinementResponse | None:
+    if provider is None or not current_code.strip() or not instruction.strip():
+        return None
+
+    retries = max_retries if max_retries is not None else settings.llm_max_retries
+    timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
+    prompt = build_artifact_refinement_prompt(
+        mapping_decisions=mapping_decisions,
+        mode=mode,
+        current_code=current_code,
+        instruction=instruction,
+        edge_cases=edge_cases,
+        reference_excerpt=reference_excerpt,
+    )
+
+    response = request_llm_json(provider, prompt, timeout, retries, "artifact_refinement")
+    if response is None:
+        return None
+
+    _raw_response, parsed = response
+    try:
+        code = sanitize_generated_code(str(parsed.get("code") or parsed.get("artifact_code") or "").strip())
+        if not code:
+            return None
+
+        return ArtifactRefinementResponse(
+            language="python-pyspark" if mode == "pyspark" else "python-pandas",
+            code=code,
+            reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
+            warnings=normalize_llm_list_field(parsed.get("warnings") or []),
+        )
+    except Exception as error:
+        logger.warning("LLM artifact refinement response rejected (%s): %s", classify_llm_error(error), error)
+
+    return None
+
+
 def call_canonical_gap_assistant(
     candidate: CanonicalGapCandidate,
     nearest_concepts: list[dict],
@@ -688,6 +736,53 @@ def build_transformation_generator_prompt(source_field: dict, target_field: dict
         "Return only valid JSON. Do not include markdown or code fences.\n"
         "Use only df_source, df_target, pd, and standard Python built-ins.\n"
         "The transformation_code may be either a full assignment like df_target[\"target\"] = ... or just the right-hand expression.\n\n"
+        f"{json.dumps(payload, ensure_ascii=True)}"
+    )
+
+
+def build_artifact_refinement_prompt(
+    *,
+    mapping_decisions: list[dict],
+    mode: str,
+    current_code: str,
+    instruction: str,
+    edge_cases: str,
+    reference_excerpt: str,
+) -> str:
+    runtime_language = "python-pyspark" if mode == "pyspark" else "python-pandas"
+    allowed_objects = ["df_source", "df_target", "F"] if mode == "pyspark" else ["df_source", "df_target", "pd"]
+    payload = {
+        "artifact_mode": mode,
+        "current_code": current_code.strip(),
+        "mapping_decisions": [
+            {
+                "source": str(item.get("source") or "").strip(),
+                "target": str(item.get("target") or "").strip(),
+                "status": str(item.get("status") or "accepted").strip(),
+                "has_transformation": bool(str(item.get("transformation_code") or "").strip()),
+            }
+            for item in mapping_decisions
+        ],
+        "instruction": instruction.strip(),
+        "edge_cases": edge_cases.strip(),
+        "reference_excerpt": reference_excerpt.strip()[:2000],
+        "rules": {
+            "json_only": True,
+            "language": runtime_language,
+            "preserve_existing_scaffold_when_possible": True,
+            "return_full_rewritten_code": True,
+            "allowed_objects": allowed_objects,
+        },
+        "response_format": {
+            "code": "string",
+            "reasoning": ["short bullet points"],
+            "warnings": ["short bullet points"],
+        },
+    }
+    return (
+        f"You refine {runtime_language} starter code for a data-mapping workflow.\n"
+        "Return only valid JSON. Do not include markdown or code fences.\n"
+        "Follow the requested runtime strictly and return the complete rewritten artifact in the code field.\n\n"
         f"{json.dumps(payload, ensure_ascii=True)}"
     )
 

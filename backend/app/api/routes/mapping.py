@@ -2,12 +2,19 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.deps import require_admin
 from app.models.mapping import (
+    ArtifactRefinementRequest,
+    ArtifactRefinementResponse,
     AutoMappingRequest,
     AutoMappingResponse,
+    MappingAnalysisAudioRequest,
+    MappingAnalysisNarrationRequest,
+    MappingAnalysisNarrationResponse,
+    MappingAnalysisRequest,
+    MappingAnalysisSummaryResponse,
     CanonicalMappingRequest,
     CodegenRequest,
     GeneratedArtifact,
@@ -23,6 +30,8 @@ from app.models.mapping import (
     MappingJobStatusResponse,
     PreviewRequest,
     PreviewResponse,
+    ReviewPlanRequest,
+    ReviewPlanResponse,
     TransformationGenerationRequest,
     TransformationGenerationResponse,
     TransformationTestSetCreateRequest,
@@ -31,9 +40,12 @@ from app.models.mapping import (
     TransformationTestSetRunResponse,
     TransformationTemplate,
 )
-from app.services.llm_service import build_provider_from_settings, call_transformation_generator
-from app.services.codegen_service import generate_pandas_code
+from app.services.llm_service import build_provider_from_settings, call_artifact_refinement, call_transformation_generator
+from app.services.mapping_analysis_service import build_mapping_analysis_narration, build_mapping_analysis_summary
+from app.services.mapping_audio_service import synthesize_orpheus_wav
+from app.services.codegen_service import generate_pandas_code, generate_pyspark_code
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
+from app.services.review_plan_service import build_review_plan
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.persistence_service import persistence_service
 from app.services.preview_service import build_preview
@@ -205,10 +217,72 @@ async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
     return build_preview(source.rows, request.mapping_decisions)
 
 
+@router.post("/analysis/summary", response_model=MappingAnalysisSummaryResponse)
+async def summarize_mapping_analysis(request: MappingAnalysisRequest) -> MappingAnalysisSummaryResponse:
+    provider = build_provider_from_settings()
+    return build_mapping_analysis_summary(request, provider=provider)
+
+
+@router.post("/analysis/narration", response_model=MappingAnalysisNarrationResponse)
+async def narrate_mapping_analysis(request: MappingAnalysisNarrationRequest) -> MappingAnalysisNarrationResponse:
+    provider = build_provider_from_settings()
+    return build_mapping_analysis_narration(request, provider=provider)
+
+
+@router.post("/analysis/audio")
+async def synthesize_mapping_analysis_audio(request: MappingAnalysisAudioRequest) -> Response:
+    try:
+        audio_bytes = synthesize_orpheus_wav(
+            request.spoken_script,
+            voice=request.voice,
+            model=request.model,
+        )
+    except (ImportError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+    return Response(
+        content=audio_bytes,
+        media_type="audio/wav",
+        headers={
+            "Content-Disposition": 'inline; filename="mapping_analysis.wav"',
+            "X-Audio-Provider": "lmstudio_orpheus",
+        },
+    )
+
+
+@router.post("/review-plan", response_model=ReviewPlanResponse)
+async def summarize_review_plan(request: ReviewPlanRequest) -> ReviewPlanResponse:
+    provider = build_provider_from_settings()
+    return build_review_plan(request, provider=provider)
+
+
 @router.post("/codegen", response_model=GeneratedArtifact)
 async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
     _require_accepted_output_decisions(request.mapping_decisions, action_label="Code generation")
+    if request.mode == "pyspark":
+        return generate_pyspark_code(request.mapping_decisions)
     return generate_pandas_code(request.mapping_decisions)
+
+
+@router.post("/codegen/refine", response_model=ArtifactRefinementResponse)
+async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> ArtifactRefinementResponse:
+    _require_accepted_output_decisions(request.mapping_decisions, action_label="Code refinement")
+    provider = build_provider_from_settings()
+    if provider is None:
+        raise HTTPException(status_code=503, detail="LLM provider is not configured.")
+
+    result = call_artifact_refinement(
+        mapping_decisions=[decision.model_dump() for decision in request.mapping_decisions],
+        mode=request.mode,
+        current_code=request.current_code,
+        instruction=request.instruction,
+        edge_cases=request.edge_cases,
+        reference_excerpt=request.reference_excerpt,
+        provider=provider,
+    )
+    if result is None:
+        raise HTTPException(status_code=502, detail="LLM did not return a valid artifact refinement.")
+    return result
 
 
 @router.post("/sets", response_model=MappingSetRecord, dependencies=[Depends(require_admin)])

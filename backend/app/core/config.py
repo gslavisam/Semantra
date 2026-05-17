@@ -32,12 +32,17 @@ class Settings:
     llm_min_confidence: float = 0.5
     llm_gate_min_score: float = 0.3
     llm_gate_max_score: float = 0.75
+    tts_provider: str = "lmstudio_orpheus"
+    tts_timeout_seconds: float = 300.0
     admin_api_token: str = ""
     sqlite_path: str = str(Path(__file__).resolve().parents[2] / "semantra.sqlite3")
     openai_base_url: str = "https://api.openai.com/v1/responses"
     openai_api_key: str = ""
     ollama_base_url: str = "http://localhost:11434/api/generate"
     lmstudio_base_url: str = "http://127.0.0.1:1234/v1/chat/completions"
+    lmstudio_tts_base_url: str = "http://127.0.0.1:1234"
+    lmstudio_orpheus_model: str = "orpheus-3b-0.1-ft"
+    lmstudio_orpheus_voice: str = "tara"
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
@@ -70,6 +75,11 @@ def settings_snapshot() -> dict[str, Any]:
         "llm_model": settings.llm_model,
         "llm_timeout_seconds": settings.llm_timeout_seconds,
         "lmstudio_base_url": settings.lmstudio_base_url,
+        "tts_provider": settings.tts_provider,
+        "tts_timeout_seconds": settings.tts_timeout_seconds,
+        "lmstudio_tts_base_url": settings.lmstudio_tts_base_url,
+        "lmstudio_orpheus_model": settings.lmstudio_orpheus_model,
+        "lmstudio_orpheus_voice": settings.lmstudio_orpheus_voice,
         "embedding_provider": settings.embedding_provider,
         "scoring_profile": settings.scoring_profile,
         "cors_origins": list(settings.cors_origins),

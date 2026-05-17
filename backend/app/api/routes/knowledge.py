@@ -38,7 +38,10 @@ from app.models.mapping import (
     CanonicalGapRejectRequest,
     CanonicalGapSuggestion,
     CanonicalGapSuggestionRequest,
+    CanonicalGapTriageSummaryRequest,
+    CanonicalGapTriageSummaryResponse,
 )
+from app.services.canonical_gap_triage_service import build_canonical_gap_triage_summary
 from app.services.canonical_gap_service import (
     approve_canonical_gap_suggestion,
     extract_canonical_gap_candidates,
@@ -638,6 +641,12 @@ async def suggest_canonical_gap(request: CanonicalGapSuggestionRequest) -> Canon
             risk_notes=["Review the mapping and glossary manually."],
         )
     return suggestion
+
+
+@router.post("/canonical-gaps/triage-summary", response_model=CanonicalGapTriageSummaryResponse, dependencies=[Depends(require_admin)])
+async def summarize_canonical_gap_triage(request: CanonicalGapTriageSummaryRequest) -> CanonicalGapTriageSummaryResponse:
+    provider = build_provider_from_settings()
+    return build_canonical_gap_triage_summary(request, provider=provider)
 
 
 @router.post("/canonical-gaps/approve", response_model=CanonicalGapApproveResponse, dependencies=[Depends(require_admin)])

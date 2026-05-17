@@ -3,8 +3,14 @@ import pytest
 from streamlit_ui.workspace_views import (
     poll_mapping_job,
     default_llm_validation_enabled,
+    _workspace_codegen_action_label,
+    _workspace_codegen_button_label,
     _workspace_codegen_block_reason,
+    _workspace_generated_artifact_header,
+    _workspace_llm_refinement_enabled,
+    _workspace_output_section_label,
     _workspace_preview_advisory_message,
+    _workspace_refinement_source_response,
     companion_enrichment_message,
     should_show_table_selector,
 )
@@ -36,6 +42,49 @@ def test_workspace_codegen_block_reason_requires_all_accepted_decisions() -> Non
         "Pandas code generation is blocked until all active mapping decisions are accepted. "
         "Review statuses: needs_review."
     )
+
+
+def test_workspace_codegen_helpers_switch_to_pyspark_labels() -> None:
+    assert _workspace_codegen_action_label("pyspark") == "PySpark code generation"
+    assert _workspace_codegen_button_label("pyspark") == "Generate PySpark code"
+    assert _workspace_generated_artifact_header("python-pyspark") == "Generated PySpark Code"
+    assert _workspace_codegen_block_reason([{"source": "cust_id", "status": "needs_review"}], "pyspark") == (
+        "PySpark code generation is blocked until all active mapping decisions are accepted. "
+        "Review statuses: needs_review."
+    )
+
+
+def test_workspace_output_section_label_appends_detail_only_when_present() -> None:
+    assert _workspace_output_section_label("Preview Result", "12 rows") == "Preview Result · 12 rows"
+    assert _workspace_output_section_label("Generated Pandas Code", "") == "Generated Pandas Code"
+
+
+def test_workspace_llm_refinement_enabled_requires_reachable_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+    from streamlit_ui import workspace_views
+
+    monkeypatch.setattr(
+        workspace_views,
+        "st",
+        SimpleNamespace(session_state={"runtime_config_snapshot": {"llm_provider": "lmstudio", "llm_status": "reachable"}}),
+    )
+    assert _workspace_llm_refinement_enabled() is True
+
+    monkeypatch.setattr(
+        workspace_views,
+        "st",
+        SimpleNamespace(session_state={"runtime_config_snapshot": {"llm_provider": "none", "llm_status": "disabled"}}),
+    )
+    assert _workspace_llm_refinement_enabled() is False
+
+
+def test_workspace_refinement_source_response_prefers_pending_refinement() -> None:
+    base = {"code": 'df_target["customer_id"] = df_source["cust_id"]'}
+    refined = {"code": 'df_target["customer_id"] = df_source["cust_id"].astype(str)'}
+
+    assert _workspace_refinement_source_response(base, refined) is refined
+    assert _workspace_refinement_source_response(base, None) is base
+    assert _workspace_refinement_source_response(base, {"code": "   "}) is base
 
 
 def test_workspace_preview_advisory_message_keeps_preview_available() -> None:

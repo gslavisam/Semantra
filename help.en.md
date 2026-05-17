@@ -73,11 +73,21 @@ Use `Review` to inspect:
 - confidence and signal breakdown
 - LLM notes when validation was used
 - canonical path information
+- `Mapping Analysis Overview` for a technical summary of the current mapping state
+- optional narration and audio generation for the mapping analysis
+- `Review Queue Plan` for queue-level prioritization over the currently filtered review set
 - `Source -> Concept View`
 - `Concept -> Target View`
 - canonical-gap suggestion flows for rows that look semantically right but still have missing canonical coverage
+- `Gap Queue Summary` for repeated canonical-gap families before you review candidates one by one
 
 This is the main place where you decide whether the engine output makes sense before you persist or generate artifacts.
+
+Important distinction:
+
+- `Mapping Analysis Overview` explains the current mapping state as a technical readout
+- `Review Queue Plan` is about review order, clustering, and follow-up for the current queue
+- `Gap Queue Summary` applies the same idea specifically to the canonical-gap queue
 
 ### `Decisions`
 
@@ -99,12 +109,20 @@ Important current rules:
 Use `Output` for:
 
 - `Generate preview`
-- `Generate Pandas code`
+- `Generate Pandas code` or `Generate PySpark code`
+- `Refine with LLM` on an already generated artifact
 
 Important distinction:
 
 - preview is advisory and can be used before final approval
 - code generation is governance-sensitive and requires accepted active decisions
+
+If you use refinement:
+
+- the original and refined artifacts are shown side by side
+- `Accept refined version` replaces the current generated artifact with the refinement candidate
+- `Discard refinement` removes the refinement candidate and keeps the original artifact
+- refinement does not become the active artifact until you explicitly accept it
 
 If you are using transformations:
 
@@ -143,15 +161,19 @@ For the detailed reference on canonical runtime behavior, overlay lifecycle, ste
 Use it to:
 
 - list and search integrations
+- inspect the `Discovery Overview` across source-system -> target-system paths
 - open integration detail
 - inspect concept-centric catalog detail
 - load mapping-set detail, audit, and diff
+- use `similar approved integration exists` hints in result browsing
+- run `Workspace Reuse Fit` for the selected catalog version
 - reuse an approved mapping set back into Workspace
 
 Important:
 
 - Catalog works over saved artifacts, not the live review state
 - reuse back into Workspace is governance-gated by mapping-set status
+- `Workspace Reuse Fit` is a bounded explanation layer; it does not apply anything automatically, it only explains whether the selected version fits the current Workspace context
 
 For the detailed reference on catalog search, similarity heuristics, and `Reuse in Workspace` behavior, see `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
@@ -164,13 +186,16 @@ Use it to:
 - save the current mapping as a benchmark dataset
 - load saved benchmark datasets
 - run a selected benchmark
+- compare scoring profiles
 - measure correction impact
+- generate `Benchmark Explanation` for the currently loaded benchmark evidence
 - inspect benchmark run history
 
 Important:
 
 - `Save current mapping as benchmark` requires accepted active decisions
 - this is for measuring quality and regression behavior, not for everyday mapping review itself
+- `Benchmark Explanation` does not change the score or runtime config; it only summarizes the currently loaded evidence and risks
 
 ## Admin / Debug
 
@@ -191,9 +216,11 @@ Use it for:
 2. Select tables or `Schema spec` mode if needed.
 3. Click `Upload and profile`.
 4. Click `Generate mapping`.
-5. In `Review`, inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
+5. In `Review`, optionally generate `Mapping Analysis Overview`, then inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
+6. If the review queue is large or noisy, use `Review Queue Plan` and, when relevant, `Gap Queue Summary`.
 6. In `Decisions`, make manual edits, export a checkpoint, or save a mapping set.
 7. In `Output`, use preview first, then code generation when the decisions are accepted.
+8. If the generated artifact needs polishing, use `Refine with LLM`, then explicitly accept or discard the refinement.
 
 ### Canonical-first workflow
 
@@ -216,6 +243,7 @@ Use it for:
 - The confidence score is a review heuristic, not a probability.
 - Preview is intentionally advisory; it does not mean the mapping is fully approved.
 - Durable artifact and execution-like surfaces are governed more strictly than preview.
+- The newer bounded AI panels across Review, Benchmarks, and Catalog are guidance layers only; they do not auto-apply durable changes.
 - If the UI state feels inconsistent after multiple experiments, `Reset flow` is often the fastest recovery path.
 
 For the detailed reference on signals, score formula, confidence thresholds, and bounded LLM cases, see `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.

@@ -5,6 +5,11 @@ from unittest.mock import patch
 from streamlit_ui import admin_views
 
 
+def test_section_label_appends_detail_only_when_present() -> None:
+    assert admin_views._section_label("Overlay Summary", "customer-overlay") == "Overlay Summary · customer-overlay"
+    assert admin_views._section_label("Canonical Glossary", "") == "Canonical Glossary"
+
+
 def test_filter_canonical_concepts_matches_alias_and_display_name() -> None:
     concepts = [
         {

@@ -73,11 +73,21 @@ Ovde vidiš:
 - confidence i signal breakdown
 - LLM napomene kada je validator korišćen
 - canonical path pregled
+- `Mapping Analysis Overview` za tehnički sažetak trenutnog mapping stanja
+- opcioni audio narativ za generated mapping analysis
+- `Review Queue Plan` za grupisanje review reda po prioritetima i obrascima
 - `Source -> Concept View`
 - `Concept -> Target View`
 - canonical gap suggestion tok za slučajeve gde mapping izgleda dobar, ali canonical path nije popunjen
+- `Gap Queue Summary` za queue-level pregled ponavljanih canonical gap familija
 
 Ovo je mesto gde proveravaš da li sistemski predlog ima smisla pre nego što pređeš na persist ili output.
+
+Važna razlika:
+
+- `Mapping Analysis Overview` opisuje trenutno stanje mapping-a kao tehnički readout
+- `Review Queue Plan` ne objašnjava mapping globalno, već predlaže kojim redom da rešavaš current review queue
+- `Gap Queue Summary` radi isto to, ali samo za canonical gap candidate red
 
 ### `Decisions`
 
@@ -99,12 +109,20 @@ Važna pravila:
 Ovde radiš:
 
 - `Generate preview`
-- `Generate Pandas code`
+- `Generate Pandas code` ili `Generate PySpark code`
+- `Refine with LLM` nad već generisanim artefaktom
 
 Važna razlika:
 
 - preview je advisory i možeš ga koristiti i pre finalnog odobravanja, da vidiš trenutno ponašanje mapping-a
 - code generation je governance-sensitive surface i traži accepted aktivne odluke
+
+Ako koristiš refinement:
+
+- originalni i refined artifact se prikazuju paralelno
+- `Accept refined version` zamenjuje aktivni generated artifact refinement kandidatom
+- `Discard refinement` odbacuje refinement i zadržava originalni artifact
+- refinement ne menja ništa trajno dok ga eksplicitno ne prihvatiš
 
 Ako koristiš transformacije:
 
@@ -142,15 +160,19 @@ Za detaljan opis canonical runtime-a, overlay lifecycle-a, stewardship stanja i 
 Ovde možeš:
 
 - listati i pretraživati integracije
+- gledati `Discovery Overview` nad source-system -> target-system parovima
 - otvarati integration detail
 - gledati concept-centric detail iz kataloga
 - učitati mapping set detail, audit i diff
+- videti hint tipa `similar approved integration exists`
+- pokrenuti `Workspace Reuse Fit` za izabranu catalog verziju
 - reuse-ovati odobren mapping set nazad u Workspace
 
 Važno:
 
 - Catalog radi nad sačuvanim mapping set i catalog projekcijama, nije zamena za live review tok
 - reuse nazad u Workspace je governance-gated i zavisi od statusa mapping seta
+- `Workspace Reuse Fit` je bounded explanation layer; ne apply-je ništa automatski, već objašnjava da li je selected version dobar kandidat za trenutni Workspace context
 
 Za detaljan opis catalog search-a, similarity heuristike i `Reuse in Workspace` ponašanja pogledaj `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
 
@@ -163,13 +185,16 @@ Ovde možeš:
 - sačuvati trenutni mapping kao benchmark dataset
 - učitati ranije sačuvane benchmark datasetove
 - pustiti benchmark run
+- uporediti scoring profile
 - izmeriti correction impact
+- generisati `Benchmark Explanation` nad trenutno učitanim benchmark evidence skupom
 - pregledati benchmark run history
 
 Važno:
 
 - `Save current mapping as benchmark` traži accepted aktivne odluke
 - benchmark surface je namenjen proveri kvaliteta, ne svakodnevnom review-u svake sesije
+- `Benchmark Explanation` ne menja score niti runtime config; samo objašnjava trenutno učitane benchmark rezultate i rizike
 
 ## Admin / Debug
 
@@ -192,9 +217,11 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 2. Po potrebi izaberi tabele ili `Schema spec` mod.
 3. Klikni `Upload and profile`.
 4. Klikni `Generate mapping`.
-5. U `Review` proveri trust layer, canonical path i eventualne canonical gap predloge.
+5. U `Review` po potrebi generiši `Mapping Analysis Overview`, zatim proveri trust layer, canonical path i eventualne canonical gap predloge.
+6. Ako review red deluje velik ili šumovit, koristi `Review Queue Plan` i po potrebi `Gap Queue Summary`.
 6. U `Decisions` unesi ručne izmene, eksportuj checkpoint ili sačuvaj mapping set.
 7. U `Output` koristi preview, pa zatim codegen kada su odluke accepted.
+8. Ako generated artifact treba poliranje, koristi `Refine with LLM`, pa onda `Accept refined version` ili `Discard refinement`.
 
 ### Canonical-first tok
 
@@ -217,6 +244,7 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 - Confidence score je heuristika za review prioritet, ne verovatnoća.
 - Preview je namerno advisory; ne znači da je mapping finalno odobren.
 - Durable i execution-like površine su strože governed od samog preview-a.
+- Nove bounded AI sekcije u Review, Benchmarks i Catalog ne rade automatske write operacije; služe za objašnjenje, trijažu i pripremu ljudske odluke.
 - Ako UI stanje deluje čudno posle više eksperimenata, `Reset flow` je često najbrži oporavak.
 
 Za detaljan opis signala, score formule, confidence pragova i bounded LLM slučajeva pogledaj `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.

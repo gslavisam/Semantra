@@ -561,6 +561,262 @@ def test_auto_map_returns_selected_mapping_and_ranked_candidates() -> None:
     assert payload["mappings"][0]["target"] in {"customer_id", "phone_number"}
 
 
+def test_mapping_analysis_summary_returns_deterministic_overview() -> None:
+    request_payload = {
+        "workspace": {
+            "mapping_mode": "standard",
+            "source_dataset_name": "customer_source",
+            "target_dataset_name": "customer_target",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+        },
+        "mapping_response": {
+            "mappings": [
+                {
+                    "source": "customer_id",
+                    "target": "account_id",
+                    "confidence": 0.97,
+                    "confidence_label": "high_confidence",
+                    "status": "accepted",
+                    "method": "multi_signal_heuristic",
+                    "signals": {"name": 0.9, "semantic": 0.8, "knowledge": 0.7, "canonical": 0.6},
+                    "explanation": ["Identifier naming and metadata both support this match."],
+                    "canonical_details": {
+                        "shared_concepts": [{"concept_id": "customer.id", "display_name": "Customer ID", "strength": 0.9}]
+                    },
+                },
+                {
+                    "source": "customer_name",
+                    "target": "account_name",
+                    "confidence": 0.54,
+                    "confidence_label": "low_confidence",
+                    "status": "needs_review",
+                    "method": "multi_signal_heuristic",
+                    "signals": {"name": 0.4, "semantic": 0.5, "llm": 0.4},
+                    "explanation": ["Confidence is limited because multiple target name fields remain plausible."],
+                    "alternatives": ["display_name", "billing_name"],
+                    "llm_recommendation": {
+                        "selected_target": "display_name",
+                        "confidence": 0.62,
+                        "reasoning": ["The display name target looked slightly stronger from the available descriptions."]
+                    },
+                },
+                {
+                    "source": "legacy_group_code",
+                    "target": None,
+                    "confidence": 0.0,
+                    "confidence_label": "low_confidence",
+                    "status": "needs_review",
+                    "method": "no_match",
+                    "signals": {},
+                    "explanation": ["No compatible target field was selected from the current candidate set."],
+                    "alternatives": ["customer_group", "segment_code"],
+                },
+            ],
+            "canonical_coverage": {
+                "source": {"total_columns": 3, "matched_columns": 2, "coverage_ratio": 0.67},
+                "target": {"total_columns": 3, "matched_columns": 2, "coverage_ratio": 0.67},
+                "project": {
+                    "total_columns": 6,
+                    "matched_columns": 4,
+                    "coverage_ratio": 0.67,
+                    "concept_count": 3,
+                    "shared_concept_count": 1,
+                    "shared_concepts": ["customer.id"],
+                    "source_only_concepts": ["customer.group"],
+                    "target_only_concepts": ["customer.segment"]
+                }
+            }
+        },
+    }
+
+    with patch("app.api.routes.mapping.build_provider_from_settings", return_value=None):
+        response = client.post("/mapping/analysis/summary", json=request_payload)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "Mapping analysis: customer_source -> customer_target"
+    assert payload["overall_mapping_health"]["accepted_count"] == 1
+    assert payload["overall_mapping_health"]["needs_review_count"] == 2
+    assert payload["overall_mapping_health"]["unmatched_count"] == 1
+    assert payload["generation_metadata"]["used_llm"] is False
+    assert payload["generation_metadata"]["fallback_used"] is True
+    assert payload["strongest_matches"][0]["source"] == "customer_id"
+    assert any(item["source"] == "legacy_group_code" for item in payload["unmatched_sources"])
+    assert payload["recommended_next_actions"]
+
+
+def test_mapping_analysis_summary_uses_llm_when_provider_returns_valid_json() -> None:
+    request_payload = {
+        "workspace": {
+            "mapping_mode": "canonical",
+            "source_dataset_name": "material_source",
+            "target_dataset_name": "canonical"
+        },
+        "mapping_response": {
+            "mappings": [
+                {
+                    "source": "matnr",
+                    "target": "material_number",
+                    "confidence": 0.93,
+                    "confidence_label": "high_confidence",
+                    "status": "accepted",
+                    "method": "multi_signal_heuristic",
+                    "signals": {"name": 0.8, "knowledge": 0.9, "canonical": 0.8},
+                    "explanation": ["Canonical concept lock is strong."],
+                    "canonical_details": {
+                        "shared_concepts": [{"concept_id": "material.number", "display_name": "Material Number", "strength": 0.95}]
+                    }
+                }
+            ],
+            "canonical_coverage": {
+                "source": {"total_columns": 1, "matched_columns": 1, "coverage_ratio": 1.0},
+                "target": {"total_columns": 1, "matched_columns": 1, "coverage_ratio": 1.0},
+                "project": {
+                    "total_columns": 2,
+                    "matched_columns": 2,
+                    "coverage_ratio": 1.0,
+                    "concept_count": 1,
+                    "shared_concept_count": 1,
+                    "shared_concepts": ["material.number"]
+                }
+            }
+        },
+    }
+    llm_payload = {
+        "title": "LLM mapping overview",
+        "audience": "technical_implementor",
+        "mapping_mode": "canonical",
+        "overall_mapping_health": {
+            "summary": "LLM confirmed a strong canonical mapping with low delivery risk.",
+            "accepted_count": 1,
+            "needs_review_count": 0,
+            "rejected_count": 0,
+            "unmatched_count": 0,
+            "high_confidence_count": 1,
+            "medium_confidence_count": 0,
+            "low_confidence_count": 0,
+            "overall_risk": "low"
+        },
+        "confidence_distribution": {
+            "high_confidence_count": 1,
+            "medium_confidence_count": 0,
+            "low_confidence_count": 0,
+            "high_confidence_ratio": 1.0,
+            "medium_confidence_ratio": 0.0,
+            "low_confidence_ratio": 0.0,
+            "interpretation": "All visible mappings are high confidence."
+        },
+        "strongest_matches": [
+            {
+                "source": "matnr",
+                "target": "material_number",
+                "confidence": 0.93,
+                "why_it_is_strong": "Canonical alignment is explicit and consistent.",
+                "supporting_signals": ["knowledge", "canonical", "name"],
+                "canonical_path": "matnr -> Material Number -> material_number"
+            }
+        ],
+        "needs_review_items": [],
+        "unmatched_sources": [],
+        "canonical_coverage_summary": {
+            "source_coverage": 1.0,
+            "target_coverage": 1.0,
+            "project_coverage": 1.0,
+            "shared_concepts": ["material.number"],
+            "source_only_concepts": [],
+            "target_only_concepts": [],
+            "coverage_strength": "strong",
+            "coverage_interpretation": "Canonical grounding is complete for this slice."
+        },
+        "transformation_hotspots": [],
+        "implementation_risks": ["No major implementation blockers are visible in the current mapping payload."],
+        "recommended_next_actions": ["Proceed to downstream validation using representative material records."],
+        "narration_script_seed": "This mapping is strongly grounded in the canonical glossary.",
+        "generation_metadata": {}
+    }
+
+    with patch(
+        "app.api.routes.mapping.build_provider_from_settings",
+        return_value=StaticLLMProvider(json.dumps(llm_payload)),
+    ):
+        response = client.post("/mapping/analysis/summary", json=request_payload)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "LLM mapping overview"
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["generation_metadata"]["fallback_used"] is False
+    assert payload["generation_metadata"]["llm_provider"] == settings.llm_provider
+
+
+def test_mapping_analysis_narration_returns_fallback_when_provider_missing() -> None:
+    request_payload = {
+        "summary": {
+            "title": "Mapping analysis: customer_source -> customer_target",
+            "audience": "technical_implementor",
+            "mapping_mode": "standard",
+            "overall_mapping_health": {
+                "summary": "One mapping is accepted and one requires review.",
+                "accepted_count": 1,
+                "needs_review_count": 1,
+                "rejected_count": 0,
+                "unmatched_count": 0,
+                "high_confidence_count": 1,
+                "medium_confidence_count": 0,
+                "low_confidence_count": 1,
+                "overall_risk": "medium"
+            },
+            "confidence_distribution": {
+                "high_confidence_count": 1,
+                "medium_confidence_count": 0,
+                "low_confidence_count": 1,
+                "high_confidence_ratio": 0.5,
+                "medium_confidence_ratio": 0.0,
+                "low_confidence_ratio": 0.5,
+                "interpretation": "Confidence is mixed."
+            },
+            "strongest_matches": [],
+            "needs_review_items": [],
+            "unmatched_sources": [],
+            "canonical_coverage_summary": {
+                "source_coverage": 0.5,
+                "target_coverage": 0.5,
+                "project_coverage": 0.5,
+                "shared_concepts": [],
+                "source_only_concepts": [],
+                "target_only_concepts": [],
+                "coverage_strength": "moderate",
+                "coverage_interpretation": "Coverage is partial."
+            },
+            "transformation_hotspots": [],
+            "implementation_risks": [],
+            "recommended_next_actions": [],
+            "narration_script_seed": "This is the fallback narration seed.",
+            "generation_metadata": {"used_llm": False, "fallback_used": True}
+        }
+    }
+
+    with patch("app.api.routes.mapping.build_provider_from_settings", return_value=None):
+        response = client.post("/mapping/analysis/narration", json=request_payload)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["spoken_script"] == "This is the fallback narration seed."
+    assert payload["generation_metadata"]["used_llm"] is False
+    assert payload["generation_metadata"]["fallback_used"] is True
+
+
+def test_mapping_analysis_audio_returns_wav_bytes() -> None:
+    with patch("app.api.routes.mapping.synthesize_orpheus_wav", return_value=b"RIFFdemo"):
+        response = client.post("/mapping/analysis/audio", json={"spoken_script": "Technical overview narration."})
+
+    assert response.status_code == 200
+    assert response.content == b"RIFFdemo"
+    assert response.headers["content-type"].startswith("audio/wav")
+    assert response.headers["x-audio-provider"] == "lmstudio_orpheus"
+
+
 def test_knowledge_overlay_validate_create_activate_and_reload_flow() -> None:
     overlay_csv = csv_bytes(
         "entry_type,canonical_term,alias,domain,source_system,note\n"
@@ -1930,6 +2186,281 @@ def test_codegen_returns_pandas_snippet_for_mapping_decisions() -> None:
     assert 'df_target["phone_number"] = df_source["phone"]' in payload["code"]
 
 
+def test_codegen_returns_pyspark_snippet_for_mapping_decisions() -> None:
+    response = client.post(
+        "/mapping/codegen",
+        json={
+            "mode": "pyspark",
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "phone", "target": "phone_number", "status": "accepted"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["language"] == "python-pyspark"
+    assert 'from pyspark.sql import functions as F' in payload["code"]
+    assert 'F.col("cust_id").alias("customer_id")' in payload["code"]
+    assert 'F.col("phone").alias("phone_number")' in payload["code"]
+
+
+def test_codegen_reports_warning_when_pyspark_cannot_translate_custom_pandas_logic() -> None:
+    response = client.post(
+        "/mapping/codegen",
+        json={
+            "mode": "pyspark",
+            "mapping_decisions": [
+                {
+                    "source": "email",
+                    "target": "customer_name",
+                    "status": "accepted",
+                    "transformation_code": 'df_target["customer_name"] = df_source["email"].str.split("@").str[0].str.title()',
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert 'F.col("email").alias("customer_name")' in payload["code"]
+    assert payload["warnings"][0]["code"] == "untranslated_custom_transformation"
+    assert payload["warnings"][0]["stage"] == "codegen"
+    assert payload["warnings"][0]["fallback_applied"] is True
+
+
+def test_codegen_refine_returns_refined_artifact_when_llm_is_available() -> None:
+    import json
+
+    from app.services import llm_service
+    from unittest.mock import patch
+
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        json.dumps(
+            {
+                "code": (
+                    "from pyspark.sql import functions as F\n\n"
+                    "df_target = df_source.select(\n"
+                    '    F.trim(F.col("client_mail")).alias("customer_email"),\n'
+                    ")"
+                ),
+                "reasoning": ["Applied trim to the email column."],
+                "warnings": [],
+            }
+        )
+    )
+    try:
+        with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/mapping/codegen/refine",
+                json={
+                    "mode": "pyspark",
+                    "current_code": 'from pyspark.sql import functions as F\n\ndf_target = df_source.select(\n    F.col("client_mail").alias("customer_email"),\n)',
+                    "instruction": "Trim the email column before aliasing it.",
+                    "mapping_decisions": [
+                        {"source": "client_mail", "target": "customer_email", "status": "accepted"},
+                    ],
+                    "edge_cases": "",
+                    "reference_excerpt": "",
+                },
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["language"] == "python-pyspark"
+    assert 'F.trim(F.col("client_mail")).alias("customer_email")' in payload["code"]
+    assert payload["reasoning"] == ["Applied trim to the email column."]
+
+
+def test_review_plan_returns_structured_clusters_when_llm_is_available() -> None:
+    from app.services import llm_service
+    from unittest.mock import patch
+
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        '{"title":"Review triage plan","queue_summary":"The filtered review queue is dominated by unmatched canonical gaps and low-confidence customer-id rows.","clusters":[{"issue_type":"unmatched","focus":"No canonical match","canonical_status":"No canonical match","priority":"high","count":2,"source_examples":["LAND1","REGIO"],"summary":"Two unmatched rows share the same missing-canonical pattern.","recommended_follow_up":"Check missing glossary coverage before forcing target selection."}],"risks":["Unmatched rows still block a clean review-ready state."],"next_actions":["Resolve the unmatched glossary gap cluster first."]}'
+    )
+    try:
+        with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/mapping/review-plan",
+                json={
+                    "filtered_rows": [
+                        {
+                            "source": "LAND1",
+                            "target": "",
+                            "status": "needs_review",
+                            "confidence_label": "low_confidence",
+                            "canonical_status": "no_match",
+                            "canonical_status_label": "No canonical match",
+                        },
+                        {
+                            "source": "REGIO",
+                            "target": "",
+                            "status": "needs_review",
+                            "confidence_label": "low_confidence",
+                            "canonical_status": "no_match",
+                            "canonical_status_label": "No canonical match",
+                        },
+                    ],
+                    "attention_summary_rows": [
+                        {
+                            "issue_type": "unmatched",
+                            "focus": "No canonical match",
+                            "canonical_status": "No canonical match",
+                            "count": 2,
+                            "source_examples": "LAND1, REGIO",
+                            "follow_up": "Check missing glossary coverage before forcing target decisions.",
+                        }
+                    ],
+                    "filters": {"status": "needs_review", "confidence_label": "low_confidence", "source": "All"},
+                },
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["clusters"][0]["issue_type"] == "unmatched"
+    assert payload["clusters"][0]["priority"] == "high"
+
+
+def test_canonical_gap_triage_summary_returns_grouped_queue_when_llm_is_available() -> None:
+    from app.services import llm_service
+    from unittest.mock import patch
+
+    settings.admin_api_token = "secret-token"
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        '{"title":"Canonical gap batch triage","summary":"The queue is split between approve-ready alias additions and unresolved no-action items.","groups":[{"priority":"high","focus":"customer.shadow_id","count":2,"suggestion_action":"existing_concept_alias","proposal_state":"ready_for_approval","source_examples":["ALT_KUNNR","LEGACY_KUNNR"],"summary":"Two candidates are ready for approval against the same concept.","recommended_follow_up":"Approve this alias family before generating new suggestions."}],"risks":["Some candidates still lack a usable suggestion payload."],"next_actions":["Process approve-ready alias groups first."]}'
+    )
+    try:
+        with patch("app.api.routes.knowledge.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/knowledge/canonical-gaps/triage-summary",
+                json={
+                    "candidates": [
+                        {
+                            "source": "ALT_KUNNR",
+                            "target": "customer_shadow_id",
+                            "confidence": 0.88,
+                            "confidence_label": "high_confidence",
+                            "status": "accepted",
+                            "method": "multi_signal_heuristic",
+                            "signals": {},
+                            "explanation": ["Shared customer id concept is missing in the active canonical path."],
+                            "canonical_details": {},
+                            "reason": "Missing canonical path.",
+                        },
+                        {
+                            "source": "LEGACY_KUNNR",
+                            "target": "customer_shadow_id",
+                            "confidence": 0.85,
+                            "confidence_label": "high_confidence",
+                            "status": "accepted",
+                            "method": "multi_signal_heuristic",
+                            "signals": {},
+                            "explanation": ["Shared customer id concept is missing in the active canonical path."],
+                            "canonical_details": {},
+                            "reason": "Missing canonical path.",
+                        },
+                    ],
+                    "suggestions": {
+                        "canonical_gap_ALT_KUNNR_customer_shadow_id": {
+                            "action": "existing_concept_alias",
+                            "concept_id": "customer.shadow_id",
+                            "display_name": "Customer Shadow ID",
+                            "aliases": ["ALT_KUNNR"],
+                            "confidence": 0.92,
+                            "reasoning": ["The alias points to an existing customer shadow identifier concept."],
+                            "risk_notes": [],
+                            "raw_response": None
+                        },
+                        "canonical_gap_LEGACY_KUNNR_customer_shadow_id": {
+                            "action": "existing_concept_alias",
+                            "concept_id": "customer.shadow_id",
+                            "display_name": "Customer Shadow ID",
+                            "aliases": ["LEGACY_KUNNR"],
+                            "confidence": 0.9,
+                            "reasoning": ["The alias points to an existing customer shadow identifier concept."],
+                            "risk_notes": [],
+                            "raw_response": None
+                        }
+                    },
+                    "proposal_states": {
+                        "canonical_gap_ALT_KUNNR_customer_shadow_id": "ready_for_approval",
+                        "canonical_gap_LEGACY_KUNNR_customer_shadow_id": "ready_for_approval"
+                    }
+                },
+                headers=admin_headers(),
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["groups"][0]["proposal_state"] == "ready_for_approval"
+    assert payload["groups"][0]["suggestion_action"] == "existing_concept_alias"
+
+
+def test_catalog_reuse_fit_returns_structured_assessment_when_llm_is_available() -> None:
+    from app.services import llm_service
+    from unittest.mock import patch
+
+    settings.admin_api_token = "secret-token"
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        '{"title":"Reuse fit for customer-master","fit_assessment":"strong_fit","summary":"This approved customer mapping set matches the current workspace systems and domain closely enough for controlled reuse review.","key_matches":["Source and target systems match the active workspace context."],"risks":["Manual review is still required before applying the mapping set."],"next_actions":["Inspect unmatched sources and transformation code before reuse."]}'
+    )
+    try:
+        with patch("app.api.routes.catalog.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/catalog/reuse-fit",
+                json={
+                    "mapping_set_detail": {
+                        "mapping_set_id": 7,
+                        "name": "customer-master",
+                        "version": 3,
+                        "status": "approved",
+                        "artifact_type": "standard",
+                        "source_system": "SAP",
+                        "target_system": "CRM",
+                        "business_domain": "Customer",
+                        "mapping_decisions": [{"source": "KUNNR", "target": "customer_id", "status": "accepted"}],
+                    },
+                    "workspace_context": {
+                        "workspace_loaded": True,
+                        "mapping_mode": "standard",
+                        "source_dataset_name": "sap_customer.csv",
+                        "target_dataset_name": "crm_customer.csv",
+                        "source_system": "SAP",
+                        "target_system": "CRM",
+                        "business_domain": "Customer",
+                        "current_decision_count": 8,
+                    },
+                },
+                headers=admin_headers(),
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["fit_assessment"] == "strong_fit"
+    assert payload["key_matches"]
+
+
 def test_codegen_uses_transformation_code_when_present() -> None:
     response = client.post(
         "/mapping/codegen",
@@ -2734,6 +3265,8 @@ def test_admin_guard_allows_sensitive_endpoints_with_correct_token() -> None:
 
     assert response.status_code == 200
     assert "llm_provider" in response.json()
+    assert "tts_provider" in response.json()
+    assert "lmstudio_tts_base_url" in response.json()
 
 
 def test_evaluation_benchmark_endpoint_returns_metrics() -> None:
@@ -3125,6 +3658,61 @@ def test_saved_benchmark_correction_impact_reports_improvement_from_history() ->
     assert payload["correction_aware"]["accuracy"] == 1.0
     assert payload["accuracy_delta"] == 1.0
     assert payload["correct_matches_delta"] == 1
+
+
+def test_benchmark_explain_returns_structured_summary_when_llm_is_available() -> None:
+    from app.services import llm_service
+    from unittest.mock import patch
+
+    settings.admin_api_token = "secret-token"
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        '{"title":"Benchmark explanation for email-case","summary":"The compared profiles tie on this benchmark, so keep the current default until broader fixtures are added.","key_findings":["Balanced and canonical_first both reached 100% accuracy on the loaded fixture."],"risks":["The fixture set is too narrow to justify a default-profile change."],"next_actions":["Add broader benchmark cases before changing the default scoring profile."]}'
+    )
+    try:
+        with patch("app.api.routes.evaluation.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/evaluation/explain",
+                json={
+                    "dataset_name": "email-case",
+                    "profile_comparison": {
+                        "profiles": [
+                            {
+                                "profile": "balanced",
+                                "total_cases": 1,
+                                "total_fields": 1,
+                                "correct_matches": 1,
+                                "top1_accuracy": 1.0,
+                                "accuracy": 1.0,
+                                "confidence_by_bucket": {"high_confidence": 1.0, "medium_confidence": 0.0, "low_confidence": 0.0},
+                            },
+                            {
+                                "profile": "canonical_first",
+                                "total_cases": 1,
+                                "total_fields": 1,
+                                "correct_matches": 1,
+                                "top1_accuracy": 1.0,
+                                "accuracy": 1.0,
+                                "confidence_by_bucket": {"high_confidence": 1.0, "medium_confidence": 0.0, "low_confidence": 0.0},
+                            },
+                        ],
+                        "recommended_profile": "balanced",
+                        "recommendation_reason": "No decisive winner; keep balanced because it ties for best metrics.",
+                    },
+                },
+                headers=admin_headers(),
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "Benchmark explanation for email-case"
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["key_findings"]
+    assert payload["risks"]
+    assert payload["next_actions"]
 
 
 def upload_example_datasets() -> dict:

@@ -16,11 +16,18 @@ CATALOG_DETAIL_STATE_KEYS = (
     "catalog_selected_mapping_set_detail",
     "catalog_selected_mapping_set_audit",
     "catalog_selected_mapping_set_diff",
+    "catalog_reuse_fit_summary",
+    "catalog_reuse_fit_error",
 )
 
 
 def _normalized_text(value: object) -> str:
     return str(value or "").strip()
+
+
+def _section_label(title: str, detail: str | None = None) -> str:
+    detail_text = str(detail or "").strip()
+    return f"{title} · {detail_text}" if detail_text else title
 
 
 def _catalog_concept_reuse_summary(concept_detail: dict[str, Any] | None) -> dict[str, int]:
@@ -244,11 +251,67 @@ def _mapping_set_reuse_block_reason(status: str | None) -> str:
     return mapping_set_workspace_block_reason(status, action_label="reused in Workspace")
 
 
+def _catalog_reuse_fit_workspace_context() -> dict[str, Any]:
+    upload_response = st.session_state.get("upload_response") or {}
+    mapping_response = st.session_state.get("mapping_response") or {}
+    source_handle = upload_response.get("source") or {}
+    target_handle = upload_response.get("target") or {}
+    mapping_mode = (_normalized_text(upload_response.get("mapping_mode") or st.session_state.get("mapping_mode") or "standard").lower() or "standard")
+    decision_rows = mapping_response.get("ranked_mappings") or mapping_response.get("mappings") or []
+    return {
+        "workspace_loaded": bool(upload_response or mapping_response),
+        "mapping_mode": mapping_mode,
+        "source_dataset_name": _normalized_text(source_handle.get("dataset_name")) or "Source dataset",
+        "target_dataset_name": (
+            _normalized_text(upload_response.get("target_system"))
+            if mapping_mode == "canonical"
+            else _normalized_text(target_handle.get("dataset_name"))
+        )
+        or "Target dataset",
+        "source_system": _normalized_text(st.session_state.get("analysis_source_system")) or None,
+        "target_system": (
+            _normalized_text(st.session_state.get("analysis_target_system"))
+            or (_normalized_text(upload_response.get("target_system")) if mapping_mode == "canonical" else "")
+            or None
+        ),
+        "business_domain": _normalized_text(st.session_state.get("analysis_business_domain")) or None,
+        "current_decision_count": len(decision_rows),
+    }
+
+
+def _catalog_reuse_fit_payload(mapping_set_detail: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "mapping_set_detail": mapping_set_detail,
+        "workspace_context": _catalog_reuse_fit_workspace_context(),
+    }
+
+
+def _catalog_reuse_fit_label(fit_assessment: str | None) -> str:
+    normalized = _normalized_text(fit_assessment).lower()
+    labels = {
+        "strong_fit": "strong fit",
+        "partial_fit": "partial fit",
+        "low_fit": "low fit",
+    }
+    return labels.get(normalized, "not generated")
+
+
+def _catalog_reuse_fit_ready_for_selected_version(
+    selected_version: dict[str, Any] | None,
+    selected_mapping_set_detail: dict[str, Any] | None,
+) -> bool:
+    if not selected_version or not selected_mapping_set_detail:
+        return False
+    return int(selected_version.get("mapping_set_id") or 0) == int(selected_mapping_set_detail.get("mapping_set_id") or 0)
+
+
 def _clear_catalog_mapping_set_context() -> None:
     for key in (
         "catalog_selected_mapping_set_detail",
         "catalog_selected_mapping_set_audit",
         "catalog_selected_mapping_set_diff",
+        "catalog_reuse_fit_summary",
+        "catalog_reuse_fit_error",
     ):
         st.session_state.pop(key, None)
 
@@ -280,6 +343,8 @@ def _load_catalog_mapping_set_detail(
     )
     st.session_state["catalog_selected_mapping_set_audit"] = None
     st.session_state["catalog_selected_mapping_set_diff"] = None
+    st.session_state["catalog_reuse_fit_summary"] = None
+    st.session_state["catalog_reuse_fit_error"] = None
     st.session_state["last_action"] = {
         "level": "success",
         "message": f"Loaded mapping set #{mapping_set_id} into catalog drilldown.",
@@ -607,8 +672,6 @@ def render_catalog_tab(
         discovery_rows = _catalog_system_pair_matrix_rows(results)
         reuse_hints = _catalog_result_reuse_hints(results)
         if discovery_rows:
-            st.subheader("Discovery Overview")
-            discovery_columns = st.columns(4)
             unique_integrations = {
                 _normalized_text(item.get("integration_name"))
                 for item in results
@@ -629,14 +692,19 @@ def render_catalog_tab(
                 for concept in item.get("canonical_concepts", [])
                 if _normalized_text(concept)
             }
-            discovery_columns[0].metric("Integrations", len(unique_integrations))
-            discovery_columns[1].metric("Approved integrations", len(approved_integrations))
-            discovery_columns[2].metric("System pairs", len(system_pairs))
-            discovery_columns[3].metric("Distinct concepts", len(distinct_concepts))
-            st.caption(
-                "High-level discovery matrix over the current catalog result set. Cells show how many distinct integrations exist for each source-system to target-system path."
-            )
-            st.dataframe(discovery_rows, width="stretch", hide_index=True)
+            with st.expander(
+                _section_label("Discovery Overview", f"{len(system_pairs)} system pairs"),
+                expanded=True,
+            ):
+                discovery_columns = st.columns(4)
+                discovery_columns[0].metric("Integrations", len(unique_integrations))
+                discovery_columns[1].metric("Approved integrations", len(approved_integrations))
+                discovery_columns[2].metric("System pairs", len(system_pairs))
+                discovery_columns[3].metric("Distinct concepts", len(distinct_concepts))
+                st.caption(
+                    "High-level discovery matrix over the current catalog result set. Cells show how many distinct integrations exist for each source-system to target-system path."
+                )
+                st.dataframe(discovery_rows, width="stretch", hide_index=True)
 
         st.subheader("Integration Results")
         st.dataframe(
@@ -689,210 +757,306 @@ def render_catalog_tab(
 
     integration_detail = st.session_state.get("catalog_integration_detail")
     if integration_detail:
-        st.subheader("Integration Detail")
-        summary_columns = st.columns(4)
-        summary_columns[0].metric("Latest version", integration_detail["latest_version"]["version"])
-        summary_columns[1].metric("Versions", len(integration_detail.get("versions", [])))
-        summary_columns[2].metric("Canonical concepts", len(integration_detail.get("canonical_concepts", [])))
-        summary_columns[3].metric("Unmatched sources", len(integration_detail.get("unmatched_sources", [])))
-        st.caption(
-            "Systems: "
-            f"{integration_detail.get('source_system') or '-'} -> {integration_detail.get('target_system') or '-'} | "
-            f"Domain: {integration_detail.get('business_domain') or '-'} | "
-            f"Interface: {integration_detail.get('interface_type') or '-'}"
-        )
-        if integration_detail.get("description"):
-            st.write(integration_detail["description"])
-        latest_approved = integration_detail.get("latest_approved_version")
-        if latest_approved:
-            st.caption(
-                f"Latest approved version: v{latest_approved['version']} ({latest_approved.get('status')}, owner={latest_approved.get('owner') or '-'})"
-            )
-        st.write("**Canonical concepts:** " + (", ".join(integration_detail.get("canonical_concepts", [])) or "-"))
-        st.write("**Unmatched sources:** " + (", ".join(integration_detail.get("unmatched_sources", [])) or "-"))
-        st.dataframe(integration_detail.get("versions", []), width="stretch", hide_index=True)
-
-        version_records = integration_detail.get("versions", [])
-        version_labels = [
-            f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
-            for item in version_records
-        ]
-        selected_version_label = st.selectbox(
-            "Catalog version drilldown",
-            version_labels,
-            key="catalog_selected_version_label",
-        )
-        selected_version = version_records[version_labels.index(selected_version_label)]
-        reuse_block_reason = _mapping_set_reuse_block_reason(selected_version.get("status"))
-        drilldown_actions = st.columns(4)
-        if drilldown_actions[0].button("Open selected version", width="stretch", key="catalog_open_selected_version"):
-            try:
-                _load_catalog_mapping_set_detail(selected_version["mapping_set_id"], api_request=api_request)
-                st.rerun()
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Loading mapping set detail failed: {error}",
-                }
-                st.rerun()
-        if drilldown_actions[1].button("Load selected audit", width="stretch", key="catalog_open_selected_audit"):
-            try:
-                _load_catalog_mapping_set_audit(selected_version["mapping_set_id"], api_request=api_request)
-                st.rerun()
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Loading mapping set audit failed: {error}",
-                }
-                st.rerun()
-        if drilldown_actions[2].button(
-            "Reuse in Workspace",
-            width="stretch",
-            key="catalog_reuse_selected_version",
-            disabled=bool(reuse_block_reason),
+        with st.expander(
+            _section_label("Integration Detail", f"{len(integration_detail.get('versions', []))} versions"),
+            expanded=True,
         ):
-            try:
-                _reuse_catalog_mapping_set_in_workspace(selected_version["mapping_set_id"], api_request=api_request)
-                st.rerun()
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": api_error_message(error, default_prefix="Reusing mapping set in workspace failed"),
-                }
-                st.rerun()
-        if reuse_block_reason:
-            st.caption(reuse_block_reason)
-        if drilldown_actions[3].button(
-            "Open approved version",
-            width="stretch",
-            key="catalog_open_approved_version",
-            disabled=not bool(latest_approved),
-        ):
-            try:
-                _load_catalog_mapping_set_detail(latest_approved["mapping_set_id"], api_request=api_request)
-                st.rerun()
-            except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
-                    "level": "error",
-                    "message": f"Loading approved mapping set detail failed: {error}",
-                }
-                st.rerun()
-
-        selected_mapping_set_detail = st.session_state.get("catalog_selected_mapping_set_detail")
-        if selected_mapping_set_detail:
-            st.subheader("Mapping Set Drilldown")
+            summary_columns = st.columns(4)
+            summary_columns[0].metric("Latest version", integration_detail["latest_version"]["version"])
+            summary_columns[1].metric("Versions", len(integration_detail.get("versions", [])))
+            summary_columns[2].metric("Canonical concepts", len(integration_detail.get("canonical_concepts", [])))
+            summary_columns[3].metric("Unmatched sources", len(integration_detail.get("unmatched_sources", [])))
             st.caption(
-                f"#{selected_mapping_set_detail['mapping_set_id']} | {selected_mapping_set_detail['name']} | "
-                f"v{selected_mapping_set_detail['version']} | {selected_mapping_set_detail['status']}"
+                "Systems: "
+                f"{integration_detail.get('source_system') or '-'} -> {integration_detail.get('target_system') or '-'} | "
+                f"Domain: {integration_detail.get('business_domain') or '-'} | "
+                f"Interface: {integration_detail.get('interface_type') or '-'}"
             )
-            drilldown_summary = st.columns(4)
-            drilldown_summary[0].metric("Decisions", selected_mapping_set_detail.get("decision_count", 0))
-            drilldown_summary[1].metric("Status", selected_mapping_set_detail.get("status", "-"))
-            drilldown_summary[2].metric("Owner", selected_mapping_set_detail.get("owner") or "-")
-            drilldown_summary[3].metric("Assignee", selected_mapping_set_detail.get("assignee") or "-")
-            if selected_mapping_set_detail.get("review_note"):
-                st.caption(f"Review note: {selected_mapping_set_detail['review_note']}")
-            st.dataframe(selected_mapping_set_detail.get("mapping_decisions", []), width="stretch", hide_index=True)
-
-            comparison_candidates = [
-                item
-                for item in version_records
-                if item.get("name") == selected_mapping_set_detail.get("name")
-                and item.get("mapping_set_id") != selected_mapping_set_detail.get("mapping_set_id")
-            ]
-            if comparison_candidates:
-                comparison_labels = [
-                    f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
-                    for item in comparison_candidates
-                ]
-                comparison_columns = st.columns([3, 1])
-                selected_comparison_label = comparison_columns[0].selectbox(
-                    "Compare selected version against",
-                    comparison_labels,
-                    key="catalog_selected_mapping_set_diff_label",
-                )
-                comparison_mapping_set = comparison_candidates[
-                    comparison_labels.index(selected_comparison_label)
-                ]
-                if comparison_columns[1].button(
-                    "Load version diff",
-                    width="stretch",
-                    key="catalog_load_selected_mapping_set_diff",
-                ):
-                    try:
-                        _load_catalog_mapping_set_diff(
-                            selected_mapping_set_detail["mapping_set_id"],
-                            comparison_mapping_set["mapping_set_id"],
-                            api_request=api_request,
-                        )
-                        st.rerun()
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Loading mapping set diff failed: {error}",
-                        }
-                        st.rerun()
-
-            selected_mapping_set_audit = st.session_state.get("catalog_selected_mapping_set_audit")
-            if selected_mapping_set_audit:
-                st.caption("Selected mapping set audit")
-                st.dataframe(selected_mapping_set_audit, width="stretch", hide_index=True)
-
-            selected_mapping_set_diff = st.session_state.get("catalog_selected_mapping_set_diff")
-            if selected_mapping_set_diff:
+            if integration_detail.get("description"):
+                st.write(integration_detail["description"])
+            latest_approved = integration_detail.get("latest_approved_version")
+            if latest_approved:
                 st.caption(
-                    "Selected mapping set diff: "
-                    f"v{selected_mapping_set_diff.get('current_version')} vs "
-                    f"v{selected_mapping_set_diff.get('against_version')}"
+                    f"Latest approved version: v{latest_approved['version']} ({latest_approved.get('status')}, owner={latest_approved.get('owner') or '-'})"
                 )
-                diff_summary = st.columns(3)
-                diff_summary[0].metric("Added", selected_mapping_set_diff.get("added_count", 0))
-                diff_summary[1].metric("Removed", selected_mapping_set_diff.get("removed_count", 0))
-                diff_summary[2].metric("Changed", selected_mapping_set_diff.get("changed_count", 0))
-                st.dataframe(selected_mapping_set_diff.get("changes", []), width="stretch", hide_index=True)
+            st.write("**Canonical concepts:** " + (", ".join(integration_detail.get("canonical_concepts", [])) or "-"))
+            st.write("**Unmatched sources:** " + (", ".join(integration_detail.get("unmatched_sources", [])) or "-"))
+            st.dataframe(integration_detail.get("versions", []), width="stretch", hide_index=True)
 
-        similar_integrations = integration_detail.get("similar_integrations", [])
-        if similar_integrations:
-            st.subheader("Similar Integrations")
-            st.caption(
-                "Similarity is ranked by shared canonical concepts first, then by same source system, target system, business domain, and artifact type."
+            version_records = integration_detail.get("versions", [])
+            version_labels = [
+                f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
+                for item in version_records
+            ]
+            selected_version_label = st.selectbox(
+                "Catalog version drilldown",
+                version_labels,
+                key="catalog_selected_version_label",
             )
-            st.dataframe(
-                [
-                    {
-                        "integration_name": item.get("integration_name"),
-                        "similarity_score": item.get("similarity_score"),
-                        "shared_concept_count": item.get("shared_concept_count"),
-                        "shared_concepts": ", ".join(item.get("shared_concepts", [])),
-                        "same_source_system": item.get("same_source_system"),
-                        "same_target_system": item.get("same_target_system"),
-                        "same_business_domain": item.get("same_business_domain"),
-                        "same_artifact_type": item.get("same_artifact_type"),
-                        "latest_version": item.get("latest_version", {}).get("version"),
-                        "latest_status": item.get("latest_version", {}).get("status"),
-                    }
-                    for item in similar_integrations
-                ],
-                width="stretch",
-                hide_index=True,
-            )
-            similar_names = [item["integration_name"] for item in similar_integrations]
-            similar_columns = st.columns([3, 1])
-            selected_similar_name = similar_columns[0].selectbox(
-                "Open similar integration detail",
-                similar_names,
-                key="catalog_selected_similar_integration_name",
-            )
-            if similar_columns[1].button("Open similar integration", width="stretch", key="catalog_open_similar_integration"):
+            selected_version = version_records[version_labels.index(selected_version_label)]
+            reuse_block_reason = _mapping_set_reuse_block_reason(selected_version.get("status"))
+            drilldown_actions = st.columns(4)
+            if drilldown_actions[0].button("Open selected version", width="stretch", key="catalog_open_selected_version"):
                 try:
-                    _load_catalog_integration_detail(selected_similar_name, api_request=api_request)
+                    _load_catalog_mapping_set_detail(selected_version["mapping_set_id"], api_request=api_request)
                     st.rerun()
                 except httpx.HTTPError as error:
                     st.session_state["last_action"] = {
                         "level": "error",
-                        "message": f"Loading similar integration failed: {error}",
+                        "message": f"Loading mapping set detail failed: {error}",
                     }
                     st.rerun()
+            if drilldown_actions[1].button("Load selected audit", width="stretch", key="catalog_open_selected_audit"):
+                try:
+                    _load_catalog_mapping_set_audit(selected_version["mapping_set_id"], api_request=api_request)
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Loading mapping set audit failed: {error}",
+                    }
+                    st.rerun()
+            if drilldown_actions[2].button(
+                "Reuse in Workspace",
+                width="stretch",
+                key="catalog_reuse_selected_version",
+                disabled=bool(reuse_block_reason),
+            ):
+                try:
+                    _reuse_catalog_mapping_set_in_workspace(selected_version["mapping_set_id"], api_request=api_request)
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": api_error_message(error, default_prefix="Reusing mapping set in workspace failed"),
+                    }
+                    st.rerun()
+            if reuse_block_reason:
+                st.caption(reuse_block_reason)
+            if drilldown_actions[3].button(
+                "Open approved version",
+                width="stretch",
+                key="catalog_open_approved_version",
+                disabled=not bool(latest_approved),
+            ):
+                try:
+                    _load_catalog_mapping_set_detail(latest_approved["mapping_set_id"], api_request=api_request)
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Loading approved mapping set detail failed: {error}",
+                    }
+                    st.rerun()
+
+            selected_mapping_set_detail = st.session_state.get("catalog_selected_mapping_set_detail")
+            reuse_fit_summary = st.session_state.get("catalog_reuse_fit_summary")
+            reuse_fit_error = st.session_state.get("catalog_reuse_fit_error")
+            reuse_fit_context = _catalog_reuse_fit_workspace_context()
+            reuse_fit_ready = _catalog_reuse_fit_ready_for_selected_version(
+                selected_version,
+                selected_mapping_set_detail,
+            )
+            with st.expander(
+                _section_label(
+                    "Workspace Reuse Fit",
+                    _catalog_reuse_fit_label((reuse_fit_summary or {}).get("fit_assessment")) if reuse_fit_ready else None,
+                ),
+                expanded=bool(reuse_fit_summary or reuse_fit_error),
+            ):
+                st.caption(
+                    "Bounded reuse assessment for the selected catalog version against the current workspace snapshot. "
+                    "This does not apply or approve anything automatically."
+                )
+                st.caption(
+                    "Workspace context: "
+                    f"{reuse_fit_context.get('source_dataset_name') or 'Source dataset'} -> "
+                    f"{reuse_fit_context.get('target_dataset_name') or 'Target dataset'} | "
+                    f"mode={reuse_fit_context.get('mapping_mode') or 'standard'} | "
+                    f"active decisions={reuse_fit_context.get('current_decision_count', 0)}"
+                )
+                if not reuse_fit_ready:
+                    st.info("Open the selected catalog version first to inspect workspace fit.")
+                    if st.button(
+                        "Open selected version for fit review",
+                        width="stretch",
+                        key="catalog_open_selected_version_for_fit",
+                    ):
+                        try:
+                            _load_catalog_mapping_set_detail(selected_version["mapping_set_id"], api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Loading mapping set detail failed: {error}",
+                            }
+                            st.rerun()
+                else:
+                    if st.button(
+                        "Refresh workspace fit" if reuse_fit_summary else "Explain workspace fit",
+                        width="stretch",
+                        key="catalog_explain_workspace_fit",
+                    ):
+                        try:
+                            st.session_state["catalog_reuse_fit_summary"] = api_request(
+                                "POST",
+                                "/catalog/reuse-fit",
+                                json=_catalog_reuse_fit_payload(selected_mapping_set_detail),
+                                timeout=90.0,
+                            )
+                            st.session_state["catalog_reuse_fit_error"] = None
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": "Generated workspace reuse-fit explanation for the selected catalog mapping set.",
+                            }
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["catalog_reuse_fit_summary"] = None
+                            st.session_state["catalog_reuse_fit_error"] = f"Generating reuse-fit explanation failed: {error}"
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": st.session_state["catalog_reuse_fit_error"],
+                            }
+                            st.rerun()
+
+                    if reuse_fit_error:
+                        st.warning(reuse_fit_error)
+                    if reuse_fit_summary:
+                        fit_columns = st.columns(3)
+                        fit_columns[0].metric("Fit", _catalog_reuse_fit_label(reuse_fit_summary.get("fit_assessment")))
+                        fit_columns[1].metric(
+                            "Generated with",
+                            "LLM" if (reuse_fit_summary.get("generation_metadata") or {}).get("used_llm") else "Fallback",
+                        )
+                        fit_columns[2].metric("Catalog decisions", selected_mapping_set_detail.get("decision_count", 0))
+                        st.write(reuse_fit_summary.get("summary") or "")
+                        st.write("**Key matches**")
+                        for item in reuse_fit_summary.get("key_matches", []):
+                            st.write(f"- {item}")
+                        st.write("**Risks**")
+                        for item in reuse_fit_summary.get("risks", []):
+                            st.write(f"- {item}")
+                        st.write("**Next actions**")
+                        for item in reuse_fit_summary.get("next_actions", []):
+                            st.write(f"- {item}")
+                    else:
+                        st.info("No workspace reuse-fit explanation has been generated yet for the selected version.")
+
+            if selected_mapping_set_detail:
+                st.subheader("Mapping Set Drilldown")
+                st.caption(
+                    f"#{selected_mapping_set_detail['mapping_set_id']} | {selected_mapping_set_detail['name']} | "
+                    f"v{selected_mapping_set_detail['version']} | {selected_mapping_set_detail['status']}"
+                )
+                drilldown_summary = st.columns(4)
+                drilldown_summary[0].metric("Decisions", selected_mapping_set_detail.get("decision_count", 0))
+                drilldown_summary[1].metric("Status", selected_mapping_set_detail.get("status", "-"))
+                drilldown_summary[2].metric("Owner", selected_mapping_set_detail.get("owner") or "-")
+                drilldown_summary[3].metric("Assignee", selected_mapping_set_detail.get("assignee") or "-")
+                if selected_mapping_set_detail.get("review_note"):
+                    st.caption(f"Review note: {selected_mapping_set_detail['review_note']}")
+
+                st.dataframe(selected_mapping_set_detail.get("mapping_decisions", []), width="stretch", hide_index=True)
+
+                comparison_candidates = [
+                    item
+                    for item in version_records
+                    if item.get("name") == selected_mapping_set_detail.get("name")
+                    and item.get("mapping_set_id") != selected_mapping_set_detail.get("mapping_set_id")
+                ]
+                if comparison_candidates:
+                    comparison_labels = [
+                        f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
+                        for item in comparison_candidates
+                    ]
+                    comparison_columns = st.columns([3, 1])
+                    selected_comparison_label = comparison_columns[0].selectbox(
+                        "Compare selected version against",
+                        comparison_labels,
+                        key="catalog_selected_mapping_set_diff_label",
+                    )
+                    comparison_mapping_set = comparison_candidates[
+                        comparison_labels.index(selected_comparison_label)
+                    ]
+                    if comparison_columns[1].button(
+                        "Load version diff",
+                        width="stretch",
+                        key="catalog_load_selected_mapping_set_diff",
+                    ):
+                        try:
+                            _load_catalog_mapping_set_diff(
+                                selected_mapping_set_detail["mapping_set_id"],
+                                comparison_mapping_set["mapping_set_id"],
+                                api_request=api_request,
+                            )
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Loading mapping set diff failed: {error}",
+                            }
+                            st.rerun()
+
+                selected_mapping_set_audit = st.session_state.get("catalog_selected_mapping_set_audit")
+                if selected_mapping_set_audit:
+                    st.caption("Selected mapping set audit")
+                    st.dataframe(selected_mapping_set_audit, width="stretch", hide_index=True)
+
+                selected_mapping_set_diff = st.session_state.get("catalog_selected_mapping_set_diff")
+                if selected_mapping_set_diff:
+                    st.caption(
+                        "Selected mapping set diff: "
+                        f"v{selected_mapping_set_diff.get('current_version')} vs "
+                        f"v{selected_mapping_set_diff.get('against_version')}"
+                    )
+                    diff_summary = st.columns(3)
+                    diff_summary[0].metric("Added", selected_mapping_set_diff.get("added_count", 0))
+                    diff_summary[1].metric("Removed", selected_mapping_set_diff.get("removed_count", 0))
+                    diff_summary[2].metric("Changed", selected_mapping_set_diff.get("changed_count", 0))
+                    st.dataframe(selected_mapping_set_diff.get("changes", []), width="stretch", hide_index=True)
+
+            similar_integrations = integration_detail.get("similar_integrations", [])
+            if similar_integrations:
+                st.subheader("Similar Integrations")
+                st.caption(
+                    "Similarity is ranked by shared canonical concepts first, then by same source system, target system, business domain, and artifact type."
+                )
+                st.dataframe(
+                    [
+                        {
+                            "integration_name": item.get("integration_name"),
+                            "similarity_score": item.get("similarity_score"),
+                            "shared_concept_count": item.get("shared_concept_count"),
+                            "shared_concepts": ", ".join(item.get("shared_concepts", [])),
+                            "same_source_system": item.get("same_source_system"),
+                            "same_target_system": item.get("same_target_system"),
+                            "same_business_domain": item.get("same_business_domain"),
+                            "same_artifact_type": item.get("same_artifact_type"),
+                            "latest_version": item.get("latest_version", {}).get("version"),
+                            "latest_status": item.get("latest_version", {}).get("status"),
+                        }
+                        for item in similar_integrations
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+                similar_names = [item["integration_name"] for item in similar_integrations]
+                similar_columns = st.columns([3, 1])
+                selected_similar_name = similar_columns[0].selectbox(
+                    "Open similar integration detail",
+                    similar_names,
+                    key="catalog_selected_similar_integration_name",
+                )
+                if similar_columns[1].button("Open similar integration", width="stretch", key="catalog_open_similar_integration"):
+                    try:
+                        _load_catalog_integration_detail(selected_similar_name, api_request=api_request)
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Loading similar integration failed: {error}",
+                        }
+                        st.rerun()
 
     st.subheader("Concept Lookup")
     concept_columns = st.columns([3, 1])
@@ -924,44 +1088,48 @@ def render_catalog_tab(
     if concept_detail:
         reuse_summary = _catalog_concept_reuse_summary(concept_detail)
         reuse_rows = _catalog_concept_reuse_rows(concept_detail)
-        st.caption(
-            f"Concept {concept_detail['concept_id']} appears in {reuse_summary['usage_count']} saved mapping version(s)."
-        )
-        summary_columns = st.columns(5)
-        summary_columns[0].metric("Usage versions", reuse_summary["usage_count"])
-        summary_columns[1].metric("Integrations", reuse_summary["integration_count"])
-        summary_columns[2].metric("Approved integrations", reuse_summary["approved_integration_count"])
-        summary_columns[3].metric("Source systems", reuse_summary["source_system_count"])
-        summary_columns[4].metric("Target systems", reuse_summary["target_system_count"])
-
-        if reuse_rows:
-            st.write("**Concept-centric reuse view**")
+        with st.expander(
+            _section_label("Concept Usage Summary", f"{reuse_summary['usage_count']} versions"),
+            expanded=True,
+        ):
             st.caption(
-                "Grouped view of how this canonical concept is reused across integrations, with latest and approved version signals."
+                f"Concept {concept_detail['concept_id']} appears in {reuse_summary['usage_count']} saved mapping version(s)."
             )
-            st.dataframe(reuse_rows, width="stretch", hide_index=True)
-            integration_options = [row["integration_name"] for row in reuse_rows if _normalized_text(row.get("integration_name"))]
-            if integration_options:
-                concept_action_columns = st.columns([3, 1])
-                selected_concept_integration = concept_action_columns[0].selectbox(
-                    "Open integration from concept reuse view",
-                    integration_options,
-                    key="catalog_selected_concept_integration_name",
-                )
-                if concept_action_columns[1].button(
-                    "Open integration",
-                    width="stretch",
-                    key="catalog_open_concept_integration",
-                ):
-                    try:
-                        _load_catalog_integration_detail(selected_concept_integration, api_request=api_request)
-                        st.rerun()
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Loading integration from concept reuse view failed: {error}",
-                        }
-                        st.rerun()
+            summary_columns = st.columns(5)
+            summary_columns[0].metric("Usage versions", reuse_summary["usage_count"])
+            summary_columns[1].metric("Integrations", reuse_summary["integration_count"])
+            summary_columns[2].metric("Approved integrations", reuse_summary["approved_integration_count"])
+            summary_columns[3].metric("Source systems", reuse_summary["source_system_count"])
+            summary_columns[4].metric("Target systems", reuse_summary["target_system_count"])
 
-        st.write("**Version-level usage records**")
-        st.dataframe(concept_detail.get("integrations", []), width="stretch", hide_index=True)
+            if reuse_rows:
+                st.write("**Concept-centric reuse view**")
+                st.caption(
+                    "Grouped view of how this canonical concept is reused across integrations, with latest and approved version signals."
+                )
+                st.dataframe(reuse_rows, width="stretch", hide_index=True)
+                integration_options = [row["integration_name"] for row in reuse_rows if _normalized_text(row.get("integration_name"))]
+                if integration_options:
+                    concept_action_columns = st.columns([3, 1])
+                    selected_concept_integration = concept_action_columns[0].selectbox(
+                        "Open integration from concept reuse view",
+                        integration_options,
+                        key="catalog_selected_concept_integration_name",
+                    )
+                    if concept_action_columns[1].button(
+                        "Open integration",
+                        width="stretch",
+                        key="catalog_open_concept_integration",
+                    ):
+                        try:
+                            _load_catalog_integration_detail(selected_concept_integration, api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Loading integration from concept reuse view failed: {error}",
+                            }
+                            st.rerun()
+
+            st.write("**Version-level usage records**")
+            st.dataframe(concept_detail.get("integrations", []), width="stretch", hide_index=True)

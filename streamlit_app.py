@@ -7,6 +7,10 @@ from streamlit_ui.api import (
     admin_token_required,
     api_request,
     api_request_content,
+    request_mapping_analysis_audio,
+    request_mapping_analysis_narration,
+    request_mapping_analysis_summary,
+    request_review_plan_summary,
     request_llm_transformation_suggestion,
     request_transformation_templates,
     sql_tables_for_upload,
@@ -206,6 +210,16 @@ def trust_layer_rows(mapping_response: dict) -> list[dict]:
 
 # Workspace review view adapters
 
+def render_mapping_analysis_panel(mapping_response: dict) -> None:
+    from streamlit_ui.workspace_review_views import render_mapping_analysis_panel as _impl
+
+    return _impl(
+        mapping_response,
+        request_mapping_analysis_audio=request_mapping_analysis_audio,
+        request_mapping_analysis_narration=request_mapping_analysis_narration,
+        request_mapping_analysis_summary=request_mapping_analysis_summary,
+    )
+
 def display_trust_layer(mapping_response: dict) -> None:
     from streamlit_ui.workspace_review_views import display_trust_layer as _impl
 
@@ -242,8 +256,23 @@ def reset_flow_state() -> None:
     for key in (
         "upload_response",
         "mapping_response",
+        "mapping_analysis_summary",
+        "mapping_analysis_error",
+        "mapping_analysis_spoken_script",
+        "mapping_analysis_audio_bytes",
+        "mapping_analysis_audio_mime_type",
+        "mapping_analysis_audio_error",
+        "review_plan_summary",
+        "review_plan_error",
+        "canonical_gap_candidates",
+        "canonical_gap_suggestions",
+        "canonical_gap_triage_summary",
+        "canonical_gap_triage_error",
+        "catalog_reuse_fit_summary",
+        "catalog_reuse_fit_error",
         "preview_response",
         "codegen_response",
+        "codegen_refinement_response",
         "saved_corrections",
         "mapping_editor_state",
         "transformation_templates",
@@ -319,12 +348,21 @@ def render_mapping_review(mapping_response: dict) -> None:
     return _impl(
         mapping_response,
         current_mapping_rows=current_mapping_rows,
-        canonical_concept_groups=canonical_concept_groups,
         source_concept_rows=source_concept_rows,
         concept_target_rows=concept_target_rows,
         all_filter_option=ALL_FILTER_OPTION,
         validator_badge=validator_badge,
         canonical_path_label=canonical_path_label,
+        request_review_plan_summary=request_review_plan_summary,
+    )
+
+
+def render_canonical_concept_summary(mapping_response: dict) -> None:
+    from streamlit_ui.workspace_review_views import render_canonical_concept_summary as _impl
+
+    return _impl(
+        mapping_response,
+        canonical_concept_groups=canonical_concept_groups,
     )
 
 
@@ -373,6 +411,12 @@ def render_mapping_editor(mapping_response: dict) -> None:
     from streamlit_ui.workspace_review_views import render_mapping_editor as _impl
 
     return _impl(mapping_response, selected_target_options=selected_target_options)
+
+
+def render_canonical_gap_assistant(mapping_response: dict) -> None:
+    from streamlit_ui.workspace_review_views import render_canonical_gap_assistant as _impl
+
+    return _impl(mapping_response, api_request=api_request)
 
 
 def upsert_manual_mapping(source: str, target: str, status: str) -> None:
@@ -522,6 +566,17 @@ def render_mapping_io_panel() -> None:
     )
 
 
+def render_mapping_set_versions_panel() -> None:
+    from streamlit_ui.workspace_decision_views import render_mapping_set_versions_panel as _impl
+
+    return _impl(
+        build_mapping_decisions=build_mapping_decisions,
+        apply_imported_mapping_payload=apply_imported_mapping_payload,
+        api_request=api_request,
+        build_mapping_set_payload=build_mapping_set_payload,
+    )
+
+
 def render_correction_panel() -> None:
     from streamlit_ui.workspace_decision_views import render_correction_panel as _impl
 
@@ -596,12 +651,16 @@ def render_workspace_tab() -> None:
         uploaded_file_bytes=uploaded_file_bytes,
         render_dataset_summary=render_dataset_summary,
         initialize_mapping_editor_state=initialize_mapping_editor_state,
+        render_mapping_analysis_panel=render_mapping_analysis_panel,
         display_trust_layer=display_trust_layer,
         render_mapping_review=render_mapping_review,
         render_mapping_editor=render_mapping_editor,
+        render_canonical_gap_assistant=render_canonical_gap_assistant,
+        render_canonical_concept_summary=render_canonical_concept_summary,
         render_manual_mapping_panel=render_manual_mapping_panel,
         render_mapping_decision_summary=render_mapping_decision_summary,
         render_mapping_io_panel=render_mapping_io_panel,
+        render_mapping_set_versions_panel=render_mapping_set_versions_panel,
         render_correction_panel=render_correction_panel,
         build_mapping_decisions=build_mapping_decisions,
     )
@@ -621,7 +680,9 @@ def main() -> None:
         st.header("Connection")
         st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url")
         st.text_input("Admin Token", value="", key="admin_token", type="password")
-        st.markdown("This UI is a thin client above the existing FastAPI backend.")
+        st.markdown(
+            "This UI talks to the Semantra FastAPI backend. LLM and TTS provider endpoints are configured behind that backend and shown below in Runtime."
+        )
         render_llm_runtime_status()
         if st.button("Reset flow"):
             reset_flow_state()

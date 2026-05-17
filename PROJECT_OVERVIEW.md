@@ -10,7 +10,7 @@ It is built around a deterministic-first loop:
 2. profile schemas and rank mapping candidates
 3. enrich matching with metadata knowledge, canonical concepts, and prior review memory
 4. use bounded AI only where it adds explainable value
-5. review, refine, preview, and persist governed artifacts
+5. review, refine, preview, benchmark, and persist governed artifacts
 
 The current product is pilot-ready for controlled analyst and stewardship workflows. It is not yet a production ETL runtime, enterprise connector platform, or orchestration engine.
 
@@ -24,7 +24,27 @@ The goal of Semantra is to make schema mapping:
 - reusable
 - improvable through governed feedback
 
-The product does not treat LLMs as an autonomous mapper. Instead, it keeps the main inference path deterministic and uses AI only inside bounded, inspectable surfaces such as ambiguity review, transformation generation, and canonical-gap suggestion.
+The product does not treat LLMs as an autonomous mapper. Instead, it keeps the main inference path deterministic and uses AI only inside bounded, inspectable surfaces.
+
+## Bounded AI Operating Model
+
+Today, Semantra uses optional AI only in controlled surfaces such as:
+
+- closed-set mapping validation in the ambiguity band
+- Mapping Analysis Overview, narration, and audio generation
+- transformation generation
+- output artifact refinement
+- review queue planning
+- canonical-gap suggestion and queue summary
+- benchmark explanation
+- catalog workspace reuse-fit explanation
+
+These surfaces share the same intent:
+
+- they do not auto-approve or auto-apply durable changes
+- they expose structured output rather than freeform hidden reasoning
+- they stay close to a concrete local workflow step
+- they fall back gracefully when the LLM is unavailable or the response is invalid
 
 ## Product Shape Today
 
@@ -76,7 +96,7 @@ Implemented today:
 - top-k candidate ranking with one-to-one assignment
 - signal fusion across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, embedding, correction, and optional LLM inputs
 - project/source/target canonical coverage reporting
-- async mapping jobs with progress polling
+- async mapping jobs with progress polling, active-job limits, and cancel support
 
 Important behavior:
 
@@ -91,38 +111,45 @@ Main anchors:
 - `backend/app/api/routes/mapping.py`
 - `backend/app/services/mapping_job_service.py`
 
-### 3. Review and decisioning
+### 3. Review, explainability, and guided queue support
 
 Implemented today:
 
 - trust-layer explanations and signal breakdowns
 - source-to-concept and concept-to-target review views
-- manual target adjustment
-- decision export/import as JSON and Excel
-- reusable transformation templates and manual transformation editing
+- Mapping Analysis Overview with technical summary, recommended actions, and optional narration/audio
+- Review Queue Plan for the currently filtered review set
+- grouped review-attention summary for repeated unmatched or low-confidence patterns
+- Canonical Gap Suggestions plus Gap Queue Summary for queue-level canonical stewardship guidance
 
 This turns the engine output into an analyst-controlled review surface rather than an opaque guess.
 
 Main anchors:
 
 - `streamlit_ui/workspace_review_views.py`
-- `streamlit_ui/workspace_decision_views.py`
-- `streamlit_ui/mapping_helpers.py`
+- `backend/app/services/mapping_analysis_service.py`
+- `backend/app/services/review_plan_service.py`
+- `backend/app/services/canonical_gap_triage_service.py`
 
-### 4. Preview, code generation, and transformation testing
+### 4. Decisions, preview, code generation, and artifact refinement
 
 Implemented today:
 
+- manual target adjustment
+- decision export/import as JSON and Excel
+- reusable transformation templates and manual transformation editing
 - advisory preview over active mapping decisions
-- Pandas code generation
-- LLM transformation generation when configured
+- Pandas and PySpark starter code generation
 - structured transformation warnings and fallback behavior
+- LLM transformation generation when configured
+- output artifact refinement with original vs refined compare and explicit accept/discard actions
 - transformation test set save/list/detail/run flows
 
 Important product contract:
 
 - preview is intentionally advisory and can run before all decisions are accepted
 - code generation and transformation test-set persistence/execution are governance-gated
+- refinement is guidance only until the user explicitly accepts the refined artifact
 
 Detailed preview/codegen warning behavior and classification is documented in `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
 
@@ -133,7 +160,9 @@ Main anchors:
 - `backend/app/services/preview_service.py`
 - `backend/app/services/codegen_service.py`
 - `backend/app/services/transformation_test_service.py`
+- `backend/app/services/llm_service.py`
 - `backend/app/api/routes/mapping.py`
+- `streamlit_ui/workspace_views.py`
 
 ### 5. Mapping-set governance and reuse
 
@@ -217,8 +246,6 @@ Main anchors:
 - `streamlit_ui/admin_views.py`
 - `backend/app/api/routes/knowledge.py`
 
-Detailed Canonical Console and stewardship behavior is documented in `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`.
-
 ### 9. Enterprise Integration Catalog
 
 Implemented today:
@@ -226,7 +253,10 @@ Implemented today:
 - integration list/search/detail APIs
 - concept-centric catalog detail
 - Streamlit Catalog browse/search/drilldown flows
-- reuse into Workspace from approved mapping-set artifacts
+- discovery overview over source-system -> target-system paths
+- similar-approved-integration hints
+- approved-only reuse into Workspace
+- workspace reuse-fit explanation for the selected catalog version against the current workspace context
 
 Current boundary:
 
@@ -236,6 +266,7 @@ Current boundary:
 Main anchors:
 
 - `backend/app/api/routes/catalog.py`
+- `backend/app/services/catalog_reuse_fit_service.py`
 - `streamlit_ui/catalog_views.py`
 
 Detailed catalog search, similarity, and reuse behavior is documented in `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
@@ -246,8 +277,10 @@ Implemented today:
 
 - built-in and custom benchmark run endpoints
 - saved benchmark dataset create/list/run flows
+- scoring-profile comparison across predefined profiles
 - evaluation run history
 - correction-impact measurement
+- bounded benchmark explanation over loaded benchmark evidence
 
 Detailed benchmark metric and correction-impact interpretation is documented in `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`.
 
@@ -255,6 +288,7 @@ Main anchors:
 
 - `backend/app/api/routes/evaluation.py`
 - `backend/app/services/evaluation_service.py`
+- `backend/app/services/benchmark_explanation_service.py`
 - `streamlit_ui/benchmark_views.py`
 
 ## Governance Model Today
@@ -323,6 +357,15 @@ Not yet in current scope:
 - destination-system writeback engine
 - multi-step RBAC enterprise workflow model
 - graph-native lineage platform
+
+## Immediate Next Steps
+
+The next product wave should focus on:
+
+1. productizing the new bounded guidance surfaces so they read as one coherent user story across Workspace, Benchmarks, and Catalog
+2. expanding catalog and concept-level reuse discovery beyond the initial matrix and hint layer
+3. continuing pilot hardening through broader regression coverage and runtime discipline
+4. separating persistence/runtime concerns where current local assumptions are likely to age poorly
 
 ## Recommended Reading Order
 

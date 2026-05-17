@@ -214,6 +214,46 @@ Isporučeno:
 - filtriranje numeric-only canonical aliasa pri importu/promociji i pri čitanju registry-ja
 - cleanup postojećeg persisted canonical alias šuma kroz reseed
 
+## 2026-05-17
+
+### Workspace Output: artifact refinement slice
+
+Isporučeno:
+
+- `POST /mapping/codegen/refine` bounded refinement endpoint
+- split-view original/refined artifact prikaz u `Workspace > Output`
+- `Accept refined version` i `Discard refinement` UX
+- refinement instrukcije, edge cases i reference excerpt inputi
+
+Ishod:
+
+- Output više ne staje na jedan generated artifact; postoji kontrolisan refinement loop bez automatskog overwrite ponašanja
+
+### Guided copilots expansion across Review, Benchmarks, Canonical Gap queue, and Catalog
+
+Isporučeno:
+
+- benchmark explanation surface (`/evaluation/explain` + Benchmarks UI)
+- review queue planning surface (`/mapping/review-plan` + Review UI)
+- canonical gap queue summary surface (`/knowledge/canonical-gaps/triage-summary` + Review UI)
+- catalog workspace reuse-fit surface (`/catalog/reuse-fit` + Catalog UI)
+
+Ishod:
+
+- bounded AI sloj više nije vezan samo za mapping validation i transformation generation; sada pokriva i objašnjenje, triage i reuse-fit readout tokove
+
+### Discoverability and documentation alignment wave
+
+Isporučeno:
+
+- review-plan labeling je pooštren u `Review Queue Plan` da se jasnije razlikuje od `Mapping Analysis Overview`
+- `Gap Queue Summary`, `Benchmark Explanation` i `Workspace Reuse Fit` sada imaju vidljive unlock/prazne state poruke umesto da deluju kao sakrivene funkcije
+- `project_docs`, `README`, `PROJECT_OVERVIEW` i `help` dokumenti su usklađeni sa trenutnim stanjem proizvoda i novim sledećim koracima
+
+Ishod:
+
+- korisnik sada jasnije vidi gde se nalaze nove bounded guidance površine i kako se razlikuju od postojećih review/explanation tokova
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

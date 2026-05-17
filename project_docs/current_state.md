@@ -1,16 +1,17 @@
 # Semantra Current State
 
-As of 2026-05-10, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, governed artifact persistence, canonical knowledge management, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-17, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
 What Semantra is today:
 
-- an AI-assisted mapping and review tool for source-to-target and source-to-canonical workflows
+- an analyst-guided mapping and review tool for source-to-target and source-to-canonical workflows
 - a governed workspace for saving, reviewing, reusing, and auditing mapping artifacts
 - a canonical and overlay management console for semantic stewardship
 - a searchable catalog of approved integration knowledge and concept reuse
 - a benchmark and regression surface for measuring mapping quality changes
+- a deterministic-first product with bounded AI assistance rather than autonomous mapping
 
 What Semantra is not yet:
 
@@ -45,7 +46,8 @@ Implemented:
 
 - standard source-to-target auto mapping
 - canonical-only source-to-business-concept mapping without a real target dataset
-- sync and async mapping job flows with progress activity polling
+- sync and async mapping job flows with progress polling
+- active-job limits, TTL cleanup, and cooperative cancel support for mapping jobs
 - one-to-one target assignment across the full target schema
 - optional LLM closed-set validation layered on top of heuristic ranking
 - scoring based on name, semantic, knowledge, canonical, pattern, statistical, overlap, embedding, correction, and LLM signals
@@ -60,35 +62,45 @@ Main code surfaces:
 - `streamlit_ui/workspace_views.py`
 - `streamlit_ui/workspace_review_views.py`
 
-### 3. Review, Explainability, and Decisioning
+### 3. Review, Explainability, and Guided Copilots
 
 Implemented:
 
 - trust-layer review of selected mappings with confidence, signal traces, explanations, and LLM notes
 - source-to-concept and concept-to-target review views
-- manual adjustment of suggested target mappings in the Decisions flow
-- transformation suggestion, template-assisted authoring, and manual transformation code editing
-- export/import of current mapping decisions as JSON and Excel
-- decision-state helpers shared across Streamlit views
+- Mapping Analysis Overview with structured technical summary, risk readout, and recommended next actions
+- optional narration/audio generation for Mapping Analysis Overview
+- Review Queue Plan for queue-level prioritization over the currently filtered review set
+- grouped attention summary for repeated unmatched or low-confidence review patterns
+- canonical-gap suggestion flow for individual candidates
+- Gap Queue Summary for the current canonical-gap queue before candidate-by-candidate review
+
+Important current behavior:
+
+- these guidance surfaces do not auto-approve or auto-apply durable changes
+- they are designed to stay close to a concrete local workflow step
+- they use deterministic fallback behavior when LLM output is unavailable or invalid
 
 Main code surfaces:
 
 - `streamlit_ui/workspace_review_views.py`
-- `streamlit_ui/workspace_decision_views.py`
-- `streamlit_ui/mapping_helpers.py`
-- `streamlit_ui/mapping_state.py`
-- `backend/app/services/llm_service.py`
-- `backend/app/services/transformation_template_service.py`
+- `backend/app/services/mapping_analysis_service.py`
+- `backend/app/services/review_plan_service.py`
+- `backend/app/services/canonical_gap_triage_service.py`
 
-### 4. Output, Preview, Code Generation, and Transformation Testing
+### 4. Decisions, Output, and Transformation Authoring
 
 Implemented:
 
+- manual adjustment of suggested target mappings in the Decisions flow
+- export/import of current mapping decisions as JSON and Excel
+- transformation suggestion, template-assisted authoring, and manual transformation code editing
 - advisory row preview from active mapping decisions
-- Pandas code generation from reviewed mapping decisions
+- Pandas and PySpark starter code generation from reviewed mapping decisions
 - transformation generation via LLM when configured
 - structured preview/codegen warnings for syntax, runtime, type coercion, row-count mismatch, and related issues
 - transformation templates
+- output artifact refinement with side-by-side original/refined compare and explicit accept/discard actions
 - transformation test set persistence, detail, listing, and execution
 
 Important current behavior:
@@ -96,6 +108,7 @@ Important current behavior:
 - preview is intentionally advisory and remains available before all decisions are accepted
 - code generation is governance-gated and requires accepted active decisions
 - transformation test-set save and run are governance-gated and require accepted active decisions
+- refinement does not replace the active generated artifact until the user explicitly accepts it
 
 Main code surfaces:
 
@@ -103,6 +116,7 @@ Main code surfaces:
 - `backend/app/services/preview_service.py`
 - `backend/app/services/codegen_service.py`
 - `backend/app/services/transformation_test_service.py`
+- `backend/app/services/llm_service.py`
 - `streamlit_ui/workspace_views.py`
 
 ### 5. Mapping Set Governance and Reuse
@@ -205,17 +219,22 @@ Implemented:
 - integration detail drilldown
 - concept-centric catalog detail lookup
 - Streamlit Catalog tab for browse/search/detail flows
-- reuse-aware linkage from saved mapping sets into catalog projections
+- source-system -> target-system discovery overview over catalog results
+- similar-approved-integration hints in result browsing
+- mapping-set detail, audit, and diff drilldown
+- approved-only reuse back into Workspace
+- Workspace Reuse Fit explanation for the selected catalog version against the current workspace context
 
 Current boundary:
 
-- basic catalog search and detail are implemented
-- broader concept/reuse discovery and higher-level visual discovery remain open
+- basic catalog search and initial reuse discovery are implemented
+- broader concept/reuse visual discovery and richer comparison flows remain open
 
 Main code surfaces:
 
 - `backend/app/api/routes/catalog.py`
 - `backend/app/services/persistence_service.py`
+- `backend/app/services/catalog_reuse_fit_service.py`
 - `streamlit_ui/catalog_views.py`
 
 ### 10. Benchmarks and Evaluation
@@ -225,18 +244,21 @@ Implemented:
 - fixture benchmark run endpoint
 - custom benchmark run endpoint
 - saved benchmark dataset create/list/run flows
+- scoring-profile comparison
 - saved evaluation run history
 - correction-impact benchmarking
-- Streamlit Benchmarks tab for dataset save, run, and history inspection
+- Benchmark Explanation over the currently loaded benchmark evidence in the Benchmarks UI
 
 Important current behavior:
 
 - saving the current mapping as a benchmark is governance-gated and requires accepted active decisions
+- benchmark explanation is a readout surface only; it does not change runtime scoring state
 
 Main code surfaces:
 
 - `backend/app/api/routes/evaluation.py`
 - `backend/app/services/evaluation_service.py`
+- `backend/app/services/benchmark_explanation_service.py`
 - `streamlit_ui/benchmark_views.py`
 
 ### 11. Admin and Observability
@@ -292,6 +314,7 @@ Important implementation characteristics:
 - knowledge and canonical runtime are loaded primarily from SQLite when the seed hash is current
 - canonical glossary and metadata source files are still part of the canonical authoring/reseed story
 - background mapping jobs are currently in-memory/thread based and designed for local/demo use
+- newer bounded AI surfaces use small structured request/response contracts and deterministic fallback behavior
 
 ## Testing and Validation Shape
 
@@ -301,12 +324,12 @@ Strongly covered areas include:
 
 - upload and multi-format ingestion
 - auto mapping and async job polling
-- preview/codegen behavior
+- preview/codegen behavior and artifact refinement
 - mapping-set governance and catalog detail flows
 - canonical gap assistant and canonical console governance flows
 - overlay promotion and stable glossary execution
-- benchmark flows and correction impact
-- Streamlit helper behavior for workspace, benchmark, admin, and transformation state
+- benchmark flows, profile comparison, correction impact, and explanation
+- Streamlit helper behavior for workspace, benchmark, catalog, admin, and transformation state
 
 The primary regression anchors are:
 
@@ -314,20 +337,21 @@ The primary regression anchors are:
 - `backend/tests/test_mapping_service.py`
 - `tests/test_streamlit_*`
 
-## Known Boundaries and Open Productization Gaps
+## Known Boundaries and Immediate Next Steps
 
-The following items remain outside the current pilot-complete scope:
+The following items remain outside the current pilot-complete scope or are the next productization steps:
 
+- stronger cross-surface productization of the new bounded guidance panels so they feel like one coherent workflow family
+- richer concept/reuse visual discovery in the catalog (`Epic 13D`)
 - persistent background job queue/status backend for multi-user, restart-resilient, or materially longer-running tasks
 - DB-only canonical authoring and promotion model without file-backed reseed source inputs
-- richer concept/reuse visual discovery in the catalog (`Epic 13D`)
 - system-specific virtual targets beyond canonical-only mode (`Epic 12B`)
 - stronger data-quality intelligence signals (`Epic 9`)
 - broader operational packaging beyond preview/codegen/test artifacts (`Epic 10`)
 - deeper vector/cache acceleration and signal precomputation (`Epic 14A/14B`)
 - graph-shaped lineage and impact analysis as a derived analysis layer (`Epic 15`)
 
-## How To Use `project_docs` After This Cleanup
+## How To Use `project_docs`
 
 Use the project docs in this order:
 

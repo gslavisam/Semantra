@@ -27,6 +27,39 @@ def _current_mapping_benchmark_block_reason(mapping_decisions: list[dict[str, An
     return mapping_benchmark_block_reason(mapping_decisions)
 
 
+def _benchmark_explanation_enabled(
+    benchmark_result: dict[str, Any] | None,
+    correction_impact: dict[str, Any] | None,
+    profile_comparison: dict[str, Any] | None,
+) -> bool:
+    return any(item is not None for item in (benchmark_result, correction_impact, profile_comparison))
+
+
+def _benchmark_explanation_unlock_message(
+    benchmark_result: dict[str, Any] | None,
+    correction_impact: dict[str, Any] | None,
+    profile_comparison: dict[str, Any] | None,
+) -> str:
+    if _benchmark_explanation_enabled(benchmark_result, correction_impact, profile_comparison):
+        return "Generate or refresh the explanation for the currently loaded benchmark evidence."
+    return "Run a benchmark, correction-impact check, or scoring-profile comparison to unlock this explanation."
+
+
+def _benchmark_explanation_payload(
+    *,
+    dataset_name: str,
+    benchmark_result: dict[str, Any] | None,
+    correction_impact: dict[str, Any] | None,
+    profile_comparison: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "dataset_name": str(dataset_name or "").strip(),
+        "benchmark_result": benchmark_result,
+        "correction_impact": correction_impact,
+        "profile_comparison": profile_comparison,
+    }
+
+
 def render_benchmark_tab(
     *,
     admin_token_required: Callable[[], bool],
@@ -113,6 +146,11 @@ def render_benchmark_tab(
             key="selected_benchmark_dataset_label",
         )
         selected_dataset_id = next(dataset_id for label, dataset_id in dataset_options if label == selected_label)
+        selected_dataset = next(
+            (item for item in st.session_state.get("benchmark_datasets", []) if item.get("dataset_id") == selected_dataset_id),
+            None,
+        )
+        selected_dataset_name = str((selected_dataset or {}).get("name") or f"dataset #{selected_dataset_id}")
         with_llm = st.checkbox("Run selected benchmark with configured LLM", key="benchmark_with_llm")
         current_runtime_profile = str(st.session_state.get("runtime_config_snapshot", {}).get("scoring_profile", "balanced"))
         st.caption(f"Current runtime scoring profile: {current_runtime_profile}")
@@ -131,6 +169,7 @@ def render_benchmark_tab(
                     f"/evaluation/datasets/{selected_dataset_id}/run?with_configured_llm={'true' if with_llm else 'false'}",
                 )
                 st.session_state["last_benchmark_result"] = result
+                st.session_state.pop("last_benchmark_explanation", None)
                 st.session_state["last_action"] = {
                     "level": "success",
                     "message": f"Ran benchmark dataset #{selected_dataset_id}.",
@@ -145,6 +184,7 @@ def render_benchmark_tab(
                     f"/evaluation/datasets/{selected_dataset_id}/correction-impact?with_configured_llm={'true' if with_llm else 'false'}",
                 )
                 st.session_state["last_correction_impact"] = impact
+                st.session_state.pop("last_benchmark_explanation", None)
                 st.session_state["last_action"] = {
                     "level": "success",
                     "message": f"Measured correction impact for benchmark dataset #{selected_dataset_id}.",
@@ -168,6 +208,7 @@ def render_benchmark_tab(
                     },
                 )
                 st.session_state["last_profile_comparison"] = comparison
+                st.session_state.pop("last_benchmark_explanation", None)
                 st.session_state["last_action"] = {
                     "level": "success",
                     "message": f"Compared scoring profiles for benchmark dataset #{selected_dataset_id}.",
@@ -175,6 +216,10 @@ def render_benchmark_tab(
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {"level": "error", "message": f"Comparing scoring profiles failed: {error}"}
             st.rerun()
+
+        loaded_benchmark_result = st.session_state.get("last_benchmark_result")
+        loaded_correction_impact = st.session_state.get("last_correction_impact")
+        loaded_profile_comparison = st.session_state.get("last_profile_comparison")
     else:
         st.info(
             "No saved benchmark datasets are available yet. Save the current mapping as a benchmark or load an existing dataset to unlock scoring profile comparison."
@@ -248,6 +293,81 @@ def render_benchmark_tab(
             width="stretch",
             hide_index=True,
         )
+
+    benchmark_explanation = st.session_state.get("last_benchmark_explanation")
+    loaded_benchmark_result = st.session_state.get("last_benchmark_result")
+    loaded_correction_impact = st.session_state.get("last_correction_impact")
+    loaded_profile_comparison = st.session_state.get("last_profile_comparison")
+    explanation_enabled = _benchmark_explanation_enabled(
+        loaded_benchmark_result,
+        loaded_correction_impact,
+        loaded_profile_comparison,
+    )
+    with st.expander(
+        "Benchmark Explanation",
+        expanded=bool(benchmark_explanation),
+    ):
+        st.caption(
+            "Bounded explanation for the currently loaded benchmark evidence. This is separate from raw metrics and does not change scoring state."
+        )
+        st.caption(
+            _benchmark_explanation_unlock_message(
+                loaded_benchmark_result,
+                loaded_correction_impact,
+                loaded_profile_comparison,
+            )
+        )
+        if st.button(
+            "Refresh benchmark explanation" if benchmark_explanation else "Generate benchmark explanation",
+            width="stretch",
+            key="benchmark_explain_loaded_results",
+            disabled=not explanation_enabled,
+        ):
+            try:
+                st.session_state["last_benchmark_explanation"] = api_request(
+                    "POST",
+                    "/evaluation/explain",
+                    json=_benchmark_explanation_payload(
+                        dataset_name=selected_dataset_name if dataset_options else "",
+                        benchmark_result=loaded_benchmark_result,
+                        correction_impact=loaded_correction_impact,
+                        profile_comparison=loaded_profile_comparison,
+                    ),
+                    timeout=90.0,
+                )
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Generated a benchmark explanation for {selected_dataset_name if dataset_options else 'the loaded benchmark'}.",
+                }
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Benchmark explanation failed: {error}",
+                }
+            st.rerun()
+
+        if benchmark_explanation:
+            metadata = benchmark_explanation.get("generation_metadata") or {}
+            st.caption("LLM explanation" if metadata.get("used_llm") else "Fallback explanation")
+            if benchmark_explanation.get("summary"):
+                st.write(str(benchmark_explanation.get("summary")))
+            findings_col, risks_col, actions_col = st.columns(3)
+            with findings_col:
+                st.caption("Key findings")
+                for line in benchmark_explanation.get("key_findings") or []:
+                    st.write(f"- {line}")
+            with risks_col:
+                st.caption("Risks")
+                for line in benchmark_explanation.get("risks") or []:
+                    st.write(f"- {line}")
+            with actions_col:
+                st.caption("Next actions")
+                for line in benchmark_explanation.get("next_actions") or []:
+                    st.write(f"- {line}")
+        elif not explanation_enabled:
+            st.info("No benchmark evidence is loaded yet.")
+        else:
+            st.info("No benchmark explanation has been generated yet for the loaded results.")
 
     benchmark_runs = st.session_state.get("benchmark_runs")
     if benchmark_runs:

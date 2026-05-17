@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
 from app.core.config import settings
-from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, CorrectionImpactMetrics, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest, ScoringProfileComparisonResponse
+from app.models.mapping import BenchmarkDatasetCreateRequest, BenchmarkDatasetRecord, BenchmarkExplanationRequest, BenchmarkExplanationResponse, CorrectionImpactMetrics, EvaluationMetrics, EvaluationRunRecord, EvaluationRunRequest, ScoringProfileComparisonResponse
+from app.services.benchmark_explanation_service import build_benchmark_explanation
 from app.services.evaluation_service import build_scoring_profile_comparison_response, evaluate_cases, evaluate_correction_impact
 from app.services.llm_service import build_provider_from_settings
 from app.services.persistence_service import persistence_service
@@ -26,6 +27,12 @@ async def run_benchmark() -> EvaluationMetrics:
 @router.post("/run", response_model=EvaluationMetrics)
 async def run_custom_benchmark(request: EvaluationRunRequest) -> EvaluationMetrics:
     return evaluate_cases(request.cases)
+
+
+@router.post("/explain", response_model=BenchmarkExplanationResponse, dependencies=[Depends(require_admin)])
+async def explain_benchmark_results(request: BenchmarkExplanationRequest) -> BenchmarkExplanationResponse:
+    provider = build_provider_from_settings()
+    return build_benchmark_explanation(request, provider=provider)
 
 
 @router.post("/datasets", response_model=BenchmarkDatasetRecord, dependencies=[Depends(require_admin)])
