@@ -2,7 +2,15 @@ from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
-from app.services.mapping_service import TOTAL_WEIGHT, build_explanation, compute_final_score, generate_mapping_candidates, resolve_scoring_weights
+from app.services.mapping_service import (
+    TOTAL_WEIGHT,
+    build_explanation,
+    compute_final_score,
+    generate_mapping_candidates,
+    label_to_status,
+    resolve_scoring_weights,
+    score_to_label,
+)
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
 from app.services.virtual_target_service import build_virtual_target_schema
@@ -739,3 +747,123 @@ def test_canonical_virtual_target_keeps_strong_concept_lock_high_confidence() ->
     assert selected.confidence_label == "high_confidence"
     assert any("Internal metadata dictionary aligns both fields to concept 'Customer ID'" in line for line in selected.explanation)
     assert any("Canonical glossary aligns both fields to business concept 'Customer ID'" in line for line in selected.explanation)
+
+
+def test_label_to_status_auto_accepts_scores_above_auto_accept_threshold() -> None:
+    score = 0.8193
+
+    assert score_to_label(score) == "medium_confidence"
+    assert label_to_status(score) == "accepted"
+
+
+def test_description_priority_mode_uses_source_description_for_canonical_matching() -> None:
+    source_column = ColumnProfile(
+        name="SENIOR_FIELD",
+        normalized_name="senior field",
+        description="Employee phone",
+        declared_type="VARCHAR",
+        dtype="object",
+        null_ratio=0.0,
+        unique_ratio=0.0,
+        avg_length=0.0,
+        non_null_count=0,
+        sample_values=[],
+        distinct_sample_values=[],
+        detected_patterns=["text"],
+        tokenized_name=["senior", "field"],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="canonical_subset.csv",
+        row_count=0,
+        columns=[
+            make_column("employee.phone", ["phone"], []),
+            make_column("employee.id", ["numeric_id"], []),
+        ],
+    )
+
+    baseline_matches = metadata_knowledge_service.match_canonical_concepts(source_column)
+    priority_matches = metadata_knowledge_service.match_canonical_concepts(
+        source_column,
+        prefer_metadata_text=True,
+    )
+
+    assert not any(match.concept_id == "employee.phone" for match in baseline_matches)
+    assert any(match.concept_id == "employee.phone" for match in priority_matches)
+
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source_senior.xlsx",
+        row_count=0,
+        columns=[source_column],
+    )
+    result = generate_mapping_candidates(
+        source_schema,
+        target_schema,
+        description_priority=True,
+    )
+
+    assert result.mappings[0].target == "employee.phone"
+    assert any("Description-priority mode injected source description/type metadata" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_candidate_pool_limits_full_scoring_to_shortlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.services import mapping_service
+
+    seen_targets: list[str] = []
+    original_compute_signals = mapping_service.compute_signals
+
+    def recording_compute_signals(source, target, **kwargs):
+        seen_targets.append(target.name)
+        return original_compute_signals(source, target, **kwargs)
+
+    monkeypatch.setattr(mapping_service, "compute_signals", recording_compute_signals)
+
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source_senior.xlsx",
+        row_count=0,
+        columns=[
+            ColumnProfile(
+                name="SENIOR_FIELD",
+                normalized_name="senior field",
+                description="Employee phone",
+                declared_type="VARCHAR",
+                dtype="object",
+                null_ratio=0.0,
+                unique_ratio=0.0,
+                avg_length=0.0,
+                non_null_count=0,
+                sample_values=[],
+                distinct_sample_values=[],
+                detected_patterns=["text"],
+                tokenized_name=["senior", "field"],
+            )
+        ],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="canonical_subset.csv",
+        row_count=0,
+        columns=[
+            make_column("employee.phone", ["phone"], []),
+            make_column("employee.id", ["numeric_id"], []),
+            make_column("employee.email", ["email"], []),
+            make_column("employee.manager.id", ["numeric_id"], []),
+            make_column("employee.department.name", ["text"], []),
+            make_column("employee.birth_date", ["date"], []),
+            make_column("employee.status", ["text"], []),
+            make_column("employee.country.code", ["text"], []),
+        ],
+    )
+
+    result = generate_mapping_candidates(
+        source_schema,
+        target_schema,
+        description_priority=True,
+        candidate_pool_size=5,
+    )
+
+    assert result.mappings[0].target == "employee.phone"
+    assert len(seen_targets) == 5
+    assert "employee.phone" in seen_targets

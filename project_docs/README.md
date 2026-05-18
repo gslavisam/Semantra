@@ -2,7 +2,7 @@
 
 Ovaj folder drži mali skup projektnih dokumenata sa jasnim ulogama. Cilj je da stanje proizvoda, istorija isporuke, sledeći prioriteti i izvršne checkliste budu pregledni bez međusobnog preklapanja.
 
-Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-17.
+Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-18.
 
 ## Preporučeni red čitanja
 

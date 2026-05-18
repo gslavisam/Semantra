@@ -245,3 +245,32 @@ class KnowledgeStewardshipItemStatusUpdateRequest(BaseModel):
     owner: str | None = None
     assignee: str | None = None
     review_note: str | None = None
+
+
+class SourceFieldHintRecord(BaseModel):
+    hint_id: int | None = None
+    source_system: str
+    business_domain: str | None = None
+    integration_name: str | None = None
+    source_field: str
+    meaning_hint: str = ""
+    negative_hint: str = ""
+    sample_values: list[str] = Field(default_factory=list)
+    active: bool = True
+    created_by: str | None = None
+    changed_by: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class SourceFieldHintUpsertRequest(BaseModel):
+    source_system: str
+    business_domain: str | None = None
+    integration_name: str | None = None
+    source_field: str
+    meaning_hint: str = ""
+    negative_hint: str = ""
+    sample_values: list[str] = Field(default_factory=list)
+    active: bool = True
+    created_by: str | None = None
+    changed_by: str | None = None

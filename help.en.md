@@ -53,10 +53,13 @@ Use `Setup` for:
 - choosing `Row data` or `Schema spec` when a file looks like a field-per-row specification
 - selecting tables when an SQL snapshot contains multiple tables
 - optionally enriching the source dataset with companion metadata
+- optionally enriching the target dataset with companion metadata in standard mode
+- setting `Canonical candidate pool size` in canonical mode
 
 Use `Standard` when:
 
 - you have a real source and a real target
+- you may want separate companion files for both source and target when the uploaded row data lacks descriptions or the SQL DDL is too thin
 - you want preview and Pandas code generation later
 
 Use `Canonical` when:
@@ -64,6 +67,8 @@ Use `Canonical` when:
 - you do not yet have a real target dataset
 - you want to normalize source fields to business concepts first
 - you want a semantic preparation pass before a concrete source-to-target run
+- preview is intentionally unavailable because no concrete target rows exist
+- code generation can still be produced from the current source-to-canonical decisions
 
 ### `Review`
 
@@ -72,6 +77,9 @@ Use `Review` to inspect:
 - trust-layer explanations
 - confidence and signal breakdown
 - LLM notes when validation was used
+- per-row `LLM refine` inputs with meaning, negative guidance, sample values, and a refinement instruction
+- batch low-confidence LLM refinement for the current review set
+- accept/revert handling for LLM-refined row proposals
 - canonical path information
 - `Mapping Analysis Overview` for a technical summary of the current mapping state
 - optional narration and audio generation for the mapping analysis
@@ -94,6 +102,7 @@ Important distinction:
 Use `Decisions` for:
 
 - manual target adjustments
+- manual mapping in canonical mode through the virtual canonical target options
 - exporting or importing mapping decisions as JSON or Excel
 - saving mapping-set versions
 - loading and applying previously saved mapping sets
@@ -115,7 +124,8 @@ Use `Output` for:
 Important distinction:
 
 - preview is advisory and can be used before final approval
-- code generation is governance-sensitive and requires accepted active decisions
+- standard-mode code generation is governance-sensitive and requires accepted active decisions
+- canonical mode skips preview but still allows code generation from active source-to-canonical decisions
 
 If you use refinement:
 
@@ -213,10 +223,10 @@ Use it for:
 ### Standard mapping workflow
 
 1. In `Workspace > Setup`, upload source and target.
-2. Select tables or `Schema spec` mode if needed.
+2. Select tables or `Schema spec` mode if needed, and optionally add source/target companion files.
 3. Click `Upload and profile`.
 4. Click `Generate mapping`.
-5. In `Review`, optionally generate `Mapping Analysis Overview`, then inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
+5. In `Review`, optionally generate `Mapping Analysis Overview`, use per-row or batch `LLM refine`, then inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
 6. If the review queue is large or noisy, use `Review Queue Plan` and, when relevant, `Gap Queue Summary`.
 6. In `Decisions`, make manual edits, export a checkpoint, or save a mapping set.
 7. In `Output`, use preview first, then code generation when the decisions are accepted.
@@ -225,10 +235,12 @@ Use it for:
 ### Canonical-first workflow
 
 1. In `Workspace > Setup`, switch to `Canonical` mode.
-2. Upload source row data or a source spec.
-3. Click `Upload and profile`, then `Generate canonical mapping`.
-4. In `Review`, inspect the source -> canonical path.
-5. If you find semantic gaps, continue the governance loop in `Canonical Console`.
+2. Upload source row data or a source spec and, if needed, adjust `Canonical candidate pool size`.
+3. Optionally add source companion metadata, then click `Upload and profile` and `Generate canonical mapping`.
+4. In `Review`, inspect the source -> canonical path and use per-row `LLM refine` when needed.
+5. In `Decisions`, you can manually map to canonical options.
+6. In `Output`, generate code without preview.
+7. If you find semantic gaps, continue the governance loop in `Canonical Console`.
 
 ### Canonical governance workflow
 
@@ -241,6 +253,7 @@ Use it for:
 ## Short notes
 
 - The confidence score is a review heuristic, not a probability.
+- Scores `>= 0.75` are currently auto-accepted even when the confidence label stays `medium_confidence`.
 - Preview is intentionally advisory; it does not mean the mapping is fully approved.
 - Durable artifact and execution-like surfaces are governed more strictly than preview.
 - The newer bounded AI panels across Review, Benchmarks, and Catalog are guidance layers only; they do not auto-apply durable changes.

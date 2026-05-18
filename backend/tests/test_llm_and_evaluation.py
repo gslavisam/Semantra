@@ -292,6 +292,24 @@ def test_canonical_rescue_gate_triggers_for_semantic_only_low_confidence_candida
     assert should_run_llm_validation([candidate]) is True
 
 
+def test_canonical_rescue_gate_skips_candidates_with_canonical_lock() -> None:
+    candidate = CandidateScore(
+        source=make_column("supplier_label", ["text"], ["Supplier A", "Supplier B"]),
+        target=make_column("vendor.name", ["text"], ["Vendor A", "Vendor B"]),
+        score=0.34,
+        signals=ScoringSignals(
+            semantic=0.58,
+            knowledge=0.52,
+            canonical=0.41,
+            statistical=0.32,
+        ),
+        explanation=[],
+        active_signal_names={"semantic", "knowledge", "canonical", "statistical"},
+    )
+
+    assert should_run_canonical_semantic_rescue(candidate) is False
+
+
 def test_llm_can_generate_transformation_code_from_user_instruction() -> None:
     provider = StaticLLMProvider(
         json.dumps(

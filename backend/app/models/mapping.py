@@ -119,6 +119,10 @@ class AutoMappingRequest(BaseModel):
     source_dataset_id: str
     target_dataset_id: str
     use_llm: bool = True
+    description_priority: bool = False
+    source_system: str | None = None
+    business_domain: str | None = None
+    integration_name: str | None = None
 
 
 TargetSystem = Literal["canonical"]
@@ -128,6 +132,29 @@ class CanonicalMappingRequest(BaseModel):
     source_dataset_id: str
     target_system: TargetSystem = "canonical"
     use_llm: bool = True
+    description_priority: bool = False
+    candidate_pool_size: int | None = Field(default=None, ge=1, le=25)
+    source_system: str | None = None
+    business_domain: str | None = None
+    integration_name: str | None = None
+
+
+class MappingRefinementRequest(BaseModel):
+    source_dataset_id: str
+    source_field: str
+    target_dataset_id: str | None = None
+    target_system: TargetSystem | None = None
+    candidate_targets: list[str] = Field(default_factory=list)
+    use_llm: bool = True
+    description_priority: bool = False
+    candidate_pool_size: int | None = Field(default=None, ge=1, le=25)
+    meaning_hint: str = ""
+    negative_hint: str = ""
+    sample_values: list[str] = Field(default_factory=list)
+    refinement_instruction: str = ""
+    source_system: str | None = None
+    business_domain: str | None = None
+    integration_name: str | None = None
 
 
 class CanonicalCoverageColumnMatch(BaseModel):
@@ -165,6 +192,7 @@ class AutoMappingResponse(BaseModel):
     mappings: list[MappingCandidate] = Field(default_factory=list)
     ranked_mappings: list[SourceMappingResult] = Field(default_factory=list)
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
+    applied_source_field_hints: list[dict[str, Any]] = Field(default_factory=list)
 
 
 MappingAnalysisAudience = Literal["technical_implementor"]
@@ -941,6 +969,7 @@ class TransformationTestSetRunResponse(BaseModel):
 class CodegenRequest(BaseModel):
     mapping_decisions: list[MappingDecision]
     mode: CodegenMode = "pandas"
+    allow_unaccepted: bool = False
 
 
 class GeneratedArtifact(BaseModel):
@@ -952,6 +981,7 @@ class GeneratedArtifact(BaseModel):
 class ArtifactRefinementRequest(BaseModel):
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
     mode: CodegenMode = "pandas"
+    allow_unaccepted: bool = False
     current_code: str = Field(min_length=1)
     instruction: str = Field(min_length=1)
     edge_cases: str = ""

@@ -18,6 +18,7 @@ class Settings:
     cors_origins: list[str] = field(default_factory=lambda: ["*"])
     max_upload_preview_rows: int = 10
     max_profile_samples: int = 5
+    auto_accept_threshold: float = 0.75
     high_confidence_threshold: float = 0.85
     medium_confidence_threshold: float = 0.65
     top_k_candidates: int = 3

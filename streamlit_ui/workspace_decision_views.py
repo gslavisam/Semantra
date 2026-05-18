@@ -28,23 +28,35 @@ def render_manual_mapping_panel(
     upsert_manual_mapping,
     manual_mapping_rows,
     remove_manual_mapping,
+    list_canonical_target_fields,
 ) -> None:
     upload_response = st.session_state.get("upload_response")
     if not upload_response:
         return
 
+    mapping_mode = str(upload_response.get("mapping_mode") or "standard").strip().lower() or "standard"
     source_columns = schema_column_names(upload_response["source"])
-    target_columns = schema_column_names(upload_response["target"])
+    if mapping_mode == "canonical":
+        try:
+            target_columns = list_canonical_target_fields(upload_response.get("target_system", "canonical"))
+        except httpx.HTTPError as error:
+            st.warning(api_error_message(error, default_prefix="Canonical target options are unavailable right now"))
+            return
+    else:
+        target_columns = schema_column_names(upload_response["target"])
     active_sources = {decision["source"] for decision in build_mapping_decisions()}
     preferred_sources = [source for source in source_columns if source not in active_sources]
     source_options = preferred_sources or source_columns
     manual_rows = manual_mapping_rows(mapping_response)
 
     with st.expander(
-        _section_label("Add Manual Mapping", f"{len(manual_rows)} overrides" if manual_rows else None),
-        expanded=False,
+        _section_label("Manual Mapping", f"{len(manual_rows)} overrides" if manual_rows else "add or override"),
+        expanded=True,
     ):
-        st.caption("Add or override a source-to-target pair even when the auto-mapper did not propose it.")
+        st.caption(
+            "Add or override a source-to-target pair even when the auto-mapper did not propose it. "
+            "In canonical mode, targets are canonical concept IDs from the virtual glossary target."
+        )
 
         form_columns = st.columns([2, 2, 1, 1])
         selected_source = form_columns[0].selectbox(

@@ -89,6 +89,190 @@ def test_request_mapping_analysis_summary_uses_current_workspace_context(monkeyp
     }
 
 
+def test_current_workspace_scope_reads_source_scope_from_session(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "analysis_source_system": "Senior HR",
+            "analysis_business_domain": "HR",
+            "analysis_integration_name": "employee-import",
+        }
+    )
+    monkeypatch.setattr(streamlit_api, "st", fake_streamlit)
+
+    assert streamlit_api.current_workspace_scope() == {
+        "source_system": "Senior HR",
+        "business_domain": "HR",
+        "integration_name": "employee-import",
+    }
+
+
+def test_save_source_field_hint_posts_expected_payload(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={})
+    captured: dict[str, object] = {}
+
+    def fake_api_request(method: str, path: str, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["json"] = kwargs.get("json")
+        return {"hint_id": 1}
+
+    monkeypatch.setattr(streamlit_api, "st", fake_streamlit)
+    monkeypatch.setattr(streamlit_api, "api_request", fake_api_request)
+
+    result = streamlit_api.save_source_field_hint(
+        source_field="tipOpe",
+        source_system="Senior HR",
+        business_domain="HR",
+        integration_name="employee-import",
+        meaning_hint="Operation type",
+        negative_hint="Not contact name",
+        sample_values=["SALE", "RETURN"],
+    )
+
+    assert result == {"hint_id": 1}
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/mapping/source-field-hints"
+    assert captured["json"] == {
+        "source_field": "tipOpe",
+        "source_system": "Senior HR",
+        "business_domain": "HR",
+        "integration_name": "employee-import",
+        "meaning_hint": "Operation type",
+        "negative_hint": "Not contact name",
+        "sample_values": ["SALE", "RETURN"],
+        "created_by": None,
+    }
+
+
+def test_list_source_field_hints_can_request_inactive_rows(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={})
+    captured: dict[str, object] = {}
+
+    def fake_api_request(method: str, path: str, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["params"] = kwargs.get("params")
+        return [{"hint_id": 1}]
+
+    monkeypatch.setattr(streamlit_api, "st", fake_streamlit)
+    monkeypatch.setattr(streamlit_api, "api_request", fake_api_request)
+
+    result = streamlit_api.list_source_field_hints(
+        source_system="Senior HR",
+        active_only=False,
+    )
+
+    assert result == [{"hint_id": 1}]
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/mapping/source-field-hints"
+    assert captured["params"] == {
+        "source_system": "Senior HR",
+        "active_only": False,
+    }
+
+
+def test_request_llm_mapping_refinement_posts_expected_payload(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "upload_response": {
+                "mapping_mode": "canonical",
+                "source": {"dataset_id": "src-1"},
+                "target_system": "canonical",
+            },
+            "use_llm_validation": True,
+            "use_description_priority": True,
+            "canonical_candidate_pool_size": 5,
+            "analysis_source_system": "Senior HR",
+            "analysis_business_domain": "HR",
+            "analysis_integration_name": "employee-import",
+        }
+    )
+    captured: dict[str, object] = {}
+
+    def fake_api_request(method: str, path: str, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["json"] = kwargs.get("json")
+        captured["timeout"] = kwargs.get("timeout")
+        return {"selected": {"target": "employee_type"}}
+
+    monkeypatch.setattr(streamlit_api, "st", fake_streamlit)
+    monkeypatch.setattr(streamlit_api, "api_request", fake_api_request)
+
+    result = streamlit_api.request_llm_mapping_refinement(
+        "tipOpe",
+        candidate_targets=["employee_type", "employee_name"],
+        meaning_hint="Operation type",
+        negative_hint="Not employee name",
+        sample_values=["SALE", "RETURN"],
+        refinement_instruction="Prefer transaction type semantics.",
+    )
+
+    assert result == {"selected": {"target": "employee_type"}}
+    assert captured["method"] == "POST"
+    assert captured["path"] == "/mapping/refine"
+    assert captured["timeout"] == 90.0
+    assert captured["json"] == {
+        "source_dataset_id": "src-1",
+        "source_field": "tipOpe",
+        "candidate_targets": ["employee_type", "employee_name"],
+        "use_llm": True,
+        "description_priority": True,
+        "candidate_pool_size": 5,
+        "meaning_hint": "Operation type",
+        "negative_hint": "Not employee name",
+        "sample_values": ["SALE", "RETURN"],
+        "refinement_instruction": "Prefer transaction type semantics.",
+        "source_system": "Senior HR",
+        "business_domain": "HR",
+        "integration_name": "employee-import",
+        "target_system": "canonical",
+    }
+
+
+def test_request_llm_mapping_refinement_defaults_canonical_candidate_pool_size_to_10(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "upload_response": {
+                "mapping_mode": "canonical",
+                "source": {"dataset_id": "src-1"},
+                "target_system": "canonical",
+            },
+        }
+    )
+    captured: dict[str, object] = {}
+
+    def fake_api_request(method: str, path: str, **kwargs):
+        captured["json"] = kwargs.get("json")
+        return {"selected": {"target": "employee_type"}}
+
+    monkeypatch.setattr(streamlit_api, "st", fake_streamlit)
+    monkeypatch.setattr(streamlit_api, "api_request", fake_api_request)
+
+    streamlit_api.request_llm_mapping_refinement("tipOpe", candidate_targets=["employee_type"])
+
+    assert captured["json"]["candidate_pool_size"] == 10
+
+
+def test_list_canonical_target_fields_requests_mapping_target_options(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_api_request(method: str, path: str, **kwargs):
+        captured["method"] = method
+        captured["path"] = path
+        captured["params"] = kwargs.get("params")
+        return ["customer.id", "customer.name"]
+
+    monkeypatch.setattr(streamlit_api, "api_request", fake_api_request)
+
+    result = streamlit_api.list_canonical_target_fields("canonical")
+
+    assert result == ["customer.id", "customer.name"]
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/mapping/target-fields"
+    assert captured["params"] == {"target_system": "canonical"}
+
+
 def test_request_mapping_analysis_narration_posts_current_summary(monkeypatch) -> None:
     fake_streamlit = SimpleNamespace(session_state={"mapping_analysis_summary": {"title": "summary"}})
     captured: dict[str, object] = {}

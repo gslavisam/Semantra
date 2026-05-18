@@ -95,6 +95,7 @@ def upload_dataset_handle(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> dict:
     if uploaded_file is None:
         raise ValueError("Select a file before uploading.")
@@ -108,6 +109,8 @@ def upload_dataset_handle(
             form_data["description_col"] = description_col
         if type_col:
             form_data["type_col"] = type_col
+        if sample_values_col:
+            form_data["sample_values_col"] = sample_values_col
         return api_request("POST", "/upload/spec", files=request_files, data=form_data or None)
     return api_request(
         "POST",
@@ -124,9 +127,10 @@ def enrich_dataset_metadata(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> dict:
     if not dataset_id:
-        raise ValueError("Select and upload the source dataset before applying companion metadata.")
+        raise ValueError("Select and upload the dataset before applying companion metadata.")
     if uploaded_file is None:
         raise ValueError("Select a companion schema/spec file before applying metadata enrichment.")
 
@@ -137,6 +141,8 @@ def enrich_dataset_metadata(
         form_data["description_col"] = description_col
     if type_col:
         form_data["type_col"] = type_col
+    if sample_values_col:
+        form_data["sample_values_col"] = sample_values_col
     return api_request(
         "POST",
         "/upload/handle/metadata",
@@ -275,6 +281,115 @@ def request_llm_transformation_suggestion(source: str, target: str, instruction:
     )
 
 
+def request_llm_mapping_refinement(
+    source: str,
+    *,
+    candidate_targets: list[str],
+    meaning_hint: str = "",
+    negative_hint: str = "",
+    sample_values: list[str] | None = None,
+    refinement_instruction: str = "",
+) -> dict:
+    upload_response = st.session_state.get("upload_response")
+    if not upload_response:
+        raise ValueError("Upload datasets and generate mapping results before refining a mapping.")
+    if not source.strip():
+        raise ValueError("Select a source field before refining a mapping.")
+
+    mapping_mode = str(upload_response.get("mapping_mode") or "standard").strip().lower() or "standard"
+    payload = {
+        "source_dataset_id": upload_response["source"]["dataset_id"],
+        "source_field": source,
+        "candidate_targets": [str(target or "").strip() for target in candidate_targets if str(target or "").strip()],
+        "use_llm": bool(st.session_state.get("use_llm_validation", True)),
+        "description_priority": bool(st.session_state.get("use_description_priority", False)),
+        "candidate_pool_size": (
+            int(st.session_state.get("canonical_candidate_pool_size", 10))
+            if mapping_mode == "canonical"
+            else None
+        ),
+        "meaning_hint": meaning_hint,
+        "negative_hint": negative_hint,
+        "sample_values": list(sample_values or []),
+        "refinement_instruction": refinement_instruction,
+        **current_workspace_scope(),
+    }
+    if mapping_mode == "canonical":
+        payload["target_system"] = upload_response.get("target_system", "canonical")
+    else:
+        payload["target_dataset_id"] = upload_response["target"]["dataset_id"]
+
+    return api_request(
+        "POST",
+        "/mapping/refine",
+        json=payload,
+        timeout=90.0,
+    )
+
+
+def list_canonical_target_fields(target_system: str = "canonical") -> list[str]:
+    response = api_request(
+        "GET",
+        "/mapping/target-fields",
+        params={"target_system": target_system},
+    )
+    return [str(item or "").strip() for item in response or [] if str(item or "").strip()]
+
+
+def current_workspace_scope() -> dict[str, str | None]:
+    return {
+        "source_system": str(st.session_state.get("analysis_source_system") or "").strip() or None,
+        "business_domain": str(st.session_state.get("analysis_business_domain") or "").strip() or None,
+        "integration_name": str(st.session_state.get("analysis_integration_name") or "").strip() or None,
+    }
+
+
+def list_source_field_hints(
+    *,
+    source_system: str,
+    business_domain: str | None = None,
+    integration_name: str | None = None,
+    source_field: str | None = None,
+    active_only: bool = True,
+) -> list[dict]:
+    params = {"source_system": source_system}
+    if business_domain:
+        params["business_domain"] = business_domain
+    if integration_name:
+        params["integration_name"] = integration_name
+    if source_field:
+        params["source_field"] = source_field
+    params["active_only"] = active_only
+    return api_request("GET", "/mapping/source-field-hints", params=params)
+
+
+def save_source_field_hint(
+    *,
+    source_field: str,
+    source_system: str,
+    meaning_hint: str,
+    negative_hint: str = "",
+    sample_values: list[str] | None = None,
+    business_domain: str | None = None,
+    integration_name: str | None = None,
+    created_by: str | None = None,
+) -> dict:
+    return api_request(
+        "POST",
+        "/mapping/source-field-hints",
+        json={
+            "source_field": source_field,
+            "source_system": source_system,
+            "business_domain": business_domain,
+            "integration_name": integration_name,
+            "meaning_hint": meaning_hint,
+            "negative_hint": negative_hint,
+            "sample_values": list(sample_values or []),
+            "created_by": created_by,
+        },
+    )
+
+
 def request_mapping_analysis_summary() -> dict:
     upload_response = st.session_state.get("upload_response")
     mapping_response = st.session_state.get("mapping_response")
@@ -293,10 +408,10 @@ def request_mapping_analysis_summary() -> dict:
             else (target_handle.get("dataset_name") or "Target dataset")
         )
         or "Target dataset",
-        "source_system": st.session_state.get("analysis_source_system") or None,
+        "source_system": current_workspace_scope().get("source_system"),
         "target_system": st.session_state.get("analysis_target_system") or None,
-        "business_domain": st.session_state.get("analysis_business_domain") or None,
-        "integration_name": st.session_state.get("analysis_integration_name") or None,
+        "business_domain": current_workspace_scope().get("business_domain"),
+        "integration_name": current_workspace_scope().get("integration_name"),
     }
     return api_request(
         "POST",

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from app.api.deps import require_admin
+from app.models.knowledge import SourceFieldHintRecord, SourceFieldHintUpsertRequest
 from app.models.mapping import (
     ArtifactRefinementRequest,
     ArtifactRefinementResponse,
@@ -18,6 +19,7 @@ from app.models.mapping import (
     CanonicalMappingRequest,
     CodegenRequest,
     GeneratedArtifact,
+    MappingRefinementRequest,
     MappingDecision,
     MappingSetApplyRequest,
     MappingSetAuditEntry,
@@ -32,6 +34,7 @@ from app.models.mapping import (
     PreviewResponse,
     ReviewPlanRequest,
     ReviewPlanResponse,
+    SourceMappingResult,
     TransformationGenerationRequest,
     TransformationGenerationResponse,
     TransformationTestSetCreateRequest,
@@ -46,9 +49,10 @@ from app.services.mapping_audio_service import synthesize_orpheus_wav
 from app.services.codegen_service import generate_pandas_code, generate_pyspark_code
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.review_plan_service import build_review_plan
-from app.services.mapping_service import generate_mapping_candidates
+from app.services.mapping_service import generate_mapping_candidates, refine_mapping_for_source
 from app.services.persistence_service import persistence_service
 from app.services.preview_service import build_preview
+from app.services.source_field_hint_service import apply_inline_source_field_hint, apply_source_field_hints
 from app.services.transformation_test_service import run_transformation_test_set
 from app.services.transformation_template_service import list_transformation_templates
 from app.services.upload_store import dataset_store
@@ -58,18 +62,28 @@ from app.services.virtual_target_service import build_virtual_target_schema
 router = APIRouter(prefix="/mapping", tags=["mapping"])
 
 
-def _blocked_output_decision_statuses(mapping_decisions: list[MappingDecision]) -> list[str]:
+def _blocked_output_decision_statuses(
+    mapping_decisions: list[MappingDecision],
+    *,
+    allow_unaccepted: bool = False,
+) -> list[str]:
+    allowed_statuses = {"accepted", "needs_review"} if allow_unaccepted else {"accepted"}
     return sorted(
         {
             (str(decision.status or "").strip().lower() or "needs_review")
             for decision in mapping_decisions
-            if (str(decision.status or "").strip().lower() or "needs_review") != "accepted"
+            if (str(decision.status or "").strip().lower() or "needs_review") not in allowed_statuses
         }
     )
 
 
-def _require_accepted_output_decisions(mapping_decisions: list[MappingDecision], *, action_label: str) -> None:
-    blocked_statuses = _blocked_output_decision_statuses(mapping_decisions)
+def _require_accepted_output_decisions(
+    mapping_decisions: list[MappingDecision],
+    *,
+    action_label: str,
+    allow_unaccepted: bool = False,
+) -> None:
+    blocked_statuses = _blocked_output_decision_statuses(mapping_decisions, allow_unaccepted=allow_unaccepted)
     if blocked_statuses:
         raise HTTPException(
             status_code=409,
@@ -101,6 +115,64 @@ def append_mapping_set_audit(
     )
 
 
+def _prepare_source_schema_with_persistent_hints(
+    source_schema,
+    *,
+    source_system: str | None,
+    business_domain: str | None,
+    integration_name: str | None,
+) -> tuple[object, list[SourceFieldHintRecord]]:
+    enriched_schema, applied_hints = apply_source_field_hints(
+        source_schema,
+        source_system=source_system,
+        business_domain=business_domain,
+        integration_name=integration_name,
+    )
+    return enriched_schema, applied_hints
+
+
+def _attach_applied_source_field_hints(
+    response: AutoMappingResponse,
+    applied_hints: list[SourceFieldHintRecord],
+) -> AutoMappingResponse:
+    if not applied_hints:
+        return response
+    return response.model_copy(
+        update={
+            "applied_source_field_hints": [hint.model_dump(mode="json") for hint in applied_hints],
+        }
+    )
+
+
+def _normalized_field_name(value: str | None) -> str:
+    return str(value or "").strip().lower()
+
+
+def _find_schema_column(schema_profile, column_name: str):
+    normalized_name = _normalized_field_name(column_name)
+    for column in schema_profile.columns:
+        if _normalized_field_name(column.name) == normalized_name:
+            return column
+    return None
+
+
+def _resolve_refinement_target_schema(request: MappingRefinementRequest):
+    if request.target_dataset_id:
+        try:
+            target = dataset_store.get_dataset(request.target_dataset_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        return target.handle.schema_profile
+
+    if request.target_system:
+        target_schema = build_virtual_target_schema(request.target_system)
+        if not target_schema.columns:
+            raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
+        return target_schema
+
+    raise HTTPException(status_code=400, detail="Provide either target_dataset_id or target_system for mapping refinement.")
+
+
 @router.post("/auto", response_model=AutoMappingResponse)
 async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
     try:
@@ -109,11 +181,20 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    return generate_mapping_candidates(
+    prepared_source_schema, applied_persistent_hints = _prepare_source_schema_with_persistent_hints(
         source.handle.schema_profile,
+        source_system=request.source_system,
+        business_domain=request.business_domain,
+        integration_name=request.integration_name,
+    )
+
+    response = generate_mapping_candidates(
+        prepared_source_schema,
         target.handle.schema_profile,
         llm_provider=build_provider_from_settings() if request.use_llm else None,
+        description_priority=request.description_priority or bool(applied_persistent_hints),
     )
+    return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
 
 @router.post("/auto/jobs", response_model=MappingJobStartResponse)
@@ -124,13 +205,22 @@ async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResp
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
+    prepared_source_schema, applied_persistent_hints = _prepare_source_schema_with_persistent_hints(
+        source.handle.schema_profile,
+        source_system=request.source_system,
+        business_domain=request.business_domain,
+        integration_name=request.integration_name,
+    )
+
     def worker(progress_callback):
-        return generate_mapping_candidates(
-            source.handle.schema_profile,
+        response = generate_mapping_candidates(
+            prepared_source_schema,
             target.handle.schema_profile,
             llm_provider=build_provider_from_settings() if request.use_llm else None,
             progress_callback=progress_callback,
+            description_priority=request.description_priority or bool(applied_persistent_hints),
         )
+        return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
     try:
         job = mapping_job_store.start(worker)
@@ -154,11 +244,81 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
     if not target_schema.columns:
         raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
 
-    return generate_mapping_candidates(
+    prepared_source_schema, applied_persistent_hints = _prepare_source_schema_with_persistent_hints(
         source.handle.schema_profile,
+        source_system=request.source_system,
+        business_domain=request.business_domain,
+        integration_name=request.integration_name,
+    )
+
+    response = generate_mapping_candidates(
+        prepared_source_schema,
         target_schema,
         llm_provider=build_provider_from_settings() if request.use_llm else None,
+        description_priority=request.description_priority or bool(applied_persistent_hints),
+        candidate_pool_size=request.candidate_pool_size,
     )
+    return _attach_applied_source_field_hints(response, applied_persistent_hints)
+
+
+@router.get("/target-fields", response_model=list[str])
+async def list_mapping_target_fields(target_system: str | None = Query(default=None)) -> list[str]:
+    normalized_target_system = str(target_system or "").strip().lower()
+    if normalized_target_system:
+        if normalized_target_system != "canonical":
+            raise HTTPException(status_code=400, detail=f"Unsupported target_system: {target_system}")
+        target_schema = build_virtual_target_schema("canonical")
+        if not target_schema.columns:
+            raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
+        return [column.name for column in target_schema.columns]
+
+    raise HTTPException(status_code=400, detail="Provide target_system to list mapping target fields.")
+
+
+@router.post("/refine", response_model=SourceMappingResult)
+async def refine_mapping(request: MappingRefinementRequest) -> SourceMappingResult:
+    try:
+        source = dataset_store.get_dataset(request.source_dataset_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    target_schema = _resolve_refinement_target_schema(request)
+    prepared_source_schema, _applied_persistent_hints = _prepare_source_schema_with_persistent_hints(
+        source.handle.schema_profile,
+        source_system=request.source_system,
+        business_domain=request.business_domain,
+        integration_name=request.integration_name,
+    )
+    source_column = _find_schema_column(prepared_source_schema, request.source_field)
+    if source_column is None:
+        raise HTTPException(status_code=404, detail=f"Source field '{request.source_field}' was not found in the source schema.")
+
+    refined_source_column = apply_inline_source_field_hint(
+        source_column,
+        meaning_hint=request.meaning_hint,
+        negative_hint=request.negative_hint,
+        sample_values=request.sample_values,
+        refinement_instruction=request.refinement_instruction,
+    )
+    effective_description_priority = request.description_priority or any(
+        [
+            request.meaning_hint.strip(),
+            request.negative_hint.strip(),
+            list(request.sample_values),
+            request.refinement_instruction.strip(),
+        ]
+    )
+    try:
+        return refine_mapping_for_source(
+            refined_source_column,
+            list(target_schema.columns),
+            llm_provider=build_provider_from_settings() if request.use_llm else None,
+            description_priority=effective_description_priority,
+            candidate_pool_size=request.candidate_pool_size,
+            candidate_target_names=request.candidate_targets,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 @router.post("/canonical/jobs", response_model=MappingJobStartResponse)
@@ -172,13 +332,23 @@ async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJo
     if not target_schema.columns:
         raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
 
+    prepared_source_schema, applied_persistent_hints = _prepare_source_schema_with_persistent_hints(
+        source.handle.schema_profile,
+        source_system=request.source_system,
+        business_domain=request.business_domain,
+        integration_name=request.integration_name,
+    )
+
     def worker(progress_callback):
-        return generate_mapping_candidates(
-            source.handle.schema_profile,
+        response = generate_mapping_candidates(
+            prepared_source_schema,
             target_schema,
             llm_provider=build_provider_from_settings() if request.use_llm else None,
             progress_callback=progress_callback,
+            description_priority=request.description_priority or bool(applied_persistent_hints),
+            candidate_pool_size=request.candidate_pool_size,
         )
+        return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
     try:
         job = mapping_job_store.start(worker)
@@ -256,9 +426,38 @@ async def summarize_review_plan(request: ReviewPlanRequest) -> ReviewPlanRespons
     return build_review_plan(request, provider=provider)
 
 
+@router.get("/source-field-hints", response_model=list[SourceFieldHintRecord])
+async def list_source_field_hints(
+    source_system: str = Query(...),
+    business_domain: str | None = Query(default=None),
+    integration_name: str | None = Query(default=None),
+    source_field: str | None = Query(default=None),
+    active_only: bool = Query(default=True),
+) -> list[SourceFieldHintRecord]:
+    return persistence_service.list_source_field_hints(
+        source_system=source_system,
+        business_domain=business_domain,
+        integration_name=integration_name,
+        source_field=source_field,
+        active_only=active_only,
+    )
+
+
+@router.post("/source-field-hints", response_model=SourceFieldHintRecord)
+async def save_source_field_hint(request: SourceFieldHintUpsertRequest) -> SourceFieldHintRecord:
+    try:
+        return persistence_service.save_source_field_hint(request)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
 @router.post("/codegen", response_model=GeneratedArtifact)
 async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
-    _require_accepted_output_decisions(request.mapping_decisions, action_label="Code generation")
+    _require_accepted_output_decisions(
+        request.mapping_decisions,
+        action_label="Code generation",
+        allow_unaccepted=request.allow_unaccepted,
+    )
     if request.mode == "pyspark":
         return generate_pyspark_code(request.mapping_decisions)
     return generate_pandas_code(request.mapping_decisions)
@@ -266,7 +465,11 @@ async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
 
 @router.post("/codegen/refine", response_model=ArtifactRefinementResponse)
 async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> ArtifactRefinementResponse:
-    _require_accepted_output_decisions(request.mapping_decisions, action_label="Code refinement")
+    _require_accepted_output_decisions(
+        request.mapping_decisions,
+        action_label="Code refinement",
+        allow_unaccepted=request.allow_unaccepted,
+    )
     provider = build_provider_from_settings()
     if provider is None:
         raise HTTPException(status_code=503, detail="LLM provider is not configured.")

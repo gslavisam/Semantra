@@ -1,4 +1,5 @@
 import pytest
+from types import SimpleNamespace
 
 from streamlit_ui.workspace_views import (
     poll_mapping_job,
@@ -36,12 +37,22 @@ def test_companion_enrichment_message_reports_full_match() -> None:
     assert message == "Source companion metadata enriched 3 columns; all companion fields matched."
 
 
+def test_companion_enrichment_message_supports_target_label() -> None:
+    message = companion_enrichment_message({"matched_columns": 1, "unmatched_columns": []}, "Target")
+
+    assert message == "Target companion metadata enriched 1 columns; all companion fields matched."
+
+
 def test_workspace_codegen_block_reason_requires_all_accepted_decisions() -> None:
     assert _workspace_codegen_block_reason([{"source": "cust_id", "status": "accepted"}]) == ""
     assert _workspace_codegen_block_reason([{"source": "cust_id", "status": "needs_review"}]) == (
         "Pandas code generation is blocked until all active mapping decisions are accepted. "
         "Review statuses: needs_review."
     )
+    assert _workspace_codegen_block_reason(
+        [{"source": "cust_id", "status": "needs_review"}],
+        allow_unaccepted=True,
+    ) == ""
 
 
 def test_workspace_codegen_helpers_switch_to_pyspark_labels() -> None:
@@ -52,6 +63,11 @@ def test_workspace_codegen_helpers_switch_to_pyspark_labels() -> None:
         "PySpark code generation is blocked until all active mapping decisions are accepted. "
         "Review statuses: needs_review."
     )
+    assert _workspace_codegen_block_reason(
+        [{"source": "cust_id", "status": "needs_review"}],
+        "pyspark",
+        allow_unaccepted=True,
+    ) == ""
 
 
 def test_workspace_output_section_label_appends_detail_only_when_present() -> None:
@@ -127,3 +143,55 @@ def test_poll_mapping_job_raises_on_canceled_status() -> None:
             status=StatusRecorder(),
             timeout_seconds=0.01,
         )
+
+
+def test_poll_mapping_job_timeout_tracks_active_job_for_resume(monkeypatch: pytest.MonkeyPatch) -> None:
+    from streamlit_ui import workspace_views
+
+    fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(workspace_views, "st", fake_streamlit)
+
+    def api_request(method: str, path: str, **kwargs):
+        if method == "POST":
+            return {"job_id": "job-timeout", "status": "queued"}
+        return {"job_id": "job-timeout", "status": "running", "activity": []}
+
+    with pytest.raises(RuntimeError, match="Resume current mapping job"):
+        poll_mapping_job(
+            api_request=api_request,
+            start_path="/mapping/canonical/jobs",
+            payload={"source_dataset_id": "source", "target_system": "canonical", "use_llm": False},
+            status=SimpleNamespace(write=lambda _message: None),
+            timeout_seconds=0.01,
+        )
+
+    assert fake_streamlit.session_state["active_mapping_job"]["job_id"] == "job-timeout"
+
+
+def test_poll_mapping_job_resume_returns_completed_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    from streamlit_ui import workspace_views
+
+    fake_streamlit = SimpleNamespace(session_state={"active_mapping_job": {"job_id": "job-1"}})
+    monkeypatch.setattr(workspace_views, "st", fake_streamlit)
+
+    def api_request(method: str, path: str, **kwargs):
+        assert method == "GET"
+        assert path == "/mapping/jobs/job-1"
+        return {
+            "job_id": "job-1",
+            "status": "completed",
+            "activity": ["12:00:00 | Mapping job completed."],
+            "response": {"mappings": [{"source": "A", "target": "B"}]},
+        }
+
+    response = poll_mapping_job(
+        api_request=api_request,
+        start_path="/mapping/canonical/jobs",
+        payload={"source_dataset_id": "source", "target_system": "canonical", "use_llm": False},
+        status=SimpleNamespace(write=lambda _message: None),
+        existing_job_id="job-1",
+        timeout_seconds=0.01,
+    )
+
+    assert response == {"mappings": [{"source": "A", "target": "B"}]}
+    assert "active_mapping_job" not in fake_streamlit.session_state

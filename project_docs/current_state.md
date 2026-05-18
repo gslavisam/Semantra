@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-17, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-18, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -30,6 +30,7 @@ Implemented:
 - SQL schema snapshot upload with table discovery and explicit table selection for multi-table files
 - schema-spec upload where each row describes one field rather than one business record
 - source-side companion metadata enrichment over an existing uploaded dataset handle
+- target-side companion metadata enrichment over an existing uploaded target dataset handle in standard mode
 - dataset summary and schema-profile display in the Workspace setup flow
 
 Main code surfaces:
@@ -46,12 +47,19 @@ Implemented:
 
 - standard source-to-target auto mapping
 - canonical-only source-to-business-concept mapping without a real target dataset
+- configurable canonical candidate shortlisting before full canonical scoring
 - sync and async mapping job flows with progress polling
 - active-job limits, TTL cleanup, and cooperative cancel support for mapping jobs
 - one-to-one target assignment across the full target schema
 - optional LLM closed-set validation layered on top of heuristic ranking
 - scoring based on name, semantic, knowledge, canonical, pattern, statistical, overlap, embedding, correction, and LLM signals
 - project/source/target canonical coverage reporting in mapping responses
+
+Important current behavior:
+
+- confidence labels remain `high >= 0.85`, `medium >= 0.65`, otherwise `low`
+- mappings with score `>= 0.75` are currently auto-accepted even if the label remains `medium_confidence`
+- canonical mode can narrow the initial search to a configurable likely-candidate pool before full scoring; the UI default is currently `10`
 
 Main code surfaces:
 
@@ -68,6 +76,8 @@ Implemented:
 
 - trust-layer review of selected mappings with confidence, signal traces, explanations, and LLM notes
 - source-to-concept and concept-to-target review views
+- per-row LLM mapping refinement with transient meaning, negative guidance, sample values, and a refinement instruction
+- batch low-confidence LLM refinement plus accept/revert handling for refined row proposals
 - Mapping Analysis Overview with structured technical summary, risk readout, and recommended next actions
 - optional narration/audio generation for Mapping Analysis Overview
 - Review Queue Plan for queue-level prioritization over the currently filtered review set
@@ -93,6 +103,7 @@ Main code surfaces:
 Implemented:
 
 - manual adjustment of suggested target mappings in the Decisions flow
+- manual mapping to virtual canonical target options in canonical mode
 - export/import of current mapping decisions as JSON and Excel
 - transformation suggestion, template-assisted authoring, and manual transformation code editing
 - advisory row preview from active mapping decisions
@@ -106,7 +117,8 @@ Implemented:
 Important current behavior:
 
 - preview is intentionally advisory and remains available before all decisions are accepted
-- code generation is governance-gated and requires accepted active decisions
+- standard-mode code generation is governance-gated and requires accepted active decisions
+- canonical mode intentionally skips preview because no concrete target dataset exists, but still supports Pandas/PySpark code generation and artifact refinement from active source-to-canonical decisions
 - transformation test-set save and run are governance-gated and require accepted active decisions
 - refinement does not replace the active generated artifact until the user explicitly accepts it
 

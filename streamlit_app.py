@@ -7,6 +7,8 @@ from streamlit_ui.api import (
     admin_token_required,
     api_request,
     api_request_content,
+    list_canonical_target_fields,
+    request_llm_mapping_refinement,
     request_mapping_analysis_audio,
     request_mapping_analysis_narration,
     request_mapping_analysis_summary,
@@ -128,6 +130,7 @@ def upload_dataset_handle(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> dict:
     from streamlit_ui.api import upload_dataset_handle as _impl
 
@@ -138,6 +141,7 @@ def upload_dataset_handle(
         name_col=name_col,
         description_col=description_col,
         type_col=type_col,
+        sample_values_col=sample_values_col,
     )
 
 
@@ -148,6 +152,7 @@ def enrich_dataset_metadata(
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
+    sample_values_col: str | None = None,
 ) -> dict:
     from streamlit_ui.api import enrich_dataset_metadata as _impl
 
@@ -157,6 +162,7 @@ def enrich_dataset_metadata(
         name_col=name_col,
         description_col=description_col,
         type_col=type_col,
+        sample_values_col=sample_values_col,
     )
 
 
@@ -231,6 +237,7 @@ def display_trust_layer(mapping_response: dict) -> None:
         canonical_concept_labels=canonical_concept_labels,
         transformation_mode_label=transformation_mode_label,
         llm_runtime_enabled=llm_runtime_enabled,
+        request_llm_mapping_refinement=request_llm_mapping_refinement,
         request_llm_transformation_suggestion=request_llm_transformation_suggestion,
         request_transformation_templates=request_transformation_templates,
         materialize_transformation_template=materialize_transformation_template,
@@ -459,6 +466,7 @@ def render_manual_mapping_panel(mapping_response: dict) -> None:
         upsert_manual_mapping=upsert_manual_mapping,
         manual_mapping_rows=manual_mapping_rows,
         remove_manual_mapping=remove_manual_mapping,
+        list_canonical_target_fields=list_canonical_target_fields,
     )
 
 
@@ -599,6 +607,7 @@ def render_admin_debug_tab() -> None:
         api_request=api_request,
         api_request_content=api_request_content,
         upload_file_to_request_files=upload_file_to_request_files,
+        current_mapping_rows=current_mapping_rows,
         knowledge_debug_rows=knowledge_debug_rows,
     )
 

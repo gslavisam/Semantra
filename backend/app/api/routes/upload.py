@@ -56,6 +56,7 @@ async def upload_schema_spec(
     name_col: str | None = Form(default=None),
     description_col: str | None = Form(default=None),
     type_col: str | None = Form(default=None),
+    sample_values_col: str | None = Form(default=None),
 ) -> DatasetHandle:
     filename = (file.filename or "").lower()
     if not filename.endswith(SUPPORTED_ROW_FORMATS):
@@ -73,6 +74,7 @@ async def upload_schema_spec(
             name_col=name_col,
             description_col=description_col,
             type_col=type_col,
+            sample_values_col=sample_values_col,
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
@@ -94,6 +96,7 @@ async def enrich_dataset_metadata(
     name_col: str | None = Form(default=None),
     description_col: str | None = Form(default=None),
     type_col: str | None = Form(default=None),
+    sample_values_col: str | None = Form(default=None),
 ) -> MetadataEnrichmentResponse:
     filename = (file.filename or "").lower()
     if not filename.endswith(SUPPORTED_ROW_FORMATS):
@@ -111,6 +114,7 @@ async def enrich_dataset_metadata(
             name_col=name_col,
             description_col=description_col,
             type_col=type_col,
+            sample_values_col=sample_values_col,
         )
         dataset_handle, matched_columns, unmatched_columns = dataset_store.merge_companion_metadata(
             dataset_id,

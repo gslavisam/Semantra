@@ -53,17 +53,21 @@ Ovde radiš:
 - izbor `Row data` ili `Schema spec` kada fajl liči na field-per-row specifikaciju
 - izbor tabela kada SQL snapshot sadrži više tabela
 - opciono source companion metadata enrichment
+- opciono target companion metadata enrichment kada radiš standard source + target tok
+- podešavanje `Canonical candidate pool size` u canonical modu
 
 Kada koristiš `Standard`:
 
 - imaš realan source i realan target
+- možeš dodati odvojene companion fajlove za source i target kada su row-data uploadi ili SQL DDL nema dovoljno opisa
 - kasnije možeš da radiš preview i Pandas code generation
 
 Kada koristiš `Canonical`:
 
 - nemaš još realan target ili želiš prvo semantic normalization pass
 - rezultat je source -> canonical concept mapping
-- preview i codegen nisu cilj ovog moda
+- preview nije dostupan jer nema realnog target dataseta
+- codegen je i dalje dostupan nad trenutnim source -> canonical odlukama
 
 ### `Review`
 
@@ -72,6 +76,9 @@ Ovde vidiš:
 - trust-layer objašnjenja za izabrane predloge
 - confidence i signal breakdown
 - LLM napomene kada je validator korišćen
+- per-row `LLM refine` unos za trenutno polje, uključujući meaning/negative/sample/refinement instruction kontekst
+- batch low-confidence LLM refine za review red
+- accept/revert tok za prihvatanje LLM refined row predloga
 - canonical path pregled
 - `Mapping Analysis Overview` za tehnički sažetak trenutnog mapping stanja
 - opcioni audio narativ za generated mapping analysis
@@ -94,6 +101,7 @@ Važna razlika:
 Ovde radiš:
 
 - ručne izmene target izbora
+- ručno mapiranje i u canonical modu, prema virtual canonical target opcijama
 - import/export mapping odluka kao JSON ili Excel
 - čuvanje mapping set verzija
 - učitavanje i primenu prethodno sačuvanih mapping setova
@@ -115,7 +123,8 @@ Ovde radiš:
 Važna razlika:
 
 - preview je advisory i možeš ga koristiti i pre finalnog odobravanja, da vidiš trenutno ponašanje mapping-a
-- code generation je governance-sensitive surface i traži accepted aktivne odluke
+- standard code generation je governance-sensitive surface i traži accepted aktivne odluke
+- u canonical modu preview nije dostupan, ali code generation radi nad aktivnim source -> canonical odlukama
 
 Ako koristiš refinement:
 
@@ -214,10 +223,10 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 ### Standard mapping tok
 
 1. U `Workspace > Setup` uploaduj source i target.
-2. Po potrebi izaberi tabele ili `Schema spec` mod.
+2. Po potrebi izaberi tabele ili `Schema spec` mod i dodaj source/target companion fajlove.
 3. Klikni `Upload and profile`.
 4. Klikni `Generate mapping`.
-5. U `Review` po potrebi generiši `Mapping Analysis Overview`, zatim proveri trust layer, canonical path i eventualne canonical gap predloge.
+5. U `Review` po potrebi generiši `Mapping Analysis Overview`, koristi per-row ili batch `LLM refine`, zatim proveri trust layer, canonical path i eventualne canonical gap predloge.
 6. Ako review red deluje velik ili šumovit, koristi `Review Queue Plan` i po potrebi `Gap Queue Summary`.
 6. U `Decisions` unesi ručne izmene, eksportuj checkpoint ili sačuvaj mapping set.
 7. U `Output` koristi preview, pa zatim codegen kada su odluke accepted.
@@ -226,10 +235,12 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 ### Canonical-first tok
 
 1. U `Workspace > Setup` pređi na `Canonical` mod.
-2. Uploaduj source row-data ili source spec.
-3. Klikni `Upload and profile`, pa `Generate canonical mapping`.
-4. U `Review` proveri source -> canonical path.
-5. Ako postoje semantic gap-ovi, po potrebi ih prebaci u canonical governance tok kroz `Canonical Console`.
+2. Uploaduj source row-data ili source spec i po potrebi podesi `Canonical candidate pool size`.
+3. Po potrebi dodaj source companion metadata, pa klikni `Upload and profile`, zatim `Generate canonical mapping`.
+4. U `Review` proveri source -> canonical path i po potrebi koristi per-row `LLM refine`.
+5. U `Decisions` možeš ručno mapirati na canonical opcije.
+6. U `Output` možeš generisati kod i bez preview-a.
+7. Ako postoje semantic gap-ovi, po potrebi ih prebaci u canonical governance tok kroz `Canonical Console`.
 
 ### Canonical governance tok
 
@@ -242,6 +253,7 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 ## Kratke napomene
 
 - Confidence score je heuristika za review prioritet, ne verovatnoća.
+- Score `>= 0.75` trenutno auto-prihvata mapping iako confidence label može ostati `medium_confidence`.
 - Preview je namerno advisory; ne znači da je mapping finalno odobren.
 - Durable i execution-like površine su strože governed od samog preview-a.
 - Nove bounded AI sekcije u Review, Benchmarks i Catalog ne rade automatske write operacije; služe za objašnjenje, trijažu i pripremu ljudske odluke.

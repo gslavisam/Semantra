@@ -35,11 +35,15 @@ Top-level UI areas:
 Core implemented capabilities:
 
 - CSV, JSON, XML, XLSX, SQL snapshot, and schema-spec ingestion
+- source-side and target-side companion metadata enrichment over uploaded dataset handles
 - standard source-to-target mapping and canonical-only source-to-concept mapping
 - explainable multi-signal ranking with optional closed-set LLM validation
+- configurable canonical candidate pool shortlisting before full canonical scoring
 - Mapping Analysis Overview with optional narration/audio generation
 - Review Queue Plan and Gap Queue Summary for queue-level review guidance
+- per-row and batch LLM mapping refinement with transient field context and accept/revert controls
 - transformation generation, templates, advisory preview, and Pandas/PySpark starter generation
+- canonical-mode manual mapping and canonical-mode code generation against virtual canonical targets
 - LLM-based artifact refinement with split-view compare and accept/discard actions
 - governed mapping-set persistence with status, audit, diff, and approved-only reuse
 - correction persistence and reusable correction-rule promotion
@@ -127,6 +131,7 @@ The mapping confidence score is a normalized multi-signal heuristic, not a calib
 
 - the final score is normalized into `0..1`
 - current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
+- current auto-accept threshold is `>= 0.75`, separate from the confidence-label buckets
 - treat the score as review prioritization, not as a guarantee that a mapping is correct
 - the active score profile is configurable via `SEMANTRA_SCORING_PROFILE` (`balanced`, `schema_only`, `data_rich`, `canonical_first`)
 - the active profile can be fine-tuned with `SEMANTRA_SCORING_WEIGHT_OVERRIDES` as a JSON object in `backend/.env`

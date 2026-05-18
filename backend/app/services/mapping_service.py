@@ -76,6 +76,18 @@ SCORING_PROFILES = {
         "correction": 0.10,
         "llm": 0.05,
     },
+    "description_priority": {
+        "name": 0.12,
+        "semantic": 0.22,
+        "knowledge": 0.18,
+        "canonical": 0.12,
+        "pattern": 0.08,
+        "statistical": 0.05,
+        "overlap": 0.03,
+        "embedding": 0.12,
+        "correction": 0.03,
+        "llm": 0.05,
+    },
 }
 WEIGHTS = SCORING_PROFILES[DEFAULT_SCORING_PROFILE]
 SIGNAL_WEIGHT_NAMES = tuple(WEIGHTS.keys())
@@ -138,6 +150,8 @@ def generate_mapping_candidates(
     llm_provider: LLMProvider | None = None,
     write_decision_log: bool = True,
     progress_callback: ProgressCallback | None = None,
+    description_priority: bool = False,
+    candidate_pool_size: int | None = None,
 ) -> AutoMappingResponse:
     source_columns = list(source_schema.columns)
     target_columns = list(target_schema.columns)
@@ -146,6 +160,11 @@ def generate_mapping_candidates(
         progress_callback,
         f"Loaded {len(source_columns)} source fields and {len(target_columns)} target fields for mapping.",
     )
+    if candidate_pool_size:
+        _emit_progress(
+            progress_callback,
+            f"Canonical shortlist enabled: scoring up to {candidate_pool_size} likely targets per source field.",
+        )
     per_source_scores: dict[str, list[CandidateScore]] = {}
     for index, source_column in enumerate(source_columns, start=1):
         _emit_progress(progress_callback, f"Ranking {index}/{len(source_columns)}: {source_column.name}.")
@@ -153,6 +172,8 @@ def generate_mapping_candidates(
             source_column,
             target_columns,
             target_embedding_cache=target_embedding_cache,
+            description_priority=description_priority,
+            candidate_pool_size=candidate_pool_size,
         )
 
     _emit_progress(progress_callback, "Applying LLM validation gates." if llm_provider else "LLM validation disabled; using heuristic ranking only.")
@@ -294,8 +315,14 @@ def generate_mapping_candidates(
             f"({selected.confidence:.0%}, {selected.method}).",
         )
 
-    source_canonical_coverage = metadata_knowledge_service.canonical_coverage(source_schema)
-    target_canonical_coverage = metadata_knowledge_service.canonical_coverage(target_schema)
+    source_canonical_coverage = metadata_knowledge_service.canonical_coverage(
+        source_schema,
+        prefer_metadata_text=description_priority,
+    )
+    target_canonical_coverage = metadata_knowledge_service.canonical_coverage(
+        target_schema,
+        prefer_metadata_text=description_priority,
+    )
     canonical_coverage = CanonicalCoverageReport(
         source=source_canonical_coverage,
         target=target_canonical_coverage,
@@ -316,21 +343,152 @@ def generate_mapping_candidates(
     return response
 
 
+def refine_mapping_for_source(
+    source: ColumnProfile,
+    targets: list[ColumnProfile],
+    *,
+    llm_provider: LLMProvider | None,
+    description_priority: bool = False,
+    candidate_pool_size: int | None = None,
+    candidate_target_names: list[str] | None = None,
+) -> SourceMappingResult:
+    rankings = rank_targets_for_source(
+        source,
+        targets,
+        description_priority=description_priority,
+        candidate_pool_size=candidate_pool_size,
+    )
+    if candidate_target_names:
+        allowed_names = {str(name or "").strip() for name in candidate_target_names if str(name or "").strip()}
+        rankings = [score for score in rankings if score.target.name in allowed_names]
+
+    candidate_scores = rankings[: settings.top_k_candidates]
+    candidate_options = [build_candidate_option(score) for score in candidate_scores]
+    if not candidate_scores:
+        return SourceMappingResult(source=source.name, selected=None, candidates=[])
+    if llm_provider is None:
+        raise ValueError("LLM mapping refinement requires an active runtime provider.")
+
+    llm_result = call_validator(
+        source_field={
+            "name": source.name,
+            "description": source.description,
+            "declared_type": source.declared_type,
+            "sample_values": source.sample_values,
+            "pattern": source.detected_patterns,
+            "detected_patterns": source.detected_patterns,
+            "unique_ratio": source.unique_ratio,
+        },
+        candidate_targets=[
+            {
+                "name": candidate.target.name,
+                "description": candidate.target.description,
+                "declared_type": candidate.target.declared_type,
+                "sample_values": candidate.target.sample_values,
+                "pattern": candidate.target.detected_patterns,
+                "detected_patterns": candidate.target.detected_patterns,
+                "confidence": candidate.score,
+            }
+            for candidate in candidate_scores
+        ],
+        provider=llm_provider,
+    )
+    if llm_result is None:
+        raise ValueError("LLM returned no usable mapping refinement for this field.")
+
+    if source.description or source.declared_type:
+        llm_result.reasoning = list(llm_result.reasoning) + [
+            "LLM received source field metadata context (description/type) for this refinement."
+        ]
+
+    considered_targets = [candidate.target.name for candidate in candidate_scores]
+    if llm_result.selected_target == "no_match":
+        selected = MappingCandidate(
+            source=source.name,
+            target=None,
+            confidence=0.0,
+            confidence_label="low_confidence",
+            status="needs_review",
+            method="llm_validator_no_match",
+            signals=ScoringSignals(llm=llm_result.confidence),
+            explanation=[
+                "LLM refinement rejected the available candidates inside the closed candidate set.",
+                *[f"LLM: {reason}" for reason in llm_result.reasoning],
+            ],
+            alternatives=considered_targets,
+            transformation_code=llm_result.transformation_code,
+            llm_consulted=True,
+            llm_recommendation=llm_result,
+            llm_decision_proposition=build_llm_decision_proposition(
+                llm_result,
+                final_target=None,
+                considered_targets=considered_targets,
+            ),
+        )
+        return SourceMappingResult(source=source.name, selected=selected, candidates=candidate_options)
+
+    selected_score = next((candidate for candidate in candidate_scores if candidate.target.name == llm_result.selected_target), None)
+    if selected_score is None:
+        raise ValueError("LLM selected a target outside the candidate set.")
+
+    selected_score.signals.llm = round(llm_result.confidence, 4)
+    selected_score.active_signal_names.add("llm")
+    selected_score.score = compute_final_score(
+        selected_score.signals,
+        selected_score.active_signal_names,
+        profile_name="description_priority" if description_priority else None,
+    )
+    selected_score.llm_result = llm_result
+    selected_score.llm_selected = True
+    refresh_signal_breakdown(selected_score.explanation, selected_score.signals)
+    selected_score.explanation.append("LLM validator re-ranked this candidate within the closed candidate set.")
+    if has_strong_identifier_consensus(selected_score.signals, selected_score.active_signal_names):
+        selected_score.explanation.append(
+            "Strong identifier consensus detected: business metadata, value behavior, and LLM confirmation all point to this target."
+        )
+
+    selected = build_selected_mapping(
+        source.name,
+        selected_score,
+        status="needs_review",
+        extra_explanation=[],
+        alternatives=[candidate.target.name for candidate in candidate_scores if candidate.target.name != selected_score.target.name],
+        llm_result=llm_result,
+        considered_targets=considered_targets,
+    )
+    if llm_result.transformation_code:
+        selected.transformation_code = llm_result.transformation_code
+    return SourceMappingResult(source=source.name, selected=selected, candidates=candidate_options)
+
+
 def rank_targets_for_source(
     source: ColumnProfile,
     targets: list[ColumnProfile],
     *,
     target_embedding_cache: dict[str, list[float] | None] | None = None,
+    description_priority: bool = False,
+    candidate_pool_size: int | None = None,
 ) -> list[CandidateScore]:
+    candidate_targets = shortlist_targets_for_source(
+        source,
+        targets,
+        candidate_pool_size=candidate_pool_size,
+        description_priority=description_priority,
+    )
     scored: list[CandidateScore] = []
-    for target in targets:
+    for target in candidate_targets:
         signals, active_signal_names = compute_signals(
             source,
             target,
             target_embedding_cache=target_embedding_cache,
+            description_priority=description_priority,
         )
-        final_score = compute_final_score(signals, active_signal_names)
-        explanation = build_explanation(source, target, signals)
+        final_score = compute_final_score(
+            signals,
+            active_signal_names,
+            profile_name="description_priority" if description_priority else None,
+        )
+        explanation = build_explanation(source, target, signals, description_priority=description_priority)
         scored.append(
             CandidateScore(
                 source=source,
@@ -339,10 +497,69 @@ def rank_targets_for_source(
                 signals=signals,
                 active_signal_names=active_signal_names,
                 explanation=explanation,
-                canonical_details=metadata_knowledge_service.canonical_mapping_details(source, target),
+                canonical_details=metadata_knowledge_service.canonical_mapping_details(
+                    source,
+                    target,
+                    prefer_metadata_text=description_priority,
+                ),
             )
         )
     return sorted(scored, key=lambda item: item.score, reverse=True)
+
+
+def shortlist_targets_for_source(
+    source: ColumnProfile,
+    targets: list[ColumnProfile],
+    *,
+    candidate_pool_size: int | None = None,
+    description_priority: bool = False,
+) -> list[ColumnProfile]:
+    if not candidate_pool_size or candidate_pool_size >= len(targets):
+        return targets
+
+    target_by_name = {target.name: target for target in targets}
+    shortlisted_names: list[str] = []
+    seen_names: set[str] = set()
+
+    source_canonical_matches = metadata_knowledge_service.match_canonical_concepts(
+        source,
+        prefer_metadata_text=description_priority,
+    )
+    for match in sorted(source_canonical_matches, key=lambda item: item.strength, reverse=True):
+        target = target_by_name.get(match.concept_id)
+        if target is None or target.name in seen_names:
+            continue
+        shortlisted_names.append(target.name)
+        seen_names.add(target.name)
+        if len(shortlisted_names) >= candidate_pool_size:
+            return [target_by_name[name] for name in shortlisted_names]
+
+    source_tokens = set(source.tokenized_name)
+    source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(
+        source,
+        prefer_metadata_text=description_priority,
+    )
+    ranked_by_likelihood = sorted(
+        targets,
+        key=lambda target: (
+            0.45 * fuzzy_similarity(source.normalized_name, target.normalized_name)
+            + 0.35 * jaccard_similarity(
+                source_semantic,
+                semantic_token_set(target.name) | set(target.tokenized_name),
+            )
+            + 0.20 * jaccard_similarity(source_tokens, set(target.tokenized_name))
+        ),
+        reverse=True,
+    )
+    for target in ranked_by_likelihood:
+        if target.name in seen_names:
+            continue
+        shortlisted_names.append(target.name)
+        seen_names.add(target.name)
+        if len(shortlisted_names) >= candidate_pool_size:
+            break
+
+    return [target_by_name[name] for name in shortlisted_names]
 
 
 def apply_llm_validation(
@@ -476,7 +693,7 @@ def has_close_strong_canonical_competitor(rankings: list[CandidateScore]) -> boo
 
 
 def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
-    if top_candidate.score >= settings.llm_gate_min_score or top_candidate.score < 0.2:
+    if top_candidate.score >= settings.llm_gate_max_score or top_candidate.score < 0.2:
         return False
     if not is_canonical_target_name(top_candidate.target.name):
         return False
@@ -496,11 +713,18 @@ def compute_signals(
     target: ColumnProfile,
     *,
     target_embedding_cache: dict[str, list[float] | None] | None = None,
+    description_priority: bool = False,
 ) -> tuple[ScoringSignals, set[str]]:
     source_tokens = set(source.tokenized_name)
     target_tokens = set(target.tokenized_name)
-    source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(source)
-    target_semantic = semantic_token_set(target.name) | metadata_knowledge_service.expand_semantic_tokens(target)
+    source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(
+        source,
+        prefer_metadata_text=description_priority,
+    )
+    target_semantic = semantic_token_set(target.name) | metadata_knowledge_service.expand_semantic_tokens(
+        target,
+        prefer_metadata_text=description_priority,
+    )
     source_patterns = set(source.detected_patterns)
     target_patterns = set(target.detected_patterns)
     source_values = set(source.distinct_sample_values)
@@ -510,8 +734,16 @@ def compute_signals(
         0.4 * jaccard_similarity(source_tokens, target_tokens)
     )
     semantic_signal = jaccard_similarity(source_semantic, target_semantic)
-    knowledge_signal = metadata_knowledge_service.knowledge_alignment(source, target)
-    canonical_signal = metadata_knowledge_service.canonical_alignment(source, target)
+    knowledge_signal = metadata_knowledge_service.knowledge_alignment(
+        source,
+        target,
+        prefer_metadata_text=description_priority,
+    )
+    canonical_signal = metadata_knowledge_service.canonical_alignment(
+        source,
+        target,
+        prefer_metadata_text=description_priority,
+    )
     pattern_signal = jaccard_similarity(source_patterns, target_patterns)
     stat_signal = (
         score_distance(source.unique_ratio, target.unique_ratio)
@@ -584,8 +816,13 @@ def is_strong_canonical_concept_match(target: ColumnProfile, knowledge_signal: f
     return knowledge_signal >= 0.85 and canonical_signal >= 0.6
 
 
-def compute_final_score(signals: ScoringSignals, active_signal_names: set[str] | None = None) -> float:
-    weights = resolve_scoring_weights()
+def compute_final_score(
+    signals: ScoringSignals,
+    active_signal_names: set[str] | None = None,
+    *,
+    profile_name: str | None = None,
+) -> float:
+    weights = resolve_scoring_weights(profile_name=profile_name)
     if active_signal_names is None:
         active_signal_names = {
             signal_name
@@ -814,7 +1051,13 @@ def refresh_signal_breakdown(explanation: list[str], signals: ScoringSignals) ->
     explanation.append(breakdown)
 
 
-def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: ScoringSignals) -> list[str]:
+def build_explanation(
+    source: ColumnProfile,
+    target: ColumnProfile,
+    signals: ScoringSignals,
+    *,
+    description_priority: bool = False,
+) -> list[str]:
     explanation: list[str] = []
     correction_feedback = correction_store.describe_feedback(source.name, target.name)
 
@@ -828,10 +1071,26 @@ def build_explanation(source: ColumnProfile, target: ColumnProfile, signals: Sco
         )
     if signals.semantic >= 0.6:
         explanation.append("Semantic tokens align after abbreviation expansion and synonym enrichment.")
+    if description_priority and (source.description or source.declared_type):
+        explanation.append(
+            "Description-priority mode injected source description/type metadata into semantic and concept matching for this candidate."
+        )
     if signals.knowledge > 0:
-        explanation.extend(metadata_knowledge_service.explain_alignment(source, target))
+        explanation.extend(
+            metadata_knowledge_service.explain_alignment(
+                source,
+                target,
+                prefer_metadata_text=description_priority,
+            )
+        )
     if signals.canonical > 0:
-        explanation.extend(metadata_knowledge_service.explain_canonical_alignment(source, target))
+        explanation.extend(
+            metadata_knowledge_service.explain_canonical_alignment(
+                source,
+                target,
+                prefer_metadata_text=description_priority,
+            )
+        )
     if signals.name >= 0.75:
         explanation.append("Field names are lexically very similar.")
     if signals.overlap > 0:
@@ -886,7 +1145,6 @@ def score_to_label(score: float) -> str:
 
 
 def label_to_status(score: float) -> str:
-    label = score_to_label(score)
-    if label == "high_confidence":
+    if score >= settings.auto_accept_threshold:
         return "accepted"
     return "needs_review"

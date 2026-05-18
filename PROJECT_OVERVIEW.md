@@ -72,7 +72,8 @@ Implemented today:
 - row-data upload for CSV, JSON, XML, and XLSX
 - SQL snapshot upload with explicit table selection for multi-table files
 - schema-spec upload where each row represents one field
-- source companion metadata enrichment over an existing uploaded dataset
+- source companion metadata enrichment over an existing uploaded source dataset
+- target companion metadata enrichment over an existing uploaded target dataset in standard mode
 
 Purpose:
 
@@ -93,6 +94,7 @@ Implemented today:
 
 - standard source-to-target mapping
 - canonical-only source-to-business-concept mapping
+- configurable canonical candidate shortlisting before full canonical scoring
 - top-k candidate ranking with one-to-one assignment
 - signal fusion across lexical, semantic, knowledge, canonical, pattern, statistical, overlap, embedding, correction, and optional LLM inputs
 - project/source/target canonical coverage reporting
@@ -102,6 +104,8 @@ Important behavior:
 
 - confidence is a normalized ranking heuristic, not a calibrated probability
 - current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
+- scores `>= 0.75` are auto-accepted even when the confidence label remains `medium_confidence`
+- canonical mode can narrow the initial search to a configurable likely-candidate pool before full scoring; the default UI pool is now `10`
 
 Detailed signal, score, and bounded LLM behavior is documented in `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 
@@ -117,6 +121,8 @@ Implemented today:
 
 - trust-layer explanations and signal breakdowns
 - source-to-concept and concept-to-target review views
+- per-row LLM mapping refinement with transient meaning/negative/sample/refinement hints
+- batch low-confidence LLM refinement plus accept/revert handling for refined row proposals
 - Mapping Analysis Overview with technical summary, recommended actions, and optional narration/audio
 - Review Queue Plan for the currently filtered review set
 - grouped review-attention summary for repeated unmatched or low-confidence patterns
@@ -135,7 +141,7 @@ Main anchors:
 
 Implemented today:
 
-- manual target adjustment
+- manual target adjustment in both standard and canonical workflows
 - decision export/import as JSON and Excel
 - reusable transformation templates and manual transformation editing
 - advisory preview over active mapping decisions
@@ -148,7 +154,9 @@ Implemented today:
 Important product contract:
 
 - preview is intentionally advisory and can run before all decisions are accepted
-- code generation and transformation test-set persistence/execution are governance-gated
+- preview remains a standard-mode artifact; canonical mode intentionally skips preview because no concrete target rows exist
+- standard-mode code generation and transformation test-set persistence/execution are governance-gated
+- canonical mode still supports Pandas/PySpark code generation and artifact refinement from current source-to-canonical decisions
 - refinement is guidance only until the user explicitly accepts the refined artifact
 
 Detailed preview/codegen warning behavior and classification is documented in `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
@@ -298,7 +306,8 @@ Semantra already enforces several concrete governance contracts, not just passiv
 Implemented backend-enforced rules include:
 
 - only approved mapping sets can be applied or reused in Workspace flows
-- code generation requires accepted active mapping decisions
+- standard-mode code generation requires accepted active mapping decisions
+- canonical-mode code generation is allowed from active source-to-canonical decisions even before final acceptance
 - saving the current mapping as a benchmark requires accepted active decisions
 - reviewed corrections require closed review outcomes
 - reusable-rule promotion rejects unresolved review states

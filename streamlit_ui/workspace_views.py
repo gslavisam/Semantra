@@ -4,7 +4,20 @@ import httpx
 import streamlit as st
 import time
 
+from streamlit_ui.api import current_workspace_scope
 from streamlit_ui.governance import api_error_message, mapping_output_block_reason
+
+
+def _set_active_mapping_job(job_id: str, *, start_path: str, payload: dict) -> None:
+    st.session_state["active_mapping_job"] = {
+        "job_id": job_id,
+        "start_path": start_path,
+        "payload": dict(payload),
+    }
+
+
+def _clear_active_mapping_job() -> None:
+    st.session_state.pop("active_mapping_job", None)
 
 
 def poll_mapping_job(
@@ -14,10 +27,17 @@ def poll_mapping_job(
     payload: dict,
     status,
     timeout_seconds: float = 600.0,
+    existing_job_id: str | None = None,
 ) -> dict:
-    started = api_request("POST", start_path, json=payload, timeout=30.0)
-    job_id = started["job_id"]
-    status.write(f"Started mapping job {job_id}.")
+    if existing_job_id:
+        job_id = existing_job_id
+        _set_active_mapping_job(job_id, start_path=start_path, payload=payload)
+        status.write(f"Resuming mapping job {job_id}.")
+    else:
+        started = api_request("POST", start_path, json=payload, timeout=30.0)
+        job_id = started["job_id"]
+        _set_active_mapping_job(job_id, start_path=start_path, payload=payload)
+        status.write(f"Started mapping job {job_id}.")
 
     seen_activity_count = 0
     deadline = time.monotonic() + timeout_seconds
@@ -32,15 +52,21 @@ def poll_mapping_job(
             response = job_status.get("response")
             if not response:
                 raise RuntimeError("Mapping job completed without a response payload.")
+            _clear_active_mapping_job()
             return response
         if job_status.get("status") == "canceled":
+            _clear_active_mapping_job()
             raise RuntimeError("Mapping job was canceled.")
         if job_status.get("status") == "failed":
+            _clear_active_mapping_job()
             raise RuntimeError(job_status.get("error") or "Mapping job failed.")
 
         time.sleep(0.5)
 
-    raise RuntimeError(f"Mapping job {job_id} did not finish before the timeout.")
+    raise RuntimeError(
+        f"Mapping job {job_id} did not finish before the timeout. "
+        "The backend job may still be running; use Resume current mapping job to continue polling."
+    )
 
 
 def _workspace_codegen_action_label(mode: str) -> str:
@@ -79,7 +105,26 @@ def _workspace_refinement_source_response(
     return codegen_response
 
 
-def _workspace_codegen_block_reason(mapping_decisions: list[dict], mode: str = "pandas") -> str:
+def _workspace_codegen_block_reason(
+    mapping_decisions: list[dict],
+    mode: str = "pandas",
+    *,
+    allow_unaccepted: bool = False,
+) -> str:
+    if allow_unaccepted:
+        blocked_statuses = sorted(
+            {
+                (str(item.get("status") or "").strip().lower() or "needs_review")
+                for item in mapping_decisions
+                if (str(item.get("status") or "").strip().lower() or "needs_review") not in {"accepted", "needs_review"}
+            }
+        )
+        if not blocked_statuses:
+            return ""
+        return (
+            f"{_workspace_codegen_action_label(mode)} is blocked by unsupported review statuses. "
+            f"Review statuses: {', '.join(blocked_statuses)}."
+        )
     return mapping_output_block_reason(
         mapping_decisions,
         action_label=_workspace_codegen_action_label(mode),
@@ -107,7 +152,7 @@ def should_show_table_selector(available_tables: list[str], upload_mode: str, *,
     return bool(available_tables) and (is_sql or upload_mode == "Row data")
 
 
-def companion_enrichment_message(result: dict | None) -> str:
+def companion_enrichment_message(result: dict | None, dataset_label: str = "Source") -> str:
     if not result:
         return ""
 
@@ -115,10 +160,30 @@ def companion_enrichment_message(result: dict | None) -> str:
     unmatched_columns = [str(item) for item in (result.get("unmatched_columns") or []) if str(item).strip()]
     if unmatched_columns:
         return (
-            f"Source companion metadata enriched {matched_columns} columns; "
+            f"{dataset_label} companion metadata enriched {matched_columns} columns; "
             f"unmatched spec fields: {', '.join(unmatched_columns)}."
         )
-    return f"Source companion metadata enriched {matched_columns} columns; all companion fields matched."
+    return f"{dataset_label} companion metadata enriched {matched_columns} columns; all companion fields matched."
+
+
+def _reset_workspace_mapping_state(session_state: dict) -> None:
+    session_state.pop("mapping_response", None)
+    session_state.pop("mapping_analysis_summary", None)
+    session_state.pop("mapping_analysis_error", None)
+    session_state.pop("mapping_analysis_spoken_script", None)
+    session_state.pop("mapping_analysis_audio_bytes", None)
+    session_state.pop("mapping_analysis_audio_mime_type", None)
+    session_state.pop("mapping_analysis_audio_error", None)
+    session_state.pop("review_plan_summary", None)
+    session_state.pop("review_plan_error", None)
+    session_state.pop("canonical_gap_candidates", None)
+    session_state.pop("canonical_gap_suggestions", None)
+    session_state.pop("canonical_gap_triage_summary", None)
+    session_state.pop("canonical_gap_triage_error", None)
+    session_state.pop("preview_response", None)
+    session_state.pop("codegen_response", None)
+    session_state.pop("codegen_refinement_response", None)
+    session_state.pop("mapping_editor_state", None)
 
 
 def default_llm_validation_enabled(session_state: dict | None = None) -> bool:
@@ -224,14 +289,15 @@ def render_workspace_tab(
                         "Source file looks like a field specification: "
                         f"name={source_spec_hint['name_col']}, "
                         f"description={source_spec_hint.get('description_col') or '-'}, "
-                        f"type={source_spec_hint.get('type_col') or '-'}"
+                        f"type={source_spec_hint.get('type_col') or '-'}, "
+                        f"sample={source_spec_hint.get('sample_values_col') or '-'}"
                     )
                 elif source_mode == "Schema spec":
                     st.caption(
                         "Auto-detection found no matching column headers. "
                         "Enter the column names from your spec file manually."
                     )
-                    _src_cols = st.columns(3)
+                    _src_cols = st.columns(4)
                     _src_cols[0].text_input(
                         "Name column",
                         key="source_spec_manual_name_col",
@@ -246,6 +312,11 @@ def render_workspace_tab(
                         "Type column",
                         key="source_spec_manual_type_col",
                         placeholder="e.g. Type",
+                    )
+                    _src_cols[3].text_input(
+                        "Sample values column",
+                        key="source_spec_manual_sample_col",
+                        placeholder="e.g. Sample Values",
                     )
 
         target_mode = "data"
@@ -265,14 +336,15 @@ def render_workspace_tab(
                         "Target file looks like a field specification: "
                         f"name={target_spec_hint['name_col']}, "
                         f"description={target_spec_hint.get('description_col') or '-'}, "
-                        f"type={target_spec_hint.get('type_col') or '-'}"
+                        f"type={target_spec_hint.get('type_col') or '-'}, "
+                        f"sample={target_spec_hint.get('sample_values_col') or '-'}"
                     )
                 elif target_mode == "Schema spec":
                     st.caption(
                         "Auto-detection found no matching column headers. "
                         "Enter the column names from your spec file manually."
                     )
-                    _tgt_cols = st.columns(3)
+                    _tgt_cols = st.columns(4)
                     _tgt_cols[0].text_input(
                         "Name column",
                         key="target_spec_manual_name_col",
@@ -287,6 +359,11 @@ def render_workspace_tab(
                         "Type column",
                         key="target_spec_manual_type_col",
                         placeholder="e.g. Type",
+                    )
+                    _tgt_cols[3].text_input(
+                        "Sample values column",
+                        key="target_spec_manual_sample_col",
+                        placeholder="e.g. Sample Values",
                     )
 
         st.subheader("3. Select Tables")
@@ -323,6 +400,7 @@ def render_workspace_tab(
                         name_col=source_spec_hint.get("name_col") if source_spec_hint else (st.session_state.get("source_spec_manual_name_col") or None),
                         description_col=source_spec_hint.get("description_col") if source_spec_hint else (st.session_state.get("source_spec_manual_desc_col") or None),
                         type_col=source_spec_hint.get("type_col") if source_spec_hint else (st.session_state.get("source_spec_manual_type_col") or None),
+                            sample_values_col=source_spec_hint.get("sample_values_col") if source_spec_hint else (st.session_state.get("source_spec_manual_sample_col") or None),
                     ),
                 }
                 if canonical_mode:
@@ -335,25 +413,12 @@ def render_workspace_tab(
                         name_col=target_spec_hint.get("name_col") if target_spec_hint else (st.session_state.get("target_spec_manual_name_col") or None),
                         description_col=target_spec_hint.get("description_col") if target_spec_hint else (st.session_state.get("target_spec_manual_desc_col") or None),
                         type_col=target_spec_hint.get("type_col") if target_spec_hint else (st.session_state.get("target_spec_manual_type_col") or None),
+                        sample_values_col=target_spec_hint.get("sample_values_col") if target_spec_hint else (st.session_state.get("target_spec_manual_sample_col") or None),
                     )
                 st.session_state["upload_response"] = payload
-                st.session_state.pop("mapping_response", None)
-                st.session_state.pop("mapping_analysis_summary", None)
-                st.session_state.pop("mapping_analysis_error", None)
-                st.session_state.pop("mapping_analysis_spoken_script", None)
-                st.session_state.pop("mapping_analysis_audio_bytes", None)
-                st.session_state.pop("mapping_analysis_audio_mime_type", None)
-                st.session_state.pop("mapping_analysis_audio_error", None)
-                st.session_state.pop("review_plan_summary", None)
-                st.session_state.pop("review_plan_error", None)
-                st.session_state.pop("canonical_gap_candidates", None)
-                st.session_state.pop("canonical_gap_suggestions", None)
-                st.session_state.pop("canonical_gap_triage_summary", None)
-                st.session_state.pop("canonical_gap_triage_error", None)
-                st.session_state.pop("preview_response", None)
-                st.session_state.pop("codegen_response", None)
-                st.session_state.pop("codegen_refinement_response", None)
-                st.session_state.pop("mapping_editor_state", None)
+                st.session_state.pop("source_companion_metadata_result", None)
+                st.session_state.pop("target_companion_metadata_result", None)
+                _reset_workspace_mapping_state(st.session_state)
                 st.session_state["last_action"] = {
                     "level": "success",
                     "message": (
@@ -383,9 +448,13 @@ def render_workspace_tab(
             st.caption(
                 "Optionally attach a source-side schema/spec file to enrich the uploaded source dataset with descriptions and declared types by column name."
             )
+            st.caption(
+                "Expected mainly when the source was uploaded as row data and you have a separate schema/spec, "
+                "or when the source was uploaded from SQL DDL and you want descriptions or sample values that are not present in the DDL."
+            )
             companion_result = st.session_state.get("source_companion_metadata_result")
             if companion_result:
-                st.info(companion_enrichment_message(companion_result))
+                st.info(companion_enrichment_message(companion_result, "Source"))
 
             source_companion_file = st.file_uploader(
                 "Source companion schema/spec",
@@ -399,14 +468,15 @@ def render_workspace_tab(
                     "Companion file looks like a field specification: "
                     f"name={source_companion_hint['name_col']}, "
                     f"description={source_companion_hint.get('description_col') or '-'}, "
-                    f"type={source_companion_hint.get('type_col') or '-'}"
+                    f"type={source_companion_hint.get('type_col') or '-'}, "
+                    f"sample={source_companion_hint.get('sample_values_col') or '-'}"
                 )
             elif source_companion_file is not None:
                 st.caption(
                     "Auto-detection found no matching column headers in the companion file. "
                     "Enter the spec header names manually."
                 )
-                _cmp_cols = st.columns(3)
+                _cmp_cols = st.columns(4)
                 _cmp_cols[0].text_input(
                     "Companion name column",
                     key="source_companion_manual_name_col",
@@ -421,6 +491,11 @@ def render_workspace_tab(
                     "Companion type column",
                     key="source_companion_manual_type_col",
                     placeholder="e.g. Type",
+                )
+                _cmp_cols[3].text_input(
+                    "Companion sample values column",
+                    key="source_companion_manual_sample_col",
+                    placeholder="e.g. Sample Values",
                 )
 
             if st.button("Apply source companion metadata", key="apply_source_companion_metadata"):
@@ -443,32 +518,21 @@ def render_workspace_tab(
                             if source_companion_hint
                             else (st.session_state.get("source_companion_manual_type_col") or None)
                         ),
+                        sample_values_col=(
+                            source_companion_hint.get("sample_values_col")
+                            if source_companion_hint
+                            else (st.session_state.get("source_companion_manual_sample_col") or None)
+                        ),
                     )
                     st.session_state["upload_response"]["source"] = enrichment_result["dataset"]
                     st.session_state["source_companion_metadata_result"] = {
                         "matched_columns": enrichment_result.get("matched_columns", 0),
                         "unmatched_columns": enrichment_result.get("unmatched_columns", []),
                     }
-                    st.session_state.pop("mapping_response", None)
-                    st.session_state.pop("mapping_analysis_summary", None)
-                    st.session_state.pop("mapping_analysis_error", None)
-                    st.session_state.pop("mapping_analysis_spoken_script", None)
-                    st.session_state.pop("mapping_analysis_audio_bytes", None)
-                    st.session_state.pop("mapping_analysis_audio_mime_type", None)
-                    st.session_state.pop("mapping_analysis_audio_error", None)
-                    st.session_state.pop("review_plan_summary", None)
-                    st.session_state.pop("review_plan_error", None)
-                    st.session_state.pop("canonical_gap_candidates", None)
-                    st.session_state.pop("canonical_gap_suggestions", None)
-                    st.session_state.pop("canonical_gap_triage_summary", None)
-                    st.session_state.pop("canonical_gap_triage_error", None)
-                    st.session_state.pop("preview_response", None)
-                    st.session_state.pop("codegen_response", None)
-                    st.session_state.pop("codegen_refinement_response", None)
-                    st.session_state.pop("mapping_editor_state", None)
+                    _reset_workspace_mapping_state(st.session_state)
                     st.session_state["last_action"] = {
                         "level": "success",
-                        "message": companion_enrichment_message(st.session_state["source_companion_metadata_result"])
+                        "message": companion_enrichment_message(st.session_state["source_companion_metadata_result"], "Source")
                         + " Re-run mapping to use the enriched source metadata.",
                     }
                     st.rerun()
@@ -478,6 +542,106 @@ def render_workspace_tab(
                         "message": f"Source companion metadata failed: {error}",
                     }
                     st.rerun()
+
+            if upload_mode != "canonical":
+                st.subheader("Target Companion Metadata")
+                st.caption(
+                    "Optionally attach a target-side schema/spec file to enrich the uploaded target dataset with descriptions and declared types by column name."
+                )
+                st.caption(
+                    "Use this when both source and target were uploaded as row data and the target meanings live in a separate schema/spec, "
+                    "or when the target came from SQL DDL and you want richer business descriptions than the DDL contains."
+                )
+                target_companion_result = st.session_state.get("target_companion_metadata_result")
+                if target_companion_result:
+                    st.info(companion_enrichment_message(target_companion_result, "Target"))
+
+                target_companion_file = st.file_uploader(
+                    "Target companion schema/spec",
+                    type=all_upload_types,
+                    key="target_companion_file",
+                    help="Use a field-per-row schema/spec file whose column names match the uploaded target dataset.",
+                )
+                target_companion_hint = detect_spec_hint_for_upload(target_companion_file, "target_companion")
+                if target_companion_file is not None and target_companion_hint:
+                    st.caption(
+                        "Companion file looks like a field specification: "
+                        f"name={target_companion_hint['name_col']}, "
+                        f"description={target_companion_hint.get('description_col') or '-'}, "
+                        f"type={target_companion_hint.get('type_col') or '-'}, "
+                        f"sample={target_companion_hint.get('sample_values_col') or '-'}"
+                    )
+                elif target_companion_file is not None:
+                    st.caption(
+                        "Auto-detection found no matching column headers in the companion file. "
+                        "Enter the spec header names manually."
+                    )
+                    _target_cmp_cols = st.columns(4)
+                    _target_cmp_cols[0].text_input(
+                        "Target companion name column",
+                        key="target_companion_manual_name_col",
+                        placeholder="e.g. Column",
+                    )
+                    _target_cmp_cols[1].text_input(
+                        "Target companion description column",
+                        key="target_companion_manual_desc_col",
+                        placeholder="e.g. Description",
+                    )
+                    _target_cmp_cols[2].text_input(
+                        "Target companion type column",
+                        key="target_companion_manual_type_col",
+                        placeholder="e.g. Type",
+                    )
+                    _target_cmp_cols[3].text_input(
+                        "Target companion sample values column",
+                        key="target_companion_manual_sample_col",
+                        placeholder="e.g. Sample Values",
+                    )
+
+                if st.button("Apply target companion metadata", key="apply_target_companion_metadata"):
+                    try:
+                        enrichment_result = enrich_dataset_metadata(
+                            upload_response["target"]["dataset_id"],
+                            target_companion_file,
+                            name_col=(
+                                target_companion_hint.get("name_col")
+                                if target_companion_hint
+                                else (st.session_state.get("target_companion_manual_name_col") or None)
+                            ),
+                            description_col=(
+                                target_companion_hint.get("description_col")
+                                if target_companion_hint
+                                else (st.session_state.get("target_companion_manual_desc_col") or None)
+                            ),
+                            type_col=(
+                                target_companion_hint.get("type_col")
+                                if target_companion_hint
+                                else (st.session_state.get("target_companion_manual_type_col") or None)
+                            ),
+                            sample_values_col=(
+                                target_companion_hint.get("sample_values_col")
+                                if target_companion_hint
+                                else (st.session_state.get("target_companion_manual_sample_col") or None)
+                            ),
+                        )
+                        st.session_state["upload_response"]["target"] = enrichment_result["dataset"]
+                        st.session_state["target_companion_metadata_result"] = {
+                            "matched_columns": enrichment_result.get("matched_columns", 0),
+                            "unmatched_columns": enrichment_result.get("unmatched_columns", []),
+                        }
+                        _reset_workspace_mapping_state(st.session_state)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": companion_enrichment_message(st.session_state["target_companion_metadata_result"], "Target")
+                            + " Re-run mapping to use the enriched target metadata.",
+                        }
+                        st.rerun()
+                    except (ValueError, httpx.HTTPError) as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Target companion metadata failed: {error}",
+                        }
+                        st.rerun()
 
             st.subheader("3. Review Mapping")
             use_llm = st.checkbox(
@@ -489,6 +653,31 @@ def render_workspace_tab(
                     "Disable this if no LLM is running locally to avoid timeouts."
                 ),
             )
+            description_priority = st.checkbox(
+                "Prioritize source descriptions",
+                value=bool(st.session_state.get("use_description_priority", False)),
+                key="use_description_priority",
+                help=(
+                    "When enabled, Semantra gives extra weight to source description/type metadata during heuristic "
+                    "matching. Useful for unfamiliar systems with technical field names."
+                ),
+            )
+            canonical_candidate_pool_size = None
+            if upload_mode == "canonical":
+                canonical_candidate_pool_size = int(
+                    st.number_input(
+                        "Canonical candidate pool size",
+                        min_value=1,
+                        max_value=25,
+                        value=int(st.session_state.get("canonical_candidate_pool_size", 10)),
+                        step=1,
+                        key="canonical_candidate_pool_size",
+                        help=(
+                            "Shortlists the most likely canonical concepts per source field before full scoring. "
+                            "Lower values run faster but can miss edge-case matches."
+                        ),
+                    )
+                )
             button_label = "Generate canonical mapping" if upload_mode == "canonical" else "Generate mapping"
             button_key = "generate_canonical_mapping" if upload_mode == "canonical" else "generate_mapping"
             activity_label = (
@@ -497,6 +686,59 @@ def render_workspace_tab(
                 else "Mapping activity"
             )
             activity_placeholder = st.empty()
+
+            def _apply_mapping_response(mapping_response_payload: dict) -> None:
+                st.session_state["mapping_response"] = mapping_response_payload
+                st.session_state.pop("mapping_analysis_summary", None)
+                st.session_state.pop("mapping_analysis_error", None)
+                st.session_state.pop("mapping_analysis_spoken_script", None)
+                st.session_state.pop("mapping_analysis_audio_bytes", None)
+                st.session_state.pop("mapping_analysis_audio_mime_type", None)
+                st.session_state.pop("mapping_analysis_audio_error", None)
+                st.session_state.pop("review_plan_summary", None)
+                st.session_state.pop("review_plan_error", None)
+                st.session_state.pop("canonical_gap_candidates", None)
+                st.session_state.pop("canonical_gap_suggestions", None)
+                st.session_state.pop("canonical_gap_triage_summary", None)
+                st.session_state.pop("canonical_gap_triage_error", None)
+                initialize_mapping_editor_state(mapping_response_payload)
+                st.session_state.pop("preview_response", None)
+                st.session_state.pop("codegen_response", None)
+                st.session_state.pop("codegen_refinement_response", None)
+                _clear_active_mapping_job()
+
+            active_mapping_job = st.session_state.get("active_mapping_job") or {}
+            active_job_id = str(active_mapping_job.get("job_id") or "").strip()
+            if active_job_id:
+                st.caption(f"Tracked background mapping job: {active_job_id}")
+                if st.button("Resume current mapping job", key="resume_mapping_job", width="stretch"):
+                    try:
+                        with activity_placeholder.container():
+                            with st.status(activity_label, expanded=True) as status:
+                                status.write("Re-attaching to existing mapping job.")
+                                mapping_response = poll_mapping_job(
+                                    api_request=api_request,
+                                    start_path=str(active_mapping_job.get("start_path") or ""),
+                                    payload=active_mapping_job.get("payload") or {},
+                                    status=status,
+                                    existing_job_id=active_job_id,
+                                )
+                                status.write("Initializing review state.")
+                                _apply_mapping_response(mapping_response)
+                                st.session_state["last_action"] = {
+                                    "level": "success",
+                                    "message": "Recovered mapping results from the active background job.",
+                                }
+                                status.write("Mapping results are ready for review.")
+                                status.update(label=f"{activity_label} complete", state="complete", expanded=True)
+                    except (httpx.HTTPError, RuntimeError) as error:
+                        with activity_placeholder.container():
+                            with st.status(activity_label, expanded=True) as status:
+                                status.write("Re-attaching to existing mapping job.")
+                                status.write(f"Request failed: {error}")
+                                status.update(label=f"{activity_label} failed", state="error", expanded=True)
+                        st.session_state["last_action"] = {"level": "error", "message": f"Mapping failed: {error}"}
+
             if st.button(button_label, type="primary", key=button_key):
                 try:
                     with activity_placeholder.container():
@@ -511,6 +753,9 @@ def render_workspace_tab(
                                         "source_dataset_id": upload_response["source"]["dataset_id"],
                                         "target_system": upload_response.get("target_system", "canonical"),
                                         "use_llm": use_llm,
+                                        "description_priority": description_priority,
+                                        "candidate_pool_size": canonical_candidate_pool_size,
+                                        **current_workspace_scope(),
                                     },
                                     status=status,
                                 )
@@ -523,27 +768,13 @@ def render_workspace_tab(
                                         "source_dataset_id": upload_response["source"]["dataset_id"],
                                         "target_dataset_id": upload_response["target"]["dataset_id"],
                                         "use_llm": use_llm,
+                                        "description_priority": description_priority,
+                                        **current_workspace_scope(),
                                     },
                                     status=status,
                                 )
                             status.write("Initializing review state.")
-                            st.session_state["mapping_response"] = mapping_response
-                            st.session_state.pop("mapping_analysis_summary", None)
-                            st.session_state.pop("mapping_analysis_error", None)
-                            st.session_state.pop("mapping_analysis_spoken_script", None)
-                            st.session_state.pop("mapping_analysis_audio_bytes", None)
-                            st.session_state.pop("mapping_analysis_audio_mime_type", None)
-                            st.session_state.pop("mapping_analysis_audio_error", None)
-                            st.session_state.pop("review_plan_summary", None)
-                            st.session_state.pop("review_plan_error", None)
-                            st.session_state.pop("canonical_gap_candidates", None)
-                            st.session_state.pop("canonical_gap_suggestions", None)
-                            st.session_state.pop("canonical_gap_triage_summary", None)
-                            st.session_state.pop("canonical_gap_triage_error", None)
-                            initialize_mapping_editor_state(mapping_response)
-                            st.session_state.pop("preview_response", None)
-                            st.session_state.pop("codegen_response", None)
-                            st.session_state.pop("codegen_refinement_response", None)
+                            _apply_mapping_response(mapping_response)
                             st.session_state["last_action"] = {
                                 "level": "success",
                                 "message": (
@@ -592,40 +823,47 @@ def render_workspace_tab(
     with decisions_tab:
         if mapping_response:
             render_mapping_decision_summary()
-            if (upload_response or {}).get("mapping_mode") != "canonical":
-                render_manual_mapping_panel(mapping_response)
-            else:
-                st.info(
-                    "Canonical-only mode currently keeps manual target additions and correction workflows disabled until a real target dataset exists."
-                )
+            render_manual_mapping_panel(mapping_response)
             render_mapping_io_panel()
             render_mapping_set_versions_panel()
             if (upload_response or {}).get("mapping_mode") != "canonical":
                 render_correction_panel()
+            else:
+                st.info(
+                    "Canonical-only mode still keeps correction workflows disabled until a real target dataset exists, "
+                    "but manual source-to-canonical overrides are available here."
+                )
         else:
             st.info("Generate mapping in Setup before managing manual overrides, imports, mapping sets, or corrections.")
 
     with output_tab:
         if mapping_response:
-            if (upload_response or {}).get("mapping_mode") == "canonical":
-                st.info(
-                    "Canonical-only mode stops at review and decision export for now. Preview rows and Pandas/PySpark code generation become available after you switch back to Standard mode with a real target dataset."
+            canonical_output_mode = (upload_response or {}).get("mapping_mode") == "canonical"
+            mapping_decisions = build_mapping_decisions()
+            if canonical_output_mode:
+                st.caption(
+                    "Canonical mode supports code generation against canonical concept IDs, but preview stays unavailable because there is no concrete target dataset to materialize against."
                 )
-            else:
-                mapping_decisions = build_mapping_decisions()
-                st.subheader("Artifact Generation")
-                codegen_mode = st.radio(
-                    "Artifact format",
-                    options=["pandas", "pyspark"],
-                    index=0 if st.session_state.get("output_codegen_mode", "pandas") == "pandas" else 1,
-                    key="output_codegen_mode",
-                    horizontal=True,
-                    format_func=lambda value: "Pandas starter" if value == "pandas" else "PySpark starter",
-                )
-                codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions, codegen_mode)
-                preview_advisory_message = _workspace_preview_advisory_message(mapping_decisions)
-                actions_left, actions_right = st.columns(2)
-                with actions_left:
+            st.subheader("Artifact Generation")
+            codegen_mode = st.radio(
+                "Artifact format",
+                options=["pandas", "pyspark"],
+                index=0 if st.session_state.get("output_codegen_mode", "pandas") == "pandas" else 1,
+                key="output_codegen_mode",
+                horizontal=True,
+                format_func=lambda value: "Pandas starter" if value == "pandas" else "PySpark starter",
+            )
+            codegen_block_reason = _workspace_codegen_block_reason(
+                mapping_decisions,
+                codegen_mode,
+                allow_unaccepted=canonical_output_mode,
+            )
+            preview_advisory_message = _workspace_preview_advisory_message(mapping_decisions)
+            actions_left, actions_right = st.columns(2)
+            with actions_left:
+                if canonical_output_mode:
+                    st.info("Preview is unavailable in canonical mode. Use code generation to produce Pandas or PySpark scaffolding against canonical targets.")
+                else:
                     if st.button("Generate preview"):
                         if not mapping_decisions:
                             st.session_state["last_action"] = {
@@ -655,34 +893,38 @@ def render_workspace_tab(
                             st.rerun()
                     if preview_advisory_message:
                         st.caption(preview_advisory_message)
-                with actions_right:
-                    if st.button(_workspace_codegen_button_label(codegen_mode), disabled=bool(codegen_block_reason)):
-                        if not mapping_decisions:
-                            st.session_state["last_action"] = {
-                                "level": "warning",
-                                "message": "Add at least one active mapping before generating code.",
-                            }
-                            st.rerun()
-                        try:
-                            st.session_state["codegen_response"] = api_request(
-                                "POST",
-                                "/mapping/codegen",
-                                json={"mapping_decisions": mapping_decisions, "mode": codegen_mode},
-                            )
-                            st.session_state.pop("codegen_refinement_response", None)
-                            st.session_state["last_action"] = {
-                                "level": "success",
-                                "message": f"Generated {_workspace_codegen_action_label(codegen_mode).lower()} from the active mapping decisions.",
-                            }
-                            st.rerun()
-                        except httpx.HTTPError as error:
-                            st.session_state["last_action"] = {
-                                "level": "error",
-                                "message": api_error_message(error, default_prefix="Code generation failed"),
-                            }
-                            st.rerun()
-                    if codegen_block_reason:
-                        st.caption(codegen_block_reason)
+            with actions_right:
+                if st.button(_workspace_codegen_button_label(codegen_mode), disabled=bool(codegen_block_reason)):
+                    if not mapping_decisions:
+                        st.session_state["last_action"] = {
+                            "level": "warning",
+                            "message": "Add at least one active mapping before generating code.",
+                        }
+                        st.rerun()
+                    try:
+                        st.session_state["codegen_response"] = api_request(
+                            "POST",
+                            "/mapping/codegen",
+                            json={
+                                "mapping_decisions": mapping_decisions,
+                                "mode": codegen_mode,
+                                "allow_unaccepted": canonical_output_mode,
+                            },
+                        )
+                        st.session_state.pop("codegen_refinement_response", None)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Generated {_workspace_codegen_action_label(codegen_mode).lower()} from the active mapping decisions.",
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": api_error_message(error, default_prefix="Code generation failed"),
+                        }
+                        st.rerun()
+                if codegen_block_reason:
+                    st.caption(codegen_block_reason)
         else:
             st.info("Generate mapping in Setup before preview or code generation.")
 
@@ -842,6 +1084,7 @@ def render_workspace_tab(
                             json={
                                 "mapping_decisions": build_mapping_decisions(),
                                 "mode": "pyspark" if refinement_source.get("language") == "python-pyspark" else "pandas",
+                                "allow_unaccepted": canonical_output_mode,
                                 "current_code": refinement_source["code"],
                                 "instruction": refinement_instruction.strip(),
                                 "edge_cases": refinement_edge_cases.strip(),

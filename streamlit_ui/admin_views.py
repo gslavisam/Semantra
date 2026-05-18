@@ -2562,6 +2562,7 @@ def render_admin_debug_tab(
     api_request: Callable[..., Any],
     api_request_content: Callable[..., bytes],
     upload_file_to_request_files: Callable[[Any], dict | None],
+    current_mapping_rows: Callable[[dict], list[dict]],
     knowledge_debug_rows: Callable[[dict], list[dict]],
 ) -> None:
     st.header("Admin / Debug")
@@ -2687,30 +2688,82 @@ def render_admin_debug_tab(
                 width="stretch",
                 hide_index=True,
             )
+        mapping_spec_rows = current_mapping_rows(mapping_response)
         knowledge_rows = knowledge_debug_rows(mapping_response)
-        if knowledge_rows:
+        if mapping_spec_rows:
             st.subheader("Knowledge and Canonical Match Insights")
-            st.dataframe(
-                [
-                    {
-                        "source": row["source"],
-                        "target": row["target"],
-                        "knowledge_signal": row["knowledge_signal"],
-                        "canonical_signal": row["canonical_signal"],
-                        "confidence": row["confidence"],
-                        "validator": row["validator"],
-                    }
-                    for row in knowledge_rows
-                ],
-                width="stretch",
-                hide_index=True,
-            )
-            for row in knowledge_rows:
+            st.caption("Uses the same mapping-spec row shape as the Review tab/export so admin inspection stays column-compatible.")
+            st.dataframe(mapping_spec_rows, width="stretch", hide_index=True)
+        if mapping_spec_rows:
+            mapping_spec_by_key = {
+                (str(item.get("source") or ""), str(item.get("target") or "")): item
+                for item in mapping_spec_rows
+            }
+            knowledge_row_by_key = {
+                (str(item.get("source") or ""), str(item.get("target") or "")): item
+                for item in knowledge_rows
+            }
+            for mapping_spec_row in mapping_spec_rows:
+                row_key = (
+                    str(mapping_spec_row.get("source") or ""),
+                    str(mapping_spec_row.get("target") or ""),
+                )
+                row = knowledge_row_by_key.get(row_key) or {
+                    "source": row_key[0],
+                    "target": row_key[1],
+                    "knowledge_explanations": [],
+                    "canonical_explanations": [],
+                }
                 with st.expander(f"Knowledge details: {row['source']} -> {row['target']}"):
+                    mapping_spec_row = mapping_spec_by_key.get(
+                        (str(row.get("source") or ""), str(row.get("target") or ""))
+                    )
+                    if mapping_spec_row:
+                        st.caption("Mapping specification")
+                        detail_fields = [
+                            "source",
+                            "target",
+                            "confidence",
+                            "confidence_label",
+                            "status",
+                            "validator",
+                            "canonical_status_label",
+                            "shared_concepts",
+                            "source_concepts",
+                            "target_concepts",
+                            "canonical_path",
+                            "llm_consulted",
+                        ]
+                        for field_name in detail_fields:
+                            st.write(f"**{field_name}:** {mapping_spec_row.get(field_name, '')}")
+                        if mapping_spec_row.get("llm_recommendation"):
+                            llm_recommendation = mapping_spec_row.get("llm_recommendation") or {}
+                            st.caption("LLM recommendation")
+                            st.write(
+                                f"**selected_target:** {llm_recommendation.get('selected_target') or 'unmapped'}"
+                            )
+                            st.write(
+                                f"**confidence:** {llm_recommendation.get('confidence') if llm_recommendation.get('confidence') is not None else ''}"
+                            )
+                            reasoning = llm_recommendation.get("reasoning") or []
+                            if reasoning:
+                                st.write("**reasoning:**")
+                                for line in reasoning:
+                                    st.write(f"- {line}")
+                            raw_response = str(llm_recommendation.get("raw_response") or "").strip()
+                            if raw_response:
+                                with st.expander("Raw LLM response", expanded=False):
+                                    st.code(raw_response)
+                    if row["knowledge_explanations"]:
+                        st.caption("Knowledge explanations")
                     for line in row["knowledge_explanations"]:
                         st.caption(line)
+                    if row["canonical_explanations"]:
+                        st.caption("Canonical explanations")
                     for line in row["canonical_explanations"]:
                         st.caption(line)
+                    if not row["knowledge_explanations"] and not row["canonical_explanations"]:
+                        st.caption("No extracted knowledge/canonical explanation is available for this mapping row.")
 
     decision_logs = st.session_state.get("debug_decision_logs")
     if decision_logs:

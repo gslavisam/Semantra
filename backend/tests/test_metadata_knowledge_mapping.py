@@ -4,6 +4,7 @@ from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
 from app.services.metadata_knowledge_service import MetadataKnowledgeService, metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.services.source_field_hint_service import apply_source_field_hints
 
 
 def make_column(name: str, patterns: list[str], sample_values: list[str], unique_ratio: float = 1.0) -> ColumnProfile:
@@ -24,7 +25,37 @@ def make_column(name: str, patterns: list[str], sample_values: list[str], unique
 
 def setup_function() -> None:
     persistence_service.clear_knowledge_overlays()
+    persistence_service.clear_source_field_hints()
     metadata_knowledge_service.refresh()
+
+
+def test_apply_source_field_hints_enriches_matching_column_from_sqlite_store() -> None:
+    persistence_service.save_source_field_hint(
+        {
+            "source_system": "Senior HR",
+            "business_domain": "HR",
+            "source_field": "tipOpe",
+            "meaning_hint": "Operation type / transaction type",
+            "negative_hint": "Not contact name",
+            "sample_values": ["SALE", "RETURN", "STORNO"],
+        }
+    )
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=2,
+        columns=[make_column("tipOpe", ["categorical"], ["SALE", "RETURN"])],
+    )
+
+    enriched_schema, applied_hints = apply_source_field_hints(
+        source_schema,
+        source_system="Senior HR",
+        business_domain="HR",
+    )
+
+    assert len(applied_hints) == 1
+    assert "Persistent field hint: Operation type / transaction type" in enriched_schema.columns[0].description
+    assert "STORNO" in enriched_schema.columns[0].sample_values
 
 
 def test_metadata_dictionary_is_loaded() -> None:

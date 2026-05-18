@@ -254,6 +254,24 @@ Ishod:
 
 - korisnik sada jasnije vidi gde se nalaze nove bounded guidance površine i kako se razlikuju od postojećih review/explanation tokova
 
+## 2026-05-18
+
+### Workspace review, canonical parity, and setup enrichment wave
+
+Isporučeno:
+
+- per-row `LLM refine` tok u `Workspace > Review` sa transient meaning/negative/sample/refinement instruction kontekstom
+- batch low-confidence LLM refine i accept/revert ponašanje za refined row predloge
+- ručno mapiranje i u canonical modu kroz virtual canonical target opcije u `Decisions`
+- canonical Output sada zadržava code generation i artifact refinement, ali bez preview-a nad nepostojećim target redovima
+- standard `Setup` sada eksplicitno podržava i `Source Companion Metadata` i `Target Companion Metadata`
+- `Canonical candidate pool size` surfaced u Setup-u, sa podignutim podrazumevanim default-om na `10`
+- auto-accept prag vraćen na `>= 0.75`, odvojen od confidence-label bucket-a
+
+Ishod:
+
+- Workspace canonical tok više nije second-class u odnosu na standard Decisions/Output površine, dok Setup i Review jasnije pokrivaju metadata enrichment i row-level LLM refinement rad
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

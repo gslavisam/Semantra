@@ -14,6 +14,8 @@ from app.models.knowledge import (
     KnowledgeStewardshipItemCreateRequest,
     KnowledgeStewardshipItemDetail,
     KnowledgeStewardshipItemRecord,
+    SourceFieldHintRecord,
+    SourceFieldHintUpsertRequest,
 )
 from app.models.mapping import (
     BenchmarkDatasetRecord,
@@ -245,6 +247,22 @@ class SQLitePersistenceService:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS source_field_hints (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_system_key TEXT NOT NULL,
+                    business_domain_key TEXT NOT NULL DEFAULT '',
+                    integration_name_key TEXT NOT NULL DEFAULT '',
+                    source_field_key TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    UNIQUE(source_system_key, business_domain_key, integration_name_key, source_field_key)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_source_field_hints_scope ON source_field_hints (source_system_key, business_domain_key, integration_name_key)"
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS knowledge_concepts (
                     concept_id   TEXT PRIMARY KEY,
                     domain       TEXT NOT NULL DEFAULT '',
@@ -370,6 +388,7 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM knowledge_overlay_versions")
             connection.execute("DELETE FROM knowledge_audit_logs")
             connection.execute("DELETE FROM knowledge_stewardship_items")
+            connection.execute("DELETE FROM source_field_hints")
 
     def clear_decision_logs(self) -> None:
         with self.connection() as connection:
@@ -378,6 +397,152 @@ class SQLitePersistenceService:
     def clear_user_corrections(self) -> None:
         with self.connection() as connection:
             connection.execute("DELETE FROM user_corrections")
+
+    def save_source_field_hint(
+        self,
+        request: SourceFieldHintUpsertRequest | dict,
+    ) -> SourceFieldHintRecord:
+        payload = request if isinstance(request, SourceFieldHintUpsertRequest) else SourceFieldHintUpsertRequest.model_validate(request)
+        normalized_source_system = self._normalize_key(payload.source_system)
+        normalized_business_domain = self._normalize_key(payload.business_domain)
+        normalized_integration_name = self._normalize_key(payload.integration_name)
+        normalized_source_field = self._normalize_key(payload.source_field)
+        if not normalized_source_system:
+            raise ValueError("Source field hints require a source system.")
+        if not normalized_source_field:
+            raise ValueError("Source field hints require a source field name.")
+
+        meaning_hint = str(payload.meaning_hint or "").strip()
+        negative_hint = str(payload.negative_hint or "").strip()
+        sample_values = self._normalize_text_list(payload.sample_values)
+        if not meaning_hint and not negative_hint and not sample_values:
+            raise ValueError("Provide meaning, negative guidance, or sample values before saving a source field hint.")
+
+        now = datetime.now(UTC).isoformat()
+        with self.connection() as connection:
+            existing = connection.execute(
+                (
+                    "SELECT id, payload FROM source_field_hints "
+                    "WHERE source_system_key = ? AND business_domain_key = ? AND integration_name_key = ? AND source_field_key = ?"
+                ),
+                (
+                    normalized_source_system,
+                    normalized_business_domain,
+                    normalized_integration_name,
+                    normalized_source_field,
+                ),
+            ).fetchone()
+
+            if existing:
+                existing_record = SourceFieldHintRecord.model_validate(
+                    {
+                        **json.loads(existing[1]),
+                        "hint_id": int(existing[0]),
+                    }
+                )
+                updated_record = SourceFieldHintRecord(
+                    hint_id=int(existing[0]),
+                    source_system=str(payload.source_system).strip(),
+                    business_domain=self._clean_optional_text(payload.business_domain),
+                    integration_name=self._clean_optional_text(payload.integration_name),
+                    source_field=str(payload.source_field).strip(),
+                    meaning_hint=meaning_hint,
+                    negative_hint=negative_hint,
+                    sample_values=sample_values,
+                    active=bool(payload.active),
+                    created_by=existing_record.created_by or payload.created_by,
+                    changed_by=payload.changed_by or payload.created_by,
+                    created_at=existing_record.created_at or now,
+                    updated_at=now,
+                )
+                connection.execute(
+                    (
+                        "UPDATE source_field_hints SET payload = ? "
+                        "WHERE source_system_key = ? AND business_domain_key = ? AND integration_name_key = ? AND source_field_key = ?"
+                    ),
+                    (
+                        updated_record.model_dump_json(),
+                        normalized_source_system,
+                        normalized_business_domain,
+                        normalized_integration_name,
+                        normalized_source_field,
+                    ),
+                )
+                return updated_record
+
+            saved_record = SourceFieldHintRecord(
+                source_system=str(payload.source_system).strip(),
+                business_domain=self._clean_optional_text(payload.business_domain),
+                integration_name=self._clean_optional_text(payload.integration_name),
+                source_field=str(payload.source_field).strip(),
+                meaning_hint=meaning_hint,
+                negative_hint=negative_hint,
+                sample_values=sample_values,
+                active=bool(payload.active),
+                created_by=payload.created_by,
+                changed_by=payload.changed_by or payload.created_by,
+                created_at=now,
+                updated_at=now,
+            )
+            cursor = connection.execute(
+                (
+                    "INSERT INTO source_field_hints (source_system_key, business_domain_key, integration_name_key, source_field_key, payload) "
+                    "VALUES (?, ?, ?, ?, ?)"
+                ),
+                (
+                    normalized_source_system,
+                    normalized_business_domain,
+                    normalized_integration_name,
+                    normalized_source_field,
+                    saved_record.model_dump_json(),
+                ),
+            )
+        return saved_record.model_copy(update={"hint_id": int(cursor.lastrowid)})
+
+    def list_source_field_hints(
+        self,
+        *,
+        source_system: str | None = None,
+        business_domain: str | None = None,
+        integration_name: str | None = None,
+        source_field: str | None = None,
+        active_only: bool = True,
+    ) -> list[SourceFieldHintRecord]:
+        query = "SELECT id, payload FROM source_field_hints WHERE 1 = 1"
+        params: list[str] = []
+        if source_system is not None:
+            query += " AND source_system_key = ?"
+            params.append(self._normalize_key(source_system))
+        if business_domain is not None:
+            query += " AND business_domain_key = ?"
+            params.append(self._normalize_key(business_domain))
+        if integration_name is not None:
+            query += " AND integration_name_key = ?"
+            params.append(self._normalize_key(integration_name))
+        if source_field is not None:
+            query += " AND source_field_key = ?"
+            params.append(self._normalize_key(source_field))
+        query += " ORDER BY id ASC"
+
+        with self.connection() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+
+        records = [
+            SourceFieldHintRecord.model_validate(
+                {
+                    **json.loads(row[1]),
+                    "hint_id": int(row[0]),
+                }
+            )
+            for row in rows
+        ]
+        if active_only:
+            return [record for record in records if record.active]
+        return records
+
+    def clear_source_field_hints(self) -> None:
+        with self.connection() as connection:
+            connection.execute("DELETE FROM source_field_hints")
 
     def save_mapping_set(
         self,
@@ -1215,6 +1380,13 @@ class SQLitePersistenceService:
             seen.add(text)
             normalized.append(text)
         return normalized
+
+    def _normalize_key(self, value: str | None) -> str:
+        return str(value or "").strip().lower()
+
+    def _clean_optional_text(self, value: object | None) -> str | None:
+        text = str(value or "").strip()
+        return text or None
 
     def _infer_artifact_type(
         self,

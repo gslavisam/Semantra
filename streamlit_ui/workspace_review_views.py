@@ -4,6 +4,396 @@ import httpx
 import streamlit as st
 
 
+def _normalized_text(value: str | None) -> str:
+    return str(value or "").strip().lower()
+
+
+def _parse_hint_sample_values(value: str) -> list[str]:
+    normalized = str(value or "").replace("\n", ",")
+    parsed: list[str] = []
+    for item in normalized.split(","):
+        text = item.strip()
+        if text and text not in parsed:
+            parsed.append(text)
+    return parsed
+
+
+def _current_hint_scope() -> tuple[str | None, str | None, str | None]:
+    return (
+        str(st.session_state.get("analysis_source_system") or "").strip() or None,
+        str(st.session_state.get("analysis_business_domain") or "").strip() or None,
+        str(st.session_state.get("analysis_integration_name") or "").strip() or None,
+    )
+
+
+def _load_source_field_hint_map(api_request) -> dict[str, dict]:
+    source_system, business_domain, integration_name = _current_hint_scope()
+    if not source_system:
+        st.session_state["source_field_hint_scope_signature"] = None
+        st.session_state["source_field_hint_records"] = {}
+        return {}
+
+    scope_signature = (source_system, business_domain, integration_name)
+    cached_signature = st.session_state.get("source_field_hint_scope_signature")
+    if cached_signature == scope_signature:
+        cached_records = st.session_state.get("source_field_hint_records") or {}
+        if isinstance(cached_records, dict):
+            return cached_records
+
+    hint_records = api_request(
+        "GET",
+        "/mapping/source-field-hints",
+        params={
+            "source_system": source_system,
+            "business_domain": business_domain,
+            "integration_name": integration_name,
+        },
+    )
+    hint_map = {
+        _normalized_text(record.get("source_field")): record
+        for record in hint_records or []
+        if _normalized_text(record.get("source_field"))
+    }
+    st.session_state["source_field_hint_scope_signature"] = scope_signature
+    st.session_state["source_field_hint_records"] = hint_map
+    return hint_map
+
+
+def _load_source_field_hint_records_for_system(api_request) -> list[dict]:
+    source_system, _business_domain, _integration_name = _current_hint_scope()
+    if not source_system:
+        st.session_state["source_field_hint_system_signature"] = None
+        st.session_state["source_field_hint_system_records"] = []
+        return []
+
+    cached_signature = st.session_state.get("source_field_hint_system_signature")
+    if cached_signature == source_system:
+        cached_records = st.session_state.get("source_field_hint_system_records") or []
+        if isinstance(cached_records, list):
+            return cached_records
+
+    records = api_request(
+        "GET",
+        "/mapping/source-field-hints",
+        params={"source_system": source_system, "active_only": False},
+    )
+    st.session_state["source_field_hint_system_signature"] = source_system
+    st.session_state["source_field_hint_system_records"] = list(records or [])
+    return list(records or [])
+
+
+def _applied_source_field_hint_map(mapping_response: dict) -> dict[str, dict]:
+    records = mapping_response.get("applied_source_field_hints") or []
+    return {
+        _normalized_text(record.get("source_field")): record
+        for record in records
+        if _normalized_text(record.get("source_field"))
+    }
+
+
+def _invalidate_source_field_hint_cache() -> None:
+    st.session_state.pop("source_field_hint_scope_signature", None)
+    st.session_state.pop("source_field_hint_records", None)
+    st.session_state.pop("source_field_hint_system_signature", None)
+    st.session_state.pop("source_field_hint_system_records", None)
+
+
+def _compose_llm_mapping_refinement_instruction(*parts: str) -> str:
+    return "\n\n".join(part.strip() for part in parts if str(part or "").strip())
+
+
+def _remember_llm_mapping_refinement(
+    entry: dict,
+    *,
+    refinement_response: dict,
+    current_target: str,
+    current_status: str,
+    instruction: str,
+) -> None:
+    entry["llm_mapping_refinement"] = refinement_response
+    entry["llm_mapping_refinement_previous_target"] = current_target
+    entry["llm_mapping_refinement_previous_status"] = current_status
+    entry["llm_mapping_instruction"] = instruction
+    entry["llm_mapping_refinement_instruction"] = instruction
+    entry["llm_mapping_refinement_applied"] = False
+
+
+def _apply_llm_mapping_refinement(entry: dict) -> str:
+    refinement_response = entry.get("llm_mapping_refinement") if isinstance(entry.get("llm_mapping_refinement"), dict) else {}
+    selected = refinement_response.get("selected") or {}
+    selected_target = str(selected.get("target") or "").strip()
+    if not selected_target:
+        return ""
+    entry["target"] = selected_target
+    entry["status"] = "needs_review"
+    entry["llm_mapping_refinement_applied"] = True
+    return selected_target
+
+
+def _clear_llm_mapping_refinement(entry: dict, *, restore_previous: bool) -> None:
+    if restore_previous:
+        entry["target"] = str(entry.get("llm_mapping_refinement_previous_target") or "")
+        entry["status"] = str(entry.get("llm_mapping_refinement_previous_status") or "needs_review")
+    entry.pop("llm_mapping_refinement", None)
+    entry.pop("llm_mapping_refinement_previous_target", None)
+    entry.pop("llm_mapping_refinement_previous_status", None)
+    entry.pop("llm_mapping_refinement_applied", None)
+
+
+def _render_llm_mapping_refine_panel(
+    *,
+    trust_rows: list[dict],
+    ranked_by_source: dict[str, dict],
+    editor_state: dict,
+    source_field_hint_map: dict[str, dict],
+    llm_runtime_enabled,
+    request_llm_mapping_refinement,
+) -> None:
+    low_confidence_rows = [
+        mapping for mapping in trust_rows if float(mapping.get("confidence", 0.0) or 0.0) < 0.7
+    ]
+    with st.expander(
+        _section_label("LLM Mapping Refine", f"{len(low_confidence_rows)} low-confidence" if low_confidence_rows else None),
+        expanded=bool(low_confidence_rows),
+    ):
+        st.caption(
+            "Enter shared guidance for the LLM here, then batch-refine low-confidence rows. "
+            "Per-row LLM refine instructions remain available inside each row's Details panel."
+        )
+        batch_instruction = st.text_area(
+            "Batch LLM refine instruction",
+            key="llm_mapping_batch_prompt",
+            placeholder="Example: Prefer business meaning over technical abbreviations and choose the target that best represents transaction or operation type.",
+        )
+        if st.button(
+            "Batch refine low-confidence rows",
+            key="batch_refine_low_confidence_rows",
+            width="stretch",
+            disabled=(not llm_runtime_enabled()) or (not low_confidence_rows),
+            help="Runs the closed-set LLM refine flow for every low-confidence row using the shared batch instruction plus any row-specific hints.",
+        ):
+            refined_count = 0
+            no_match_count = 0
+            skipped_count = 0
+            for mapping in low_confidence_rows:
+                source = str(mapping.get("source") or "").strip()
+                if not source:
+                    continue
+                ranked = ranked_by_source.get(source) or {}
+                candidate_targets = [
+                    str(candidate.get("target") or "").strip()
+                    for candidate in ranked.get("candidates", [])
+                    if str(candidate.get("target") or "").strip()
+                ]
+                if not candidate_targets:
+                    skipped_count += 1
+                    continue
+                entry = editor_state.setdefault(source, {})
+                saved_hint = source_field_hint_map.get(_normalized_text(source)) or {}
+                meaning_hint = str(
+                    st.session_state.get(
+                        f"field_hint_meaning_{source}",
+                        entry.get("field_hint_meaning") or saved_hint.get("meaning_hint") or "",
+                    )
+                )
+                negative_hint = str(
+                    st.session_state.get(
+                        f"field_hint_negative_{source}",
+                        entry.get("field_hint_negative") or saved_hint.get("negative_hint") or "",
+                    )
+                )
+                sample_values = _parse_hint_sample_values(
+                    str(
+                        st.session_state.get(
+                            f"field_hint_samples_{source}",
+                            ", ".join(saved_hint.get("sample_values") or []),
+                        )
+                    )
+                )
+                row_instruction = str(
+                    st.session_state.get(
+                        f"llm_mapping_prompt_{source}",
+                        entry.get("llm_mapping_instruction") or "",
+                    )
+                )
+                combined_instruction = _compose_llm_mapping_refinement_instruction(batch_instruction, row_instruction)
+                try:
+                    refinement_response = request_llm_mapping_refinement(
+                        source,
+                        candidate_targets=candidate_targets,
+                        meaning_hint=meaning_hint,
+                        negative_hint=negative_hint,
+                        sample_values=sample_values,
+                        refinement_instruction=combined_instruction,
+                    )
+                except (ValueError, httpx.HTTPError) as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Batch LLM mapping refine failed on {source}: {error}",
+                    }
+                    st.rerun()
+                    return
+
+                _remember_llm_mapping_refinement(
+                    entry,
+                    refinement_response=refinement_response,
+                    current_target=str(entry.get("target") or mapping.get("target") or ""),
+                    current_status=str(entry.get("status") or "needs_review"),
+                    instruction=combined_instruction,
+                )
+                selected_refinement = refinement_response.get("selected") or {}
+                if str(selected_refinement.get("target") or "").strip():
+                    refined_count += 1
+                else:
+                    no_match_count += 1
+            st.session_state["last_action"] = {
+                "level": "success",
+                "message": (
+                    f"Prepared LLM refine previews for {refined_count} row(s); "
+                    f"{no_match_count} returned no_match and {skipped_count} were skipped. "
+                    "Use Accept refined mapping inside each row to apply a suggestion."
+                ),
+            }
+            st.rerun()
+
+        if not llm_runtime_enabled():
+            st.caption("LLM mapping refine is disabled. Enable a runtime provider in backend config to use this panel.")
+
+
+def _render_saved_source_field_hints_panel(api_request) -> None:
+    source_system, _business_domain, _integration_name = _current_hint_scope()
+    label = "Saved Source Field Hints"
+    if not source_system:
+        with st.expander(label, expanded=False):
+            st.info("Set Source system in the workspace context to review and manage saved field hints.")
+        return
+
+    records = _load_source_field_hint_records_for_system(api_request)
+    detail = f"{len(records)} for {source_system}" if records else f"0 for {source_system}"
+    with st.expander(_section_label(label, detail), expanded=False):
+        st.caption("Review, edit, and deactivate persistent hints saved for the active source system.")
+        if not records:
+            st.info("No persistent field hints are saved for this source system yet.")
+            return
+
+        st.dataframe(
+            [
+                {
+                    "source_field": record.get("source_field"),
+                    "business_domain": record.get("business_domain") or "",
+                    "integration_name": record.get("integration_name") or "",
+                    "active": bool(record.get("active", False)),
+                    "meaning_hint": record.get("meaning_hint") or "",
+                    "sample_values": ", ".join(record.get("sample_values") or []),
+                }
+                for record in records
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        for record in records:
+            hint_id = int(record.get("hint_id") or 0)
+            source_field = str(record.get("source_field") or "").strip() or "unknown"
+            if f"saved_field_hint_meaning_{hint_id}" not in st.session_state:
+                st.session_state[f"saved_field_hint_meaning_{hint_id}"] = str(record.get("meaning_hint") or "")
+            if f"saved_field_hint_negative_{hint_id}" not in st.session_state:
+                st.session_state[f"saved_field_hint_negative_{hint_id}"] = str(record.get("negative_hint") or "")
+            if f"saved_field_hint_samples_{hint_id}" not in st.session_state:
+                st.session_state[f"saved_field_hint_samples_{hint_id}"] = ", ".join(record.get("sample_values") or [])
+
+            status_label = "active" if record.get("active") else "inactive"
+            with st.expander(f"Hint: {source_field} | {status_label}", expanded=False):
+                st.caption(
+                    " | ".join(
+                        part
+                        for part in (
+                            f"source_system={record.get('source_system') or source_system}",
+                            f"business_domain={record.get('business_domain')}" if record.get("business_domain") else "",
+                            f"integration_name={record.get('integration_name')}" if record.get("integration_name") else "",
+                        )
+                        if part
+                    )
+                )
+                st.text_area(
+                    f"Meaning for {source_field}",
+                    key=f"saved_field_hint_meaning_{hint_id}",
+                )
+                st.text_input(
+                    f"Negative guidance for {source_field}",
+                    key=f"saved_field_hint_negative_{hint_id}",
+                )
+                st.text_input(
+                    f"Sample values for {source_field}",
+                    key=f"saved_field_hint_samples_{hint_id}",
+                )
+                action_columns = st.columns(2)
+                if action_columns[0].button("Save changes", key=f"saved_field_hint_update_{hint_id}", width="stretch"):
+                    try:
+                        api_request(
+                            "POST",
+                            "/mapping/source-field-hints",
+                            json={
+                                "source_system": record.get("source_system") or source_system,
+                                "business_domain": record.get("business_domain"),
+                                "integration_name": record.get("integration_name"),
+                                "source_field": source_field,
+                                "meaning_hint": st.session_state.get(f"saved_field_hint_meaning_{hint_id}", ""),
+                                "negative_hint": st.session_state.get(f"saved_field_hint_negative_{hint_id}", ""),
+                                "sample_values": _parse_hint_sample_values(
+                                    st.session_state.get(f"saved_field_hint_samples_{hint_id}", "")
+                                ),
+                                "active": bool(record.get("active", True)),
+                            },
+                        )
+                        _invalidate_source_field_hint_cache()
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Updated persistent hint for {source_field}.",
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Updating source field hint failed: {error}",
+                        }
+                        st.rerun()
+
+                toggle_label = "Deactivate hint" if record.get("active") else "Activate hint"
+                if action_columns[1].button(toggle_label, key=f"saved_field_hint_toggle_{hint_id}", width="stretch"):
+                    try:
+                        api_request(
+                            "POST",
+                            "/mapping/source-field-hints",
+                            json={
+                                "source_system": record.get("source_system") or source_system,
+                                "business_domain": record.get("business_domain"),
+                                "integration_name": record.get("integration_name"),
+                                "source_field": source_field,
+                                "meaning_hint": st.session_state.get(f"saved_field_hint_meaning_{hint_id}", ""),
+                                "negative_hint": st.session_state.get(f"saved_field_hint_negative_{hint_id}", ""),
+                                "sample_values": _parse_hint_sample_values(
+                                    st.session_state.get(f"saved_field_hint_samples_{hint_id}", "")
+                                ),
+                                "active": not bool(record.get("active", True)),
+                            },
+                        )
+                        _invalidate_source_field_hint_cache()
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                f"{'Deactivated' if record.get('active') else 'Activated'} persistent hint for {source_field}."
+                            ),
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Changing source field hint status failed: {error}",
+                        }
+                        st.rerun()
+
+
 def _canonical_gap_candidate_key(candidate: dict) -> str:
     source = str(candidate.get("source") or "").strip() or "unknown"
     target = str(candidate.get("target") or "").strip() or "unknown"
@@ -379,12 +769,22 @@ def display_trust_layer(
     canonical_concept_labels,
     transformation_mode_label,
     llm_runtime_enabled,
+    request_llm_mapping_refinement,
     request_llm_transformation_suggestion,
     request_transformation_templates,
     materialize_transformation_template,
     api_request=None,
 ) -> None:
     trust_rows = trust_layer_rows(mapping_response)
+    ranked_by_source = {item.get("source"): item for item in mapping_response.get("ranked_mappings", [])}
+    editor_state = st.session_state.setdefault("mapping_editor_state", {})
+    source_field_hint_map: dict[str, dict] = {}
+    applied_hint_map = _applied_source_field_hint_map(mapping_response)
+    if api_request is not None:
+        try:
+            source_field_hint_map = _load_source_field_hint_map(api_request)
+        except httpx.HTTPError:
+            source_field_hint_map = {}
     low_confidence_count = sum(1 for mapping in trust_rows if float(mapping.get("confidence", 0.0) or 0.0) < 0.7)
     st.subheader(_section_label("🎯 Mapping Trust Layer", f"{low_confidence_count} low-confidence" if low_confidence_count else None))
     canonical_only = (st.session_state.get("upload_response") or {}).get("mapping_mode") == "canonical"
@@ -408,10 +808,31 @@ def display_trust_layer(
                 f"{project_coverage.get('concept_count', 0)} total, "
                 f"{project_coverage.get('shared_concept_count', 0)} shared across source and target."
             )
-    editor_state = st.session_state.setdefault("mapping_editor_state", {})
+    _render_llm_mapping_refine_panel(
+        trust_rows=trust_rows,
+        ranked_by_source=ranked_by_source,
+        editor_state=editor_state,
+        source_field_hint_map=source_field_hint_map,
+        llm_runtime_enabled=llm_runtime_enabled,
+        request_llm_mapping_refinement=request_llm_mapping_refinement,
+    )
+    if api_request is not None:
+        _render_saved_source_field_hints_panel(api_request)
     for mapping in trust_rows:
         source = mapping["source"]
         entry = editor_state.setdefault(source, {})
+        ranked = ranked_by_source.get(source) or {}
+        ranked_candidate_targets = [
+            str(candidate.get("target") or "").strip()
+            for candidate in ranked.get("candidates", [])
+            if str(candidate.get("target") or "").strip()
+        ]
+        refinement_result = entry.get("llm_mapping_refinement") if isinstance(entry.get("llm_mapping_refinement"), dict) else {}
+        refinement_selected = refinement_result.get("selected") or {}
+        refinement_selected_target = str(refinement_selected.get("target") or "").strip()
+        refinement_applied = bool(entry.get("llm_mapping_refinement_applied", False))
+        applied_hint = applied_hint_map.get(_normalized_text(source)) or {}
+        saved_hint = source_field_hint_map.get(_normalized_text(source)) or {}
         suggested_code = mapping.get("suggested_transformation_code") or ""
         if suggested_code and f"transform_{source}" not in st.session_state:
             st.session_state[f"transform_{source}"] = bool(entry.get("apply_transformation", False))
@@ -421,15 +842,31 @@ def display_trust_layer(
             st.session_state[f"manual_transform_{source}"] = entry.get("manual_transformation_code", "")
         if f"manual_apply_{source}" not in st.session_state:
             st.session_state[f"manual_apply_{source}"] = bool(entry.get("manual_apply_transformation", False))
+        if f"field_hint_meaning_{source}" not in st.session_state:
+            st.session_state[f"field_hint_meaning_{source}"] = str(saved_hint.get("meaning_hint") or "")
+        if f"field_hint_negative_{source}" not in st.session_state:
+            st.session_state[f"field_hint_negative_{source}"] = str(saved_hint.get("negative_hint") or "")
+        if f"field_hint_samples_{source}" not in st.session_state:
+            st.session_state[f"field_hint_samples_{source}"] = ", ".join(saved_hint.get("sample_values") or [])
+        if f"llm_mapping_prompt_{source}" not in st.session_state:
+            st.session_state[f"llm_mapping_prompt_{source}"] = str(entry.get("llm_mapping_instruction") or "")
 
         col1, col2, col3 = st.columns([3, 3, 2])
         with col1:
             st.info(f"Source: **{source}**")
         with col2:
             st.success(f"Target: **{mapping.get('target') or '—'}**")
-            llm_recommendation = mapping.get("llm_recommendation") or {}
-            llm_decision_proposition = mapping.get("llm_decision_proposition") or {}
-            if mapping.get("llm_consulted") and llm_recommendation:
+            llm_recommendation = (
+                refinement_selected.get("llm_recommendation")
+                if refinement_applied and refinement_selected_target == str(mapping.get("target") or "").strip()
+                else mapping.get("llm_recommendation")
+            ) or {}
+            llm_decision_proposition = (
+                refinement_selected.get("llm_decision_proposition")
+                if refinement_applied and refinement_selected_target == str(mapping.get("target") or "").strip()
+                else mapping.get("llm_decision_proposition")
+            ) or {}
+            if (mapping.get("llm_consulted") or refinement_applied) and llm_recommendation:
                 llm_target = llm_recommendation.get("selected_target") or "unmapped"
                 llm_confidence = round(float(llm_recommendation.get("confidence", 0.0) or 0.0) * 100)
                 if llm_target != (mapping.get("target") or ""):
@@ -445,6 +882,20 @@ def display_trust_layer(
                 canonical_labels = canonical_concept_labels(mapping.get("canonical_details"))
                 if canonical_labels:
                     st.caption("Canonical concept: " + ", ".join(canonical_labels))
+            if applied_hint:
+                applied_hint_text = str(applied_hint.get("meaning_hint") or "").strip()
+                if applied_hint_text:
+                    st.caption(f"Persistent hint applied in this run: {applied_hint_text}")
+                else:
+                    st.caption("Persistent hint applied in this run.")
+            elif saved_hint:
+                st.caption("Persistent hint exists for this scope. Re-run mapping to apply it to the current results.")
+            if refinement_result and not refinement_selected_target:
+                st.caption("LLM refine preview: no reliable match in the current closed candidate set.")
+            elif refinement_result and refinement_selected_target and not refinement_applied:
+                st.caption(f"LLM refine preview: {refinement_selected_target}. Open Details and accept it if you want to apply it.")
+            elif refinement_applied and refinement_selected_target == str(mapping.get("target") or "").strip():
+                st.caption("Accepted LLM refine applied in this session.")
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
         with col3:
             score = mapping.get("confidence", 0.0)
@@ -481,7 +932,57 @@ def display_trust_layer(
                 if rejected_targets:
                     st.write(f"- Rejected targets: {', '.join(str(item) for item in rejected_targets)}")
 
-            if mapping.get("llm_consulted") and llm_recommendation:
+            if refinement_result:
+                st.write("**LLM mapping refinement:**")
+                if refinement_selected_target:
+                    st.write(
+                        f"- Refined target: {refinement_selected_target} "
+                        f"({round(float((refinement_selected.get('llm_recommendation') or {}).get('confidence', 0.0) or 0.0) * 100)}%)"
+                    )
+                else:
+                    st.write("- Refined target: no_match")
+                if entry.get("llm_mapping_instruction"):
+                    st.write(f"- Instruction: {entry.get('llm_mapping_instruction')}")
+                for reason_line in (refinement_selected.get("llm_recommendation") or {}).get("reasoning", []) or []:
+                    st.write(f"- LLM refine: {reason_line}")
+                if refinement_selected_target and not refinement_applied:
+                    refinement_action_columns = st.columns(2)
+                    if refinement_action_columns[0].button(
+                        "Accept refined mapping",
+                        key=f"accept_refined_mapping_{source}",
+                        width="stretch",
+                    ):
+                        applied_target = _apply_llm_mapping_refinement(entry)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Accepted LLM refined mapping for {source} -> {applied_target}.",
+                        }
+                        st.rerun()
+                    if refinement_action_columns[1].button(
+                        "Discard refine preview",
+                        key=f"discard_refined_mapping_{source}",
+                        width="stretch",
+                    ):
+                        _clear_llm_mapping_refinement(entry, restore_previous=False)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Discarded the pending LLM refine preview for {source}.",
+                        }
+                        st.rerun()
+                elif refinement_applied:
+                    if st.button(
+                        "Revert refined mapping",
+                        key=f"revert_refined_mapping_{source}",
+                        width="stretch",
+                    ):
+                        _clear_llm_mapping_refinement(entry, restore_previous=True)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Reverted the accepted LLM refined mapping for {source}.",
+                        }
+                        st.rerun()
+
+            if (mapping.get("llm_consulted") or refinement_applied) and llm_recommendation:
                 st.write("**LLM review:**")
                 st.write(
                     f"- Recommended target: {llm_recommendation.get('selected_target') or 'unmapped'} "
@@ -494,6 +995,144 @@ def display_trust_layer(
             if canonical_labels:
                 st.write("**Canonical path:**")
                 st.write(f"- {source} -> {', '.join(canonical_labels)} -> {mapping.get('target') or 'unmapped'}")
+
+            st.write("**Persistent source field hint:**")
+            source_system, business_domain, integration_name = _current_hint_scope()
+            if saved_hint:
+                scope_parts = [f"source_system={saved_hint.get('source_system')}"]
+                if saved_hint.get("business_domain"):
+                    scope_parts.append(f"business_domain={saved_hint.get('business_domain')}")
+                if saved_hint.get("integration_name"):
+                    scope_parts.append(f"integration_name={saved_hint.get('integration_name')}")
+                st.caption("Saved hint active for current scope: " + " | ".join(scope_parts))
+            if applied_hint:
+                st.write(
+                    f"- Applied in current run: yes | meaning: {applied_hint.get('meaning_hint') or 'n/a'}"
+                )
+            st.write("**LLM mapping refine input:**")
+            st.caption(
+                "This text is used only for the one-shot LLM refine action. It is available for every field and is not saved unless you separately save the persistent hint below."
+            )
+            st.text_area(
+                f"LLM refine instruction for {source}",
+                key=f"llm_mapping_prompt_{source}",
+                placeholder="Example: This field is a transaction or operation type. Prefer canonical/target fields that encode business event category, not a person or free-text label.",
+            )
+            st.caption(
+                "Optional manual field context for this refine preview. These values can be used immediately for LLM refine even if you do not save them persistently."
+            )
+            st.text_area(
+                f"Business meaning for {source}",
+                key=f"field_hint_meaning_{source}",
+                placeholder="Example: Operation type / transaction type.",
+            )
+            st.text_input(
+                f"What this field is not for {source}",
+                key=f"field_hint_negative_{source}",
+                placeholder="Example: Not contact name or person name.",
+            )
+            st.text_input(
+                f"Representative sample values for {source}",
+                key=f"field_hint_samples_{source}",
+                placeholder="Example: SALE, RETURN, STORNO",
+            )
+            if st.button(
+                "Preview LLM refine",
+                key=f"refine_mapping_{source}",
+                width="stretch",
+                disabled=(not llm_runtime_enabled()) or (not ranked_candidate_targets),
+                help="Runs a closed-set LLM review for this field using the current typed refine instruction, manual hints, and candidate shortlist.",
+            ):
+                try:
+                    composed_instruction = _compose_llm_mapping_refinement_instruction(
+                        st.session_state.get("llm_mapping_batch_prompt", ""),
+                        st.session_state.get(f"llm_mapping_prompt_{source}", ""),
+                    )
+                    refinement_response = request_llm_mapping_refinement(
+                        source,
+                        candidate_targets=ranked_candidate_targets,
+                        meaning_hint=st.session_state.get(f"field_hint_meaning_{source}", ""),
+                        negative_hint=st.session_state.get(f"field_hint_negative_{source}", ""),
+                        sample_values=_parse_hint_sample_values(
+                            st.session_state.get(f"field_hint_samples_{source}", "")
+                        ),
+                        refinement_instruction=composed_instruction,
+                    )
+                    _remember_llm_mapping_refinement(
+                        entry,
+                        refinement_response=refinement_response,
+                        current_target=str(entry.get("target") or mapping.get("target") or ""),
+                        current_status=str(entry.get("status") or "needs_review"),
+                        instruction=composed_instruction,
+                    )
+                    selected_refinement = refinement_response.get("selected") or {}
+                    if str(selected_refinement.get("target") or "").strip():
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                f"Prepared an LLM refine preview for {source} -> {selected_refinement.get('target')}. "
+                                "Use Accept refined mapping below to apply it."
+                            ),
+                        }
+                    else:
+                        st.session_state["last_action"] = {
+                            "level": "warning",
+                            "message": (
+                                f"LLM refinement for {source} returned no_match in the current candidate set."
+                            ),
+                        }
+                    st.rerun()
+                except ValueError as error:
+                    st.session_state["last_action"] = {"level": "warning", "message": str(error)}
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"LLM mapping refinement failed: {error}",
+                    }
+                    st.rerun()
+
+            if not llm_runtime_enabled():
+                st.caption("LLM mapping refine is disabled. Enable a runtime provider in backend config to use it.")
+
+            if not source_system:
+                st.info("Set Source system in the workspace context before saving a persistent field hint.")
+            else:
+                st.caption(
+                    "Save field-level business meaning once and Semantra will auto-inject it into future runs for the same scope."
+                )
+                if st.button("Save hint for future runs", key=f"save_field_hint_{source}", width="stretch"):
+                    try:
+                        saved_record = api_request(
+                            "POST",
+                            "/mapping/source-field-hints",
+                            json={
+                                "source_field": source,
+                                "source_system": source_system,
+                                "business_domain": business_domain,
+                                "integration_name": integration_name,
+                                "meaning_hint": st.session_state.get(f"field_hint_meaning_{source}", ""),
+                                "negative_hint": st.session_state.get(f"field_hint_negative_{source}", ""),
+                                "sample_values": _parse_hint_sample_values(
+                                    st.session_state.get(f"field_hint_samples_{source}", "")
+                                ),
+                            },
+                        )
+                        _invalidate_source_field_hint_cache()
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": (
+                                f"Saved a persistent hint for {source}. Re-run mapping to apply it automatically for "
+                                f"{saved_record.get('source_system') or source_system}."
+                            ),
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Saving source field hint failed: {error}",
+                        }
+                        st.rerun()
 
             if canonical_only:
                 st.info(
@@ -910,14 +1549,6 @@ def render_mapping_review(
             cluster_rows = _review_plan_cluster_rows(review_plan_summary)
             if cluster_rows:
                 st.dataframe(cluster_rows, width="stretch", hide_index=True)
-            for cluster in (review_plan_summary.get("clusters") or []):
-                with st.expander(
-                    f"{str(cluster.get('priority') or 'medium').title()} priority: {cluster.get('focus') or 'review cluster'}"
-                ):
-                    if cluster.get("summary"):
-                        st.write(str(cluster.get("summary")))
-                    if cluster.get("recommended_follow_up"):
-                        st.caption(str(cluster.get("recommended_follow_up")))
             summary_columns = st.columns(2)
             with summary_columns[0]:
                 st.caption("Risks")

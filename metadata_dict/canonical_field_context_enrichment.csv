@@ -1,0 +1,213 @@
+concept_id,system,object_name,field_name,category,object_description,field_description,note
+account.status,QuickBooks,Account,IsActive,account,,Active flag,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=GL
+accounting.posting_date,QuickBooks,JournalEntry,TxnDate,accounting,,Posting date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=GL
+address.city,QuickBooks,Employee,EmployeeAddress_City,address,,City,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=PAY
+address.city,QuickBooks,Vendor,VendorAddress_City,address,,City,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+address.country,QuickBooks,Employee,EmployeeAddress_Country,address,,Country,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=PAY
+address.country,QuickBooks,Vendor,VendorAddress_Country,address,,Country,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+address.line1,QuickBooks,Vendor,VendorAddress_Addr1,address,,Address line 1,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+address.line2,QuickBooks,Vendor,VendorAddress_Addr2,address,,Address line 2,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+address.postal_code,QuickBooks,Employee,EmployeeAddress_PostalCode,address,,Postal code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=PAY
+address.postal_code,QuickBooks,Vendor,VendorAddress_PostalCode,address,,Postal code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+asset.serial_number,QuickBooks,BillItemLine,SerialNumber,asset,,Serial number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+asset.serial_number,QuickBooks,InventoryAdjustmentLine,SerialNumber,asset,,Serial number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=INV
+batch.id,QuickBooks,BillItemLine,LotNumber,batch,,Lot number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+batch.id,QuickBooks,InventoryAdjustmentLine,LotNumber,batch,,Lot number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=INV
+contact.email,QuickBooks,Employee,Email,contact,,Email address,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=PAY
+contact.email,QuickBooks,Vendor,Email,contact,,Email address,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+customer.email,QuickBooks,Customer,Email,customer,,Primary email address,source=canonical_enrichment_candidates; confidence=medium; reason=quickbooks_table_entity_specific_field; module=AR
+customer.phone,QuickBooks,Customer,Phone,customer,,Primary phone number,source=canonical_enrichment_candidates; confidence=medium; reason=quickbooks_table_entity_specific_field; module=AR
+employee.birth_date,QuickBooks,Employee,BirthDate,employee,,Date of birth,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+employee.department,QuickBooks,Employee,Department,employee,,Department name,source=canonical_enrichment_candidates; confidence=high; reason=quickbooks_table_entity_specific_field; module=PAY
+employee.email,QuickBooks,Employee,Email,employee,,Email address,source=canonical_enrichment_candidates; confidence=medium; reason=quickbooks_table_entity_specific_field; module=PAY
+employee.gender,QuickBooks,Employee,Gender,employee,,Gender (M/F),source=canonical_enrichment_candidates; confidence=high; reason=quickbooks_table_entity_specific_field; module=PAY
+employee.hire_date,QuickBooks,Employee,HireDate,employee,,Employment start date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+employee.national_id,QuickBooks,Employee,SSN,employee,,Social security number (encrypted),source=canonical_enrichment_candidates; confidence=high; reason=quickbooks_table_entity_specific_field; module=PAY
+employee.termination_date,QuickBooks,Employee,ReleasedDate,employee,,Termination date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+exchange_rate.rate,QuickBooks,Bill,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+exchange_rate.rate,QuickBooks,BillPayment,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+exchange_rate.rate,QuickBooks,CreditMemo,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+exchange_rate.rate,QuickBooks,Deposit,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=GL
+exchange_rate.rate,QuickBooks,JournalEntry,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=GL
+exchange_rate.rate,QuickBooks,PurchaseOrder,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+exchange_rate.rate,QuickBooks,ReceivePayment,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+exchange_rate.rate,QuickBooks,SalesReceipt,ExchangeRate,exchange_rate,,Exchange rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+fulfillment.due_date,QuickBooks,CreditMemo,DueDate,fulfillment,,Due date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AR
+goods_receipt.id,QuickBooks,SalesReceipt,RefNumber,goods_receipt,,Receipt number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+inventory_transaction.date,QuickBooks,JournalEntry,TxnDate,inventory_transaction,,Posting date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=GL
+invoice.due_date,QuickBooks,Bill,DueDate,invoice,,Payment due date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+invoice.due_date,QuickBooks,CreditMemo,DueDate,invoice,,Due date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AR
+invoice.due_date,QuickBooks,Invoice,DueDate,invoice,,Payment due date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+invoice.posting_date,QuickBooks,JournalEntry,TxnDate,invoice,,Posting date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=GL
+job.title,QuickBooks,Employee,JobTitle,job,,Job title,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+material.base_uom_code,QuickBooks,BillItemLine,UnitOfMeasure,material,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+material.base_uom_code,QuickBooks,JournalEntryLine,UnitOfMeasure,material,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=GL
+material.base_uom_code,QuickBooks,PurchaseOrderLine,UnitOfMeasure,material,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+payment.date,QuickBooks,BillPayment,TxnDate,payment,,Payment date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+payment.date,QuickBooks,ReceivePayment,TxnDate,payment,,Payment date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+payment.method_code,QuickBooks,ReceivePayment,PaymentMethodRef_FullName,payment,,Payment method,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+payroll.period_end_date,QuickBooks,Paycheck,WagePeriodEnd,payroll,,Pay period end date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+payroll.period_start_date,QuickBooks,Paycheck,WagePeriodStart,payroll,,Pay period start date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=PAY
+purchase_order.id,QuickBooks,PurchaseOrder,RefNumber,purchase_order,,PO number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+rfq.due_date,QuickBooks,CreditMemo,DueDate,rfq,,Due date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AR
+sales_order.id,QuickBooks,SalesOrder,RefNumber,sales_order,,SO number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=INV
+shipment.planned_ship_date,QuickBooks,Invoice,ShipDate,shipment,,Scheduled ship date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AR
+shipment.planned_ship_date,QuickBooks,SalesOrder,ShipDate,shipment,,Scheduled ship date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=INV
+supplier.address,QuickBooks,Vendor,VendorAddress_City,supplier,,City,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier.address,QuickBooks,Vendor,VendorAddress_Country,supplier,,Country,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier.address,QuickBooks,Vendor,VendorAddress_PostalCode,supplier,,Postal code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier.city,QuickBooks,Bill,VendorAddress_City,supplier,,Vendor city,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+supplier.city,QuickBooks,PurchaseOrder,VendorAddress_City,supplier,,Vendor city,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+supplier.city,QuickBooks,Vendor,VendorAddress_City,supplier,,City,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier.country_code,QuickBooks,Vendor,VendorAddress_Country,supplier,,Country,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier.postal_code,QuickBooks,Bill,VendorAddress_PostalCode,supplier,,Vendor postal code,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+supplier.postal_code,QuickBooks,Vendor,VendorAddress_PostalCode,supplier,,Postal code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+supplier_invoice.id,QuickBooks,Bill,RefNumber,supplier_invoice,,Vendor invoice number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=AP
+uom.code,QuickBooks,BillItemLine,UnitOfMeasure,uom,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+uom.code,QuickBooks,JournalEntryLine,UnitOfMeasure,uom,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=GL
+uom.code,QuickBooks,PurchaseOrderLine,UnitOfMeasure,uom,,Unit of measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=AP
+vendor.email,QuickBooks,Vendor,Email,vendor,,Email address,source=canonical_enrichment_candidates; confidence=medium; reason=quickbooks_table_entity_specific_field; module=AP
+base_uom.code,SAP,EKPO,LMEIN,uom,,Base Unit of Measure,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+base_uom.code,SAP,MARA,MEINS,uom,,Base Unit of Measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+base_uom.code,SAP,MSEG,MEINS,uom,,Base Unit of Measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+base_uom.code,SAP,VBAP,MEINS,uom,,Base Unit of Measure,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+batch.id,SAP,EBAN,CHARG,batch,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+batch.id,SAP,MSEG,CHARG,batch,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+batch.id,SAP,VBAP,CHARG,batch,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+bom.quantity,SAP,VBAP,KMPMG,bom,,Component Quantity,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+business_partner.id,SAP,VBAK,BPN,business_partner,,Business Partner Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+certification.expiration_date,SAP,MARA,SLED_BBD,certification,,Expiration Date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+company_code.id,SAP,EKKO,BUKRS,company_code,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+company_code.id,SAP,EKPO,BUKRS,company_code,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+company_code.id,SAP,MSEG,BUKRS,company_code,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+cost_center.id,SAP,EBAN,KOSTL,cost_center,,Cost Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+cost_center.id,SAP,EKPO,KOSTL,cost_center,,Cost Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+cost_center.id,SAP,MSEG,KOSTL,cost_center,,Cost Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+cost_center.id,SAP,VBAK,KOSTL,cost_center,,Cost Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+customer.id,SAP,EBAN,DISUB_KUNNR,customer,,Customer Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+customer.id,SAP,EKKO,KUNNR,customer,,Customer Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+customer.id,SAP,EKPO,DISUB_KUNNR,customer,,Customer Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+delivery.requested_delivery_date,SAP,VBAK,VDATU,delivery,,Requested Delivery Date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+demand_forecast.version,SAP,EBAN,FLDLOGSVERSION,demand_forecast,,Version,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+demand_plan.version,SAP,EBAN,FLDLOGSVERSION,demand_plan,,Version,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+distribution_channel.id,SAP,VBAK,VTWEG,distribution_channel,,Distribution Channel,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+division.id,SAP,MARA,SPART,division,,Division,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+division.id,SAP,VBAK,SPART,division,,Division,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+division.id,SAP,VBAP,SPART,division,,Division,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+document.type,SAP,MKPF,BLART,document,,Document Type,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+employee.department,SAP,EKPO,DEP_ID,employee,,Department,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+employee.id,SAP,MSEG,PERNR,employee,,Personnel Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+equipment.id,SAP,MSEG,EQUNR,equipment,,Equipment Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+exchange_rate.rate,SAP,EKKO,WKURS,exchange_rate,,Exchange Rate,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+fiscal_year.id,SAP,MSEG,GJAHR,fiscal_year,,Fiscal Year,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+inventory_location.id,SAP,EBAN,LGORT,inventory_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_location.id,SAP,EKPO,LGORT,inventory_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_location.id,SAP,MARD,LGORT,inventory_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_location.id,SAP,MSEG,LGORT,inventory_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_location.id,SAP,VBAP,LGORT,inventory_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+inventory_lot.expiration_date,SAP,MARA,SLED_BBD,inventory_lot,,Expiration Date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_lot.id,SAP,EBAN,CHARG,inventory_lot,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_lot.id,SAP,MSEG,CHARG,inventory_lot,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+inventory_lot.id,SAP,VBAP,CHARG,inventory_lot,,Batch Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+inventory_policy.reorder_point,SAP,MARC,MINBE,inventory_policy,,Reorder Point,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+inventory_policy.safety_stock_quantity,SAP,MARC,EISBE,inventory_policy,,Safety Stock,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+inventory_reservation.quantity,SAP,MARD,FSH_SALLOC_QTY_S,inventory_reservation,,Allocated Stock Quantity,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+journal_entry.debit_credit_indicator,SAP,MSEG,SHKZG,journal_entry,,Debit/Credit Indicator,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+journal_entry.reference,SAP,MKPF,XBLNR,journal_entry,,Reference Document Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+journal_entry.reference,SAP,MSEG,XBLNR_MKPF,journal_entry,,Reference Document Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+journal_entry.reference,SAP,VBAK,XBLNR,journal_entry,,Reference Document Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+make_or_buy.indicator,SAP,MARC,BESKZ,make_or_buy,,Procurement Type,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.drawing_revision,SAP,EBAN,REVLV,material,,Revision Level,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.drawing_revision,SAP,EKPO,REVLV,material,,Revision Level,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.engineering_part_number,SAP,MARA,BISMT,material,,Old material number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.gross_weight,SAP,EKPO,BRGEW,material,,Gross Weight,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.gross_weight,SAP,MARA,BRGEW,material,,Gross Weight,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.gross_weight,SAP,MARM,BRGEW,material,,Gross Weight,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.hts_code,SAP,EKPO,STAWN,material,,Commodity Code,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.hts_code,SAP,MARC,STAWN,material,,Commodity Code,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.manufacturer_part_number,SAP,EBAN,MFRPN,material,,Manufacturer Part Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.manufacturer_part_number,SAP,EKPO,MFRPN,material,,Manufacturer Part Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.manufacturer_part_number,SAP,MARA,MFRPN,material,,Manufacturer Part Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.number,SAP,EBAN,FSH_ITEM,material,,Item Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.number,SAP,EBAN,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,EKPO,EMATN,material,,Material number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.number,SAP,EKPO,FSH_ITEM,material,,Item Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+material.number,SAP,EKPO,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MAKT,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MARA,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MARC,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MARD,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MARM,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MBEW,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,MSEG,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.number,SAP,VBAP,MATNR,material,,Material Number,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+material.procurement_type,SAP,MARC,BESKZ,material,,Procurement Type,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.raw_material_group_id,SAP,EBAN,MATKL,material,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.raw_material_group_id,SAP,EKPO,MATKL,material,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.raw_material_group_id,SAP,MARA,MATKL,material,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material.raw_material_group_id,SAP,VBAP,MATKL,material,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+material_group.id,SAP,EBAN,MATKL,material_group,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material_group.id,SAP,EKPO,MATKL,material_group,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material_group.id,SAP,MARA,/STTPEC/PRDCAT,material_group,,Product Category,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material_group.id,SAP,MARA,MATKL,material_group,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+material_group.id,SAP,VBAP,MATKL,material_group,,Material Group,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+plant.id,SAP,EBAN,WERKS,plant,,Plant,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+plant.id,SAP,EKPO,WERKS,plant,,Plant,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+plant.id,SAP,MARC,WERKS,plant,,Plant,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+plant.id,SAP,MARD,WERKS,plant,,Plant,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+plant.id,SAP,MSEG,WERKS,plant,,Plant,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+price.unit,SAP,EBAN,PEINH,price,,Price unit,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+price.unit,SAP,EKPO,PEINH,price,,Price unit,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+price.unit,SAP,MBEW,PEINH,price,,Price unit,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+price.unit,SAP,VBAP,NETPR,price,,Net Price,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+product.category,SAP,MARA,/STTPEC/PRDCAT,product,,Product Category,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+product.category,SAP,MARA,PRDHA,product,,Product Hierarchy,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+product.category,SAP,VBAP,PRODH,product,,Product Hierarchy,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+production_order.planned_start_date,SAP,MARA,PRD_STARTDT,production_order,,Production Start Date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+profit_center.id,SAP,EKPO,KO_PRCTR,profit_center,,Profit Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+profit_center.id,SAP,MARC,PRCTR,profit_center,,Profit Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+profit_center.id,SAP,MARD,PRCTL,profit_center,,Profit Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+profit_center.id,SAP,MSEG,PRCTR,profit_center,,Profit Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+profit_center.id,SAP,VBAP,PRCTR,profit_center,,Profit Center,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+purchase_contract.valid_from_date,SAP,MARA,DATAB,purchase_contract,,Valid-From Date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+purchase_order.document_date,SAP,EKKO,BEDAT,purchase_order,,Purchasing Document Date,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchase_order.document_type,SAP,EKKO,BSART,purchase_order,,Purchasing Document Type,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchase_order.document_type,SAP,MKPF,BLART,purchase_order,,Document Type,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+purchase_order.id,SAP,EBAN,EBELN,purchase_order,,Purchase order number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchase_order.id,SAP,EKKO,EBELN,purchase_order,,Purchasing Document Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchase_order.id,SAP,EKPO,EBELN,purchase_order,,Purchasing Document Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchase_order.id,SAP,MSEG,EBELN,purchase_order,,Purchase order number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_group.id,SAP,EBAN,EKGRP,purchasing_group,,Purchasing Group,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_group.id,SAP,EKKO,EKGRP,purchasing_group,,Purchasing Group,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_group.id,SAP,MARC,EKGRP,purchasing_group,,Purchasing Group,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_organization.id,SAP,EBAN,EKORG,purchasing_organization,,Purchasing Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_organization.id,SAP,EBAN,EXTPURGORGFORPURG,purchasing_organization,,Purchasing Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_organization.id,SAP,EKKO,EKORG,purchasing_organization,,Purchasing Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_organization.id,SAP,EKKO,HASHCAL_EXISTS,purchasing_organization,,Purchasing Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+purchasing_organization.id,SAP,EKPO,HASHCAL_EXISTS,purchasing_organization,,Purchasing Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+quote.id,SAP,EKKO,ANGNR,quote,,Quotation Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+quote.id,SAP,EKPO,ANGNR,quote,,Quotation number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+quote.valid_from_date,SAP,MARA,DATAB,quote,,Valid-From Date,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+requisition.id,SAP,EBAN,BANFN,requisition,,Purchase Requisition Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+requisition.id,SAP,EKPO,BANFN,requisition,,Purchase Requisition Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+route.id,SAP,VBAP,ROUTE,route,,Route,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+sales_order.document_type,SAP,MKPF,BLART,sales_order,,Document Type,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+sales_order.document_type,SAP,VBAK,AUART,sales_order,,Sales Document Type,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+sales_order.id,SAP,MSEG,KDAUF,sales_order,,Sales Order Number,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+sales_organization.id,SAP,VBAK,VKORG,sales_organization,,Sales Organization,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=SD
+shipment.volume,SAP,EKPO,VOLUM,shipment,,Volume,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+shipment.volume,SAP,MARA,VOLUM,shipment,,Volume,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+shipment.volume,SAP,MARM,VOLUM,shipment,,Volume,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+shipping_point.id,SAP,LIKP,LSTEL,shipping_point,,Loading Point,source=sap_tables_mostUsed; confidence=high; reason=legacy_regression_guard; module=SD
+shipping_point.id,SAP,VEKP,LSTEL,shipping_point,,Loading Point,source=sap_tables_mostUsed; confidence=high; reason=legacy_regression_guard
+storage_location.id,SAP,EBAN,LGORT,storage_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+storage_location.id,SAP,EKPO,LGORT,storage_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+storage_location.id,SAP,MARD,LGORT,storage_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+storage_location.id,SAP,MSEG,LGORT,storage_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+storage_location.id,SAP,VBAP,LGORT,storage_location,,Storage Location,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=SD
+supplier.intercompany_code,SAP,EKKO,BUKRS,supplier,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+supplier.intercompany_code,SAP,EKPO,BUKRS,supplier,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+supplier.intercompany_code,SAP,MSEG,BUKRS,supplier,,Company Code,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+supply_plan.version,SAP,EBAN,FLDLOGSVERSION,supply_plan,,Version,source=canonical_enrichment_candidates; confidence=medium; reason=description_exact_term; module=MM
+warehouse_bin.id,SAP,MARD,LGPBE,warehouse_bin,,Storage Bin,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM
+warehouse_bin.id,SAP,MSEG,LGPLA,warehouse_bin,,Storage Bin,source=canonical_enrichment_candidates; confidence=high; reason=description_exact_term; module=MM

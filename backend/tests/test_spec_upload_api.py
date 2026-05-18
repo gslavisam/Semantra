@@ -81,6 +81,35 @@ def test_spec_upload_endpoint_returns_dataset_handle() -> None:
     assert payload["preview_rows"] == []
 
 
+def test_spec_upload_endpoint_accepts_manual_sample_values_column() -> None:
+    response = client.post(
+        "/upload/spec",
+        data={
+            "name_col": "SENIOR_FIELD",
+            "description_col": "Senior Description",
+            "type_col": "DataType",
+            "sample_values_col": "Example Values",
+        },
+        files={
+            "file": (
+                "source_spec.csv",
+                csv_bytes(
+                    "SENIOR_FIELD,Senior Description,DataType,Example Values\n"
+                    "AKONT,Reconciliation account,CHAR,160000|170000\n"
+                ),
+                "text/csv",
+            )
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["schema_profile"]["columns"][0]["name"] == "AKONT"
+    assert payload["schema_profile"]["columns"][0]["description"] == "Reconciliation account"
+    assert payload["schema_profile"]["columns"][0]["declared_type"] == "CHAR"
+    assert payload["schema_profile"]["columns"][0]["sample_values"] == ["160000", "170000"]
+
+
 def test_spec_upload_endpoint_returns_400_for_unknown_name_col() -> None:
     response = client.post(
         "/upload/spec",
