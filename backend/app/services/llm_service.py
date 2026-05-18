@@ -328,6 +328,22 @@ def request_llm_json(
     return None
 
 
+def request_bounded_llm_json(
+    provider: LLMProvider,
+    prompt: str,
+    operation_name: str,
+) -> tuple[str, dict] | None:
+    timeout_seconds = max(1.0, min(settings.llm_timeout_seconds, 5.0))
+    retries = 1
+    return request_llm_json(
+        provider,
+        prompt,
+        timeout_seconds,
+        retries,
+        operation_name,
+    )
+
+
 def parse_llm_json_payload(raw_response: str) -> dict:
     candidates = [raw_response, strip_markdown_code_fences(raw_response)]
     for candidate in candidates:

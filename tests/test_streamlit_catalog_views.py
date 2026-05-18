@@ -80,7 +80,19 @@ def test_catalog_reuse_fit_workspace_context_reads_current_workspace(monkeypatch
                 "source": {"dataset_name": "sap_customer.csv"},
                 "target_system": "customer_canonical",
             },
-            "mapping_response": {"ranked_mappings": [{"source": "KUNNR"}, {"source": "NAME1"}]},
+            "mapping_response": {
+                "ranked_mappings": [
+                    {"source": "KUNNR", "status": "accepted"},
+                    {"source": "NAME1", "status": "needs_review"},
+                ],
+                "canonical_coverage": {
+                    "source": {"unmatched_columns": ["LAND1"]},
+                    "project": {
+                        "concept_count": 3,
+                        "shared_concepts": ["customer.id", "customer.name"],
+                    },
+                },
+            },
             "analysis_source_system": "SAP",
             "analysis_target_system": "Canonical Customer",
             "analysis_business_domain": "Customer",
@@ -97,6 +109,10 @@ def test_catalog_reuse_fit_workspace_context_reads_current_workspace(monkeypatch
         "target_system": "Canonical Customer",
         "business_domain": "Customer",
         "current_decision_count": 2,
+        "current_status_counts": {"accepted": 1, "needs_review": 1},
+        "current_shared_concepts": ["customer.id", "customer.name"],
+        "current_unmatched_sources": ["LAND1"],
+        "current_concept_count": 3,
     }
 
 
@@ -108,7 +124,17 @@ def test_catalog_reuse_fit_payload_wraps_mapping_set_and_workspace_context(monke
                 "source": {"dataset_name": "sap_customer.csv"},
                 "target": {"dataset_name": "crm_customer.csv"},
             },
-            "mapping_response": {"mappings": [{"source": "KUNNR"}]},
+            "mapping_response": {
+                "mappings": [{"source": "KUNNR", "status": "accepted"}],
+                "canonical_coverage": {
+                    "source": {"unmatched_columns": ["LEGACY_ID"]},
+                    "project": {
+                        "concept_count": 2,
+                        "shared_concepts": ["customer.id"],
+                        "concepts": ["customer.id", "customer.name"],
+                    },
+                },
+            },
         }
     )
     monkeypatch.setattr(catalog_views, "st", fake_streamlit)
@@ -126,6 +152,10 @@ def test_catalog_reuse_fit_payload_wraps_mapping_set_and_workspace_context(monke
             "target_system": None,
             "business_domain": None,
             "current_decision_count": 1,
+            "current_status_counts": {"accepted": 1},
+            "current_shared_concepts": ["customer.id"],
+            "current_unmatched_sources": ["LEGACY_ID"],
+            "current_concept_count": 2,
         },
     }
 
@@ -133,7 +163,7 @@ def test_catalog_reuse_fit_payload_wraps_mapping_set_and_workspace_context(monke
 def test_catalog_reuse_fit_label_formats_known_values() -> None:
     assert catalog_views._catalog_reuse_fit_label("strong_fit") == "strong fit"
     assert catalog_views._catalog_reuse_fit_label("partial_fit") == "partial fit"
-    assert catalog_views._catalog_reuse_fit_label("unknown") == "not generated"
+    assert catalog_views._catalog_reuse_fit_label("unknown") == ""
 
 
 def test_catalog_reuse_fit_ready_for_selected_version_requires_matching_drilldown() -> None:
@@ -149,6 +179,186 @@ def test_catalog_reuse_fit_ready_for_selected_version_requires_matching_drilldow
         {"mapping_set_id": 7},
         None,
     ) is False
+
+
+def test_catalog_version_compare_payload_prefers_latest_approved_baseline() -> None:
+    payload = catalog_views._catalog_version_compare_payload(
+        {
+            "mapping_set_id": 7,
+            "name": "customer-master",
+            "version": 4,
+            "status": "review",
+            "decision_count": 6,
+            "canonical_concepts": ["customer.id", "customer.name", "customer.email"],
+        },
+        [
+            {
+                "mapping_set_id": 7,
+                "name": "customer-master",
+                "version": 4,
+                "status": "review",
+                "decision_count": 6,
+                "canonical_concepts": ["customer.id", "customer.name", "customer.email"],
+            },
+            {
+                "mapping_set_id": 5,
+                "name": "customer-master",
+                "version": 3,
+                "status": "approved",
+                "decision_count": 5,
+                "canonical_concepts": ["customer.id", "customer.name"],
+            },
+            {
+                "mapping_set_id": 4,
+                "name": "customer-master",
+                "version": 2,
+                "status": "draft",
+                "decision_count": 4,
+                "canonical_concepts": ["customer.id"],
+            },
+        ],
+        {"mapping_set_id": 5, "version": 3, "status": "approved"},
+    )
+
+    assert payload["recommended_target"]["mapping_set_id"] == 5
+    assert "latest approved baseline" in payload["recommended_reason"]
+    assert payload["rows"][0]["decision_delta"] == "+1"
+    assert payload["rows"][0]["shared_concepts"] == "customer.id, customer.name"
+    assert payload["rows"][0]["suggested_action"] == "Recommended diff baseline"
+
+
+def test_catalog_similar_compare_payload_prefers_approved_same_system_peer() -> None:
+    payload = catalog_views._catalog_similar_compare_payload(
+        {
+            "mapping_set_id": 7,
+            "canonical_concepts": ["customer.id", "customer.name", "customer.email"],
+        },
+        [
+            {
+                "integration_name": "SAP Customer to CRM",
+                "similarity_score": 0.91,
+                "shared_concepts": ["customer.id", "customer.name"],
+                "shared_concept_count": 2,
+                "same_source_system": True,
+                "same_target_system": True,
+                "same_business_domain": True,
+                "same_artifact_type": True,
+                "latest_version": {"mapping_set_id": 11, "version": 5, "status": "review"},
+                "latest_approved_version": {"mapping_set_id": 10, "version": 4, "status": "approved"},
+            },
+            {
+                "integration_name": "Legacy Customer to CRM",
+                "similarity_score": 0.88,
+                "shared_concepts": ["customer.id"],
+                "shared_concept_count": 1,
+                "same_source_system": False,
+                "same_target_system": True,
+                "same_business_domain": True,
+                "same_artifact_type": False,
+                "latest_version": {"mapping_set_id": 12, "version": 3, "status": "approved"},
+                "latest_approved_version": None,
+            },
+        ],
+    )
+
+    assert payload["recommended_integration_name"] == "SAP Customer to CRM"
+    assert "approved peer version available" in payload["recommended_reason"]
+    assert "same system pair" in payload["rows"][0]["compare_reason"]
+    assert payload["rows"][0]["drilldown_version"] == 4
+    assert payload["rows"][0]["suggested_action"] == "Open peer version"
+
+
+def test_catalog_next_action_plan_prefers_governance_for_unapproved_version() -> None:
+    plan = catalog_views._catalog_next_action_plan(
+        {
+            "mapping_set_id": 7,
+            "name": "customer-master",
+            "version": 4,
+            "status": "review",
+            "artifact_type": "standard",
+            "unmatched_sources": [],
+        },
+        {"workspace_loaded": True, "mapping_mode": "standard"},
+    )
+
+    assert plan["table_label"] == "Canonical governance handoff"
+    assert plan["primary_area"] == "Canonical Console"
+    assert plan["secondary_area"] == "Workspace"
+    assert "Inspect governance owner" in plan["primary_summary"]
+
+
+def test_catalog_next_action_plan_adds_canonical_secondary_for_unmatched_sources() -> None:
+    plan = catalog_views._catalog_next_action_plan(
+        {
+            "mapping_set_id": 7,
+            "name": "customer-master",
+            "version": 4,
+            "status": "approved",
+            "artifact_type": "canonical-only",
+            "unmatched_sources": ["LAND1"],
+        },
+        {"workspace_loaded": True, "mapping_mode": "canonical"},
+    )
+
+    assert plan["table_label"] == "Workspace review handoff"
+    assert plan["primary_area"] == "Workspace"
+    assert plan["secondary_area"] == "Canonical Console"
+    assert "canonical gaps" in plan["primary_summary"]
+
+
+def test_open_catalog_handoff_switches_top_level_area(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_handoff(
+        "Workspace",
+        {"name": "customer-master", "version": 4},
+        "Continue in Workspace Review.",
+    )
+
+    assert fake_streamlit.session_state["pending_top_level_area"] == "Workspace"
+    assert fake_streamlit.session_state["last_action"]["level"] == "info"
+    assert "Catalog handoff: customer-master v4 -> Workspace." in fake_streamlit.session_state["last_action"]["message"]
+
+
+def test_catalog_detail_state_recovery_clears_stale_catalog_state(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "catalog_results": [{"integration_name": "Customer Master Sync"}],
+            "selected_catalog_integration_name": "Lead Reuse Sync",
+            "catalog_integration_detail": {"integration_name": "Customer Master Sync"},
+            "catalog_selected_mapping_set_detail": {"mapping_set_id": 7},
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    request = httpx.Request("GET", "http://testserver/catalog/integrations/Lead%20Reuse%20Sync")
+    response = httpx.Response(
+        404,
+        json={"detail": "'Unknown catalog integration: Lead Reuse Sync'"},
+        request=request,
+    )
+    error = httpx.HTTPStatusError("HTTP 404: missing", request=request, response=response)
+
+    payload = catalog_views._catalog_detail_state_recovery(error)
+
+    assert payload == {
+        "level": "warning",
+        "message": "Catalog results look stale relative to the backend. Reload catalog query results before opening integration detail again.",
+    }
+    assert fake_streamlit.session_state == {}
+
+
+def test_catalog_detail_state_recovery_ignores_other_errors(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={"catalog_results": [1]})
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    request = httpx.Request("GET", "http://testserver/catalog/integrations/foo")
+    response = httpx.Response(409, json={"detail": "blocked"}, request=request)
+    error = httpx.HTTPStatusError("HTTP 409", request=request, response=response)
+
+    assert catalog_views._catalog_detail_state_recovery(error) is None
+    assert fake_streamlit.session_state["catalog_results"] == [1]
 
 
 def test_catalog_concept_reuse_rows_group_integrations_and_approval_state() -> None:

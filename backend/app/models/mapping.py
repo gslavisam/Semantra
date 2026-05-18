@@ -370,6 +370,7 @@ class ReviewPlanResponse(BaseModel):
 
 
 MappingJobStatus = Literal["queued", "running", "cancel_requested", "completed", "failed", "canceled"]
+MappingJobStorageMode = Literal["in_memory"]
 
 
 class MappingJobStartResponse(BaseModel):
@@ -383,6 +384,20 @@ class MappingJobStatusResponse(BaseModel):
     activity: list[str] = Field(default_factory=list)
     response: AutoMappingResponse | None = None
     error: str | None = None
+
+
+class MappingJobRuntimeStatusResponse(BaseModel):
+    storage_mode: MappingJobStorageMode = "in_memory"
+    restart_safe: bool = False
+    cross_process_safe: bool = False
+    active_jobs: int = 0
+    max_active_jobs: int = 0
+    finished_jobs: int = 0
+    max_finished_jobs: int = 0
+    finished_job_ttl_seconds: int = 0
+    oldest_active_job_age_seconds: int = 0
+    durable_backend_recommended: bool = False
+    durable_backend_triggers: list[str] = Field(default_factory=list)
 
 
 CanonicalGapSuggestionAction = Literal["existing_concept_alias", "new_canonical_concept", "no_action"]
@@ -698,6 +713,10 @@ class CatalogReuseFitWorkspaceContext(BaseModel):
     target_system: str | None = None
     business_domain: str | None = None
     current_decision_count: int = 0
+    current_status_counts: dict[str, int] = Field(default_factory=dict)
+    current_shared_concepts: list[str] = Field(default_factory=list)
+    current_unmatched_sources: list[str] = Field(default_factory=list)
+    current_concept_count: int = 0
 
 
 class CatalogReuseFitRequest(BaseModel):

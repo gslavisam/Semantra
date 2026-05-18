@@ -460,6 +460,18 @@ def test_cancel_mapping_job_endpoint_returns_cancel_requested_status() -> None:
     assert "Cancellation requested" in response.json()["activity"][0]
 
 
+def test_mapping_job_runtime_status_endpoint_reports_capacity_contract() -> None:
+    response = client.get("/observability/mapping-jobs/runtime")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["storage_mode"] == "in_memory"
+    assert payload["max_active_jobs"] == 4
+    assert payload["max_finished_jobs"] == 32
+    assert payload["finished_job_ttl_seconds"] == 900
+    assert payload["durable_backend_recommended"] is False
+
+
 def test_auto_map_accepts_multi_table_selection_on_both_sides() -> None:
     upload_response = client.post(
         "/upload",
@@ -869,6 +881,10 @@ def test_knowledge_overlay_validate_create_activate_and_reload_flow() -> None:
     assert reload_response.json()["active_overlay_name"] == "overlay-v1"
     assert reload_response.json()["active_entry_count"] == 1
     assert reload_response.json()["entry_type_counts"] == {"field_alias": 1}
+    assert reload_response.json()["runtime_source"] == "sqlite_cache"
+    assert reload_response.json()["source_hash_state"] == "current"
+    assert reload_response.json()["seeded_concept_count"] > 0
+    assert reload_response.json()["seeded_canonical_concept_count"] > 0
 
     deactivate_response = client.post(f"/knowledge/overlays/{overlay_id}/deactivate")
     assert deactivate_response.status_code == 200
@@ -877,6 +893,8 @@ def test_knowledge_overlay_validate_create_activate_and_reload_flow() -> None:
     base_only_reload_response = client.post("/knowledge/reload")
     assert base_only_reload_response.status_code == 200
     assert base_only_reload_response.json()["mode"] == "base_only"
+    assert base_only_reload_response.json()["runtime_source"] == "sqlite_cache"
+    assert base_only_reload_response.json()["source_hash_state"] == "current"
     assert base_only_reload_response.json()["active_overlay_id"] is None
 
     create_response_v2 = client.post(
@@ -2459,6 +2477,51 @@ def test_catalog_reuse_fit_returns_structured_assessment_when_llm_is_available()
     assert payload["generation_metadata"]["used_llm"] is True
     assert payload["fit_assessment"] == "strong_fit"
     assert payload["key_matches"]
+
+
+def test_catalog_reuse_fit_fallback_uses_workspace_snapshot_details() -> None:
+    settings.admin_api_token = "secret-token"
+
+    response = client.post(
+        "/catalog/reuse-fit",
+        json={
+            "mapping_set_detail": {
+                "mapping_set_id": 7,
+                "name": "customer-master",
+                "version": 3,
+                "status": "approved",
+                "artifact_type": "canonical-only",
+                "source_system": "SAP",
+                "target_system": "Canonical Customer",
+                "business_domain": "Customer",
+                "canonical_concepts": ["customer.id", "customer.name"],
+                "unmatched_sources": ["LAND1"],
+                "mapping_decisions": [{"source": "KUNNR", "target": "customer.id", "status": "accepted"}],
+            },
+            "workspace_context": {
+                "workspace_loaded": True,
+                "mapping_mode": "canonical",
+                "source_dataset_name": "sap_customer.csv",
+                "target_dataset_name": "customer_canonical",
+                "source_system": "SAP",
+                "target_system": "Canonical Customer",
+                "business_domain": "Customer",
+                "current_decision_count": 5,
+                "current_status_counts": {"accepted": 3, "needs_review": 2},
+                "current_shared_concepts": ["customer.id", "customer.email"],
+                "current_unmatched_sources": ["LAND1", "LEGACY_ID"],
+                "current_concept_count": 3,
+            },
+        },
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generation_metadata"]["fallback_used"] is True
+    assert any("share canonical concepts" in item for item in payload["key_matches"])
+    assert any("needs-review" in item for item in payload["key_matches"])
+    assert any("both leave some sources unresolved" in item for item in payload["risks"])
 
 
 def test_codegen_uses_transformation_code_when_present() -> None:

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from app.models.mapping import AutoMappingResponse, MappingJobStatusResponse
+from app.models.mapping import AutoMappingResponse, MappingJobRuntimeStatusResponse, MappingJobStatusResponse
 from app.services.mapping_service import ProgressCallbackCancelled
 
 MAX_ACTIVITY_LINES = 500
@@ -61,6 +61,36 @@ class MappingJobStore:
     def clear(self) -> None:
         with self._lock:
             self._jobs.clear()
+
+    def runtime_status(self) -> MappingJobRuntimeStatusResponse:
+        with self._lock:
+            self._prune_jobs_locked()
+            active_jobs = [job for job in self._jobs.values() if job.status in ACTIVE_JOB_STATUSES]
+            finished_jobs = [job for job in self._jobs.values() if job.status in FINISHED_JOB_STATUSES]
+            oldest_active_job_age_seconds = 0
+            if active_jobs:
+                oldest_active_job_age_seconds = int(
+                    max(time.monotonic() - job.created_at_monotonic for job in active_jobs)
+                )
+
+            durable_backend_triggers: list[str] = []
+            if len(active_jobs) >= MAX_ACTIVE_JOBS:
+                durable_backend_triggers.append("active_capacity_reached")
+            if len(finished_jobs) >= MAX_FINISHED_JOBS:
+                durable_backend_triggers.append("finished_retention_saturated")
+            if oldest_active_job_age_seconds >= FINISHED_JOB_TTL_SECONDS:
+                durable_backend_triggers.append("long_running_job_exceeds_retention_window")
+
+            return MappingJobRuntimeStatusResponse(
+                active_jobs=len(active_jobs),
+                max_active_jobs=MAX_ACTIVE_JOBS,
+                finished_jobs=len(finished_jobs),
+                max_finished_jobs=MAX_FINISHED_JOBS,
+                finished_job_ttl_seconds=FINISHED_JOB_TTL_SECONDS,
+                oldest_active_job_age_seconds=oldest_active_job_age_seconds,
+                durable_backend_recommended=bool(durable_backend_triggers),
+                durable_backend_triggers=durable_backend_triggers,
+            )
 
     def cancel(self, job_id: str) -> MappingJobStatusResponse:
         with self._lock:

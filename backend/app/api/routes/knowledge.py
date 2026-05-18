@@ -97,6 +97,14 @@ def _require_canonical_gap_ready_for_approval(candidate: object) -> None:
 
 
 def build_runtime_status() -> KnowledgeRuntimeStatus:
+    seed_meta = persistence_service.get_knowledge_seed_meta()
+    if seed_meta is None:
+        source_hash_state = "missing"
+    elif seed_meta["source_hash"] == metadata_knowledge_service.current_source_hash():
+        source_hash_state = "current"
+    else:
+        source_hash_state = "drifted"
+
     active_version = persistence_service.get_active_knowledge_overlay_version()
     active_entries = (
         persistence_service.get_knowledge_overlay_entries(active_version.overlay_id)
@@ -109,6 +117,11 @@ def build_runtime_status() -> KnowledgeRuntimeStatus:
 
     return KnowledgeRuntimeStatus(
         mode="overlay_active" if active_version else "base_only",
+        runtime_source=metadata_knowledge_service.runtime_source,
+        source_hash_state=source_hash_state,
+        seeded_at=seed_meta["seeded_at"] if seed_meta else None,
+        seeded_concept_count=int(seed_meta["concept_count"]) if seed_meta else 0,
+        seeded_canonical_concept_count=int(seed_meta["canonical_count"]) if seed_meta else 0,
         active_overlay_id=active_version.overlay_id if active_version else None,
         active_overlay_name=active_version.name if active_version else None,
         active_entry_count=len(active_entries),

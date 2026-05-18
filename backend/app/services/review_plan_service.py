@@ -4,7 +4,7 @@ import json
 
 from app.core.config import settings
 from app.models.mapping import ReviewPlanCluster, ReviewPlanGenerationMetadata, ReviewPlanRequest, ReviewPlanResponse
-from app.services.llm_service import LLMProvider, request_llm_json
+from app.services.llm_service import LLMProvider, request_bounded_llm_json
 
 
 def build_review_plan(
@@ -16,11 +16,9 @@ def build_review_plan(
         return fallback
 
     prompt = build_review_plan_prompt(request, fallback)
-    response = request_llm_json(
+    response = request_bounded_llm_json(
         provider,
         prompt,
-        settings.llm_timeout_seconds,
-        settings.llm_max_retries,
         "review_plan",
     )
     if response is None:

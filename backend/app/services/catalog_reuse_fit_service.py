@@ -8,7 +8,7 @@ from app.models.mapping import (
     CatalogReuseFitRequest,
     CatalogReuseFitResponse,
 )
-from app.services.llm_service import LLMProvider, request_llm_json
+from app.services.llm_service import LLMProvider, request_bounded_llm_json
 
 
 def build_catalog_reuse_fit(
@@ -20,11 +20,9 @@ def build_catalog_reuse_fit(
         return fallback
 
     prompt = build_catalog_reuse_fit_prompt(request, fallback)
-    response = request_llm_json(
+    response = request_bounded_llm_json(
         provider,
         prompt,
-        settings.llm_timeout_seconds,
-        settings.llm_max_retries,
         "catalog_reuse_fit",
     )
     if response is None:
@@ -48,7 +46,7 @@ def build_catalog_reuse_fit_prompt(
     }
     return (
         "You are assessing whether a saved mapping set is a good reuse candidate for the current workspace context. "
-        "Stay strictly grounded in the provided mapping-set metadata, decision counts, systems, domain, artifact type, and workspace context.\n\n"
+        "Stay strictly grounded in the provided mapping-set metadata, decision counts, systems, domain, artifact type, canonical coverage, unmatched-source context, and workspace context.\n\n"
         "Return JSON only. No markdown. No code fences. No extra prose.\n"
         "Do not tell the user to apply or persist automatically. Only explain fit, risks, and next controlled actions.\n"
         "Return exactly these top-level fields: title, fit_assessment, summary, key_matches, risks, next_actions, generation_metadata.\n\n"
@@ -63,6 +61,17 @@ def _build_fallback_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitRespo
     risks: list[str] = []
     next_actions: list[str] = []
     score = 0
+    mapping_concepts = {str(concept).strip() for concept in mapping_set.canonical_concepts if str(concept).strip()}
+    workspace_shared_concepts = {
+        str(concept).strip() for concept in workspace.current_shared_concepts if str(concept).strip()
+    }
+    shared_concepts = sorted(mapping_concepts & workspace_shared_concepts)
+    workspace_unmatched = {
+        str(source).strip() for source in workspace.current_unmatched_sources if str(source).strip()
+    }
+    mapping_unmatched = {str(source).strip() for source in mapping_set.unmatched_sources if str(source).strip()}
+    repeated_unmatched = sorted(workspace_unmatched & mapping_unmatched)
+    needs_review_count = int(workspace.current_status_counts.get("needs_review") or 0)
 
     if _same(mapping_set.source_system, workspace.source_system):
         key_matches.append(f"Source system matches the current workspace context: {mapping_set.source_system}.")
@@ -70,6 +79,15 @@ def _build_fallback_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitRespo
     if _same(mapping_set.target_system, workspace.target_system):
         key_matches.append(f"Target system matches the current workspace context: {mapping_set.target_system}.")
         score += 1
+    if shared_concepts:
+        key_matches.append(
+            f"Catalog and workspace share canonical concepts: {', '.join(shared_concepts[:3])}."
+        )
+        score += 1
+    if needs_review_count:
+        key_matches.append(
+            f"Workspace still has {needs_review_count} needs-review items, so reuse can be checked against an active unresolved queue."
+        )
     if _same(mapping_set.business_domain, workspace.business_domain):
         key_matches.append(f"Business domain matches the current workspace context: {mapping_set.business_domain}.")
         score += 1
@@ -98,11 +116,21 @@ def _build_fallback_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitRespo
         risks.append("Target-system mismatch means reuse may require remapping even if field names look similar.")
     if workspace.workspace_loaded and not _same(mapping_set.business_domain, workspace.business_domain):
         risks.append("Business-domain mismatch reduces confidence that canonical concepts and review outcomes are portable.")
+    if repeated_unmatched:
+        risks.append(
+            f"Workspace and catalog both leave some sources unresolved: {', '.join(repeated_unmatched[:3])}."
+        )
+    elif mapping_unmatched and workspace.workspace_loaded:
+        risks.append("Saved mapping set has unresolved source fields that should be checked against the current workspace review queue.")
     if not workspace.workspace_loaded:
         risks.append("No active workspace context is loaded, so reuse fit is based on catalog metadata only.")
 
     fit_assessment = "strong_fit" if score >= 4 else "partial_fit" if score >= 2 else "low_fit"
     next_actions.append("Inspect mapping decisions and unmatched sources before reusing this mapping set in Workspace.")
+    if needs_review_count:
+        next_actions.append("Compare this candidate against the current needs-review queue before applying reuse.")
+    if repeated_unmatched:
+        next_actions.append("Check whether the repeated unmatched sources need canonical coverage or transformation work rather than direct reuse.")
     if fit_assessment == "strong_fit" and mapping_set.status == "approved":
         next_actions.append("This candidate is strong enough for manual reuse review in Workspace under the current governance gate.")
     elif fit_assessment == "partial_fit":

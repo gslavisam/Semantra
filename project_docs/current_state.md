@@ -282,6 +282,8 @@ Implemented:
 - corrections and reusable-rule inspection/promote flows
 - admin-token-aware UI behavior
 - Admin / Debug surface separate from Canonical Console
+- knowledge runtime status now surfaces cache/source separation via `runtime_source`, `source_hash_state`, and seeded-count metadata
+- mapping job runtime observability now surfaces in-memory durability pressure and explicit durable-backend trigger flags
 
 Main code surfaces:
 
@@ -324,8 +326,9 @@ Current runtime shape:
 Important implementation characteristics:
 
 - knowledge and canonical runtime are loaded primarily from SQLite when the seed hash is current
-- canonical glossary and metadata source files are still part of the canonical authoring/reseed story
+- canonical glossary authoring now refreshes the canonical slice over persisted knowledge concepts without a full metadata/workbook reseed; explicit reseed remains for source-file drift
 - background mapping jobs are currently in-memory/thread based and designed for local/demo use
+- mapping job runtime now exposes concrete saturation/retention triggers before a durable backend becomes mandatory
 - newer bounded AI surfaces use small structured request/response contracts and deterministic fallback behavior
 
 ## Testing and Validation Shape

@@ -685,6 +685,10 @@ def main() -> None:
     render_step_status()
     render_last_action_status()
 
+    pending_top_level_area = st.session_state.pop("pending_top_level_area", None)
+    if pending_top_level_area in TOP_LEVEL_AREAS:
+        st.session_state["active_top_level_area"] = pending_top_level_area
+
     with st.sidebar:
         st.header("Connection")
         st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url")

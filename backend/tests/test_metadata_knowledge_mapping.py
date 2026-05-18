@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import generate_mapping_candidates
@@ -84,6 +85,45 @@ def test_metadata_dictionary_prefers_sap_customer_alias_to_customer_id() -> None
     assert result.mappings[0].target == "customer_id"
     assert result.mappings[0].signals.knowledge > 0
     assert any("Internal metadata dictionary aligns" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_glossary_import_avoids_full_metadata_reseed(tmp_path) -> None:
+    service = MetadataKnowledgeService()
+    service.canonical_glossary_path = tmp_path / "canonical_glossary.csv"
+
+    import_payload = (
+        "concept_id,entity,attribute,display_name,description,data_type,aliases\n"
+        'loyalty.id,loyalty,id,Loyalty ID,Identifier for a loyalty profile,string,"loyalty id, loyalty identifier"\n'
+    ).encode("utf-8")
+
+    with patch.object(service, "_load", side_effect=AssertionError("full metadata reseed should not run")):
+        response = service.import_canonical_glossary_csv(import_payload, filename="canonical_glossary.csv")
+
+    assert response.imported_row_count == 1
+    assert service.runtime_source == "canonical_authoring_sync"
+    assert any(entry.concept_id == "loyalty.id" for entry in service.list_canonical_glossary_entries())
+
+
+def test_canonical_glossary_promotion_avoids_full_metadata_reseed(tmp_path) -> None:
+    service = MetadataKnowledgeService()
+    service.canonical_glossary_path = tmp_path / "canonical_glossary.csv"
+    service.canonical_glossary_path.write_text(
+        "concept_id,entity,attribute,display_name,description,data_type,aliases\n"
+        "customer.id,customer,id,Customer ID,Primary customer identifier,string,customer id\n",
+        encoding="utf-8",
+    )
+    service.refresh()
+
+    with patch.object(service, "_load", side_effect=AssertionError("full metadata reseed should not run")):
+        entry, alias_added, concept_created = service.promote_overlay_alias_to_canonical_glossary(
+            "customer.id",
+            "legacy_customer_identifier",
+        )
+
+    assert alias_added is True
+    assert concept_created is False
+    assert service.runtime_source == "canonical_authoring_sync"
+    assert "legacy customer identifier" in entry.aliases
 
 
 def test_metadata_dictionary_bridges_serbian_term_to_english_target() -> None:

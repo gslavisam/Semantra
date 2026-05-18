@@ -22,7 +22,7 @@ from app.models.mapping import (
     MappingAnalysisWorkspaceContext,
     MappingCandidate,
 )
-from app.services.llm_service import LLMProvider, normalize_llm_list_field, request_llm_json
+from app.services.llm_service import LLMProvider, normalize_llm_list_field, request_bounded_llm_json
 
 
 def build_mapping_analysis_summary(
@@ -43,11 +43,9 @@ def build_mapping_analysis_summary(
         request.options,
         fallback_summary,
     )
-    response = request_llm_json(
+    response = request_bounded_llm_json(
         provider,
         prompt,
-        settings.llm_timeout_seconds,
-        settings.llm_max_retries,
         "mapping_analysis",
     )
     if response is None:

@@ -126,6 +126,7 @@ class MetadataKnowledgeService:
         self._active_overlay_name: str | None = None
         self._overlay_aliases_by_concept: dict[str, set[str]] = {}
         self._overlay_canonical_aliases_by_concept: dict[str, set[str]] = {}
+        self._last_runtime_source = "source_files"
         # Bridge: KC concept_id → set of CC concept_ids reachable via shared aliases.
         # Built after every full load so match_canonical_concepts() can use KC signal.
         self._kc_to_cc: dict[str, set[str]] = {}
@@ -142,6 +143,13 @@ class MetadataKnowledgeService:
     @property
     def canonical_concept_count(self) -> int:
         return len(self._canonical_concepts_by_id)
+
+    @property
+    def runtime_source(self) -> str:
+        return self._last_runtime_source
+
+    def current_source_hash(self) -> str:
+        return self._compute_source_hash()
 
     def concepts_for_alias(self, alias: str) -> list[str]:
         normalized_alias = _normalize_alias(alias)
@@ -222,7 +230,7 @@ class MetadataKnowledgeService:
             writer = csv.DictWriter(handle, fieldnames=CANONICAL_GLOSSARY_HEADERS)
             writer.writeheader()
             writer.writerows(parsed_rows)
-        self.refresh()
+        self._refresh_after_canonical_authoring_change()
         return CanonicalGlossaryImportResponse(
             imported_row_count=len(parsed_rows),
             canonical_concept_count=self.canonical_concept_count,
@@ -282,7 +290,7 @@ class MetadataKnowledgeService:
             writer.writeheader()
             writer.writerows(rows)
 
-        self.refresh()
+        self._refresh_after_canonical_authoring_change()
 
         concept = self._canonical_concepts_by_id.get(normalized_concept_id)
         if concept is None:
@@ -302,25 +310,19 @@ class MetadataKnowledgeService:
         )
 
     def refresh(self) -> None:
-        self._concepts_by_id.clear()
-        self._alias_to_concepts.clear()
-        self._field_alias_to_contexts.clear()
-        self._canonical_concepts_by_id.clear()
-        self._canonical_alias_to_concepts.clear()
-        self._active_overlay_name = None
-        self._overlay_aliases_by_concept.clear()
-        self._overlay_canonical_aliases_by_concept.clear()
-        clear_normalization_overrides()
+        self._clear_runtime_state()
 
         # --- DB-first loading (skip expensive file parsing when DB is current) ---
         current_hash = self._compute_source_hash()
         seed_meta = persistence_service.get_knowledge_seed_meta()
         if seed_meta and seed_meta["source_hash"] == current_hash:
             self._load_from_db()
+            self._last_runtime_source = "sqlite_cache"
         else:
             self._load_canonical_glossary()
             self._load()
             self._seed_to_db(current_hash)
+            self._last_runtime_source = "source_files"
 
         self._apply_active_overlay()
         self._rebuild_kc_cc_bridge()
@@ -750,18 +752,11 @@ class MetadataKnowledgeService:
 
         Returns stats about the newly seeded knowledge base.
         """
-        self._concepts_by_id.clear()
-        self._alias_to_concepts.clear()
-        self._field_alias_to_contexts.clear()
-        self._canonical_concepts_by_id.clear()
-        self._canonical_alias_to_concepts.clear()
-        self._active_overlay_name = None
-        self._overlay_aliases_by_concept.clear()
-        self._overlay_canonical_aliases_by_concept.clear()
-        clear_normalization_overrides()
+        self._clear_runtime_state()
         self._load_canonical_glossary()
         self._load()
         self._seed_to_db(self._compute_source_hash())
+        self._last_runtime_source = "source_files"
         self._apply_active_overlay()
         self._rebuild_kc_cc_bridge()
         return {
@@ -808,10 +803,43 @@ class MetadataKnowledgeService:
                 h.update(f"{attr_name}:missing".encode())
         return h.hexdigest()
 
+    def _clear_runtime_state(self) -> None:
+        self._concepts_by_id.clear()
+        self._alias_to_concepts.clear()
+        self._field_alias_to_contexts.clear()
+        self._canonical_concepts_by_id.clear()
+        self._canonical_alias_to_concepts.clear()
+        self._active_overlay_name = None
+        self._overlay_aliases_by_concept.clear()
+        self._overlay_canonical_aliases_by_concept.clear()
+        clear_normalization_overrides()
+
+    def _refresh_after_canonical_authoring_change(self) -> None:
+        """Reload the canonical slice without reparsing the full metadata source stack."""
+        seed_meta = persistence_service.get_knowledge_seed_meta()
+        knowledge_dicts, _canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
+        if seed_meta is None or not knowledge_dicts:
+            self.refresh()
+            return
+
+        self._clear_runtime_state()
+        self._load_persisted_knowledge_concepts(knowledge_dicts)
+        self._load_canonical_glossary()
+        self._load_persisted_canonical_field_contexts(canonical_context_dicts)
+        self._seed_to_db(self._compute_source_hash())
+        self._last_runtime_source = "canonical_authoring_sync"
+        self._apply_active_overlay()
+        self._rebuild_kc_cc_bridge()
+
     def _load_from_db(self) -> None:
         """Populate in-memory knowledge state directly from the SQLite DB."""
         knowledge_dicts, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
 
+        self._load_persisted_canonical_concepts(canonical_dicts)
+        self._load_persisted_knowledge_concepts(knowledge_dicts)
+        self._load_persisted_canonical_field_contexts(canonical_context_dicts)
+
+    def _load_persisted_canonical_concepts(self, canonical_dicts: list[dict]) -> None:
         for d in canonical_dicts:
             canonical_aliases = frozenset(filter_canonical_aliases(d["aliases"]))
             for alias in canonical_aliases:
@@ -826,6 +854,7 @@ class MetadataKnowledgeService:
                 aliases=canonical_aliases,
             )
 
+    def _load_persisted_knowledge_concepts(self, knowledge_dicts: list[dict]) -> None:
         for d in knowledge_dicts:
             contexts = tuple(
                 KnowledgeFieldContext(
@@ -855,7 +884,11 @@ class MetadataKnowledgeService:
                 if alias:
                     self._field_alias_to_contexts.setdefault(alias, []).append((d["concept_id"], ctx))
 
+    def _load_persisted_canonical_field_contexts(self, canonical_context_dicts: list[dict]) -> None:
         for ctx in canonical_context_dicts:
+            concept_id = ctx["concept_id"]
+            if concept_id not in self._canonical_concepts_by_id:
+                continue
             context = KnowledgeFieldContext(
                 system=ctx["system"],
                 object_name=ctx["object_name"],
@@ -867,7 +900,7 @@ class MetadataKnowledgeService:
             )
             alias = _normalize_alias(context.field_name)
             if alias:
-                self._field_alias_to_contexts.setdefault(alias, []).append((ctx["concept_id"], context))
+                self._field_alias_to_contexts.setdefault(alias, []).append((concept_id, context))
 
     def _seed_to_db(self, source_hash: str) -> None:
         """Persist current in-memory knowledge to the DB."""

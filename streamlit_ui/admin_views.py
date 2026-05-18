@@ -107,6 +107,8 @@ def _canonical_overlay_summary(runtime: dict | None, overlays: list[dict] | None
         status_counts[status] = status_counts.get(status, 0) + 1
     return {
         "mode": runtime_payload.get("mode") or "base_only",
+        "runtime_source": runtime_payload.get("runtime_source") or "unknown",
+        "source_hash_state": runtime_payload.get("source_hash_state") or "missing",
         "active_overlay_name": runtime_payload.get("active_overlay_name") or "none",
         "active_entry_count": int(runtime_payload.get("active_entry_count", 0) or 0),
         "concept_alias_entries": int(entry_type_counts.get("concept_alias", 0) or 0),
@@ -1076,6 +1078,8 @@ def render_canonical_console_panel(
         overlay_summary_columns[4].metric("Validated", int(overlay_summary.get("validated_versions", 0) or 0))
         st.caption(
             f"Mode={overlay_summary.get('mode') or 'base_only'} | "
+            f"runtime_source={overlay_summary.get('runtime_source') or 'unknown'} | "
+            f"source_hash_state={overlay_summary.get('source_hash_state') or 'missing'} | "
             f"active_versions={overlay_summary.get('active_versions', 0)} | "
             f"archived_versions={overlay_summary.get('archived_versions', 0)}"
         )
@@ -2631,11 +2635,22 @@ def render_admin_debug_tab(
         st.caption(
             "Knowledge mode: "
             + str(knowledge_runtime.get("mode") or "base_only")
+            + " | runtime source: "
+            + str(knowledge_runtime.get("runtime_source") or "unknown")
+            + " | source hash: "
+            + str(knowledge_runtime.get("source_hash_state") or "missing")
             + " | active overlay: "
             + str(knowledge_runtime.get("active_overlay_name") or "none")
             + f" | active_entry_count={knowledge_runtime.get('active_entry_count', 0)}"
             + f" | concept_count={knowledge_runtime.get('concept_count', 0)}"
         )
+        if knowledge_runtime.get("seeded_at"):
+            st.caption(
+                "Seed cache: "
+                + str(knowledge_runtime.get("seeded_at"))
+                + f" | seeded_concepts={knowledge_runtime.get('seeded_concept_count', 0)}"
+                + f" | seeded_canonical={knowledge_runtime.get('seeded_canonical_concept_count', 0)}"
+            )
         entry_type_counts = knowledge_runtime.get("entry_type_counts") or {}
         if entry_type_counts:
             st.caption(

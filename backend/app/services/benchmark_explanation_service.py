@@ -8,7 +8,7 @@ from app.models.mapping import (
     BenchmarkExplanationRequest,
     BenchmarkExplanationResponse,
 )
-from app.services.llm_service import LLMProvider, request_llm_json
+from app.services.llm_service import LLMProvider, request_bounded_llm_json
 
 
 def build_benchmark_explanation(
@@ -20,11 +20,9 @@ def build_benchmark_explanation(
         return fallback
 
     prompt = build_benchmark_explanation_prompt(request, fallback)
-    response = request_llm_json(
+    response = request_bounded_llm_json(
         provider,
         prompt,
-        settings.llm_timeout_seconds,
-        settings.llm_max_retries,
         "benchmark_explanation",
     )
     if response is None:

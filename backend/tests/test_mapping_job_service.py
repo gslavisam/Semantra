@@ -100,3 +100,39 @@ def test_mapping_job_store_cancels_running_worker_at_next_progress_checkpoint() 
     assert final_status.status == "canceled"
     assert any("Mapping job canceled." in line for line in final_status.activity)
     assert final_status.response is None
+
+
+def test_mapping_job_store_runtime_status_reports_in_memory_defaults() -> None:
+    store = MappingJobStore()
+
+    status = store.runtime_status()
+
+    assert status.storage_mode == "in_memory"
+    assert status.active_jobs == 0
+    assert status.finished_jobs == 0
+    assert status.durable_backend_recommended is False
+    assert status.durable_backend_triggers == []
+
+
+def test_mapping_job_store_runtime_status_surfaces_durable_backend_triggers() -> None:
+    store = MappingJobStore()
+    base_time = time.monotonic()
+    for index in range(MAX_ACTIVE_JOBS):
+        job = MappingJob(job_id=f"active-{index}", status="running")
+        job.created_at_monotonic = base_time - FINISHED_JOB_TTL_SECONDS - 5
+        store._jobs[job.job_id] = job
+    for index in range(MAX_FINISHED_JOBS):
+        job = MappingJob(job_id=f"finished-{index}", status="completed")
+        job.updated_at_monotonic = base_time - index
+        store._jobs[job.job_id] = job
+
+    status = store.runtime_status()
+
+    assert status.active_jobs == MAX_ACTIVE_JOBS
+    assert status.finished_jobs == MAX_FINISHED_JOBS
+    assert status.durable_backend_recommended is True
+    assert set(status.durable_backend_triggers) == {
+        "active_capacity_reached",
+        "finished_retention_saturated",
+        "long_running_job_exceeds_retention_window",
+    }

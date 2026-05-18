@@ -7,6 +7,7 @@ from app.core.config import reload_settings, settings_snapshot
 from app.models.mapping import (
     CorrectionRuleCandidate,
     DecisionLogEntry,
+    MappingJobRuntimeStatusResponse,
     ReusableCorrectionRule,
     ReusableCorrectionRulePromotionRequest,
     RuntimeConfigSnapshot,
@@ -15,6 +16,7 @@ from app.models.mapping import (
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.llm_service import summarize_llm_runtime
+from app.services.mapping_job_service import mapping_job_store
 from app.services.persistence_service import persistence_service
 
 
@@ -62,6 +64,11 @@ async def get_runtime_config() -> RuntimeConfigSnapshot:
     snapshot = settings_snapshot()
     snapshot.update(summarize_llm_runtime())
     return RuntimeConfigSnapshot.model_validate(snapshot)
+
+
+@router.get("/mapping-jobs/runtime", response_model=MappingJobRuntimeStatusResponse, dependencies=[Depends(require_admin)])
+async def get_mapping_job_runtime_status() -> MappingJobRuntimeStatusResponse:
+    return mapping_job_store.runtime_status()
 
 
 @router.post("/config/reload", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])

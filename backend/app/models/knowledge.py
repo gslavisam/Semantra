@@ -10,6 +10,8 @@ KnowledgeOverlayEntryType = Literal["abbreviation", "synonym", "field_alias", "c
 KnowledgeOverlayIssueSeverity = Literal["error", "warning"]
 KnowledgeOverlayRowStatus = Literal["valid", "invalid"]
 KnowledgeOverlayMode = Literal["base_only", "overlay_active"]
+KnowledgeRuntimeSource = Literal["sqlite_cache", "source_files", "canonical_authoring_sync"]
+KnowledgeSeedState = Literal["current", "drifted", "missing"]
 KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore", "triage", "stewardship"]
 CanonicalConceptSource = Literal["base", "overlay_only", "base_plus_active_overlay"]
 KnowledgeStewardshipItemType = Literal["canonical_gap", "overlay_promotion"]
@@ -86,6 +88,11 @@ class KnowledgeOverlayVersionEntriesResponse(BaseModel):
 
 class KnowledgeRuntimeStatus(BaseModel):
     mode: KnowledgeOverlayMode = "base_only"
+    runtime_source: KnowledgeRuntimeSource = "source_files"
+    source_hash_state: KnowledgeSeedState = "missing"
+    seeded_at: str | None = None
+    seeded_concept_count: int = 0
+    seeded_canonical_concept_count: int = 0
     active_overlay_id: int | None = None
     active_overlay_name: str | None = None
     active_entry_count: int = 0

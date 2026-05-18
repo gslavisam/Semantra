@@ -339,6 +339,8 @@ def test_canonical_overlay_summary_aggregates_runtime_and_overlay_versions() -> 
     summary = admin_views._canonical_overlay_summary(
         {
             "mode": "overlay_active",
+            "runtime_source": "sqlite_cache",
+            "source_hash_state": "current",
             "active_overlay_name": "customer-domain-overlay-v2",
             "active_entry_count": 7,
             "entry_type_counts": {"concept_alias": 4, "synonym": 3},
@@ -352,6 +354,8 @@ def test_canonical_overlay_summary_aggregates_runtime_and_overlay_versions() -> 
 
     assert summary == {
         "mode": "overlay_active",
+        "runtime_source": "sqlite_cache",
+        "source_hash_state": "current",
         "active_overlay_name": "customer-domain-overlay-v2",
         "active_entry_count": 7,
         "concept_alias_entries": 4,

@@ -272,6 +272,19 @@ Ishod:
 
 - Workspace canonical tok više nije second-class u odnosu na standard Decisions/Output površine, dok Setup i Review jasnije pokrivaju metadata enrichment i row-level LLM refinement rad
 
+### Run0518: Guided productization, reuse expansion, browser hardening, and runtime/persistence prep
+
+Isporučeno:
+
+- bounded guidance productization kroz realni pilot scenario, naming/alignment cleanup i jasnije razdvajanje explanation, triage i refinement surface-a
+- `Epic 13D` reuse/discovery proširenje kroz bogatiji compare/drilldown, workspace-aware reuse fit snapshot i konkretne Catalog -> Workspace / Canonical Console handoff signale
+- browser-level hardening i regression discipline kroz proširen `docs/pilot/PILOT_REGRESSION_SUBSET.md`, live Catalog reuse / Benchmarks explanation smoke prolaze i zatvorene UX prepreke iz realnog pilot toka
+- runtime/persistence separation priprema kroz zaseban slice plan, ciljano canonical authoring osvežavanje bez full metadata reseed puta i eksplicitne durable-backend trigger-e za lokalni mapping job runtime
+
+Ishod:
+
+- bounded guidance, reuse i governance surface-i su productized i pilot-hardened kao jedan završen execution wave, a naredni rad se vraća na uži post-pilot hardening backlog umesto na isti Run0518 checklist
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

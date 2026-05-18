@@ -158,7 +158,8 @@ def _render_llm_mapping_refine_panel(
     ):
         st.caption(
             "Enter shared guidance for the LLM here, then batch-refine low-confidence rows. "
-            "Per-row LLM refine instructions remain available inside each row's Details panel."
+            "Per-row LLM refine instructions remain available inside each row's Details panel. "
+            "Unlike the explanation panels below, this surface can change row-level target proposals."
         )
         batch_instruction = st.text_area(
             "Batch LLM refine instruction",
@@ -593,11 +594,12 @@ def render_mapping_analysis_panel(
 
     with st.expander(analysis_label, expanded=(summary is None or analysis_error is not None or force_open)):
         st.caption(
-            "Generate one structured technical overview of the current mapping state before drilling into row-level trust evidence."
+            "Generate one structured technical overview of the current mapping state before drilling into row-level trust evidence. "
+            "This is a read-only explanation surface and does not change decisions or approval state."
         )
 
         action_col, audio_col = st.columns([1, 1])
-        action_label = "Refresh analysis" if summary else "Generate analysis"
+        action_label = "Refresh mapping overview" if summary else "Generate mapping overview"
         if action_col.button(action_label, key="generate_mapping_analysis_summary", width="stretch"):
             try:
                 with st.spinner("Generating mapping analysis overview..."):
@@ -652,7 +654,7 @@ def render_mapping_analysis_panel(
             st.error(f"Analysis generation failed: {analysis_error}")
 
         if not summary:
-            st.info("No analysis overview has been generated yet. Use this panel to create a technical readout of the current mapping state.")
+            st.info("No mapping overview has been generated yet. Use this panel to create a technical readout of the current mapping state.")
             return
 
         metadata = summary.get("generation_metadata") or {}
@@ -1315,7 +1317,11 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
         )
         with st.expander(triage_label, expanded=bool(triage_summary) or bool(triage_error)):
             st.caption("Summarize the current canonical-gap queue into repeated families before reviewing candidates one by one.")
-            if st.button("Summarize gap queue", key="canonical_gap_triage_summary", width="stretch"):
+            if st.button(
+                "Refresh gap summary" if triage_summary else "Generate gap summary",
+                key="canonical_gap_triage_summary",
+                width="stretch",
+            ):
                 try:
                     st.session_state["canonical_gap_triage_summary"] = api_request(
                         "POST",
@@ -1495,7 +1501,8 @@ def render_mapping_review(
     if attention_summary_rows:
         st.subheader("Repeated Review Attention")
         st.caption(
-            "Groups unmatched and low-confidence patterns in the current review set so repeated glossary, knowledge, or ranking gaps are visible before row-by-row triage."
+            "Groups unmatched and low-confidence patterns in the current review set so repeated glossary, knowledge, or ranking gaps are visible before row-by-row triage. "
+            "This is deterministic attention surfacing, not a generated review plan."
         )
         st.dataframe(attention_summary_rows, width="stretch", hide_index=True)
 
@@ -1508,7 +1515,8 @@ def render_mapping_review(
     with st.expander(review_plan_label, expanded=bool(review_plan_summary) or bool(review_plan_error)):
         st.caption(
             "Generate one bounded queue plan for the currently filtered review set before changing row-level decisions. "
-            "Unlike Mapping Analysis Overview, this is about review order and cluster-level follow-up."
+            "Unlike Mapping Analysis Overview, this is about review order and cluster-level follow-up. "
+            "It does not change row-level targets or statuses."
         )
         action_label = "Refresh review plan" if review_plan_summary else "Generate review plan"
         if st.button(action_label, key="generate_review_plan", width="stretch"):

@@ -254,10 +254,18 @@ def _mapping_set_reuse_block_reason(status: str | None) -> str:
 def _catalog_reuse_fit_workspace_context() -> dict[str, Any]:
     upload_response = st.session_state.get("upload_response") or {}
     mapping_response = st.session_state.get("mapping_response") or {}
+    canonical_coverage = mapping_response.get("canonical_coverage") or {}
+    source_coverage = canonical_coverage.get("source") or {}
+    project_coverage = canonical_coverage.get("project") or {}
     source_handle = upload_response.get("source") or {}
     target_handle = upload_response.get("target") or {}
     mapping_mode = (_normalized_text(upload_response.get("mapping_mode") or st.session_state.get("mapping_mode") or "standard").lower() or "standard")
     decision_rows = mapping_response.get("ranked_mappings") or mapping_response.get("mappings") or []
+    status_counts = Counter(
+        (_normalized_text(item.get("status")) or "unknown")
+        for item in decision_rows
+        if isinstance(item, dict)
+    )
     return {
         "workspace_loaded": bool(upload_response or mapping_response),
         "mapping_mode": mapping_mode,
@@ -276,6 +284,18 @@ def _catalog_reuse_fit_workspace_context() -> dict[str, Any]:
         ),
         "business_domain": _normalized_text(st.session_state.get("analysis_business_domain")) or None,
         "current_decision_count": len(decision_rows),
+        "current_status_counts": dict(status_counts),
+        "current_shared_concepts": [
+            _normalized_text(concept)
+            for concept in project_coverage.get("shared_concepts", [])
+            if _normalized_text(concept)
+        ],
+        "current_unmatched_sources": [
+            _normalized_text(source)
+            for source in source_coverage.get("unmatched_columns", [])
+            if _normalized_text(source)
+        ],
+        "current_concept_count": int(project_coverage.get("concept_count") or len(project_coverage.get("concepts", []) or [])),
     }
 
 
@@ -293,7 +313,7 @@ def _catalog_reuse_fit_label(fit_assessment: str | None) -> str:
         "partial_fit": "partial fit",
         "low_fit": "low fit",
     }
-    return labels.get(normalized, "not generated")
+    return labels.get(normalized, "")
 
 
 def _catalog_reuse_fit_ready_for_selected_version(
@@ -303,6 +323,312 @@ def _catalog_reuse_fit_ready_for_selected_version(
     if not selected_version or not selected_mapping_set_detail:
         return False
     return int(selected_version.get("mapping_set_id") or 0) == int(selected_mapping_set_detail.get("mapping_set_id") or 0)
+
+
+def _catalog_version_compare_payload(
+    selected_mapping_set_detail: dict[str, Any] | None,
+    version_records: list[dict[str, Any]] | None,
+    latest_approved_version: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not selected_mapping_set_detail:
+        return {"recommended_target": None, "recommended_reason": "", "rows": []}
+
+    selected_mapping_set_id = int(selected_mapping_set_detail.get("mapping_set_id") or 0)
+    selected_version = int(selected_mapping_set_detail.get("version") or 0)
+    selected_decision_count = int(selected_mapping_set_detail.get("decision_count") or 0)
+    selected_name = _normalized_text(selected_mapping_set_detail.get("name"))
+    selected_concepts = {
+        _normalized_text(concept)
+        for concept in selected_mapping_set_detail.get("canonical_concepts", [])
+        if _normalized_text(concept)
+    }
+    latest_approved_mapping_set_id = int((latest_approved_version or {}).get("mapping_set_id") or 0)
+
+    ranked_rows: list[dict[str, Any]] = []
+    for item in version_records or []:
+        candidate_mapping_set_id = int(item.get("mapping_set_id") or 0)
+        if not candidate_mapping_set_id or candidate_mapping_set_id == selected_mapping_set_id:
+            continue
+        if selected_name and _normalized_text(item.get("name")) != selected_name:
+            continue
+
+        candidate_version = int(item.get("version") or 0)
+        candidate_decision_count = int(item.get("decision_count") or 0)
+        candidate_concepts = {
+            _normalized_text(concept)
+            for concept in item.get("canonical_concepts", [])
+            if _normalized_text(concept)
+        }
+        shared_concepts = sorted(selected_concepts & candidate_concepts)
+
+        compare_reasons: list[str] = []
+        priority = 0
+        if latest_approved_mapping_set_id and candidate_mapping_set_id == latest_approved_mapping_set_id:
+            compare_reasons.append("latest approved baseline")
+            priority = 4
+        if candidate_version < selected_version:
+            compare_reasons.append("previous version")
+            priority = max(priority, 3)
+        elif candidate_version > selected_version:
+            compare_reasons.append("newer version")
+            priority = max(priority, 2)
+        else:
+            compare_reasons.append("same version lineage")
+            priority = max(priority, 1)
+
+        ranked_rows.append(
+            {
+                "record": item,
+                "priority": priority,
+                "version_gap": abs(selected_version - candidate_version),
+                "shared_concept_count": len(shared_concepts),
+                "compare_reason": ", ".join(compare_reasons),
+                "row": {
+                    "mapping_set_id": candidate_mapping_set_id,
+                    "version": candidate_version,
+                    "status": _normalized_text(item.get("status")) or "-",
+                    "decision_count": candidate_decision_count,
+                    "decision_delta": f"{selected_decision_count - candidate_decision_count:+d}",
+                    "shared_concepts": ", ".join(shared_concepts[:3]) or "-",
+                    "compare_reason": ", ".join(compare_reasons),
+                },
+            }
+        )
+
+    ranked_rows.sort(
+        key=lambda item: (
+            -int(item["priority"]),
+            int(item["version_gap"]),
+            -int(item["shared_concept_count"]),
+            -int(item["record"].get("version") or 0),
+            int(item["record"].get("mapping_set_id") or 0),
+        )
+    )
+    if not ranked_rows:
+        return {"recommended_target": None, "recommended_reason": "", "rows": []}
+
+    recommended_target = ranked_rows[0]["record"]
+    rows: list[dict[str, Any]] = []
+    for index, item in enumerate(ranked_rows):
+        row = dict(item["row"])
+        row["suggested_action"] = "Recommended diff baseline" if index == 0 else "Optional peer compare"
+        rows.append(row)
+    return {
+        "recommended_target": recommended_target,
+        "recommended_reason": ranked_rows[0]["compare_reason"],
+        "rows": rows,
+    }
+
+
+def _catalog_similar_compare_payload(
+    selected_version: dict[str, Any] | None,
+    similar_integrations: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    selected_concepts = {
+        _normalized_text(concept)
+        for concept in (selected_version or {}).get("canonical_concepts", [])
+        if _normalized_text(concept)
+    }
+
+    ranked_rows: list[dict[str, Any]] = []
+    for item in similar_integrations or []:
+        peer_version = item.get("latest_approved_version") or item.get("latest_version") or {}
+        peer_mapping_set_id = int(peer_version.get("mapping_set_id") or 0)
+        if not peer_mapping_set_id:
+            continue
+
+        shared_concepts = [
+            _normalized_text(concept)
+            for concept in item.get("shared_concepts", [])
+            if _normalized_text(concept)
+        ]
+        if not shared_concepts and selected_concepts:
+            candidate_concepts = {
+                _normalized_text(concept)
+                for concept in (peer_version or {}).get("canonical_concepts", [])
+                if _normalized_text(concept)
+            }
+            shared_concepts = sorted(selected_concepts & candidate_concepts)
+
+        compare_reasons: list[str] = []
+        priority = 0
+        if item.get("latest_approved_version"):
+            compare_reasons.append("approved peer version available")
+            priority += 4
+        if item.get("same_source_system") and item.get("same_target_system"):
+            compare_reasons.append("same system pair")
+            priority += 3
+        elif item.get("same_business_domain"):
+            compare_reasons.append("same business domain")
+            priority += 1
+        if item.get("same_artifact_type"):
+            compare_reasons.append("same artifact type")
+            priority += 1
+
+        similarity_score = float(item.get("similarity_score") or 0.0)
+        shared_concept_count = max(int(item.get("shared_concept_count") or 0), len(shared_concepts))
+        ranked_rows.append(
+            {
+                "integration_name": _normalized_text(item.get("integration_name")),
+                "priority": priority,
+                "similarity_score": similarity_score,
+                "shared_concept_count": shared_concept_count,
+                "compare_reason": ", ".join(compare_reasons) or "shared canonical coverage",
+                "peer_version": peer_version,
+                "row": {
+                    "integration_name": _normalized_text(item.get("integration_name")) or "-",
+                    "drilldown_version": int(peer_version.get("version") or 0),
+                    "drilldown_status": _normalized_text(peer_version.get("status")) or "-",
+                    "similarity_score": round(similarity_score, 2),
+                    "shared_concept_count": shared_concept_count,
+                    "shared_concepts": ", ".join(shared_concepts[:3]) or "-",
+                    "compare_reason": ", ".join(compare_reasons) or "shared canonical coverage",
+                },
+            }
+        )
+
+    ranked_rows.sort(
+        key=lambda item: (
+            -int(item["priority"]),
+            -float(item["similarity_score"]),
+            -int(item["shared_concept_count"]),
+            _normalized_text(item["integration_name"]).lower(),
+        )
+    )
+    if not ranked_rows:
+        return {"recommended_integration_name": "", "recommended_reason": "", "rows": []}
+
+    rows: list[dict[str, Any]] = []
+    for index, item in enumerate(ranked_rows):
+        row = dict(item["row"])
+        row["suggested_action"] = "Open peer version" if index == 0 else "Open peer detail"
+        rows.append(row)
+    return {
+        "recommended_integration_name": ranked_rows[0]["integration_name"],
+        "recommended_reason": ranked_rows[0]["compare_reason"],
+        "rows": rows,
+    }
+
+
+def _catalog_next_action_plan(
+    mapping_set_detail: dict[str, Any] | None,
+    workspace_context: dict[str, Any] | None,
+) -> dict[str, str]:
+    if not mapping_set_detail:
+        return {
+            "table_label": "Load detail",
+            "primary_area": "Catalog",
+            "primary_label": "",
+            "primary_summary": "Load integration detail to decide the next action.",
+            "secondary_area": "",
+            "secondary_label": "",
+            "secondary_summary": "",
+        }
+
+    workspace_loaded = bool((workspace_context or {}).get("workspace_loaded"))
+    status = _normalized_text(mapping_set_detail.get("status")) or "unknown"
+    artifact_type = _normalized_text(mapping_set_detail.get("artifact_type")) or "standard"
+    unmatched_sources = [
+        _normalized_text(source)
+        for source in mapping_set_detail.get("unmatched_sources", [])
+        if _normalized_text(source)
+    ]
+
+    if not workspace_loaded:
+        plan = {
+            "table_label": "Workspace setup handoff",
+            "primary_area": "Workspace",
+            "primary_label": "Open workspace setup handoff",
+            "primary_summary": (
+                "No workspace snapshot is loaded. Continue in Workspace, load the current datasets, and then compare or reuse this catalog version."
+            ),
+            "secondary_area": "",
+            "secondary_label": "",
+            "secondary_summary": "",
+        }
+        if status != "approved" or unmatched_sources or artifact_type == "canonical-only":
+            plan.update(
+                {
+                    "secondary_area": "Canonical Console",
+                    "secondary_label": "Open canonical governance handoff",
+                    "secondary_summary": (
+                        "Inspect canonical coverage, stewardship, and approval context before treating this version as a stable reuse baseline."
+                    ),
+                }
+            )
+        return plan
+
+    if status != "approved":
+        return {
+            "table_label": "Canonical governance handoff",
+            "primary_area": "Canonical Console",
+            "primary_label": "Open canonical governance handoff",
+            "primary_summary": (
+                f"This version is {status}. Inspect governance owner, review note, and canonical coverage before reusing it in Workspace."
+            ),
+            "secondary_area": "Workspace",
+            "secondary_label": "Open workspace review context",
+            "secondary_summary": (
+                "Keep the current workspace review set visible while you compare this catalog candidate against the active queue."
+            ),
+        }
+
+    primary_summary = (
+        "Continue in Workspace Review to compare the active review set with this approved catalog version before applying reuse."
+    )
+    if unmatched_sources:
+        primary_summary += " After review, run canonical gaps if the same sources stay unmatched."
+
+    secondary_area = ""
+    secondary_label = ""
+    secondary_summary = ""
+    if unmatched_sources or artifact_type == "canonical-only":
+        secondary_area = "Canonical Console"
+        secondary_label = "Open canonical governance handoff"
+        secondary_summary = (
+            "Inspect canonical usage, gap queue, and overlay context for the concepts behind this reuse candidate."
+        )
+
+    return {
+        "table_label": "Workspace review handoff",
+        "primary_area": "Workspace",
+        "primary_label": "Open workspace review handoff",
+        "primary_summary": primary_summary,
+        "secondary_area": secondary_area,
+        "secondary_label": secondary_label,
+        "secondary_summary": secondary_summary,
+    }
+
+
+def _open_catalog_handoff(area: str, mapping_set_detail: dict[str, Any], summary: str) -> None:
+    version = int(mapping_set_detail.get("version") or 0)
+    name = _normalized_text(mapping_set_detail.get("name")) or "mapping-set"
+    st.session_state["pending_top_level_area"] = area
+    st.session_state["last_action"] = {
+        "level": "info",
+        "message": f"Catalog handoff: {name} v{version} -> {area}. {summary}",
+    }
+
+
+def _catalog_detail_state_recovery(error: httpx.HTTPError) -> dict[str, str] | None:
+    response = getattr(error, "response", None)
+    if response is None or response.status_code != 404:
+        return None
+    try:
+        detail = _normalized_text(response.json().get("detail"))
+    except Exception:
+        detail = ""
+    if "Unknown catalog integration" not in detail:
+        return None
+
+    for key in ("catalog_results", "selected_catalog_integration_name", *CATALOG_DETAIL_STATE_KEYS):
+        st.session_state.pop(key, None)
+    return {
+        "level": "warning",
+        "message": (
+            "Catalog results look stale relative to the backend. Reload catalog query results before opening integration detail again."
+        ),
+    }
 
 
 def _clear_catalog_mapping_set_context() -> None:
@@ -671,6 +997,7 @@ def render_catalog_tab(
     if results:
         discovery_rows = _catalog_system_pair_matrix_rows(results)
         reuse_hints = _catalog_result_reuse_hints(results)
+        workspace_context = _catalog_reuse_fit_workspace_context()
         if discovery_rows:
             unique_integrations = {
                 _normalized_text(item.get("integration_name"))
@@ -721,6 +1048,7 @@ def render_catalog_tab(
                     "decision_count": item.get("decision_count"),
                     "canonical_concepts": ", ".join(item.get("canonical_concepts", [])),
                     "reuse_hint": reuse_hints.get(_normalized_text(item.get("integration_name")), ""),
+                    "next_action": _catalog_next_action_plan(item, workspace_context).get("table_label", ""),
                 }
                 for item in results
             ],
@@ -747,7 +1075,7 @@ def render_catalog_tab(
                 _load_catalog_integration_detail(selected_name, api_request=api_request)
                 st.rerun()
             except httpx.HTTPError as error:
-                st.session_state["last_action"] = {
+                st.session_state["last_action"] = _catalog_detail_state_recovery(error) or {
                     "level": "error",
                     "message": f"Loading integration detail failed: {error}",
                 }
@@ -860,7 +1188,7 @@ def render_catalog_tab(
             with st.expander(
                 _section_label(
                     "Workspace Reuse Fit",
-                    _catalog_reuse_fit_label((reuse_fit_summary or {}).get("fit_assessment")) if reuse_fit_ready else None,
+                    _catalog_reuse_fit_label((reuse_fit_summary or {}).get("fit_assessment")) if reuse_fit_summary else None,
                 ),
                 expanded=bool(reuse_fit_summary or reuse_fit_error),
             ):
@@ -873,7 +1201,9 @@ def render_catalog_tab(
                     f"{reuse_fit_context.get('source_dataset_name') or 'Source dataset'} -> "
                     f"{reuse_fit_context.get('target_dataset_name') or 'Target dataset'} | "
                     f"mode={reuse_fit_context.get('mapping_mode') or 'standard'} | "
-                    f"active decisions={reuse_fit_context.get('current_decision_count', 0)}"
+                    f"active decisions={reuse_fit_context.get('current_decision_count', 0)} | "
+                    f"shared concepts={len(reuse_fit_context.get('current_shared_concepts', []))} | "
+                    f"unmatched sources={len(reuse_fit_context.get('current_unmatched_sources', []))}"
                 )
                 if not reuse_fit_ready:
                     st.info("Open the selected catalog version first to inspect workspace fit.")
@@ -893,7 +1223,7 @@ def render_catalog_tab(
                             st.rerun()
                 else:
                     if st.button(
-                        "Refresh workspace fit" if reuse_fit_summary else "Explain workspace fit",
+                        "Refresh reuse fit" if reuse_fit_summary else "Generate reuse fit",
                         width="stretch",
                         key="catalog_explain_workspace_fit",
                     ):
@@ -943,6 +1273,11 @@ def render_catalog_tab(
                         st.info("No workspace reuse-fit explanation has been generated yet for the selected version.")
 
             if selected_mapping_set_detail:
+                selected_workspace_context = _catalog_reuse_fit_workspace_context()
+                selected_next_action_plan = _catalog_next_action_plan(
+                    selected_mapping_set_detail,
+                    selected_workspace_context,
+                )
                 st.subheader("Mapping Set Drilldown")
                 st.caption(
                     f"#{selected_mapping_set_detail['mapping_set_id']} | {selected_mapping_set_detail['name']} | "
@@ -956,7 +1291,53 @@ def render_catalog_tab(
                 if selected_mapping_set_detail.get("review_note"):
                     st.caption(f"Review note: {selected_mapping_set_detail['review_note']}")
 
+                handoff_columns = st.columns(2)
+                st.caption(selected_next_action_plan.get("primary_summary") or "")
+                if handoff_columns[0].button(
+                    selected_next_action_plan.get("primary_label") or "Continue",
+                    width="stretch",
+                    key="catalog_open_primary_handoff",
+                    disabled=not bool(selected_next_action_plan.get("primary_area")) or selected_next_action_plan.get("primary_area") == "Catalog",
+                ):
+                    _open_catalog_handoff(
+                        selected_next_action_plan["primary_area"],
+                        selected_mapping_set_detail,
+                        selected_next_action_plan.get("primary_summary") or "Continue from Catalog.",
+                    )
+                    st.rerun()
+                if selected_next_action_plan.get("secondary_area"):
+                    if handoff_columns[1].button(
+                        selected_next_action_plan.get("secondary_label") or "Open secondary handoff",
+                        width="stretch",
+                        key="catalog_open_secondary_handoff",
+                    ):
+                        _open_catalog_handoff(
+                            selected_next_action_plan["secondary_area"],
+                            selected_mapping_set_detail,
+                            selected_next_action_plan.get("secondary_summary") or "Continue from Catalog.",
+                        )
+                        st.rerun()
+                else:
+                    handoff_columns[1].caption("No secondary governance handoff is needed for this version right now.")
+
                 st.dataframe(selected_mapping_set_detail.get("mapping_decisions", []), width="stretch", hide_index=True)
+
+                version_compare_payload = _catalog_version_compare_payload(
+                    selected_mapping_set_detail,
+                    version_records,
+                    latest_approved,
+                )
+                if version_compare_payload.get("rows"):
+                    recommended_compare_target = version_compare_payload.get("recommended_target") or {}
+                    st.caption(
+                        "Version compare path: start from the recommended baseline, then load a diff only when you need row-level changes."
+                    )
+                    st.dataframe(version_compare_payload["rows"], width="stretch", hide_index=True)
+                    st.caption(
+                        f"Recommended diff baseline: v{recommended_compare_target.get('version')} "
+                        f"({recommended_compare_target.get('status') or '-'}) | "
+                        f"{version_compare_payload.get('recommended_reason') or 'peer compare'}"
+                    )
 
                 comparison_candidates = [
                     item
@@ -965,6 +1346,9 @@ def render_catalog_tab(
                     and item.get("mapping_set_id") != selected_mapping_set_detail.get("mapping_set_id")
                 ]
                 if comparison_candidates:
+                    recommended_compare_mapping_set_id = int(
+                        ((version_compare_payload.get("recommended_target") or {}).get("mapping_set_id") or 0)
+                    )
                     comparison_labels = [
                         f"#{item['mapping_set_id']} | {item['name']} | v{item['version']} | {item['status']}"
                         for item in comparison_candidates
@@ -973,6 +1357,14 @@ def render_catalog_tab(
                     selected_comparison_label = comparison_columns[0].selectbox(
                         "Compare selected version against",
                         comparison_labels,
+                        index=next(
+                            (
+                                index
+                                for index, item in enumerate(comparison_candidates)
+                                if int(item.get("mapping_set_id") or 0) == recommended_compare_mapping_set_id
+                            ),
+                            0,
+                        ),
                         key="catalog_selected_mapping_set_diff_label",
                     )
                     comparison_mapping_set = comparison_candidates[
@@ -1017,6 +1409,7 @@ def render_catalog_tab(
 
             similar_integrations = integration_detail.get("similar_integrations", [])
             if similar_integrations:
+                similar_compare_payload = _catalog_similar_compare_payload(selected_version, similar_integrations)
                 st.subheader("Similar Integrations")
                 st.caption(
                     "Similarity is ranked by shared canonical concepts first, then by same source system, target system, business domain, and artifact type."
@@ -1040,21 +1433,64 @@ def render_catalog_tab(
                     width="stretch",
                     hide_index=True,
                 )
+                if similar_compare_payload.get("rows"):
+                    st.caption(
+                        "Peer drilldown path: prefer approved peer versions with the closest system and canonical overlap before opening the broader integration detail."
+                    )
+                    st.dataframe(similar_compare_payload["rows"], width="stretch", hide_index=True)
                 similar_names = [item["integration_name"] for item in similar_integrations]
-                similar_columns = st.columns([3, 1])
+                recommended_similar_name = _normalized_text(similar_compare_payload.get("recommended_integration_name"))
+                similar_columns = st.columns([3, 1, 1])
                 selected_similar_name = similar_columns[0].selectbox(
                     "Open similar integration detail",
                     similar_names,
+                    index=next(
+                        (
+                            index
+                            for index, name in enumerate(similar_names)
+                            if _normalized_text(name) == recommended_similar_name
+                        ),
+                        0,
+                    ),
                     key="catalog_selected_similar_integration_name",
+                )
+                selected_similar_integration = next(
+                    (
+                        item
+                        for item in similar_integrations
+                        if _normalized_text(item.get("integration_name")) == _normalized_text(selected_similar_name)
+                    ),
+                    similar_integrations[0],
+                )
+                selected_peer_version = selected_similar_integration.get("latest_approved_version") or selected_similar_integration.get("latest_version") or {}
+                st.caption(
+                    f"Selected peer drilldown: v{selected_peer_version.get('version') or '-'} "
+                    f"({selected_peer_version.get('status') or '-'}) | "
+                    f"{similar_compare_payload.get('recommended_reason') if _normalized_text(selected_similar_name) == recommended_similar_name else 'Open peer detail to inspect version lineage.'}"
                 )
                 if similar_columns[1].button("Open similar integration", width="stretch", key="catalog_open_similar_integration"):
                     try:
                         _load_catalog_integration_detail(selected_similar_name, api_request=api_request)
                         st.rerun()
                     except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
+                        st.session_state["last_action"] = _catalog_detail_state_recovery(error) or {
                             "level": "error",
                             "message": f"Loading similar integration failed: {error}",
+                        }
+                        st.rerun()
+                if similar_columns[2].button(
+                    "Open peer version",
+                    width="stretch",
+                    key="catalog_open_similar_integration_version",
+                    disabled=not bool(selected_peer_version.get("mapping_set_id")),
+                ):
+                    try:
+                        _load_catalog_mapping_set_detail(int(selected_peer_version["mapping_set_id"]), api_request=api_request)
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Loading similar integration version failed: {error}",
                         }
                         st.rerun()
 
