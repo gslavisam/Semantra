@@ -1,3 +1,5 @@
+"""Companion metadata enrichment helpers for source and target dataset profiles."""
+
 from __future__ import annotations
 
 from app.models.knowledge import SourceFieldHintRecord
@@ -51,6 +53,8 @@ def apply_source_field_hints(
     business_domain: str | None = None,
     integration_name: str | None = None,
 ) -> tuple[SchemaProfile, list[SourceFieldHintRecord]]:
+    """Apply persisted source-field hints to a schema profile based on source, domain, and integration scope."""
+
     normalized_source_system = _normalized_text(source_system)
     if not normalized_source_system:
         return schema_profile, []
@@ -108,6 +112,8 @@ def apply_inline_source_field_hint(
     sample_values: list[str] | None = None,
     refinement_instruction: str = "",
 ) -> ColumnProfile:
+    """Apply transient UI-provided field hints to a single column profile without persisting them."""
+
     if (
         not str(meaning_hint or "").strip()
         and not str(negative_hint or "").strip()

@@ -1,3 +1,5 @@
+"""CLI utility for comparing Semantra scoring profiles on benchmark cases."""
+
 from __future__ import annotations
 
 import argparse

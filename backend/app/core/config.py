@@ -1,3 +1,5 @@
+"""Runtime settings loading and configuration helpers for Semantra."""
+
 from __future__ import annotations
 
 import json

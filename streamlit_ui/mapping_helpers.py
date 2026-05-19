@@ -1,3 +1,5 @@
+"""Derived mapping and explanation helpers shared across Streamlit views."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -8,10 +10,14 @@ def _normalized_text(value: object) -> str:
 
 
 def suggested_mapping_by_source(mapping_response: dict) -> dict[str, dict]:
+    """Index selected mapping rows by source field for quick lookup in the UI."""
+
     return {item["source"]: item for item in mapping_response.get("mappings", [])}
 
 
 def resolve_suggested_transformation_code(entry: dict | None, fallback_code: str | None = None) -> str:
+    """Return the suggested transformation code only when it still matches the active target."""
+
     current_entry = entry or {}
     current_target = _normalized_text(current_entry.get("target"))
     suggested_target = _normalized_text(current_entry.get("suggested_target"))
@@ -21,6 +27,8 @@ def resolve_suggested_transformation_code(entry: dict | None, fallback_code: str
 
 
 def effective_transformation_code(source: str, session_state: dict, fallback_code: str | None = None) -> str | None:
+    """Resolve the transformation code that is currently active for one source field."""
+
     manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
     if manual_code and session_state.get(f"manual_apply_{source}", False):
         return manual_code
@@ -32,6 +40,8 @@ def effective_transformation_code(source: str, session_state: dict, fallback_cod
 
 
 def transformation_mode(source: str, session_state: dict, fallback_code: str | None = None) -> str:
+    """Return whether a source field is using direct, suggested, or custom transformation logic."""
+
     manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
     if manual_code and session_state.get(f"manual_apply_{source}", False):
         return "custom"
@@ -43,6 +53,8 @@ def transformation_mode(source: str, session_state: dict, fallback_code: str | N
 
 
 def transformation_mode_label(mode: str) -> str:
+    """Return a user-facing label for the current transformation mode."""
+
     labels = {
         "custom": "Transformation: custom",
         "suggested": "Transformation: suggested",
@@ -52,6 +64,8 @@ def transformation_mode_label(mode: str) -> str:
 
 
 def knowledge_explanation_lines(explanation: list[str] | None) -> list[str]:
+    """Filter explanation lines down to knowledge-layer evidence only."""
+
     lines = explanation or []
     return [
         line for line in lines
@@ -60,6 +74,8 @@ def knowledge_explanation_lines(explanation: list[str] | None) -> list[str]:
 
 
 def canonical_explanation_lines(explanation: list[str] | None) -> list[str]:
+    """Filter explanation lines down to canonical-glossary evidence only."""
+
     lines = explanation or []
     return [
         line for line in lines
@@ -68,6 +84,8 @@ def canonical_explanation_lines(explanation: list[str] | None) -> list[str]:
 
 
 def canonical_concept_labels(canonical_details: dict | None) -> list[str]:
+    """Build display labels for the most relevant canonical concepts on a mapping row."""
+
     details = canonical_details or {}
     shared = details.get("shared_concepts") or []
     source = details.get("source_concepts") or []
@@ -84,6 +102,8 @@ def canonical_concept_labels(canonical_details: dict | None) -> list[str]:
 
 
 def canonical_scope_labels(canonical_details: dict | None, scope: str) -> list[str]:
+    """Build display labels for canonical concepts from one requested scope bucket."""
+
     details = canonical_details or {}
     concepts = details.get(scope) or []
     labels: list[str] = []
@@ -97,6 +117,8 @@ def canonical_scope_labels(canonical_details: dict | None, scope: str) -> list[s
 
 
 def canonical_match_status(canonical_details: dict | None) -> str:
+    """Classify how source and target resolve against canonical concepts."""
+
     details = canonical_details or {}
     shared = details.get("shared_concepts") or []
     source = details.get("source_concepts") or []
@@ -113,6 +135,8 @@ def canonical_match_status(canonical_details: dict | None) -> str:
 
 
 def canonical_match_status_label(status: str) -> str:
+    """Return a user-facing label for one canonical match status value."""
+
     labels = {
         "shared_match": "Shared canonical concept",
         "source_only": "Source resolved, target unresolved",
@@ -130,6 +154,8 @@ def canonical_path_label(
     *,
     canonical_concept_labels_func: Callable[[dict | None], list[str]] = canonical_concept_labels,
 ) -> str:
+    """Format a canonical path label showing source, concept bridge, and target."""
+
     concept_labels = canonical_concept_labels_func(canonical_details)
     if not concept_labels:
         return ""
@@ -143,6 +169,8 @@ def source_concept_rows(
     *,
     suggested_mapping_by_source_func: Callable[[dict], dict[str, dict]] = suggested_mapping_by_source,
 ) -> list[dict]:
+    """Build a source-to-concept view for the currently selected mapping state."""
+
     selected_by_source = suggested_mapping_by_source_func(mapping_response)
     rows: list[dict] = []
 
@@ -181,6 +209,8 @@ def concept_target_rows(
     *,
     suggested_mapping_by_source_func: Callable[[dict], dict[str, dict]] = suggested_mapping_by_source,
 ) -> list[dict]:
+    """Build a concept-to-target aggregation for the currently selected mapping state."""
+
     selected_by_source = suggested_mapping_by_source_func(mapping_response)
     grouped: dict[tuple[str, str], dict] = {}
 
@@ -234,6 +264,8 @@ def canonical_concept_groups(
     suggested_mapping_by_source_func: Callable[[dict], dict[str, dict]] = suggested_mapping_by_source,
     canonical_path_label_func: Callable[[str, str | None, dict | None], str] = canonical_path_label,
 ) -> list[dict]:
+    """Group current mappings by shared canonical concept for summary views."""
+
     selected_by_source = suggested_mapping_by_source_func(mapping_response)
     grouped: dict[str, dict] = {}
 
@@ -297,6 +329,8 @@ def trust_layer_rows(
     effective_transformation_code_func: Callable[[str, dict, str | None], str | None] = effective_transformation_code,
     transformation_mode_func: Callable[[str, dict, str | None], str] = transformation_mode,
 ) -> list[dict]:
+    """Build row-level trust-layer payloads for evidence, transformation, and hinting views."""
+
     selected_by_source = suggested_mapping_by_source_func(mapping_response)
     rows: list[dict] = []
     for ranked in mapping_response.get("ranked_mappings", []):
@@ -338,6 +372,8 @@ def current_mapping_rows(
     validator_badge: Callable[[str], str],
     canonical_path_label_func: Callable[[str, str | None, dict | None], str] = canonical_path_label,
 ) -> list[dict]:
+    """Build the flattened current-mapping table used by review and governance surfaces."""
+
     selected_by_source = suggested_mapping_by_source_func(mapping_response)
     rows: list[dict] = []
     for ranked in mapping_response["ranked_mappings"]:
@@ -377,6 +413,8 @@ def current_mapping_rows(
 
 
 def selected_target_options(ranked: dict) -> list[str]:
+    """Return selectbox target options for one ranked mapping row, preserving any active selection."""
+
     options = [candidate["target"] for candidate in ranked["candidates"]]
     selected = ranked["selected"]["target"] if ranked["selected"] and ranked["selected"].get("target") else None
     if ranked.get("selected") and not selected:
@@ -387,6 +425,8 @@ def selected_target_options(ranked: dict) -> list[str]:
 
 
 def has_knowledge_match(signals: dict | None, explanation: list[str] | str | None = None) -> bool:
+    """Return whether a mapping row shows knowledge-layer evidence in signals or explanation text."""
+
     if isinstance(signals, dict):
         try:
             if float(signals.get("knowledge", 0.0) or 0.0) > 0.0:
@@ -414,6 +454,8 @@ def has_knowledge_match(signals: dict | None, explanation: list[str] | str | Non
 
 
 def has_canonical_match(signals: dict | None, explanation: list[str] | str | None = None) -> bool:
+    """Return whether a mapping row shows canonical-glossary evidence in signals or explanation text."""
+
     if isinstance(signals, dict):
         try:
             if float(signals.get("canonical", 0.0) or 0.0) > 0.0:

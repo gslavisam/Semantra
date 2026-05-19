@@ -1,3 +1,5 @@
+"""API smoke tests covering primary Semantra product and governance flows."""
+
 from __future__ import annotations
 
 import json

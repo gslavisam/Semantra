@@ -1,3 +1,5 @@
+"""Benchmark evaluation, scoring-profile comparison, and correction-impact logic."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -11,6 +13,8 @@ from app.services.mapping_service import DEFAULT_SCORING_PROFILE, SCORING_PROFIL
 
 @contextmanager
 def scoring_profile_context(profile_name: str, weight_overrides: dict[str, float] | None = None):
+    """Temporarily switch the active scoring profile and weight overrides for evaluation runs."""
+
     normalized_profile = normalize_scoring_profile_name(profile_name)
     resolve_scoring_weights(normalized_profile, weight_overrides or {})
     previous_profile = settings.scoring_profile
@@ -25,6 +29,8 @@ def scoring_profile_context(profile_name: str, weight_overrides: dict[str, float
 
 
 def evaluate_cases(cases: list[dict], llm_provider=None) -> EvaluationMetrics:
+    """Evaluate benchmark cases against the current mapping configuration."""
+
     total_cases = len(cases)
     total_fields = 0
     correct_matches = 0
@@ -81,6 +87,8 @@ def evaluate_cases(cases: list[dict], llm_provider=None) -> EvaluationMetrics:
 
 
 def evaluate_correction_impact(cases: list[dict], llm_provider=None) -> CorrectionImpactMetrics:
+    """Compare baseline and correction-aware benchmark performance on the same cases."""
+
     with correction_store.feedback_disabled():
         baseline = evaluate_cases(cases, llm_provider=llm_provider)
 
@@ -102,6 +110,8 @@ def evaluate_cases_for_profile(
     llm_provider=None,
     weight_overrides: dict[str, float] | None = None,
 ) -> EvaluationMetrics:
+    """Evaluate benchmark cases under one named scoring profile and optional weight overrides."""
+
     with scoring_profile_context(profile_name, weight_overrides):
         return evaluate_cases(cases, llm_provider=llm_provider)
 
@@ -112,6 +122,8 @@ def compare_scoring_profiles(
     profile_names: list[str] | None = None,
     llm_provider=None,
 ) -> dict[str, EvaluationMetrics]:
+    """Evaluate the same benchmark cases across multiple scoring profiles."""
+
     resolved_profile_names = [normalize_scoring_profile_name(name) for name in (profile_names or list(SCORING_PROFILES.keys()))]
     comparison: dict[str, EvaluationMetrics] = {}
     for profile_name in resolved_profile_names:
@@ -120,6 +132,8 @@ def compare_scoring_profiles(
 
 
 def recommend_scoring_profile(comparison: dict[str, EvaluationMetrics]) -> tuple[str | None, str]:
+    """Choose the best default scoring profile from a comparison result and explain why."""
+
     if not comparison:
         return None, "No scoring profiles were compared."
 
@@ -157,6 +171,8 @@ def build_scoring_profile_comparison_response(
     profile_names: list[str] | None = None,
     llm_provider=None,
 ) -> ScoringProfileComparisonResponse:
+    """Build the API response used to compare and recommend scoring profiles."""
+
     comparison = compare_scoring_profiles(cases, profile_names=profile_names, llm_provider=llm_provider)
     recommended_profile, recommendation_reason = recommend_scoring_profile(comparison)
     return ScoringProfileComparisonResponse(
@@ -178,6 +194,8 @@ def build_scoring_profile_comparison_response(
 
 
 def build_column_profile(column: dict) -> ColumnProfile:
+    """Build a synthetic ColumnProfile from serialized benchmark fixture data."""
+
     return ColumnProfile(
         name=column["name"],
         normalized_name=column.get("normalized_name", column["name"].replace("_", " ")),

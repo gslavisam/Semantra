@@ -1,3 +1,5 @@
+"""Catalog and approved-reuse endpoints for Semantra integration knowledge."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,6 +24,8 @@ async def list_catalog_integrations(
     artifact_type: str | None = Query(None),
     integration_name: str | None = Query(None),
 ) -> list[CatalogIntegrationRecord]:
+    """List cataloged integrations using optional admin filters."""
+
     return persistence_service.list_catalog_integrations(
         source_system=source_system,
         target_system=target_system,
@@ -43,6 +47,8 @@ async def search_catalog_integrations(
     status: str | None = Query(None),
     artifact_type: str | None = Query(None),
 ) -> list[CatalogIntegrationRecord]:
+    """Search cataloged integrations by free text plus optional admin filters."""
+
     return persistence_service.search_catalog_integrations(
         q,
         source_system=source_system,
@@ -56,6 +62,8 @@ async def search_catalog_integrations(
 
 @router.get("/integrations/{integration_name}", response_model=CatalogIntegrationDetail, dependencies=[Depends(require_admin)])
 async def get_catalog_integration_detail(integration_name: str) -> CatalogIntegrationDetail:
+    """Return one catalog integration with its detailed reuse metadata."""
+
     try:
         return persistence_service.get_catalog_integration_detail(integration_name)
     except KeyError as error:
@@ -70,6 +78,8 @@ async def get_catalog_concept_detail(
     status: str | None = Query(None),
     artifact_type: str | None = Query(None),
 ) -> CatalogConceptDetail:
+    """Return one catalog concept with filtered usage and integration detail."""
+
     try:
         return persistence_service.get_catalog_concept_detail(
             concept_id,
@@ -84,5 +94,7 @@ async def get_catalog_concept_detail(
 
 @router.post("/reuse-fit", response_model=CatalogReuseFitResponse, dependencies=[Depends(require_admin)])
 async def explain_catalog_reuse_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitResponse:
+    """Generate an admin-facing reuse-fit explanation for a proposed catalog match."""
+
     provider = build_provider_from_settings()
     return build_catalog_reuse_fit(request, provider=provider)

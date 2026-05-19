@@ -1,3 +1,5 @@
+"""UI-side governance guardrails and friendly error helpers for blocked actions."""
+
 from __future__ import annotations
 
 import httpx
@@ -5,6 +7,8 @@ from typing import Any
 
 
 def mapping_set_workspace_block_reason(status: str | None, *, action_label: str) -> str:
+    """Explain why a mapping-set workspace action is blocked by governance status."""
+
     normalized_status = str(status or "").strip().lower()
     if normalized_status == "approved":
         return ""
@@ -13,6 +17,8 @@ def mapping_set_workspace_block_reason(status: str | None, *, action_label: str)
 
 
 def mapping_output_block_reason(mapping_decisions: list[dict[str, Any]], *, action_label: str) -> str:
+    """Explain why an output action is blocked until active decisions are accepted."""
+
     blocked_statuses = sorted(
         {
             (str(item.get("status") or "").strip().lower() or "needs_review")
@@ -29,6 +35,8 @@ def mapping_output_block_reason(mapping_decisions: list[dict[str, Any]], *, acti
 
 
 def mapping_benchmark_block_reason(mapping_decisions: list[dict[str, Any]]) -> str:
+    """Explain why the current mapping cannot yet be saved as a benchmark fixture."""
+
     return mapping_output_block_reason(
         mapping_decisions,
         action_label="Saving current mapping as benchmark",
@@ -36,6 +44,8 @@ def mapping_benchmark_block_reason(mapping_decisions: list[dict[str, Any]]) -> s
 
 
 def api_error_message(error: httpx.HTTPError, *, default_prefix: str) -> str:
+    """Convert an HTTP client error into a user-facing message with backend detail when useful."""
+
     response = getattr(error, "response", None)
     if response is not None and response.status_code in {403, 409}:
         try:

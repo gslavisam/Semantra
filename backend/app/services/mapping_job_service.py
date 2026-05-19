@@ -1,3 +1,5 @@
+"""In-memory async mapping job runtime with lifecycle and capacity management."""
+
 from __future__ import annotations
 
 import threading
@@ -18,11 +20,15 @@ FINISHED_JOB_STATUSES = {"completed", "failed", "canceled"}
 
 
 class MappingJobCapacityError(RuntimeError):
+    """Raised when the in-memory mapping job store has reached active-job capacity."""
+
     pass
 
 
 @dataclass
 class MappingJob:
+    """Runtime record for one async mapping job tracked by the in-memory job store."""
+
     job_id: str
     status: str = "queued"
     activity: list[str] = field(default_factory=list)
@@ -35,11 +41,15 @@ class MappingJob:
 
 
 class MappingJobStore:
+    """In-memory async job store used by local and pilot Semantra mapping flows."""
+
     def __init__(self) -> None:
         self._jobs: dict[str, MappingJob] = {}
         self._lock = threading.Lock()
 
     def start(self, worker) -> MappingJob:
+        """Create and launch one background mapping job for the supplied worker callback."""
+
         job = MappingJob(job_id=uuid4().hex)
         self._save(job)
         thread = threading.Thread(target=self._run_worker, args=(job.job_id, worker), daemon=True)

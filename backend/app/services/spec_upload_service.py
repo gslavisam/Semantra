@@ -1,3 +1,5 @@
+"""Schema-spec upload parsing and normalization for field-oriented metadata files."""
+
 from __future__ import annotations
 
 import re
@@ -48,6 +50,8 @@ MAX_SPEC_SAMPLE_VALUES = 5
 
 
 def build_spec_layout_hint(rows: list[dict[str, object]]) -> SpecLayoutHint | None:
+    """Infer a likely schema-spec layout from parsed tabular rows."""
+
     if not rows:
         return None
 
@@ -56,6 +60,8 @@ def build_spec_layout_hint(rows: list[dict[str, object]]) -> SpecLayoutHint | No
 
 
 def detect_spec_layout(headers: list[str]) -> SpecLayoutHint | None:
+    """Detect which headers in a tabular file correspond to name, description, type, and samples."""
+
     normalized_headers = [normalize_header_candidate(header) for header in headers]
     if not normalized_headers or len(normalized_headers) > SPEC_LAYOUT_MAX_COLUMNS:
         return None
@@ -89,6 +95,8 @@ def parse_spec_payload(
     type_col: str | None = None,
     sample_values_col: str | None = None,
 ) -> SchemaProfile:
+    """Parse an uploaded schema-spec file into the SchemaProfile used by Semantra."""
+
     rows = parse_tabular_payload(payload, filename)
     return parse_spec_rows(
         rows,
@@ -111,6 +119,8 @@ def parse_spec_rows(
     type_col: str | None = None,
     sample_values_col: str | None = None,
 ) -> SchemaProfile:
+    """Convert parsed schema-spec rows into the SchemaProfile used by Semantra."""
+
     if not rows:
         raise ValueError("Spec upload requires at least one field row")
 
@@ -178,6 +188,8 @@ def resolve_spec_layout(
     type_col: str | None,
     sample_values_col: str | None,
 ) -> SpecLayoutHint:
+    """Resolve explicit or detected schema-spec columns into one validated layout hint."""
+
     headers = list(rows[0].keys())
     available_headers = {normalize_tabular_header(header): header for header in headers}
 
@@ -208,6 +220,8 @@ def resolve_optional_header(
     available_headers: dict[str, str],
     header_kind: str,
 ) -> str | None:
+    """Resolve one optional user-specified header against normalized available headers."""
+
     if not requested_header:
         return None
     resolved_header = available_headers.get(normalize_tabular_header(requested_header))
@@ -221,6 +235,8 @@ def find_matching_header(
     normalized_headers: list[str],
     candidates: set[str],
 ) -> str | None:
+    """Return the first header whose normalized form matches one of the candidate names."""
+
     for header, normalized in zip(headers, normalized_headers, strict=False):
         if normalized in candidates:
             return header
@@ -228,11 +244,15 @@ def find_matching_header(
 
 
 def normalize_header_candidate(header: str) -> str:
+    """Normalize a raw header into the comparable form used for schema-spec detection."""
+
     normalized = normalize_tabular_header(header).strip().lower().replace("_", " ")
     return re.sub(r"[^a-z0-9]+", " ", normalized).strip()
 
 
 def is_plausible_field_name(value: str, header_name: str) -> bool:
+    """Return whether a cell value looks like a real field name instead of another header."""
+
     stripped = value.strip()
     if not stripped:
         return False
@@ -249,6 +269,8 @@ def is_plausible_field_name(value: str, header_name: str) -> bool:
 
 
 def map_spec_type(raw_type: object) -> str:
+    """Map raw schema-spec type text into Semantra's simplified dtype labels."""
+
     lowered = "" if is_nullish(raw_type) else str(raw_type).strip().lower()
     if any(token in lowered for token in ("datetime", "timestamp", "dttm")):
         return "datetime"
@@ -264,6 +286,8 @@ def map_spec_type(raw_type: object) -> str:
 
 
 def map_spec_pattern(dtype: str) -> str:
+    """Map a simplified dtype into the default detected pattern used for spec-only uploads."""
+
     if dtype in {"date", "datetime"}:
         return "date"
     if dtype == "float":
@@ -274,6 +298,8 @@ def map_spec_pattern(dtype: str) -> str:
 
 
 def parse_spec_sample_values(raw_value: object) -> list[str]:
+    """Parse sample values from a schema-spec cell into a bounded list of strings."""
+
     if is_nullish(raw_value):
         return []
 

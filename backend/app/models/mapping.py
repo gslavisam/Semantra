@@ -1,3 +1,5 @@
+"""Domain models for Semantra mapping, governance, preview, and evaluation payloads."""
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -30,6 +32,8 @@ TransformationWarningCode = Literal[
 
 
 class ScoringSignals(BaseModel):
+    """Per-signal score breakdown used to rank one mapping candidate."""
+
     name: float = 0.0
     semantic: float = 0.0
     knowledge: float = 0.0
@@ -43,18 +47,24 @@ class ScoringSignals(BaseModel):
 
 
 class CanonicalConceptMatchDetail(BaseModel):
+    """Strength-weighted canonical concept match attached to a source or target field."""
+
     concept_id: str
     display_name: str
     strength: float = 0.0
 
 
 class CanonicalMappingDetails(BaseModel):
+    """Canonical concept resolution details for a source-target comparison."""
+
     source_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
     target_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
     shared_concepts: list[CanonicalConceptMatchDetail] = Field(default_factory=list)
 
 
 class CandidateOption(BaseModel):
+    """One candidate target option considered for a source field."""
+
     target: str
     confidence: float
     confidence_label: ConfidenceLabel
@@ -65,6 +75,8 @@ class CandidateOption(BaseModel):
 
 
 class LLMValidationResult(BaseModel):
+    """Closed-set LLM validator result for one source field and candidate shortlist."""
+
     selected_target: str
     confidence: float
     reasoning: list[str] = Field(default_factory=list)
@@ -73,6 +85,8 @@ class LLMValidationResult(BaseModel):
 
 
 class LLMDecisionProposition(BaseModel):
+    """Structured explanation of how an LLM recommendation related to the final decision."""
+
     proposition_type: Literal["confirm", "challenge", "no_match"]
     proposed_target: str | None = None
     final_target: str | None = None
@@ -86,6 +100,8 @@ class LLMDecisionProposition(BaseModel):
 
 
 class MappingCandidate(BaseModel):
+    """Selected mapping candidate outcome for one source field."""
+
     source: str
     target: str | None = None
     confidence: float
@@ -103,12 +119,16 @@ class MappingCandidate(BaseModel):
 
 
 class SourceMappingResult(BaseModel):
+    """Ranked candidate set for one source field, including the selected choice."""
+
     source: str
     selected: MappingCandidate | None = None
     candidates: list[CandidateOption] = Field(default_factory=list)
 
 
 class MappingDecision(BaseModel):
+    """Persistable mapping decision chosen during review."""
+
     source: str
     target: str
     status: DecisionStatus = "accepted"
@@ -116,6 +136,8 @@ class MappingDecision(BaseModel):
 
 
 class AutoMappingRequest(BaseModel):
+    """Request payload for standard source-to-target auto-mapping."""
+
     source_dataset_id: str
     target_dataset_id: str
     use_llm: bool = True
@@ -129,6 +151,8 @@ TargetSystem = Literal["canonical"]
 
 
 class CanonicalMappingRequest(BaseModel):
+    """Request payload for mapping a source dataset into the virtual canonical target."""
+
     source_dataset_id: str
     target_system: TargetSystem = "canonical"
     use_llm: bool = True
@@ -140,6 +164,8 @@ class CanonicalMappingRequest(BaseModel):
 
 
 class MappingRefinementRequest(BaseModel):
+    """Request payload for re-ranking targets for one source field."""
+
     source_dataset_id: str
     source_field: str
     target_dataset_id: str | None = None
@@ -158,11 +184,15 @@ class MappingRefinementRequest(BaseModel):
 
 
 class CanonicalCoverageColumnMatch(BaseModel):
+    """Canonical concept matches attached to one schema column."""
+
     column: str
     concept_ids: list[str] = Field(default_factory=list)
 
 
 class CanonicalCoverageSummary(BaseModel):
+    """Coverage statistics for canonical resolution across one side of a mapping."""
+
     total_columns: int = 0
     matched_columns: int = 0
     coverage_ratio: float = 0.0
@@ -171,6 +201,8 @@ class CanonicalCoverageSummary(BaseModel):
 
 
 class CanonicalCoverageProjectSummary(BaseModel):
+    """Project-level canonical coverage summary across both source and target."""
+
     total_columns: int = 0
     matched_columns: int = 0
     coverage_ratio: float = 0.0
@@ -183,12 +215,16 @@ class CanonicalCoverageProjectSummary(BaseModel):
 
 
 class CanonicalCoverageReport(BaseModel):
+    """Combined canonical coverage report for source, target, and project scopes."""
+
     source: CanonicalCoverageSummary = Field(default_factory=CanonicalCoverageSummary)
     target: CanonicalCoverageSummary = Field(default_factory=CanonicalCoverageSummary)
     project: CanonicalCoverageProjectSummary = Field(default_factory=CanonicalCoverageProjectSummary)
 
 
 class AutoMappingResponse(BaseModel):
+    """Response returned after generating ranked mapping candidates."""
+
     mappings: list[MappingCandidate] = Field(default_factory=list)
     ranked_mappings: list[SourceMappingResult] = Field(default_factory=list)
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
@@ -202,6 +238,8 @@ MappingAnalysisTransformationRisk = Literal["low", "medium", "high"]
 
 
 class MappingAnalysisWorkspaceContext(BaseModel):
+    """Workspace metadata used to contextualize mapping analysis generation."""
+
     mapping_mode: Literal["standard", "canonical"] = "standard"
     source_dataset_name: str = "Source dataset"
     target_dataset_name: str = "Target dataset"
@@ -212,17 +250,23 @@ class MappingAnalysisWorkspaceContext(BaseModel):
 
 
 class MappingAnalysisOptions(BaseModel):
+    """Options controlling how mapping analysis summaries are generated."""
+
     audience: MappingAnalysisAudience = "technical_implementor"
     include_narration_seed: bool = True
 
 
 class MappingAnalysisRequest(BaseModel):
+    """Request payload for generating a mapping-analysis summary."""
+
     mapping_response: AutoMappingResponse
     workspace: MappingAnalysisWorkspaceContext = Field(default_factory=MappingAnalysisWorkspaceContext)
     options: MappingAnalysisOptions = Field(default_factory=MappingAnalysisOptions)
 
 
 class MappingAnalysisOverallMappingHealth(BaseModel):
+    """Top-level health summary for the current mapping response."""
+
     summary: str = ""
     accepted_count: int = 0
     needs_review_count: int = 0
@@ -235,6 +279,8 @@ class MappingAnalysisOverallMappingHealth(BaseModel):
 
 
 class MappingAnalysisConfidenceDistribution(BaseModel):
+    """Confidence-bucket distribution used in analysis summaries."""
+
     high_confidence_count: int = 0
     medium_confidence_count: int = 0
     low_confidence_count: int = 0
@@ -245,6 +291,8 @@ class MappingAnalysisConfidenceDistribution(BaseModel):
 
 
 class MappingAnalysisStrongestMatch(BaseModel):
+    """One standout high-confidence match highlighted in the analysis summary."""
+
     source: str
     target: str
     confidence: float = 0.0
@@ -254,6 +302,8 @@ class MappingAnalysisStrongestMatch(BaseModel):
 
 
 class MappingAnalysisNeedsReviewItem(BaseModel):
+    """One highlighted review queue item from the mapping analysis summary."""
+
     source: str
     proposed_target: str = ""
     confidence: float = 0.0
@@ -264,12 +314,16 @@ class MappingAnalysisNeedsReviewItem(BaseModel):
 
 
 class MappingAnalysisUnmatchedSource(BaseModel):
+    """One unmatched source field highlighted by the analysis summary."""
+
     source: str
     reason: str = ""
     recommended_follow_up: str = ""
 
 
 class MappingAnalysisCanonicalCoverageSummary(BaseModel):
+    """Canonical coverage interpretation included in mapping analysis responses."""
+
     source_coverage: float = 0.0
     target_coverage: float = 0.0
     project_coverage: float = 0.0
@@ -281,6 +335,8 @@ class MappingAnalysisCanonicalCoverageSummary(BaseModel):
 
 
 class MappingAnalysisTransformationHotspot(BaseModel):
+    """One mapping row flagged as a transformation hotspot."""
+
     source: str
     target: str = ""
     transformation_required: bool = False
@@ -289,6 +345,8 @@ class MappingAnalysisTransformationHotspot(BaseModel):
 
 
 class MappingAnalysisGenerationMetadata(BaseModel):
+    """Generation metadata describing whether analysis used the LLM or fallback logic."""
+
     used_llm: bool = False
     fallback_used: bool = True
     llm_provider: str | None = None
@@ -296,6 +354,8 @@ class MappingAnalysisGenerationMetadata(BaseModel):
 
 
 class MappingAnalysisSummaryResponse(BaseModel):
+    """Structured mapping-analysis overview returned to the UI."""
+
     title: str = ""
     audience: MappingAnalysisAudience = "technical_implementor"
     mapping_mode: Literal["standard", "canonical"] = "standard"
@@ -319,15 +379,21 @@ class MappingAnalysisSummaryResponse(BaseModel):
 
 
 class MappingAnalysisNarrationRequest(BaseModel):
+    """Request payload for turning an analysis summary into spoken narration."""
+
     summary: MappingAnalysisSummaryResponse
 
 
 class MappingAnalysisNarrationResponse(BaseModel):
+    """Narration payload generated from a mapping-analysis summary."""
+
     spoken_script: str = ""
     generation_metadata: MappingAnalysisGenerationMetadata = Field(default_factory=MappingAnalysisGenerationMetadata)
 
 
 class MappingAnalysisAudioRequest(BaseModel):
+    """Request payload for synthesizing audio from a spoken narration script."""
+
     spoken_script: str
     voice: str | None = None
     model: str | None = None
@@ -337,6 +403,8 @@ ReviewPlanPriority = Literal["high", "medium", "low"]
 
 
 class ReviewPlanGenerationMetadata(BaseModel):
+    """Generation metadata describing whether the review plan used the LLM or fallback logic."""
+
     used_llm: bool = False
     fallback_used: bool = True
     llm_provider: str | None = None
@@ -344,6 +412,8 @@ class ReviewPlanGenerationMetadata(BaseModel):
 
 
 class ReviewPlanCluster(BaseModel):
+    """Cluster of related review items grouped into one suggested follow-up theme."""
+
     issue_type: str = ""
     focus: str = ""
     canonical_status: str = ""
@@ -355,12 +425,16 @@ class ReviewPlanCluster(BaseModel):
 
 
 class ReviewPlanRequest(BaseModel):
+    """Request payload for generating a queue-level mapping review plan."""
+
     filtered_rows: list[dict[str, Any]] = Field(default_factory=list)
     attention_summary_rows: list[dict[str, Any]] = Field(default_factory=list)
     filters: dict[str, str] = Field(default_factory=dict)
 
 
 class ReviewPlanResponse(BaseModel):
+    """Structured queue-level review plan returned to the UI."""
+
     title: str = ""
     queue_summary: str = ""
     clusters: list[ReviewPlanCluster] = Field(default_factory=list)
@@ -374,11 +448,15 @@ MappingJobStorageMode = Literal["in_memory"]
 
 
 class MappingJobStartResponse(BaseModel):
+    """Response returned when a background mapping job is started."""
+
     job_id: str
     status: MappingJobStatus
 
 
 class MappingJobStatusResponse(BaseModel):
+    """Runtime status for one background mapping job."""
+
     job_id: str
     status: MappingJobStatus
     activity: list[str] = Field(default_factory=list)
@@ -387,6 +465,8 @@ class MappingJobStatusResponse(BaseModel):
 
 
 class MappingJobRuntimeStatusResponse(BaseModel):
+    """Aggregate runtime status for the mapping job subsystem."""
+
     storage_mode: MappingJobStorageMode = "in_memory"
     restart_safe: bool = False
     cross_process_safe: bool = False
@@ -406,6 +486,8 @@ CanonicalGapProposalState = Literal["new", "needs_review", "ready_for_approval"]
 
 
 class CanonicalGapCandidate(BaseModel):
+    """Mapping row that appears to need a new or expanded canonical concept path."""
+
     source: str
     target: str
     confidence: float = 0.0
@@ -419,19 +501,27 @@ class CanonicalGapCandidate(BaseModel):
 
 
 class CanonicalGapCandidatesRequest(BaseModel):
+    """Request payload for extracting canonical-gap candidates from a mapping response."""
+
     mapping_response: AutoMappingResponse
     min_confidence: float = 0.65
 
 
 class CanonicalGapCandidatesResponse(BaseModel):
+    """Response containing canonical-gap candidates extracted from a mapping response."""
+
     candidates: list[CanonicalGapCandidate] = Field(default_factory=list)
 
 
 class CanonicalGapSuggestionRequest(BaseModel):
+    """Request payload for generating a canonical-gap suggestion for one candidate."""
+
     candidate: CanonicalGapCandidate
 
 
 class CanonicalGapSuggestion(BaseModel):
+    """LLM-assisted suggestion describing how to resolve one canonical gap."""
+
     action: CanonicalGapSuggestionAction = "no_action"
     concept_id: str | None = None
     display_name: str | None = None
@@ -443,6 +533,8 @@ class CanonicalGapSuggestion(BaseModel):
 
 
 class CanonicalGapApproveRequest(BaseModel):
+    """Request payload for approving a canonical-gap suggestion into an overlay."""
+
     candidate: CanonicalGapCandidate
     suggestion: CanonicalGapSuggestion
     approved_by: str | None = None
@@ -450,6 +542,8 @@ class CanonicalGapApproveRequest(BaseModel):
 
 
 class CanonicalGapApproveResponse(BaseModel):
+    """Response returned after persisting an approved canonical-gap overlay update."""
+
     overlay_id: int
     overlay_name: str
     saved_entry_count: int = 0
@@ -457,6 +551,8 @@ class CanonicalGapApproveResponse(BaseModel):
 
 
 class CanonicalGapRejectRequest(BaseModel):
+    """Request payload for rejecting or ignoring a canonical-gap suggestion."""
+
     candidate: CanonicalGapCandidate
     suggestion: CanonicalGapSuggestion | None = None
     disposition: CanonicalGapDisposition = "rejected"
@@ -465,6 +561,8 @@ class CanonicalGapRejectRequest(BaseModel):
 
 
 class CanonicalGapProposalStateRequest(BaseModel):
+    """Request payload for persisting triage state on a canonical-gap candidate."""
+
     candidate_key: str
     candidate: CanonicalGapCandidate
     proposal_state: CanonicalGapProposalState = "new"
@@ -473,6 +571,8 @@ class CanonicalGapProposalStateRequest(BaseModel):
 
 
 class CanonicalGapProposalStateRecord(BaseModel):
+    """Persisted triage state for one canonical-gap candidate."""
+
     candidate_key: str
     source: str
     target: str
@@ -483,6 +583,8 @@ class CanonicalGapProposalStateRecord(BaseModel):
 
 
 class CanonicalGapTriageGenerationMetadata(BaseModel):
+    """Generation metadata describing whether canonical-gap triage used the LLM or fallback logic."""
+
     used_llm: bool = False
     fallback_used: bool = True
     llm_provider: str | None = None
@@ -490,6 +592,8 @@ class CanonicalGapTriageGenerationMetadata(BaseModel):
 
 
 class CanonicalGapTriageGroup(BaseModel):
+    """Grouped canonical-gap queue family used in triage summaries."""
+
     priority: Literal["high", "medium", "low"] = "medium"
     focus: str = ""
     count: int = 0
@@ -501,12 +605,16 @@ class CanonicalGapTriageGroup(BaseModel):
 
 
 class CanonicalGapTriageSummaryRequest(BaseModel):
+    """Request payload for generating a queue-level canonical-gap triage summary."""
+
     candidates: list[CanonicalGapCandidate] = Field(default_factory=list)
     suggestions: dict[str, CanonicalGapSuggestion] = Field(default_factory=dict)
     proposal_states: dict[str, CanonicalGapProposalState] = Field(default_factory=dict)
 
 
 class CanonicalGapTriageSummaryResponse(BaseModel):
+    """Structured summary of grouped canonical-gap review work."""
+
     title: str = ""
     summary: str = ""
     groups: list[CanonicalGapTriageGroup] = Field(default_factory=list)
@@ -518,6 +626,8 @@ class CanonicalGapTriageSummaryResponse(BaseModel):
 
 
 class DecisionLogEntry(BaseModel):
+    """Observed decision log entry capturing heuristics, LLM output, and the final choice."""
+
     source: str
     candidate_targets: list[str] = Field(default_factory=list)
     heuristic_scores: dict[str, float] = Field(default_factory=dict)
@@ -528,6 +638,8 @@ class DecisionLogEntry(BaseModel):
 
 
 class UserCorrectionEntry(BaseModel):
+    """Persisted user correction captured from review feedback."""
+
     correction_id: int | None = None
     source: str
     suggested_target: str | None = None
@@ -539,6 +651,8 @@ class UserCorrectionEntry(BaseModel):
 
 
 class CorrectionRuleCandidate(BaseModel):
+    """Suggested reusable correction rule mined from repeated feedback."""
+
     source: str
     suggested_target: str | None = None
     corrected_target: str | None = None
@@ -550,6 +664,8 @@ class CorrectionRuleCandidate(BaseModel):
 
 
 class ReusableCorrectionRule(BaseModel):
+    """Promoted correction rule that can be reused in future mapping runs."""
+
     rule_id: int | None = None
     source: str
     suggested_target: str | None = None
@@ -563,6 +679,8 @@ class ReusableCorrectionRule(BaseModel):
 
 
 class ReusableCorrectionRulePromotionRequest(BaseModel):
+    """Request payload used to promote a mined correction rule into active reuse."""
+
     source: str
     suggested_target: str | None = None
     corrected_target: str | None = None
@@ -573,6 +691,8 @@ class ReusableCorrectionRulePromotionRequest(BaseModel):
 
 
 class MappingSetCreateRequest(BaseModel):
+    """Request payload for saving the current workspace as a governed mapping set."""
+
     name: str
     source_dataset_id: str | None = None
     target_dataset_id: str | None = None
@@ -594,6 +714,8 @@ class MappingSetCreateRequest(BaseModel):
 
 
 class MappingSetRecord(BaseModel):
+    """Summary record for one persisted versioned mapping set."""
+
     mapping_set_id: int
     name: str
     status: MappingSetStatus = "draft"
@@ -619,10 +741,14 @@ class MappingSetRecord(BaseModel):
 
 
 class MappingSetDetail(MappingSetRecord):
+    """Expanded mapping-set record including the full mapping decisions."""
+
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
 
 
 class CatalogIntegrationRecord(BaseModel):
+    """Catalog summary record for one saved integration version."""
+
     mapping_set_id: int
     name: str
     integration_name: str
@@ -646,6 +772,8 @@ class CatalogIntegrationRecord(BaseModel):
 
 
 class CatalogIntegrationDetail(BaseModel):
+    """Detailed catalog view for one integration across versions and similar assets."""
+
     integration_name: str
     source_system: str | None = None
     target_system: str | None = None
@@ -661,6 +789,8 @@ class CatalogIntegrationDetail(BaseModel):
 
 
 class CatalogSimilarIntegrationRecord(BaseModel):
+    """Catalog record describing one integration that is similar to another."""
+
     integration_name: str
     similarity_score: float = 0.0
     shared_concepts: list[str] = Field(default_factory=list)
@@ -674,6 +804,8 @@ class CatalogSimilarIntegrationRecord(BaseModel):
 
 
 class CatalogConceptUsageRecord(BaseModel):
+    """Catalog usage record showing where one canonical concept appears."""
+
     concept_id: str
     mapping_set_id: int
     name: str
@@ -689,6 +821,8 @@ class CatalogConceptUsageRecord(BaseModel):
 
 
 class CatalogConceptDetail(BaseModel):
+    """Detail response for one catalog concept and its integration usage."""
+
     concept_id: str
     usage_count: int = 0
     integrations: list[CatalogConceptUsageRecord] = Field(default_factory=list)
@@ -698,6 +832,8 @@ CatalogReuseFitAssessment = Literal["strong_fit", "partial_fit", "low_fit"]
 
 
 class CatalogReuseFitGenerationMetadata(BaseModel):
+    """Generation metadata describing whether reuse-fit analysis used the LLM or fallback logic."""
+
     used_llm: bool = False
     fallback_used: bool = True
     llm_provider: str | None = None
@@ -705,6 +841,8 @@ class CatalogReuseFitGenerationMetadata(BaseModel):
 
 
 class CatalogReuseFitWorkspaceContext(BaseModel):
+    """Current workspace context used to assess catalog reuse fit."""
+
     workspace_loaded: bool = False
     mapping_mode: str = ""
     source_dataset_name: str = ""
@@ -720,11 +858,15 @@ class CatalogReuseFitWorkspaceContext(BaseModel):
 
 
 class CatalogReuseFitRequest(BaseModel):
+    """Request payload for evaluating how well a catalog asset fits the current workspace."""
+
     mapping_set_detail: MappingSetDetail
     workspace_context: CatalogReuseFitWorkspaceContext = Field(default_factory=CatalogReuseFitWorkspaceContext)
 
 
 class CatalogReuseFitResponse(BaseModel):
+    """Structured reuse-fit assessment returned for a selected catalog mapping set."""
+
     title: str = ""
     fit_assessment: CatalogReuseFitAssessment = "partial_fit"
     summary: str = ""
@@ -735,6 +877,8 @@ class CatalogReuseFitResponse(BaseModel):
 
 
 class MappingSetStatusUpdateRequest(BaseModel):
+    """Request payload for changing mapping-set governance status or ownership metadata."""
+
     status: MappingSetStatus
     changed_by: str | None = None
     note: str | None = None
@@ -744,11 +888,15 @@ class MappingSetStatusUpdateRequest(BaseModel):
 
 
 class MappingSetApplyRequest(BaseModel):
+    """Request payload for marking a mapping set as applied in workspace flows."""
+
     changed_by: str | None = None
     note: str | None = None
 
 
 class MappingSetAuditEntry(BaseModel):
+    """Audit log entry describing one mapping-set lifecycle action."""
+
     audit_id: int | None = None
     mapping_set_id: int
     mapping_set_name: str
@@ -761,6 +909,8 @@ class MappingSetAuditEntry(BaseModel):
 
 
 class MappingSetDecisionDiffEntry(BaseModel):
+    """One row-level change between two mapping-set versions."""
+
     change_type: Literal["added", "removed", "changed"]
     source: str
     from_target: str | None = None
@@ -772,6 +922,8 @@ class MappingSetDecisionDiffEntry(BaseModel):
 
 
 class MappingSetDiffResponse(BaseModel):
+    """Diff summary comparing one mapping-set version against another."""
+
     current_mapping_set_id: int
     current_name: str
     current_version: int
@@ -785,6 +937,8 @@ class MappingSetDiffResponse(BaseModel):
 
 
 class RuntimeConfigSnapshot(BaseModel):
+    """Admin-facing runtime configuration snapshot for backend observability."""
+
     llm_provider: str
     llm_model: str
     llm_timeout_seconds: float
@@ -808,11 +962,15 @@ class RuntimeConfigSnapshot(BaseModel):
 
 
 class BenchmarkDatasetCreateRequest(BaseModel):
+    """Request payload for saving a reusable benchmark dataset."""
+
     name: str
     cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class BenchmarkDatasetRecord(BaseModel):
+    """Summary record for one saved benchmark dataset."""
+
     dataset_id: int
     name: str
     case_count: int
@@ -821,6 +979,8 @@ class BenchmarkDatasetRecord(BaseModel):
 
 
 class EvaluationMetrics(BaseModel):
+    """Accuracy metrics produced by benchmark evaluation runs."""
+
     total_cases: int
     total_fields: int
     correct_matches: int
@@ -830,6 +990,8 @@ class EvaluationMetrics(BaseModel):
 
 
 class ScoringProfileMetrics(BaseModel):
+    """Evaluation metrics for one scoring profile in a profile comparison."""
+
     profile: str
     total_cases: int
     total_fields: int
@@ -840,12 +1002,16 @@ class ScoringProfileMetrics(BaseModel):
 
 
 class ScoringProfileComparisonResponse(BaseModel):
+    """Comparison response for multiple scoring profiles on the same benchmark set."""
+
     profiles: list[ScoringProfileMetrics] = Field(default_factory=list)
     recommended_profile: str | None = None
     recommendation_reason: str = ""
 
 
 class CorrectionImpactMetrics(BaseModel):
+    """Benchmark metrics comparing baseline and correction-aware evaluation modes."""
+
     baseline: EvaluationMetrics
     correction_aware: EvaluationMetrics
     accuracy_delta: float = 0.0
@@ -854,6 +1020,8 @@ class CorrectionImpactMetrics(BaseModel):
 
 
 class BenchmarkExplanationGenerationMetadata(BaseModel):
+    """Generation metadata describing whether benchmark explanation used the LLM or fallback logic."""
+
     used_llm: bool = False
     fallback_used: bool = True
     llm_provider: str | None = None
@@ -861,6 +1029,8 @@ class BenchmarkExplanationGenerationMetadata(BaseModel):
 
 
 class BenchmarkExplanationRequest(BaseModel):
+    """Request payload for generating a narrative explanation of benchmark results."""
+
     dataset_name: str = ""
     benchmark_result: EvaluationMetrics | None = None
     correction_impact: CorrectionImpactMetrics | None = None
@@ -868,6 +1038,8 @@ class BenchmarkExplanationRequest(BaseModel):
 
 
 class BenchmarkExplanationResponse(BaseModel):
+    """Structured explanation of benchmark findings, risks, and next actions."""
+
     title: str = ""
     summary: str = ""
     key_findings: list[str] = Field(default_factory=list)
@@ -879,6 +1051,8 @@ class BenchmarkExplanationResponse(BaseModel):
 
 
 class EvaluationRunRecord(BaseModel):
+    """Persisted record of one executed benchmark run."""
+
     run_id: int
     dataset_id: int | None = None
     dataset_name: str | None = None
@@ -893,20 +1067,28 @@ class EvaluationRunRecord(BaseModel):
 
 
 class EvaluationRunRequest(BaseModel):
+    """Request payload for running an ad hoc evaluation benchmark."""
+
     cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class PreviewRequest(BaseModel):
+    """Request payload for previewing mapping decisions against uploaded source rows."""
+
     source_dataset_id: str
     mapping_decisions: list[MappingDecision]
 
 
 class PreviewRow(BaseModel):
+    """One preview output row together with any row-level warnings."""
+
     values: dict[str, Any]
     warnings: list[str] = Field(default_factory=list)
 
 
 class TransformationPreviewWarning(BaseModel):
+    """Structured warning emitted while previewing or generating transformations."""
+
     code: TransformationWarningCode
     message: str
     source: str | None = None
@@ -918,6 +1100,8 @@ class TransformationPreviewWarning(BaseModel):
 
 
 class TransformationPreviewResult(BaseModel):
+    """Per-mapping transformation preview result including samples and warnings."""
+
     source: str
     target: str
     mode: TransformationPreviewMode = "direct"
@@ -929,12 +1113,16 @@ class TransformationPreviewResult(BaseModel):
 
 
 class PreviewResponse(BaseModel):
+    """Preview response including output rows, unresolved targets, and transformation results."""
+
     preview: list[PreviewRow] = Field(default_factory=list)
     unresolved_targets: list[str] = Field(default_factory=list)
     transformation_previews: list[TransformationPreviewResult] = Field(default_factory=list)
 
 
 class TransformationTestAssertion(BaseModel):
+    """Assertion describing expected transformation preview behavior for one target."""
+
     target: str
     expected_status: TransformationPreviewStatus | None = None
     expected_classification: TransformationPreviewClassification | None = None
@@ -943,18 +1131,24 @@ class TransformationTestAssertion(BaseModel):
 
 
 class TransformationTestCase(BaseModel):
+    """Transformation test case containing source rows and expected assertions."""
+
     case_name: str
     source_rows: list[dict[str, Any]] = Field(default_factory=list)
     assertions: list[TransformationTestAssertion] = Field(default_factory=list)
 
 
 class TransformationTestSetCreateRequest(BaseModel):
+    """Request payload for saving a reusable transformation test set."""
+
     name: str
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
     cases: list[TransformationTestCase] = Field(default_factory=list)
 
 
 class TransformationTestSetRecord(BaseModel):
+    """Summary record for one saved transformation test set."""
+
     test_set_id: int
     name: str
     mapping_count: int
@@ -964,11 +1158,15 @@ class TransformationTestSetRecord(BaseModel):
 
 
 class TransformationTestSetDetail(TransformationTestSetRecord):
+    """Expanded transformation test set including mapping decisions and test cases."""
+
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
     cases: list[TransformationTestCase] = Field(default_factory=list)
 
 
 class TransformationTestCaseResult(BaseModel):
+    """Execution result for one transformation test case."""
+
     case_name: str
     passed: bool
     failures: list[str] = Field(default_factory=list)
@@ -977,6 +1175,8 @@ class TransformationTestCaseResult(BaseModel):
 
 
 class TransformationTestSetRunResponse(BaseModel):
+    """Aggregate execution response for a saved transformation test set."""
+
     test_set_id: int
     name: str
     passed: bool
@@ -986,18 +1186,24 @@ class TransformationTestSetRunResponse(BaseModel):
 
 
 class CodegenRequest(BaseModel):
+    """Request payload for generating Pandas or PySpark mapping code."""
+
     mapping_decisions: list[MappingDecision]
     mode: CodegenMode = "pandas"
     allow_unaccepted: bool = False
 
 
 class GeneratedArtifact(BaseModel):
+    """Generated code artifact returned from a mapping codegen request."""
+
     language: Literal["python-pandas", "python-pyspark"] = "python-pandas"
     code: str
     warnings: list[TransformationPreviewWarning] = Field(default_factory=list)
 
 
 class ArtifactRefinementRequest(BaseModel):
+    """Request payload for refining an already generated code artifact."""
+
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
     mode: CodegenMode = "pandas"
     allow_unaccepted: bool = False
@@ -1008,6 +1214,8 @@ class ArtifactRefinementRequest(BaseModel):
 
 
 class ArtifactRefinementResponse(BaseModel):
+    """Response containing refined code, reasoning, and warnings from artifact refinement."""
+
     language: Literal["python-pandas", "python-pyspark"]
     code: str
     reasoning: list[str] = Field(default_factory=list)
@@ -1015,6 +1223,8 @@ class ArtifactRefinementResponse(BaseModel):
 
 
 class TransformationGenerationRequest(BaseModel):
+    """Request payload for generating a transformation for one source-target column pair."""
+
     source_dataset_id: str
     target_dataset_id: str
     source_column: str
@@ -1023,12 +1233,16 @@ class TransformationGenerationRequest(BaseModel):
 
 
 class TransformationGenerationResponse(BaseModel):
+    """Response containing generated transformation code plus reasoning and warnings."""
+
     transformation_code: str
     reasoning: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 
 
 class TransformationTemplate(BaseModel):
+    """Reusable transformation template exposed to the Streamlit editor."""
+
     template_id: str
     name: str
     description: str

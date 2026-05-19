@@ -1,3 +1,5 @@
+"""Shared FastAPI dependencies such as admin-token enforcement."""
+
 from __future__ import annotations
 
 from fastapi import Header, HTTPException, status

@@ -1,3 +1,5 @@
+"""Observability and protected admin endpoints for runtime inspection and control."""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,27 +27,37 @@ router = APIRouter(prefix="/observability", tags=["observability"])
 
 @router.get("/decision-logs", response_model=list[DecisionLogEntry], dependencies=[Depends(require_admin)])
 async def list_decision_logs() -> list[DecisionLogEntry]:
+    """List recorded mapping decision logs for admin inspection."""
+
     return decision_log_store.list_entries()
 
 
 @router.get("/corrections", response_model=list[UserCorrectionEntry], dependencies=[Depends(require_admin)])
 async def list_user_corrections() -> list[UserCorrectionEntry]:
+    """List persisted user correction entries captured during review."""
+
     return correction_store.list_entries()
 
 
 @router.post("/corrections", response_model=UserCorrectionEntry, dependencies=[Depends(require_admin)])
 async def create_user_correction(entry: UserCorrectionEntry) -> UserCorrectionEntry:
+    """Append one user correction entry and return the stored record."""
+
     correction_store.append(entry)
     return correction_store.list_entries()[-1]
 
 
 @router.get("/corrections/reusable-rules", response_model=list[CorrectionRuleCandidate], dependencies=[Depends(require_admin)])
 async def list_reusable_correction_rules(min_occurrences: int = Query(default=2, ge=2, le=20)) -> list[CorrectionRuleCandidate]:
+    """Suggest reusable correction rules mined from repeated feedback patterns."""
+
     return correction_store.suggest_reusable_rules(min_occurrences=min_occurrences)
 
 
 @router.get("/corrections/reusable-rules/active", response_model=list[ReusableCorrectionRule], dependencies=[Depends(require_admin)])
 async def list_active_reusable_correction_rules() -> list[ReusableCorrectionRule]:
+    """List currently active reusable correction rules."""
+
     return correction_store.list_reusable_rules()
 
 
@@ -53,6 +65,8 @@ async def list_active_reusable_correction_rules() -> list[ReusableCorrectionRule
 async def promote_reusable_correction_rule(
     request: ReusableCorrectionRulePromotionRequest,
 ) -> ReusableCorrectionRule:
+    """Promote one mined correction rule into the active reusable rule set."""
+
     try:
         return correction_store.promote_reusable_rule(request)
     except ValueError as error:
@@ -61,6 +75,8 @@ async def promote_reusable_correction_rule(
 
 @router.get("/config", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])
 async def get_runtime_config() -> RuntimeConfigSnapshot:
+    """Return the current runtime configuration snapshot, including LLM runtime state."""
+
     snapshot = settings_snapshot()
     snapshot.update(summarize_llm_runtime())
     return RuntimeConfigSnapshot.model_validate(snapshot)
@@ -68,11 +84,15 @@ async def get_runtime_config() -> RuntimeConfigSnapshot:
 
 @router.get("/mapping-jobs/runtime", response_model=MappingJobRuntimeStatusResponse, dependencies=[Depends(require_admin)])
 async def get_mapping_job_runtime_status() -> MappingJobRuntimeStatusResponse:
+    """Return aggregate runtime status for the background mapping job subsystem."""
+
     return mapping_job_store.runtime_status()
 
 
 @router.post("/config/reload", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])
 async def reload_runtime_config() -> RuntimeConfigSnapshot:
+    """Reload runtime configuration and rebind persistence to the refreshed settings."""
+
     reloaded = reload_settings()
     persistence_service.reconfigure(reloaded.sqlite_path)
     snapshot = settings_snapshot()

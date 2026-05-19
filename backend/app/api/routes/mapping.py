@@ -1,3 +1,5 @@
+"""Mapping workflow endpoints for ranking, review, preview, and governance actions."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -101,6 +103,8 @@ def append_mapping_set_audit(
     changed_by: str | None = None,
     note: str | None = None,
 ) -> MappingSetAuditEntry:
+    """Append one audit entry for a mapping-set lifecycle action."""
+
     return persistence_service.append_mapping_set_audit_log(
         MappingSetAuditEntry(
             mapping_set_id=mapping_set.mapping_set_id,
@@ -175,6 +179,8 @@ def _resolve_refinement_target_schema(request: MappingRefinementRequest):
 
 @router.post("/auto", response_model=AutoMappingResponse)
 async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
+    """Generate candidate mappings between uploaded source and target datasets."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
         target = dataset_store.get_dataset(request.target_dataset_id)
@@ -199,6 +205,8 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
 
 @router.post("/auto/jobs", response_model=MappingJobStartResponse)
 async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResponse:
+    """Start asynchronous mapping generation for uploaded source and target datasets."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
         target = dataset_store.get_dataset(request.target_dataset_id)
@@ -235,6 +243,8 @@ async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResp
 
 @router.post("/canonical", response_model=AutoMappingResponse)
 async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse:
+    """Generate mappings from a source dataset into the virtual canonical target schema."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
     except KeyError as error:
@@ -263,6 +273,8 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
 
 @router.get("/target-fields", response_model=list[str])
 async def list_mapping_target_fields(target_system: str | None = Query(default=None)) -> list[str]:
+    """List available target field names for a supported virtual target system."""
+
     normalized_target_system = str(target_system or "").strip().lower()
     if normalized_target_system:
         if normalized_target_system != "canonical":
@@ -277,6 +289,8 @@ async def list_mapping_target_fields(target_system: str | None = Query(default=N
 
 @router.post("/refine", response_model=SourceMappingResult)
 async def refine_mapping(request: MappingRefinementRequest) -> SourceMappingResult:
+    """Re-rank candidate targets for one source field using inline refinement hints."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
     except KeyError as error:
@@ -323,6 +337,8 @@ async def refine_mapping(request: MappingRefinementRequest) -> SourceMappingResu
 
 @router.post("/canonical/jobs", response_model=MappingJobStartResponse)
 async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJobStartResponse:
+    """Start asynchronous canonical-only mapping generation for one source dataset."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
     except KeyError as error:
@@ -363,6 +379,8 @@ async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJo
 
 @router.get("/jobs/{job_id}", response_model=MappingJobStatusResponse)
 async def get_mapping_job_status(job_id: str) -> MappingJobStatusResponse:
+    """Return the current runtime status for one background mapping job."""
+
     try:
         return mapping_job_store.get_status(job_id)
     except KeyError as error:
@@ -371,6 +389,8 @@ async def get_mapping_job_status(job_id: str) -> MappingJobStatusResponse:
 
 @router.post("/jobs/{job_id}/cancel", response_model=MappingJobStatusResponse)
 async def cancel_mapping_job(job_id: str) -> MappingJobStatusResponse:
+    """Cancel one background mapping job if it is still running."""
+
     try:
         return mapping_job_store.cancel(job_id)
     except KeyError as error:
@@ -379,6 +399,8 @@ async def cancel_mapping_job(job_id: str) -> MappingJobStatusResponse:
 
 @router.post("/preview", response_model=PreviewResponse)
 async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
+    """Preview mapping decisions against uploaded source rows before export or apply."""
+
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
     except KeyError as error:
@@ -389,18 +411,24 @@ async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
 
 @router.post("/analysis/summary", response_model=MappingAnalysisSummaryResponse)
 async def summarize_mapping_analysis(request: MappingAnalysisRequest) -> MappingAnalysisSummaryResponse:
+    """Generate a bounded textual analysis summary for the current mapping decisions."""
+
     provider = build_provider_from_settings()
     return build_mapping_analysis_summary(request, provider=provider)
 
 
 @router.post("/analysis/narration", response_model=MappingAnalysisNarrationResponse)
 async def narrate_mapping_analysis(request: MappingAnalysisNarrationRequest) -> MappingAnalysisNarrationResponse:
+    """Generate a spoken-script style narration for the current mapping analysis."""
+
     provider = build_provider_from_settings()
     return build_mapping_analysis_narration(request, provider=provider)
 
 
 @router.post("/analysis/audio")
 async def synthesize_mapping_analysis_audio(request: MappingAnalysisAudioRequest) -> Response:
+    """Synthesize WAV audio for a prepared mapping-analysis spoken script."""
+
     try:
         audio_bytes = synthesize_orpheus_wav(
             request.spoken_script,
@@ -422,6 +450,8 @@ async def synthesize_mapping_analysis_audio(request: MappingAnalysisAudioRequest
 
 @router.post("/review-plan", response_model=ReviewPlanResponse)
 async def summarize_review_plan(request: ReviewPlanRequest) -> ReviewPlanResponse:
+    """Generate a bounded review plan for unresolved or risky mapping decisions."""
+
     provider = build_provider_from_settings()
     return build_review_plan(request, provider=provider)
 
@@ -434,6 +464,8 @@ async def list_source_field_hints(
     source_field: str | None = Query(default=None),
     active_only: bool = Query(default=True),
 ) -> list[SourceFieldHintRecord]:
+    """List persisted source-field hints scoped to system, integration, or field."""
+
     return persistence_service.list_source_field_hints(
         source_system=source_system,
         business_domain=business_domain,
@@ -445,6 +477,8 @@ async def list_source_field_hints(
 
 @router.post("/source-field-hints", response_model=SourceFieldHintRecord)
 async def save_source_field_hint(request: SourceFieldHintUpsertRequest) -> SourceFieldHintRecord:
+    """Create or update one persistent source-field hint used during mapping."""
+
     try:
         return persistence_service.save_source_field_hint(request)
     except ValueError as error:
@@ -453,6 +487,8 @@ async def save_source_field_hint(request: SourceFieldHintUpsertRequest) -> Sourc
 
 @router.post("/codegen", response_model=GeneratedArtifact)
 async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
+    """Generate Pandas or PySpark mapping code from accepted mapping decisions."""
+
     _require_accepted_output_decisions(
         request.mapping_decisions,
         action_label="Code generation",
@@ -465,6 +501,8 @@ async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
 
 @router.post("/codegen/refine", response_model=ArtifactRefinementResponse)
 async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> ArtifactRefinementResponse:
+    """Ask the bounded LLM to refine an already generated mapping artifact."""
+
     _require_accepted_output_decisions(
         request.mapping_decisions,
         action_label="Code refinement",
@@ -490,6 +528,8 @@ async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> Artifac
 
 @router.post("/sets", response_model=MappingSetRecord, dependencies=[Depends(require_admin)])
 async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetRecord:
+    """Persist a reviewed mapping set together with metadata and audit history."""
+
     saved = persistence_service.save_mapping_set(
         request.name,
         request.mapping_decisions,
@@ -516,11 +556,15 @@ async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetReco
 
 @router.get("/sets", response_model=list[MappingSetRecord], dependencies=[Depends(require_admin)])
 async def list_mapping_sets() -> list[MappingSetRecord]:
+    """List persisted mapping sets available for governance and reuse."""
+
     return persistence_service.list_mapping_sets()
 
 
 @router.get("/sets/{mapping_set_id}", response_model=MappingSetDetail, dependencies=[Depends(require_admin)])
 async def get_mapping_set(mapping_set_id: int) -> MappingSetDetail:
+    """Return one persisted mapping set with full decision and governance detail."""
+
     try:
         return persistence_service.get_mapping_set(mapping_set_id)
     except KeyError as error:
@@ -532,6 +576,8 @@ async def update_mapping_set_status(
     mapping_set_id: int,
     request: MappingSetStatusUpdateRequest,
 ) -> MappingSetRecord:
+    """Update governance status and ownership fields for one mapping set."""
+
     try:
         updated = persistence_service.update_mapping_set_status(
             mapping_set_id,
@@ -551,6 +597,8 @@ async def apply_mapping_set(
     mapping_set_id: int,
     request: MappingSetApplyRequest,
 ) -> MappingSetDetail:
+    """Mark an approved mapping set as applied for downstream workspace reuse flows."""
+
     try:
         mapping_set = persistence_service.get_mapping_set(mapping_set_id)
     except KeyError as error:
@@ -569,6 +617,8 @@ async def apply_mapping_set(
 
 @router.get("/sets/{mapping_set_id}/audit", response_model=list[MappingSetAuditEntry], dependencies=[Depends(require_admin)])
 async def get_mapping_set_audit(mapping_set_id: int) -> list[MappingSetAuditEntry]:
+    """Return the audit trail for one persisted mapping set."""
+
     return persistence_service.list_mapping_set_audit_logs(mapping_set_id)
 
 
@@ -577,6 +627,8 @@ async def get_mapping_set_diff(
     mapping_set_id: int,
     against_id: int = Query(...),
 ) -> MappingSetDiffResponse:
+    """Compare one mapping set against another persisted version."""
+
     try:
         return persistence_service.diff_mapping_sets(mapping_set_id, against_id)
     except KeyError as error:
@@ -587,6 +639,8 @@ async def get_mapping_set_diff(
 
 @router.get("/transformation/templates", response_model=list[TransformationTemplate])
 async def get_transformation_templates() -> list[TransformationTemplate]:
+    """List reusable built-in transformation templates exposed to the mapping UI."""
+
     return list_transformation_templates()
 
 
@@ -598,6 +652,8 @@ async def get_transformation_templates() -> list[TransformationTemplate]:
 async def create_transformation_test_set(
     request: TransformationTestSetCreateRequest,
 ) -> TransformationTestSetRecord:
+    """Persist a reusable transformation test set for accepted mapping decisions."""
+
     _require_accepted_output_decisions(
         request.mapping_decisions,
         action_label="Transformation test set save",
@@ -615,6 +671,8 @@ async def create_transformation_test_set(
     dependencies=[Depends(require_admin)],
 )
 async def list_transformation_test_sets() -> list[TransformationTestSetRecord]:
+    """List persisted transformation test sets available to admins."""
+
     return persistence_service.list_transformation_test_sets()
 
 
@@ -624,6 +682,8 @@ async def list_transformation_test_sets() -> list[TransformationTestSetRecord]:
     dependencies=[Depends(require_admin)],
 )
 async def get_transformation_test_set(test_set_id: int) -> TransformationTestSetDetail:
+    """Return one transformation test set with its cases and mapping decisions."""
+
     try:
         return persistence_service.get_transformation_test_set(test_set_id)
     except KeyError as error:
@@ -636,6 +696,8 @@ async def get_transformation_test_set(test_set_id: int) -> TransformationTestSet
     dependencies=[Depends(require_admin)],
 )
 async def execute_transformation_test_set(test_set_id: int) -> TransformationTestSetRunResponse:
+    """Execute one saved transformation test set against its accepted mapping decisions."""
+
     try:
         test_set = persistence_service.get_transformation_test_set(test_set_id)
     except KeyError as error:
@@ -646,6 +708,8 @@ async def execute_transformation_test_set(test_set_id: int) -> TransformationTes
 
 @router.post("/transformation/generate", response_model=TransformationGenerationResponse)
 async def generate_transformation(request: TransformationGenerationRequest) -> TransformationGenerationResponse:
+    """Generate a bounded transformation suggestion for one source-target column pair."""
+
     provider = build_provider_from_settings()
     if provider is None:
         raise HTTPException(status_code=503, detail="LLM provider is not configured.")

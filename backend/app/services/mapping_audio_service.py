@@ -1,3 +1,5 @@
+"""Audio synthesis helpers for spoken mapping-analysis narration output."""
+
 from __future__ import annotations
 
 import importlib
@@ -17,6 +19,8 @@ LMSTUDIO_ORPHEUS_CUSTOM_TOKEN_PREFIX = "<custom_token_"
 
 
 def synthesize_orpheus_wav(text: str, *, voice: str | None = None, model: str | None = None) -> bytes:
+    """Synthesize WAV audio for narration text using the LM Studio Orpheus TTS flow."""
+
     normalized_text = _normalize_chunk_text(text)
     if not normalized_text:
         raise ValueError("Spoken script is empty; generate narration before audio synthesis.")
@@ -293,6 +297,8 @@ def _build_silence_pcm(duration_ms: int, sample_rate: int = 24000) -> bytes:
 
 
 def pcm_to_wav_bytes(pcm_bytes: bytes, sample_rate: int = 24000) -> bytes:
+    """Wrap raw PCM bytes into a WAV container suitable for playback and download."""
+
     if len(pcm_bytes) % 2 != 0:
         raise ValueError("PCM payload length must be divisible by 2 for 16-bit mono audio.")
 

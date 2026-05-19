@@ -1,3 +1,5 @@
+"""Starter artifact code generation for Pandas and PySpark outputs."""
+
 from __future__ import annotations
 
 import re
@@ -7,6 +9,8 @@ from app.services.transformation_service import build_transformation_statement, 
 
 
 def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+    """Generate a Pandas starter artifact from reviewed mapping decisions."""
+
     lines = [
         "import pandas as pd",
         "",
@@ -91,6 +95,8 @@ def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
 
 
 def generate_pyspark_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+    """Generate a PySpark starter artifact from reviewed mapping decisions."""
+
     lines = [
         "from pyspark.sql import functions as F",
         "",

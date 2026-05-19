@@ -1,3 +1,5 @@
+"""Benchmark explanation generation for scored runs and profile comparisons."""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +17,8 @@ def build_benchmark_explanation(
     request: BenchmarkExplanationRequest,
     provider: LLMProvider | None = None,
 ) -> BenchmarkExplanationResponse:
+    """Build a benchmark explanation payload with deterministic fallback and optional bounded LLM enrichment."""
+
     fallback = _build_fallback_explanation(request)
     if provider is None:
         return fallback
@@ -39,6 +43,8 @@ def build_benchmark_explanation_prompt(
     request: BenchmarkExplanationRequest,
     fallback: BenchmarkExplanationResponse,
 ) -> str:
+    """Build the bounded prompt used to narrate benchmark evidence without inventing causes."""
+
     evidence = {
         "dataset_name": request.dataset_name,
         "benchmark_result": request.benchmark_result.model_dump(mode="json") if request.benchmark_result else None,

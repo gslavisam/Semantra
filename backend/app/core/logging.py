@@ -1,3 +1,5 @@
+"""Logging bootstrap helpers used during Semantra application startup."""
+
 from __future__ import annotations
 
 import logging

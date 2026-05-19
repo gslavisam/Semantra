@@ -1,3 +1,5 @@
+"""Virtual canonical target schema builders for canonical-only mapping mode."""
+
 from __future__ import annotations
 
 from app.models.mapping import TargetSystem
@@ -7,6 +9,8 @@ from app.utils.normalization import normalize_name, tokenize_name
 
 
 def build_virtual_target_schema(target_system: TargetSystem = "canonical") -> SchemaProfile:
+    """Build a virtual target schema from the canonical glossary for canonical-only mapping mode."""
+
     if target_system != "canonical":
         raise ValueError(f"Unsupported virtual target system: {target_system}")
 

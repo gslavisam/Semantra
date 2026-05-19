@@ -1,3 +1,5 @@
+"""Parsers for CSV, JSON, XML, and XLSX row-data uploads."""
+
 from __future__ import annotations
 
 import csv
@@ -16,10 +18,14 @@ SUPPORTED_ROW_FORMATS = (".csv", ".json", ".xml", ".xlsx")
 
 
 def decode_tabular_payload(payload: bytes) -> str:
+    """Decode a text-based tabular payload using Semantra's standard decoding rules."""
+
     return decode_text_payload(payload)
 
 
 def parse_tabular_payload(payload: bytes, filename: str) -> list[dict[str, Any]]:
+    """Parse one supported row-data upload payload into normalized record dictionaries."""
+
     suffix = Path(filename).suffix.lower()
     if suffix == ".csv":
         return read_csv_payload(payload)
@@ -33,6 +39,8 @@ def parse_tabular_payload(payload: bytes, filename: str) -> list[dict[str, Any]]
 
 
 def read_csv_payload(payload: bytes) -> list[dict[str, Any]]:
+    """Parse one CSV payload into normalized record dictionaries."""
+
     decoded = decode_tabular_payload(payload)
     reader = csv.DictReader(StringIO(decoded))
     rows = [dict(row) for row in reader]
@@ -42,6 +50,8 @@ def read_csv_payload(payload: bytes) -> list[dict[str, Any]]:
 
 
 def read_json_payload(payload: bytes) -> list[dict[str, Any]]:
+    """Parse one JSON payload into normalized record dictionaries."""
+
     decoded = decode_tabular_payload(payload)
     parsed = json.loads(decoded)
     records = coerce_json_records(parsed)
@@ -49,6 +59,8 @@ def read_json_payload(payload: bytes) -> list[dict[str, Any]]:
 
 
 def read_xml_payload(payload: bytes) -> list[dict[str, Any]]:
+    """Parse one XML payload into normalized record dictionaries."""
+
     decoded = decode_tabular_payload(payload)
     root = ElementTree.fromstring(decoded)
     records = coerce_xml_records(root)
@@ -56,6 +68,8 @@ def read_xml_payload(payload: bytes) -> list[dict[str, Any]]:
 
 
 def read_xlsx_payload(payload: bytes) -> list[dict[str, Any]]:
+    """Parse one XLSX payload into normalized record dictionaries."""
+
     workbook = load_workbook(filename=BytesIO(payload), read_only=True, data_only=True)
     try:
         sheet = workbook.active
@@ -85,6 +99,8 @@ def read_xlsx_payload(payload: bytes) -> list[dict[str, Any]]:
 
 
 def coerce_json_records(payload: Any) -> list[dict[str, Any]]:
+    """Coerce supported JSON shapes into a list of object records."""
+
     if isinstance(payload, list):
         if not all(isinstance(item, dict) for item in payload):
             raise ValueError("JSON uploads must be an array of objects")
@@ -103,6 +119,8 @@ def coerce_json_records(payload: Any) -> list[dict[str, Any]]:
 
 
 def coerce_xml_records(root: ElementTree.Element) -> list[dict[str, Any]]:
+    """Coerce supported XML shapes into a list of record dictionaries."""
+
     children = list(root)
     if not children:
         raise ValueError("XML upload must contain at least one record element")
@@ -124,6 +142,8 @@ def coerce_xml_records(root: ElementTree.Element) -> list[dict[str, Any]]:
 
 
 def element_to_record(element: ElementTree.Element) -> dict[str, Any]:
+    """Convert one XML record element into a normalized flat dictionary."""
+
     record: dict[str, Any] = {}
     for child in list(element):
         key = normalize_tabular_header(child.tag)
@@ -137,6 +157,8 @@ def element_to_record(element: ElementTree.Element) -> dict[str, Any]:
 
 
 def element_to_value(element: ElementTree.Element) -> Any:
+    """Convert a nested XML element into scalar or nested dictionary form."""
+
     children = list(element)
     if not children:
         return element.text or ""
@@ -146,6 +168,8 @@ def element_to_value(element: ElementTree.Element) -> Any:
 
 
 def normalize_rows(rows: list[dict[str, Any]], header_order: list[str] | None = None) -> list[dict[str, Any]]:
+    """Normalize row dictionaries so they share cleaned headers and a stable column order."""
+
     normalized_header_order: list[str] = []
     seen: set[str] = set()
 

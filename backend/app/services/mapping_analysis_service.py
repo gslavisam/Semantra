@@ -1,3 +1,5 @@
+"""Mapping analysis summary and narration builders with deterministic fallback."""
+
 from __future__ import annotations
 
 import json
@@ -29,6 +31,8 @@ def build_mapping_analysis_summary(
     request: MappingAnalysisRequest,
     provider: LLMProvider | None = None,
 ) -> MappingAnalysisSummaryResponse:
+    """Build the Mapping Analysis Overview from current mapping evidence and workspace context."""
+
     fallback_summary = _build_deterministic_summary(
         request.mapping_response,
         request.workspace,
@@ -62,6 +66,8 @@ def build_mapping_analysis_narration(
     request: MappingAnalysisNarrationRequest,
     provider: LLMProvider | None = None,
 ) -> MappingAnalysisNarrationResponse:
+    """Build a spoken narration script for the current mapping analysis summary."""
+
     fallback_script = _fallback_spoken_script(request.summary)
     if provider is None:
         return MappingAnalysisNarrationResponse(
@@ -97,6 +103,8 @@ def build_mapping_analysis_prompt(
     options: MappingAnalysisOptions,
     fallback_summary: MappingAnalysisSummaryResponse,
 ) -> str:
+    """Build the bounded prompt used to summarize mapping evidence for technical handoff."""
+
     evidence_payload = {
         "workspace": workspace.model_dump(mode="json"),
         "options": options.model_dump(mode="json"),
@@ -125,6 +133,8 @@ def build_mapping_analysis_prompt(
 
 
 def build_mapping_analysis_narration_prompt(summary: MappingAnalysisSummaryResponse) -> str:
+    """Build the bounded prompt used to turn a mapping analysis summary into spoken narration."""
+
     compact_payload = {
         "title": summary.title,
         "mapping_mode": summary.mapping_mode,

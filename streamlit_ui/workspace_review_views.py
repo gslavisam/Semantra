@@ -1,3 +1,5 @@
+"""Workspace review UI for trust-layer inspection, refinement, and guidance flows."""
+
 from __future__ import annotations
 
 import httpx
@@ -577,6 +579,8 @@ def render_mapping_analysis_panel(
     request_mapping_analysis_narration,
     request_mapping_analysis_summary,
 ) -> None:
+    """Render the mapping-analysis overview, narration, and audio generation surface."""
+
     summary = st.session_state.get("mapping_analysis_summary")
     analysis_error = st.session_state.get("mapping_analysis_error")
     spoken_script = str(st.session_state.get("mapping_analysis_spoken_script") or "").strip()
@@ -777,6 +781,8 @@ def display_trust_layer(
     materialize_transformation_template,
     api_request=None,
 ) -> None:
+    """Render row-level trust signals, hinting, LLM refine, and transformation authoring details."""
+
     trust_rows = trust_layer_rows(mapping_response)
     ranked_by_source = {item.get("source"): item for item in mapping_response.get("ranked_mappings", [])}
     editor_state = st.session_state.setdefault("mapping_editor_state", {})
@@ -1263,6 +1269,8 @@ def display_trust_layer(
 
 
 def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> None:
+    """Render canonical-gap discovery, triage, suggestion, and approval workflows."""
+
     candidates = st.session_state.get("canonical_gap_candidates") or []
     with st.expander(
         _section_label("Canonical Gap Suggestions", f"{len(candidates)} open" if candidates else None),
@@ -1452,6 +1460,8 @@ def render_mapping_review(
     canonical_path_label,
     request_review_plan_summary,
 ) -> None:
+    """Render review filters, ranked candidates, repeated attention groups, and queue plans."""
+
     selected_rows = current_mapping_rows(mapping_response)
     source_concept_view_rows = source_concept_rows(mapping_response)
     concept_target_view_rows = concept_target_rows(mapping_response)
@@ -1627,6 +1637,8 @@ def render_canonical_concept_summary(
     *,
     canonical_concept_groups,
 ) -> None:
+    """Render a grouped summary of mappings that share canonical concepts."""
+
     concept_rows = canonical_concept_groups(mapping_response)
     if not concept_rows:
         return
@@ -1641,6 +1653,8 @@ def render_canonical_concept_summary(
 
 
 def render_mapping_editor(mapping_response: dict, *, selected_target_options) -> None:
+    """Render manual target and status editors for every ranked source mapping."""
+
     editor_state = st.session_state.setdefault("mapping_editor_state", {})
     open_item_count = _manual_review_open_item_count(
         mapping_response,

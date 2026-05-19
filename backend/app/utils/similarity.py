@@ -1,3 +1,5 @@
+"""Similarity and scoring helper functions used by the mapping engine."""
+
 from __future__ import annotations
 
 from difflib import SequenceMatcher

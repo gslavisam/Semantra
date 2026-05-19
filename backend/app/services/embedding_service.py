@@ -1,3 +1,5 @@
+"""Embedding helpers for optional vector similarity features in Semantra."""
+
 from __future__ import annotations
 
 import hashlib
@@ -8,10 +10,14 @@ from app.utils.normalization import semantic_token_set
 
 
 def is_enabled() -> bool:
+    """Return whether the configured embedding provider is active for this runtime."""
+
     return settings.embedding_provider.lower() != "none"
 
 
 def get_embedding(text: str) -> list[float] | None:
+    """Return an embedding vector for text when the configured provider supports it."""
+
     provider = settings.embedding_provider.lower()
     if provider == "none":
         return None
@@ -21,6 +27,8 @@ def get_embedding(text: str) -> list[float] | None:
 
 
 def cosine_similarity(left: list[float] | None, right: list[float] | None) -> float:
+    """Compute cosine similarity for two embedding vectors, returning 0 for incompatible inputs."""
+
     if not left or not right or len(left) != len(right):
         return 0.0
     numerator = sum(a * b for a, b in zip(left, right))

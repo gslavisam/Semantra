@@ -1,3 +1,5 @@
+"""Reusable transformation template loading and access helpers."""
+
 from __future__ import annotations
 
 from app.models.mapping import TransformationTemplate
@@ -44,4 +46,6 @@ TRANSFORMATION_TEMPLATES: list[TransformationTemplate] = [
 
 
 def list_transformation_templates() -> list[TransformationTemplate]:
+    """Return the built-in reusable transformation templates exposed to the UI."""
+
     return list(TRANSFORMATION_TEMPLATES)

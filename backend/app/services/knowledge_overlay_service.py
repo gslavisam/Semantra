@@ -1,3 +1,5 @@
+"""Knowledge overlay validation and lifecycle helpers for canonical enrichment."""
+
 from __future__ import annotations
 
 import csv
@@ -20,7 +22,11 @@ SUPPORTED_ENCODINGS = ("utf-8-sig", "utf-8", "cp1250", "cp1252", "latin-1")
 
 
 class KnowledgeOverlayValidationService:
+    """Validates uploaded overlay CSV payloads before they become persisted overlay entries."""
+
     def validate_csv_payload(self, payload: bytes, filename: str | None = None) -> KnowledgeOverlayValidationResult:
+        """Validate an uploaded knowledge overlay CSV and return a normalized preview with issues."""
+
         if filename and not filename.lower().endswith(".csv"):
             raise ValueError("Knowledge overlay upload currently supports CSV files only.")
 
@@ -191,6 +197,8 @@ class KnowledgeOverlayValidationService:
         )
 
     def build_entry(self, preview_row: KnowledgeOverlayValidationPreviewRow) -> KnowledgeOverlayEntry:
+        """Convert one validated preview row into a persistable overlay entry model."""
+
         if preview_row.status != "valid":
             raise ValueError("Cannot build a knowledge overlay entry from an invalid preview row.")
 

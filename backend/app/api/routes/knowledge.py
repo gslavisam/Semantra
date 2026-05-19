@@ -1,3 +1,5 @@
+"""Canonical glossary, overlay, and stewardship endpoints for the knowledge layer."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -57,6 +59,8 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 
 def append_audit_entry(action: str, message: str, version: KnowledgeOverlayVersion | None = None) -> KnowledgeAuditEntry:
+    """Append one knowledge audit entry and return the persisted record."""
+
     return persistence_service.append_knowledge_audit_log(
         KnowledgeAuditEntry(
             overlay_id=version.overlay_id if version else None,
@@ -97,6 +101,8 @@ def _require_canonical_gap_ready_for_approval(candidate: object) -> None:
 
 
 def build_runtime_status() -> KnowledgeRuntimeStatus:
+    """Build a runtime status snapshot for the active knowledge base and overlay state."""
+
     seed_meta = persistence_service.get_knowledge_seed_meta()
     if seed_meta is None:
         source_hash_state = "missing"
@@ -295,12 +301,16 @@ def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], d
 
 @router.get("/canonical-concepts", response_model=list[CanonicalConceptSummary], dependencies=[Depends(require_admin)])
 async def list_canonical_concepts() -> list[CanonicalConceptSummary]:
+    """List canonical concepts enriched with usage, context, and overlay metadata."""
+
     registry, _, _, _ = _canonical_concept_registry()
     return [registry[concept_id] for concept_id in sorted(registry)]
 
 
 @router.get("/canonical-concepts/{concept_id}", response_model=CanonicalConceptDetailResponse, dependencies=[Depends(require_admin)])
 async def get_canonical_concept(concept_id: str) -> CanonicalConceptDetailResponse:
+    """Return one canonical concept with field contexts, integrations, and active overlay entries."""
+
     registry, contexts_by_concept, active_overlay_version, overlay_entries_by_concept = _canonical_concept_registry()
     concept = registry.get(concept_id)
     if concept is None:
@@ -341,6 +351,8 @@ async def get_canonical_concept(concept_id: str) -> CanonicalConceptDetailRespon
 
 @router.get("/canonical-glossary/export", dependencies=[Depends(require_admin)])
 async def export_canonical_glossary() -> Response:
+    """Export the canonical glossary as a CSV download for admin stewardship flows."""
+
     payload = metadata_knowledge_service.export_canonical_glossary_csv()
     return Response(
         content=payload,
@@ -351,6 +363,8 @@ async def export_canonical_glossary() -> Response:
 
 @router.post("/canonical-glossary/import", response_model=CanonicalGlossaryImportResponse, dependencies=[Depends(require_admin)])
 async def import_canonical_glossary(file: UploadFile = File(...)) -> CanonicalGlossaryImportResponse:
+    """Import a canonical glossary CSV and record an audit entry for the change."""
+
     payload = await file.read()
     try:
         result = metadata_knowledge_service.import_canonical_glossary_csv(payload, filename=file.filename)
@@ -365,6 +379,8 @@ async def import_canonical_glossary(file: UploadFile = File(...)) -> CanonicalGl
 
 @router.post("/overlays/validate", response_model=KnowledgeOverlayValidationResult, dependencies=[Depends(require_admin)])
 async def validate_knowledge_overlay(file: UploadFile = File(...)) -> KnowledgeOverlayValidationResult:
+    """Validate an uploaded knowledge overlay CSV without persisting it."""
+
     payload = await file.read()
     return knowledge_overlay_validation_service.validate_csv_payload(payload, filename=file.filename)
 
@@ -375,6 +391,8 @@ async def create_knowledge_overlay(
     name: str | None = Form(default=None),
     created_by: str | None = Form(default=None),
 ) -> KnowledgeOverlayCreateResponse:
+    """Validate and persist a new knowledge overlay version from an uploaded CSV."""
+
     payload = await file.read()
     validation = knowledge_overlay_validation_service.validate_csv_payload(payload, filename=file.filename)
     if validation.invalid_rows > 0:
@@ -408,11 +426,15 @@ async def create_knowledge_overlay(
 
 @router.get("/overlays", response_model=list[KnowledgeOverlayVersion], dependencies=[Depends(require_admin)])
 async def list_knowledge_overlays() -> list[KnowledgeOverlayVersion]:
+    """List persisted knowledge overlay versions."""
+
     return persistence_service.list_knowledge_overlay_versions()
 
 
 @router.get("/audit", response_model=list[KnowledgeAuditEntry], dependencies=[Depends(require_admin)])
 async def list_knowledge_audit_logs() -> list[KnowledgeAuditEntry]:
+    """List audit entries for glossary, overlay, and stewardship changes."""
+
     return persistence_service.list_knowledge_audit_logs()
 
 
@@ -423,6 +445,8 @@ async def list_knowledge_stewardship_items(
     owner: str | None = Query(None),
     assignee: str | None = Query(None),
 ) -> list[KnowledgeStewardshipItemRecord]:
+    """List stewardship items filtered by type, status, owner, or assignee."""
+
     return persistence_service.list_knowledge_stewardship_items(
         item_type=item_type,
         status=status,
@@ -433,6 +457,8 @@ async def list_knowledge_stewardship_items(
 
 @router.get("/stewardship-items/{item_id}", response_model=KnowledgeStewardshipItemDetail, dependencies=[Depends(require_admin)])
 async def get_knowledge_stewardship_item(item_id: int) -> KnowledgeStewardshipItemDetail:
+    """Return one stewardship item with its persisted detail payloads."""
+
     try:
         return persistence_service.get_knowledge_stewardship_item(item_id)
     except KeyError as error:
@@ -441,6 +467,8 @@ async def get_knowledge_stewardship_item(item_id: int) -> KnowledgeStewardshipIt
 
 @router.post("/stewardship-items", response_model=KnowledgeStewardshipItemDetail, dependencies=[Depends(require_admin)])
 async def upsert_knowledge_stewardship_item(request: KnowledgeStewardshipItemCreateRequest) -> KnowledgeStewardshipItemDetail:
+    """Create or update a stewardship item and append the matching audit trail entry."""
+
     existing = persistence_service.get_knowledge_stewardship_item_by_key(request.item_type, request.item_key)
     saved = persistence_service.upsert_knowledge_stewardship_item(request)
     action = "Created" if existing is None else "Updated"
@@ -465,6 +493,8 @@ async def update_knowledge_stewardship_item_status(
     item_id: int,
     request: KnowledgeStewardshipItemStatusUpdateRequest,
 ) -> KnowledgeStewardshipItemDetail:
+    """Update stewardship status, ownership, or review notes for one item."""
+
     try:
         updated = persistence_service.update_knowledge_stewardship_item_status(
             item_id,
@@ -503,6 +533,8 @@ async def promote_knowledge_stewardship_item_to_glossary(
     item_id: int,
     request: CanonicalGlossaryPromotionRequest,
 ) -> CanonicalGlossaryPromotionResponse:
+    """Promote an approved overlay stewardship item into the canonical glossary."""
+
     try:
         item = persistence_service.get_knowledge_stewardship_item(item_id)
     except KeyError as error:
@@ -573,6 +605,8 @@ async def promote_knowledge_stewardship_item_to_glossary(
 
 @router.get("/overlays/{overlay_id}", response_model=KnowledgeOverlayVersionEntriesResponse, dependencies=[Depends(require_admin)])
 async def get_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersionEntriesResponse:
+    """Return one knowledge overlay version together with its normalized entries."""
+
     try:
         version = persistence_service.get_knowledge_overlay_version(overlay_id)
     except KeyError as error:
@@ -583,6 +617,8 @@ async def get_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersionEntri
 
 @router.post("/overlays/{overlay_id}/activate", response_model=KnowledgeOverlayVersion, dependencies=[Depends(require_admin)])
 async def activate_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion:
+    """Activate one overlay version and refresh the runtime knowledge view."""
+
     try:
         version = persistence_service.activate_knowledge_overlay_version(overlay_id)
     except KeyError as error:
@@ -596,6 +632,8 @@ async def activate_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion
 
 @router.post("/overlays/{overlay_id}/deactivate", response_model=KnowledgeOverlayVersion, dependencies=[Depends(require_admin)])
 async def deactivate_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion:
+    """Deactivate one overlay version and refresh runtime knowledge state."""
+
     try:
         version = persistence_service.deactivate_knowledge_overlay_version(overlay_id)
     except KeyError as error:
@@ -607,6 +645,8 @@ async def deactivate_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersi
 
 @router.post("/overlays/{overlay_id}/archive", response_model=KnowledgeOverlayVersion, dependencies=[Depends(require_admin)])
 async def archive_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion:
+    """Archive one overlay version after validating it can transition to archived state."""
+
     try:
         version = persistence_service.archive_knowledge_overlay_version(overlay_id)
     except KeyError as error:
@@ -620,6 +660,8 @@ async def archive_knowledge_overlay(overlay_id: int) -> KnowledgeOverlayVersion:
 
 @router.post("/overlays/rollback", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])
 async def rollback_knowledge_overlay() -> KnowledgeRuntimeStatus:
+    """Roll back the active overlay version and return the resulting runtime status."""
+
     try:
         rolled_back_to = persistence_service.rollback_knowledge_overlay_version()
     except KeyError as error:
@@ -634,6 +676,8 @@ async def rollback_knowledge_overlay() -> KnowledgeRuntimeStatus:
 
 @router.post("/canonical-gaps/candidates", response_model=CanonicalGapCandidatesResponse, dependencies=[Depends(require_admin)])
 async def canonical_gap_candidates(request: CanonicalGapCandidatesRequest) -> CanonicalGapCandidatesResponse:
+    """Extract canonical-gap candidates from a mapping response for stewardship review."""
+
     return CanonicalGapCandidatesResponse(
         candidates=extract_canonical_gap_candidates(
             request.mapping_response,
@@ -644,6 +688,8 @@ async def canonical_gap_candidates(request: CanonicalGapCandidatesRequest) -> Ca
 
 @router.post("/canonical-gaps/suggest", response_model=CanonicalGapSuggestion, dependencies=[Depends(require_admin)])
 async def suggest_canonical_gap(request: CanonicalGapSuggestionRequest) -> CanonicalGapSuggestion:
+    """Ask the bounded LLM assistant for a canonical-gap proposal on one candidate."""
+
     nearest = nearest_canonical_concepts(request.candidate)
     suggestion = call_canonical_gap_assistant(request.candidate, nearest, build_provider_from_settings())
     if suggestion is None:
@@ -658,12 +704,16 @@ async def suggest_canonical_gap(request: CanonicalGapSuggestionRequest) -> Canon
 
 @router.post("/canonical-gaps/triage-summary", response_model=CanonicalGapTriageSummaryResponse, dependencies=[Depends(require_admin)])
 async def summarize_canonical_gap_triage(request: CanonicalGapTriageSummaryRequest) -> CanonicalGapTriageSummaryResponse:
+    """Generate a triage summary for canonical-gap review using the configured provider."""
+
     provider = build_provider_from_settings()
     return build_canonical_gap_triage_summary(request, provider=provider)
 
 
 @router.post("/canonical-gaps/approve", response_model=CanonicalGapApproveResponse, dependencies=[Depends(require_admin)])
 async def approve_canonical_gap(request: CanonicalGapApproveRequest) -> CanonicalGapApproveResponse:
+    """Approve a canonical-gap proposal into an overlay after triage state checks pass."""
+
     _require_canonical_gap_ready_for_approval(request.candidate)
     try:
         response = approve_canonical_gap_suggestion(
@@ -683,6 +733,8 @@ async def approve_canonical_gap(request: CanonicalGapApproveRequest) -> Canonica
 
 @router.post("/canonical-gaps/reject", response_model=KnowledgeAuditEntry, dependencies=[Depends(require_admin)])
 async def reject_canonical_gap(request: CanonicalGapRejectRequest) -> KnowledgeAuditEntry:
+    """Record rejection or ignore disposition for a canonical-gap suggestion."""
+
     suggestion_action = request.suggestion.action if request.suggestion is not None else "no_suggestion"
     concept_id = request.suggestion.concept_id if request.suggestion is not None else None
     note = (request.note or "").strip()
@@ -704,11 +756,15 @@ async def reject_canonical_gap(request: CanonicalGapRejectRequest) -> KnowledgeA
 
 @router.get("/canonical-gaps/proposal-states", response_model=list[CanonicalGapProposalStateRecord], dependencies=[Depends(require_admin)])
 async def list_canonical_gap_proposal_states() -> list[CanonicalGapProposalStateRecord]:
+    """List the latest persisted triage state for each canonical-gap candidate."""
+
     return _list_canonical_gap_proposal_state_records()
 
 
 @router.post("/canonical-gaps/proposal-state", response_model=CanonicalGapProposalStateRecord, dependencies=[Depends(require_admin)])
 async def save_canonical_gap_proposal_state(request: CanonicalGapProposalStateRequest) -> CanonicalGapProposalStateRecord:
+    """Persist the current review state for one canonical-gap candidate."""
+
     reviewed_by = (request.reviewed_by or "").strip() or "unknown"
     note = (request.note or "").strip() or None
     candidate_key = _canonical_gap_candidate_key(request.candidate.source, request.candidate.target)
@@ -743,6 +799,8 @@ async def save_canonical_gap_proposal_state(request: CanonicalGapProposalStateRe
 
 @router.post("/reload", response_model=KnowledgeRuntimeStatus, dependencies=[Depends(require_admin)])
 async def reload_knowledge() -> KnowledgeRuntimeStatus:
+    """Refresh in-memory knowledge state from persisted runtime storage."""
+
     metadata_knowledge_service.refresh()
     return build_runtime_status()
 

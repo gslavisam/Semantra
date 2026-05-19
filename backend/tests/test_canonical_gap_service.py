@@ -1,3 +1,5 @@
+"""Tests canonical-gap extraction and suggestion behavior for stewardship flows."""
+
 from app.models.mapping import AutoMappingResponse, CanonicalGapSuggestion, MappingCandidate, ScoringSignals
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.canonical_gap_service import approve_canonical_gap_suggestion, extract_canonical_gap_candidates

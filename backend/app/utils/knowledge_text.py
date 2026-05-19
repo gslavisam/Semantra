@@ -1,3 +1,5 @@
+"""Canonical alias text normalization and filtering helpers for the knowledge layer."""
+
 from __future__ import annotations
 
 import re

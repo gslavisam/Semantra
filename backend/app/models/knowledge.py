@@ -1,3 +1,5 @@
+"""Models for canonical concepts, overlays, stewardship, and knowledge runtime status."""
+
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -19,6 +21,8 @@ KnowledgeStewardshipStatus = Literal["new", "needs_review", "ready_for_approval"
 
 
 class KnowledgeOverlayVersion(BaseModel):
+    """Metadata describing one persisted knowledge overlay version."""
+
     overlay_id: int | None = None
     name: str
     status: KnowledgeOverlayVersionStatus = "draft"
@@ -30,6 +34,8 @@ class KnowledgeOverlayVersion(BaseModel):
 
 
 class KnowledgeOverlayEntry(BaseModel):
+    """One normalized alias or concept entry belonging to a knowledge overlay version."""
+
     entry_id: int | None = None
     version_id: int | None = None
     entry_type: KnowledgeOverlayEntryType
@@ -44,6 +50,8 @@ class KnowledgeOverlayEntry(BaseModel):
 
 
 class KnowledgeOverlayValidationIssue(BaseModel):
+    """One validation issue produced while checking an uploaded overlay row."""
+
     row_number: int
     severity: KnowledgeOverlayIssueSeverity
     code: str
@@ -51,6 +59,8 @@ class KnowledgeOverlayValidationIssue(BaseModel):
 
 
 class KnowledgeOverlayValidationPreviewRow(BaseModel):
+    """Normalized preview of one uploaded overlay row together with its issues."""
+
     row_number: int
     status: KnowledgeOverlayRowStatus = "valid"
     entry_type: str | None = None
@@ -66,6 +76,8 @@ class KnowledgeOverlayValidationPreviewRow(BaseModel):
 
 
 class KnowledgeOverlayValidationResult(BaseModel):
+    """Summary and normalized preview produced when validating an overlay upload."""
+
     total_rows: int = 0
     valid_rows: int = 0
     invalid_rows: int = 0
@@ -76,17 +88,23 @@ class KnowledgeOverlayValidationResult(BaseModel):
 
 
 class KnowledgeOverlayCreateResponse(BaseModel):
+    """Response returned after successfully creating a knowledge overlay version."""
+
     version: KnowledgeOverlayVersion
     saved_entry_count: int = 0
     validation: KnowledgeOverlayValidationResult
 
 
 class KnowledgeOverlayVersionEntriesResponse(BaseModel):
+    """Overlay version detail response including its persisted entries."""
+
     version: KnowledgeOverlayVersion
     entries: list[KnowledgeOverlayEntry] = Field(default_factory=list)
 
 
 class KnowledgeRuntimeStatus(BaseModel):
+    """Runtime status snapshot for the active knowledge base and overlay state."""
+
     mode: KnowledgeOverlayMode = "base_only"
     runtime_source: KnowledgeRuntimeSource = "source_files"
     source_hash_state: KnowledgeSeedState = "missing"
@@ -102,6 +120,8 @@ class KnowledgeRuntimeStatus(BaseModel):
 
 
 class CanonicalGlossaryEntry(BaseModel):
+    """One canonical glossary concept entry with aliases and descriptive metadata."""
+
     concept_id: str
     entity: str
     attribute: str
@@ -112,17 +132,23 @@ class CanonicalGlossaryEntry(BaseModel):
 
 
 class CanonicalGlossaryImportResponse(BaseModel):
+    """Summary returned after importing a canonical glossary file."""
+
     imported_row_count: int = 0
     canonical_concept_count: int = 0
     source_filename: str | None = None
 
 
 class CanonicalGlossaryPromotionRequest(BaseModel):
+    """Request metadata for promoting a stewardship item into the glossary."""
+
     changed_by: str | None = None
     note: str | None = None
 
 
 class CanonicalGlossaryPromotionResponse(BaseModel):
+    """Response returned after promoting an overlay stewardship item into the glossary."""
+
     item: KnowledgeStewardshipItemDetail
     glossary_entry: CanonicalGlossaryEntry
     alias_added: bool = False
@@ -130,6 +156,8 @@ class CanonicalGlossaryPromotionResponse(BaseModel):
 
 
 class KnowledgeAuditEntry(BaseModel):
+    """Audit log entry for glossary, overlay, and stewardship actions."""
+
     audit_id: int | None = None
     overlay_id: int | None = None
     overlay_name: str | None = None
@@ -139,6 +167,8 @@ class KnowledgeAuditEntry(BaseModel):
 
 
 class CanonicalConceptFieldContext(BaseModel):
+    """Field-level business context attached to one canonical concept."""
+
     system: str = ""
     object_name: str = ""
     field_name: str = ""
@@ -149,6 +179,8 @@ class CanonicalConceptFieldContext(BaseModel):
 
 
 class CanonicalConceptUsageRecord(BaseModel):
+    """One mapping-set usage record showing where a canonical concept appears."""
+
     concept_id: str
     mapping_set_id: int
     name: str
@@ -164,6 +196,8 @@ class CanonicalConceptUsageRecord(BaseModel):
 
 
 class CanonicalConceptOverlayEntry(BaseModel):
+    """Overlay entry detail attached to a canonical concept detail response."""
+
     entry_id: int | None = None
     overlay_id: int
     overlay_name: str
@@ -174,6 +208,8 @@ class CanonicalConceptOverlayEntry(BaseModel):
 
 
 class CanonicalConceptSummary(BaseModel):
+    """Summary view of a canonical concept enriched with usage and overlay metadata."""
+
     concept_id: str
     entity: str = ""
     attribute: str = ""
@@ -192,6 +228,8 @@ class CanonicalConceptSummary(BaseModel):
 
 
 class CanonicalConceptDetailResponse(BaseModel):
+    """Detail response for one canonical concept, including contexts, usage, and audits."""
+
     concept: CanonicalConceptSummary
     field_contexts: list[CanonicalConceptFieldContext] = Field(default_factory=list)
     active_overlay_entries: list[CanonicalConceptOverlayEntry] = Field(default_factory=list)
@@ -200,6 +238,8 @@ class CanonicalConceptDetailResponse(BaseModel):
 
 
 class KnowledgeStewardshipItemRecord(BaseModel):
+    """Persisted stewardship queue item for canonical gaps or overlay promotions."""
+
     item_id: int
     item_type: KnowledgeStewardshipItemType = "canonical_gap"
     item_key: str
@@ -220,12 +260,16 @@ class KnowledgeStewardshipItemRecord(BaseModel):
 
 
 class KnowledgeStewardshipItemDetail(KnowledgeStewardshipItemRecord):
+    """Expanded stewardship item including serialized candidate and suggestion payloads."""
+
     candidate_payload: dict[str, Any] = Field(default_factory=dict)
     suggestion_payload: dict[str, Any] = Field(default_factory=dict)
     overlay_entry_payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class KnowledgeStewardshipItemCreateRequest(BaseModel):
+    """Request payload used to create or upsert a stewardship item."""
+
     item_type: KnowledgeStewardshipItemType = "canonical_gap"
     item_key: str
     title: str
@@ -246,6 +290,8 @@ class KnowledgeStewardshipItemCreateRequest(BaseModel):
 
 
 class KnowledgeStewardshipItemStatusUpdateRequest(BaseModel):
+    """Request payload used to change stewardship status or assignment metadata."""
+
     status: KnowledgeStewardshipStatus
     changed_by: str | None = None
     note: str | None = None
@@ -255,6 +301,8 @@ class KnowledgeStewardshipItemStatusUpdateRequest(BaseModel):
 
 
 class SourceFieldHintRecord(BaseModel):
+    """Persisted business-meaning hint for one source field within a workspace scope."""
+
     hint_id: int | None = None
     source_system: str
     business_domain: str | None = None
@@ -271,6 +319,8 @@ class SourceFieldHintRecord(BaseModel):
 
 
 class SourceFieldHintUpsertRequest(BaseModel):
+    """Request payload used to create or update a persistent source-field hint."""
+
     source_system: str
     business_domain: str | None = None
     integration_name: str | None = None

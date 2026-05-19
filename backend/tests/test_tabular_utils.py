@@ -1,3 +1,5 @@
+"""Tests low-level tabular parsing and normalization helpers."""
+
 from __future__ import annotations
 
 import json

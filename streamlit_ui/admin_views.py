@@ -1,3 +1,5 @@
+"""Admin and Canonical Console UI surfaces for observability and stewardship."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -944,6 +946,8 @@ def render_canonical_console_panel(
     api_request_content: Callable[..., bytes],
     upload_file_to_request_files: Callable[[Any], dict | None],
 ) -> None:
+    """Render the Canonical Console for registry browsing, overlay lifecycle, and stewardship review."""
+
     st.header("Canonical Console")
     st.caption(
         "Concept registry and review console for the active canonical model, including overlay aliases, usage, gap queue, and audit context."
@@ -2569,6 +2573,8 @@ def render_admin_debug_tab(
     current_mapping_rows: Callable[[dict], list[dict]],
     knowledge_debug_rows: Callable[[dict], list[dict]],
 ) -> None:
+    """Render the admin and debug surface for runtime config, logs, and observability payloads."""
+
     st.header("Admin / Debug")
     admin_token = st.session_state.get("admin_token", "").strip()
     token_required = admin_token_required()

@@ -1,3 +1,5 @@
+"""Persistence and execution helpers for transformation test sets."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -24,6 +26,8 @@ def run_transformation_test_case(
     mapping_decisions: list[Any],
     case: TransformationTestCase,
 ) -> TransformationTestCaseResult:
+    """Execute one transformation test case against a set of mapping decisions."""
+
     preview = build_preview(case.source_rows, mapping_decisions)
     failures: list[str] = []
 
@@ -74,6 +78,8 @@ def run_transformation_test_case(
 
 
 def run_transformation_test_set(test_set: TransformationTestSetDetail) -> TransformationTestSetRunResponse:
+    """Execute every case in a saved transformation test set and aggregate the results."""
+
     case_results = [run_transformation_test_case(test_set.mapping_decisions, case) for case in test_set.cases]
     passed_cases = sum(1 for result in case_results if result.passed)
     return TransformationTestSetRunResponse(

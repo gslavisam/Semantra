@@ -1,3 +1,5 @@
+"""SQLite persistence layer for governed Semantra runtime and artifact state."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -41,12 +43,16 @@ from app.models.mapping import (
 
 
 class SQLitePersistenceService:
+    """SQLite-backed persistence service for Semantra governance, catalog, and knowledge state."""
+
     def __init__(self, db_path: str) -> None:
         self.db_path = db_path
         self.init_db()
 
     @contextmanager
     def connection(self):
+        """Yield a commit-on-success SQLite connection scoped to one persistence operation."""
+
         connection = sqlite3.connect(self.db_path)
         try:
             yield connection
@@ -55,6 +61,8 @@ class SQLitePersistenceService:
             connection.close()
 
     def init_db(self) -> None:
+        """Create or update the local SQLite schema used by Semantra runtime features."""
+
         with self.connection() as connection:
             connection.execute(
                 """
@@ -567,6 +575,8 @@ class SQLitePersistenceService:
         assignee: str | None = None,
         review_note: str | None = None,
     ) -> MappingSetRecord:
+        """Persist one governed mapping-set version and refresh its catalog projection."""
+
         version = 1 + max(
             (record.version for record in self.list_mapping_sets() if record.name == name),
             default=0,
@@ -710,6 +720,8 @@ class SQLitePersistenceService:
         )
 
     def list_mapping_sets(self) -> list[MappingSetRecord]:
+        """List saved mapping-set versions with their governance metadata."""
+
         with self.connection() as connection:
             rows = connection.execute(
                 "SELECT id, name, payload FROM mapping_sets ORDER BY id DESC"
@@ -756,6 +768,8 @@ class SQLitePersistenceService:
         return records
 
     def get_mapping_set(self, mapping_set_id: int) -> MappingSetDetail:
+        """Load one mapping-set version together with its stored decision payload."""
+
         with self.connection() as connection:
             row = connection.execute(
                 "SELECT id, name, payload FROM mapping_sets WHERE id = ?",
@@ -861,6 +875,8 @@ class SQLitePersistenceService:
         artifact_type: str | None = None,
         integration_name: str | None = None,
     ) -> list[CatalogIntegrationRecord]:
+        """List catalog integration records projected from persisted mapping-set history."""
+
         query = (
             "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, decision_count, "
             "source_dataset_id, target_dataset_id, source_system, target_system, business_domain, interface_type, "
@@ -968,6 +984,8 @@ class SQLitePersistenceService:
         return [self._catalog_record_from_row(row) for row in rows]
 
     def get_catalog_integration_detail(self, integration_name: str) -> CatalogIntegrationDetail:
+        """Load one catalog integration with version history and similar-integration hints."""
+
         records = self.list_catalog_integrations(integration_name=integration_name)
         exact_matches = [record for record in records if record.integration_name == integration_name]
         if not exact_matches:
@@ -1579,6 +1597,8 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM reusable_correction_rules")
 
     def save_benchmark_dataset(self, name: str, cases: list[dict]) -> BenchmarkDatasetRecord:
+        """Persist a reusable benchmark dataset for later evaluation runs."""
+
         version = 1 + max(
             (record.version for record in self.list_benchmark_datasets() if record.name == name),
             default=0,
@@ -1986,6 +2006,8 @@ class SQLitePersistenceService:
         created_by: str | None = None,
         source_filename: str | None = None,
     ) -> KnowledgeOverlayVersion:
+        """Persist one knowledge overlay version record before its rows are stored."""
+
         created_at = datetime.now(UTC).isoformat()
         payload = KnowledgeOverlayVersion(
             name=name,

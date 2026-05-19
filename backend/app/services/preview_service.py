@@ -1,3 +1,5 @@
+"""Advisory preview generation for active mapping and transformation decisions."""
+
 from __future__ import annotations
 
 from app.models.mapping import MappingDecision, PreviewResponse, PreviewRow
@@ -5,6 +7,8 @@ from app.services.transformation_service import build_transformed_target_frame
 
 
 def build_preview(rows: list[dict[str, object]], mapping_decisions: list[MappingDecision]) -> PreviewResponse:
+    """Build an advisory preview of target rows from the current mapping decisions."""
+
     accepted = [decision for decision in mapping_decisions if decision.status != "rejected"]
     if not accepted:
         return PreviewResponse(preview=[], unresolved_targets=[], transformation_previews=[])

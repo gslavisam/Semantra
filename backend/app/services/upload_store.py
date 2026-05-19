@@ -1,3 +1,5 @@
+"""Session-scoped in-memory dataset store for uploaded rows and schema profiles."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,6 +14,8 @@ from app.services.profiling_service import build_schema_profile
 
 @dataclass
 class StoredDataset:
+    """Stored upload record containing source rows and the derived dataset handle."""
+
     dataset_id: str
     dataset_name: str
     rows: list[dict[str, Any]]
@@ -19,11 +23,15 @@ class StoredDataset:
 
 
 class InMemoryDatasetStore:
+    """Session-scoped in-memory store for uploaded datasets and metadata-enriched handles."""
+
     def __init__(self) -> None:
         self._items: dict[str, StoredDataset] = {}
         self._lock = Lock()
 
     def save_rows(self, rows: list[dict[str, Any]], dataset_name: str) -> DatasetHandle:
+        """Create a schema profile from raw rows and persist the resulting dataset handle in memory."""
+
         dataset_id = str(uuid4())
         profile = build_schema_profile(rows, dataset_id=dataset_id, dataset_name=dataset_name)
         return self.save_schema_profile(profile, dataset_name=dataset_name, rows=rows)
@@ -52,6 +60,8 @@ class InMemoryDatasetStore:
         return handle
 
     def get_dataset(self, dataset_id: str) -> StoredDataset:
+        """Return one stored dataset by id or raise when the id is unknown."""
+
         try:
             return self._items[dataset_id]
         except KeyError as error:
@@ -118,6 +128,8 @@ class InMemoryDatasetStore:
             return updated_handle, matched_columns, unmatched_columns
 
     def clear(self) -> None:
+        """Clear all in-memory uploaded dataset state."""
+
         with self._lock:
             self._items.clear()
 

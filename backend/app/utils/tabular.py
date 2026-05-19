@@ -1,3 +1,5 @@
+"""Low-level tabular parsing helpers for decoding, header cleanup, and cell normalization."""
+
 from __future__ import annotations
 
 import json

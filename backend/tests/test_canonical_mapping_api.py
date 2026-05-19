@@ -1,3 +1,5 @@
+"""API tests for canonical-only mapping and related governance behavior."""
+
 from __future__ import annotations
 
 from pathlib import Path

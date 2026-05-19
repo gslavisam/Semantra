@@ -1,3 +1,5 @@
+"""Workspace decision and governance UI for durable mapping outcomes."""
+
 from __future__ import annotations
 
 import json
@@ -30,6 +32,8 @@ def render_manual_mapping_panel(
     remove_manual_mapping,
     list_canonical_target_fields,
 ) -> None:
+    """Render manual mapping add/remove controls on top of the current mapping response."""
+
     upload_response = st.session_state.get("upload_response")
     if not upload_response:
         return
@@ -104,6 +108,8 @@ def render_manual_mapping_panel(
 
 
 def render_mapping_decision_summary(*, build_mapping_decisions) -> None:
+    """Render the currently active mapping decisions selected in the editor."""
+
     decisions = build_mapping_decisions()
     if not decisions:
         st.warning("No active mapping decisions. Accept or mark at least one candidate as needs review.")
@@ -121,6 +127,8 @@ def render_mapping_io_panel(
     api_request,
     build_mapping_set_payload,
 ) -> None:
+    """Render import and export controls for mapping decisions."""
+
     decisions = build_mapping_decisions()
     export_disabled = not decisions
 
@@ -171,6 +179,8 @@ def render_mapping_set_versions_panel(
     api_request,
     build_mapping_set_payload,
 ) -> None:
+    """Render mapping-set save, load, apply, audit, and diff workflows."""
+
     decisions = build_mapping_decisions()
     saved_mapping_sets = st.session_state.get("saved_mapping_sets")
 
@@ -467,6 +477,8 @@ def render_correction_panel(
     api_request,
     persist_corrections,
 ) -> None:
+    """Render correction persistence and reusable-rule review controls."""
+
     pending_corrections = build_pending_corrections()
     block_reason = correction_block_reason()
 

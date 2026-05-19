@@ -1,3 +1,5 @@
+"""Tests Streamlit benchmark view helpers and related workflow state."""
+
 from streamlit_ui.benchmark_views import (
     _benchmark_explanation_enabled,
     _benchmark_explanation_payload,

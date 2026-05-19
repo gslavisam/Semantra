@@ -1,3 +1,5 @@
+"""Tests the Streamlit-side API client helpers and response handling."""
+
 from types import SimpleNamespace
 
 from streamlit_ui import api as streamlit_api

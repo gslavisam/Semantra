@@ -1,3 +1,5 @@
+"""Core regression tests for Semantra mapping, scoring, and assignment logic."""
+
 from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.correction_service import correction_store

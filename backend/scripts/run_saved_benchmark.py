@@ -1,3 +1,5 @@
+"""CLI utility for running a saved Semantra benchmark dataset through the API."""
+
 from __future__ import annotations
 
 import argparse

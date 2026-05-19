@@ -1,3 +1,5 @@
+"""Transformation authoring, preview classification, and warning generation logic."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -29,6 +31,8 @@ def build_transformation_warning(
     fallback_applied: bool = False,
     details: dict[str, Any] | None = None,
 ) -> TransformationPreviewWarning:
+    """Build one structured transformation warning for preview and code-generation surfaces."""
+
     return TransformationPreviewWarning(
         code=code,
         message=message,
@@ -42,6 +46,8 @@ def build_transformation_warning(
 
 
 def build_transformation_statement(decision: MappingDecision) -> str:
+    """Normalize a mapping decision into an executable Pandas assignment statement."""
+
     code = (decision.transformation_code or "").strip()
     if not code:
         return f'df_target["{decision.target}"] = df_source["{decision.source}"]'
@@ -51,10 +57,14 @@ def build_transformation_statement(decision: MappingDecision) -> str:
 
 
 def sample_series_values(series: pd.Series) -> list[str]:
+    """Return a short stringified sample from a Pandas series for preview readouts."""
+
     return ["" if pd.isna(value) else str(value) for value in series.head(3).tolist()]
 
 
 def semantic_dtype_label(series: pd.Series) -> str:
+    """Collapse a Pandas dtype into a coarse semantic label for preview comparisons."""
+
     if pd.api.types.is_bool_dtype(series):
         return "bool"
     if pd.api.types.is_numeric_dtype(series):
@@ -67,6 +77,8 @@ def semantic_dtype_label(series: pd.Series) -> str:
 
 
 def classify_transformation_preview(mode: str, status: str, warnings: list[TransformationPreviewWarning]) -> str:
+    """Classify a transformation preview as direct, safe, or risky for UI display."""
+
     if mode == "direct":
         return "direct"
     if status == "validated" and not warnings:
@@ -78,6 +90,8 @@ def build_transformed_target_frame(
     rows: list[dict[str, object]],
     mapping_decisions: list[MappingDecision],
 ) -> tuple[list[dict[str, Any]], list[TransformationPreviewResult]]:
+    """Apply mapping decisions to preview rows and collect transformation preview results."""
+
     if not rows:
         return [], []
 

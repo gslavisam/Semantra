@@ -1,3 +1,5 @@
+"""Session-state helpers for Semantra mapping, review, and transformation flows."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +10,8 @@ from openpyxl import Workbook
 
 
 def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> dict[str, str | bool]:
+    """Build the default editor-state entry for one ranked source field."""
+
     selected_mapping = selected_mapping or {}
     selected_target = None
     selected_status = "rejected"
@@ -39,6 +43,8 @@ def initialize_mapping_editor_state(
     suggested_mapping_by_source: Callable[[dict], dict[str, dict]],
     default_editor_entry_func: Callable[[dict, dict | None], dict[str, str | bool]] = default_editor_entry,
 ) -> None:
+    """Initialize editor session state from the current mapping response."""
+
     editor_state: dict[str, dict[str, str]] = {}
     for ranked in mapping_response["ranked_mappings"]:
         selected_mapping = suggested_mapping_by_source(mapping_response).get(ranked["source"], {})
@@ -47,14 +53,20 @@ def initialize_mapping_editor_state(
 
 
 def schema_column_names(handle: dict) -> list[str]:
+    """Return column names from one uploaded dataset handle payload."""
+
     return [column["name"] for column in handle["schema_profile"]["columns"]]
 
 
 def ranked_sources(mapping_response: dict) -> set[str]:
+    """Return the set of source fields present in the ranked mapping response."""
+
     return {ranked["source"] for ranked in mapping_response["ranked_mappings"]}
 
 
 def upsert_manual_mapping(source: str, target: str, status: str, session_state: dict) -> None:
+    """Insert or update one manual mapping override in editor session state."""
+
     editor_state = session_state.setdefault("mapping_editor_state", {})
     current_entry = editor_state.get(source, {})
     editor_state[source] = {
@@ -74,6 +86,8 @@ def remove_manual_mapping(
     suggested_mapping_by_source: Callable[[dict], dict[str, dict]],
     default_editor_entry_func: Callable[[dict, dict | None], dict[str, str | bool]] = default_editor_entry,
 ) -> None:
+    """Remove a manual mapping override and restore the default ranked state when available."""
+
     editor_state = session_state.setdefault("mapping_editor_state", {})
     ranked_by_source = {ranked["source"]: ranked for ranked in mapping_response["ranked_mappings"]}
     if source in ranked_by_source:
@@ -90,6 +104,8 @@ def manual_mapping_rows(
     *,
     ranked_sources_func: Callable[[dict], set[str]] = ranked_sources,
 ) -> list[dict]:
+    """Build the current table of manual mapping additions and overrides."""
+
     editor_state = session_state.get("mapping_editor_state", {})
     auto_sources = ranked_sources_func(mapping_response)
     rows: list[dict] = []
@@ -118,6 +134,8 @@ def build_mapping_decisions(
     resolve_suggested_transformation_code: Callable[[dict | None, str | None], str],
     effective_transformation_code: Callable[[str, str | None], str | None],
 ) -> list[dict]:
+    """Build API-ready mapping decisions from the current editor session state."""
+
     decisions: list[dict] = []
     for source, entry in session_state.get("mapping_editor_state", {}).items():
         target = entry.get("target", "")
@@ -133,6 +151,8 @@ def build_mapping_decisions(
 
 
 def export_mapping_payload(session_state: dict, *, build_mapping_decisions_func: Callable[[], list[dict]]) -> str:
+    """Serialize the current mapping workspace into downloadable JSON."""
+
     payload = {
         "source_dataset_id": session_state.get("upload_response", {}).get("source", {}).get("dataset_id"),
         "target_dataset_id": session_state.get("upload_response", {}).get("target", {}).get("dataset_id"),
@@ -142,6 +162,8 @@ def export_mapping_payload(session_state: dict, *, build_mapping_decisions_func:
 
 
 def export_mapping_excel_bytes(session_state: dict, *, build_mapping_decisions_func: Callable[[], list[dict]]) -> bytes:
+    """Serialize the current mapping decisions into an Excel workbook payload."""
+
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "mapping_decisions"
@@ -173,6 +195,8 @@ def build_mapping_set_payload(
     assignee: str | None = None,
     review_note: str | None = None,
 ) -> dict:
+    """Build the payload used to persist the current workspace as a mapping set."""
+
     upload_response = session_state.get("upload_response", {})
     mapping_response = session_state.get("mapping_response", {})
     canonical_coverage = mapping_response.get("canonical_coverage", {}) if isinstance(mapping_response, dict) else {}
@@ -204,6 +228,8 @@ def build_current_benchmark_case(
     build_mapping_decisions_func: Callable[[], list[dict]],
     schema_columns_for_case: Callable[[dict], list[dict]],
 ) -> dict | None:
+    """Build a single benchmark fixture case from the current workspace mapping state."""
+
     upload_response = session_state.get("upload_response")
     mapping_decisions = build_mapping_decisions_func()
     if not upload_response or not mapping_decisions or not upload_response.get("target"):
@@ -222,6 +248,8 @@ def apply_imported_mapping_payload(
     *,
     schema_column_names_func: Callable[[dict], list[str]] = schema_column_names,
 ) -> None:
+    """Apply imported mapping JSON into the current editor state."""
+
     payload = json.loads(raw_payload.decode("utf-8"))
     imported_decisions = payload.get("mapping_decisions", [])
     editor_state = session_state.get("mapping_editor_state", {})
@@ -251,6 +279,8 @@ def apply_imported_mapping_payload(
 
 
 def build_pending_corrections(session_state: dict) -> list[dict]:
+    """Build the list of reviewed mapping changes eligible to be saved as corrections."""
+
     pending: list[dict] = []
     for source, entry in session_state.get("mapping_editor_state", {}).items():
         target = entry.get("target", "")
@@ -288,6 +318,8 @@ def build_pending_corrections(session_state: dict) -> list[dict]:
 
 
 def correction_governance_block_reason(session_state: dict) -> str:
+    """Explain why reviewed corrections cannot yet be persisted based on open statuses."""
+
     blocked_statuses: set[str] = set()
     for entry in session_state.get("mapping_editor_state", {}).values():
         target = entry.get("target", "")
@@ -311,6 +343,8 @@ def persist_corrections(
     build_pending_corrections_func: Callable[[], list[dict]],
     api_request: Callable[..., dict],
 ) -> list[dict]:
+    """Persist all currently pending corrections through the observability API."""
+
     saved_entries: list[dict] = []
     pending = build_pending_corrections_func()
     for correction in pending:

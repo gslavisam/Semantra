@@ -1,3 +1,5 @@
+"""Tests Streamlit catalog view helpers for reuse and discovery flows."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

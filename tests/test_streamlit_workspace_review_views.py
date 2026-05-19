@@ -1,3 +1,5 @@
+"""Tests Streamlit workspace review helpers for analysis and refinement flows."""
+
 from __future__ import annotations
 
 from streamlit_ui import workspace_review_views

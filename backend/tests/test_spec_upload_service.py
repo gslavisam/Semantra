@@ -1,3 +1,5 @@
+"""Unit tests for schema-spec parsing and normalization service logic."""
+
 from __future__ import annotations
 
 from app.services.spec_upload_service import detect_spec_layout, map_spec_type, parse_spec_rows

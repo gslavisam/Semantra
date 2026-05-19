@@ -1,3 +1,5 @@
+"""Primary Workspace UI for upload, mapping, preview, and generation workflows."""
+
 from __future__ import annotations
 
 import httpx
@@ -29,6 +31,8 @@ def poll_mapping_job(
     timeout_seconds: float = 600.0,
     existing_job_id: str | None = None,
 ) -> dict:
+    """Start or resume an async mapping job and poll until a terminal state is reached."""
+
     if existing_job_id:
         job_id = existing_job_id
         _set_active_mapping_job(job_id, start_path=start_path, payload=payload)
@@ -149,10 +153,14 @@ def _workspace_preview_advisory_message(mapping_decisions: list[dict]) -> str:
 
 
 def should_show_table_selector(available_tables: list[str], upload_mode: str, *, is_sql: bool) -> bool:
+    """Return whether the UI should show table selection for the current upload mode."""
+
     return bool(available_tables) and (is_sql or upload_mode == "Row data")
 
 
 def companion_enrichment_message(result: dict | None, dataset_label: str = "Source") -> str:
+    """Summarize how many dataset columns were enriched by companion metadata."""
+
     if not result:
         return ""
 
@@ -187,6 +195,8 @@ def _reset_workspace_mapping_state(session_state: dict) -> None:
 
 
 def default_llm_validation_enabled(session_state: dict | None = None) -> bool:
+    """Return the persisted default for whether bounded LLM validation is enabled in the UI."""
+
     state = session_state or {}
     if "use_llm_validation" not in state:
         return False
@@ -217,6 +227,8 @@ def render_workspace_tab(
     render_correction_panel,
     build_mapping_decisions,
 ) -> None:
+    """Render the full Workspace surface from setup through review, decisions, and output."""
+
     setup_tab, review_tab, decisions_tab, output_tab = st.tabs(["Setup", "Review", "Decisions", "Output"])
 
     active_mapping_mode = st.session_state.get("mapping_mode", "Standard")

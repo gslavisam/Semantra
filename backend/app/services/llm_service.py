@@ -1,3 +1,5 @@
+"""Bounded LLM provider integration and prompt-handling helpers for Semantra."""
+
 from __future__ import annotations
 
 import json
@@ -21,12 +23,16 @@ MAX_PROMPT_SAMPLE_VALUE_LENGTH = 80
 
 
 class LLMProvider(Protocol):
+    """Protocol implemented by bounded LLM providers used throughout Semantra."""
+
     def generate(self, prompt: str, timeout_seconds: float) -> str:
         ...
 
 
 @dataclass
 class StaticLLMProvider:
+    """Deterministic test provider that returns a fixed response or callback-generated text."""
+
     responder: Callable[[str], str] | str
 
     def generate(self, prompt: str, timeout_seconds: float) -> str:
@@ -37,6 +43,8 @@ class StaticLLMProvider:
 
 @dataclass
 class OpenAIResponsesProvider:
+    """Provider wrapper for OpenAI's responses-style API."""
+
     api_key: str
     model: str | None = None
     base_url: str | None = None
@@ -67,6 +75,8 @@ class OpenAIResponsesProvider:
 
 @dataclass
 class OllamaProvider:
+    """Provider wrapper for local Ollama text generation endpoints."""
+
     model: str
     base_url: str | None = None
 
@@ -158,6 +168,8 @@ class LMStudioProvider:
 
 
 def summarize_llm_runtime() -> dict[str, object]:
+    """Summarize configured LLM runtime reachability and model status for admin surfaces."""
+
     provider_name = settings.llm_provider.strip().lower() or "none"
     configured_model = settings.llm_model.strip() or "n/a"
 
@@ -263,6 +275,8 @@ class GeminiProvider:
 
 
 def build_provider_from_settings() -> LLMProvider | None:
+    """Build the currently configured bounded LLM provider instance, or return None when disabled."""
+
     provider_name = settings.llm_provider.lower()
     if provider_name == "none":
         return None
@@ -280,6 +294,8 @@ def build_provider_from_settings() -> LLMProvider | None:
 
 
 def classify_llm_error(error: Exception) -> str:
+    """Normalize common provider and parsing failures into stable error labels."""
+
     if isinstance(error, URLError):
         return "network_error"
     if isinstance(error, json.JSONDecodeError):
@@ -294,6 +310,8 @@ def classify_llm_error(error: Exception) -> str:
 
 
 def normalize_llm_list_field(value: object) -> list[str]:
+    """Normalize a string-or-list LLM field into a list of strings."""
+
     if isinstance(value, str):
         return [value]
     if isinstance(value, list):
@@ -308,6 +326,8 @@ def request_llm_json(
     retries: int,
     operation_name: str,
 ) -> tuple[str, dict] | None:
+    """Request JSON from a provider with retry logging and parsed-payload validation."""
+
     for attempt in range(retries):
         try:
             raw_response = provider.generate(prompt, timeout_seconds)
@@ -333,6 +353,8 @@ def request_bounded_llm_json(
     prompt: str,
     operation_name: str,
 ) -> tuple[str, dict] | None:
+    """Request JSON using Semantra's short bounded timeout and retry contract."""
+
     timeout_seconds = max(1.0, min(settings.llm_timeout_seconds, 5.0))
     retries = 1
     return request_llm_json(
@@ -345,6 +367,8 @@ def request_bounded_llm_json(
 
 
 def parse_llm_json_payload(raw_response: str) -> dict:
+    """Parse JSON from raw model output, tolerating markdown fences and leading prose."""
+
     candidates = [raw_response, strip_markdown_code_fences(raw_response)]
     for candidate in candidates:
         normalized = candidate.strip()
@@ -361,6 +385,8 @@ def parse_llm_json_payload(raw_response: str) -> dict:
 
 
 def strip_markdown_code_fences(raw_response: str) -> str:
+    """Remove surrounding markdown code fences from raw LLM output when present."""
+
     stripped = raw_response.strip()
     if not stripped.startswith("```"):
         return stripped
@@ -374,6 +400,8 @@ def strip_markdown_code_fences(raw_response: str) -> str:
 
 
 def extract_first_json_object(raw_response: str) -> str | None:
+    """Extract the first balanced JSON object embedded in model output text."""
+
     start = raw_response.find("{")
     if start < 0:
         return None
@@ -406,6 +434,8 @@ def extract_first_json_object(raw_response: str) -> str | None:
 
 
 def truncate_prompt_text(value: object, max_length: int) -> str:
+    """Truncate prompt text fields to a bounded length while preserving readability."""
+
     text = str(value or "").strip()
     if len(text) <= max_length:
         return text
@@ -413,6 +443,8 @@ def truncate_prompt_text(value: object, max_length: int) -> str:
 
 
 def sanitize_prompt_sample_values(values: object) -> list[str]:
+    """Normalize and bound sample values before placing them into an LLM prompt."""
+
     if not isinstance(values, list):
         return []
     sanitized: list[str] = []
@@ -424,6 +456,8 @@ def sanitize_prompt_sample_values(values: object) -> list[str]:
 
 
 def sanitize_prompt_patterns(value: object) -> list[str]:
+    """Normalize detected pattern fields into a compact prompt-safe list."""
+
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     if isinstance(value, str) and value.strip():
@@ -432,6 +466,8 @@ def sanitize_prompt_patterns(value: object) -> list[str]:
 
 
 def sanitize_prompt_field_context(field: dict) -> dict:
+    """Trim one field context dictionary down to the prompt-safe keys used by LLM flows."""
+
     sanitized = {
         "name": str(field.get("name") or "").strip(),
         "description": truncate_prompt_text(field.get("description") or "", MAX_PROMPT_DESCRIPTION_LENGTH),
@@ -454,6 +490,8 @@ def call_validator(
     max_retries: int | None = None,
     timeout_seconds: float | None = None,
 ) -> LLMValidationResult | None:
+    """Run the closed-set mapping validator for one source field and candidate target set."""
+
     if provider is None or not candidate_targets:
         return None
 
@@ -515,6 +553,8 @@ def call_transformation_generator(
     max_retries: int | None = None,
     timeout_seconds: float | None = None,
 ) -> TransformationGenerationResponse | None:
+    """Request bounded transformation code generation for one source-target pair."""
+
     if provider is None or not user_instruction.strip():
         return None
 
@@ -557,6 +597,8 @@ def call_artifact_refinement(
     max_retries: int | None = None,
     timeout_seconds: float | None = None,
 ) -> ArtifactRefinementResponse | None:
+    """Request bounded refinement of a generated output artifact without applying it automatically."""
+
     if provider is None or not current_code.strip() or not instruction.strip():
         return None
 
@@ -600,6 +642,8 @@ def call_canonical_gap_assistant(
     max_retries: int | None = None,
     timeout_seconds: float | None = None,
 ) -> CanonicalGapSuggestion | None:
+    """Request a bounded canonical-gap suggestion for one candidate and its nearest known concepts."""
+
     if provider is None:
         return None
 
@@ -630,6 +674,8 @@ def call_canonical_gap_assistant(
 
 
 def validate_result(result: LLMValidationResult | None, candidate_targets: list[dict]) -> bool:
+    """Validate that an LLM mapping result selects a permitted target with coherent fields."""
+
     if result is None:
         return False
 
@@ -652,6 +698,8 @@ def validate_canonical_gap_suggestion(
     candidate: CanonicalGapCandidate,
     nearest_concepts: list[dict],
 ) -> bool:
+    """Validate that a canonical-gap suggestion satisfies Semantra's bounded contract."""
+
     if suggestion.action == "no_action":
         return True
     if not 0.0 <= suggestion.confidence <= 1.0:
@@ -672,6 +720,8 @@ def validate_canonical_gap_suggestion(
 
 
 def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) -> str:
+    """Build the closed-set mapping validation prompt for one source field."""
+
     payload = {
         "source_field": sanitize_prompt_field_context(source_field),
         "candidate_targets": [sanitize_prompt_field_context(target) for target in candidate_targets],
@@ -698,6 +748,8 @@ def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) ->
 
 
 def build_canonical_gap_prompt(candidate: CanonicalGapCandidate, nearest_concepts: list[dict]) -> str:
+    """Build the bounded prompt used to suggest a canonical-gap action."""
+
     payload = {
         "canonical_gap_candidate": candidate.model_dump(mode="json"),
         "nearest_existing_canonical_concepts": nearest_concepts,
@@ -729,6 +781,8 @@ def build_canonical_gap_prompt(candidate: CanonicalGapCandidate, nearest_concept
 
 
 def build_transformation_generator_prompt(source_field: dict, target_field: dict, user_instruction: str) -> str:
+    """Build the bounded prompt used to generate transformation code for one field pair."""
+
     payload = {
         "source_field": sanitize_prompt_field_context(source_field),
         "target_field": sanitize_prompt_field_context(target_field),
@@ -765,6 +819,8 @@ def build_artifact_refinement_prompt(
     edge_cases: str,
     reference_excerpt: str,
 ) -> str:
+    """Build the bounded prompt used to refine an already generated code artifact."""
+
     runtime_language = "python-pyspark" if mode == "pyspark" else "python-pandas"
     allowed_objects = ["df_source", "df_target", "F"] if mode == "pyspark" else ["df_source", "df_target", "pd"]
     payload = {
@@ -804,6 +860,8 @@ def build_artifact_refinement_prompt(
 
 
 def sanitize_generated_code(code: str) -> str:
+    """Normalize generated code by stripping fences and extraneous wrapper text."""
+
     if not code:
         return ""
     stripped = code.strip()

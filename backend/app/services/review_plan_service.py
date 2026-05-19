@@ -1,3 +1,5 @@
+"""Review-queue planning and prioritization guidance for mapping analysis."""
+
 from __future__ import annotations
 
 import json
@@ -11,6 +13,8 @@ def build_review_plan(
     request: ReviewPlanRequest,
     provider: LLMProvider | None = None,
 ) -> ReviewPlanResponse:
+    """Build queue-level review guidance for the currently filtered mapping rows."""
+
     fallback = _build_fallback_review_plan(request)
     if provider is None:
         return fallback
@@ -35,6 +39,8 @@ def build_review_plan_prompt(
     request: ReviewPlanRequest,
     fallback: ReviewPlanResponse,
 ) -> str:
+    """Build the bounded prompt used to summarize review-queue patterns and next actions."""
+
     evidence = {
         "filters": request.filters,
         "filtered_rows": request.filtered_rows[:30],

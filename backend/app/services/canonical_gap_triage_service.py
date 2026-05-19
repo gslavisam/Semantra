@@ -1,3 +1,5 @@
+"""Queue-level canonical-gap triage summaries and risk guidance generation."""
+
 from __future__ import annotations
 
 import json
@@ -17,6 +19,8 @@ def build_canonical_gap_triage_summary(
     request: CanonicalGapTriageSummaryRequest,
     provider: LLMProvider | None = None,
 ) -> CanonicalGapTriageSummaryResponse:
+    """Build queue-level canonical-gap triage guidance with deterministic fallback and optional LLM summarization."""
+
     fallback = _build_fallback_summary(request)
     if provider is None:
         return fallback
@@ -43,6 +47,8 @@ def build_canonical_gap_triage_prompt(
     request: CanonicalGapTriageSummaryRequest,
     fallback: CanonicalGapTriageSummaryResponse,
 ) -> str:
+    """Build the bounded prompt used to summarize repeated canonical-gap queue patterns."""
+
     evidence = {
         "candidates": [item.model_dump(mode="json") for item in request.candidates[:20]],
         "suggestions": {

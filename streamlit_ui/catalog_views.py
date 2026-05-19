@@ -1,3 +1,5 @@
+"""Catalog UI for approved integration discovery, detail, and reuse-fit review."""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -880,6 +882,8 @@ def render_catalog_tab(
     admin_token_required: Callable[[], bool],
     api_request: Callable[..., Any],
 ) -> None:
+    """Render catalog discovery, detail, comparison, and workspace reuse surfaces."""
+
     st.header("Catalog")
     st.caption("Browse saved integrations, search reusable mapping assets, and inspect canonical concept usage across versions.")
 

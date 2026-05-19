@@ -1,3 +1,5 @@
+"""SQL schema snapshot parsing helpers for source and target structure ingestion."""
+
 from __future__ import annotations
 
 import re
@@ -19,6 +21,8 @@ def build_schema_profile_from_sql_snapshot(
     dataset_name: str,
     selected_table: str | None = None,
 ) -> SchemaProfile:
+    """Build a schema profile from one SQL DDL snapshot, optionally scoped to a selected table."""
+
     table_blocks = extract_create_table_blocks(sql_text)
     if not table_blocks:
         raise ValueError("SQL snapshot must contain at least one CREATE TABLE statement")
@@ -46,6 +50,8 @@ def build_schema_profile_from_sql_snapshot(
 
 
 def list_tables_from_sql_snapshot(sql_text: str) -> list[str]:
+    """List available table names from a SQL snapshot containing CREATE TABLE statements."""
+
     table_blocks = extract_create_table_blocks(sql_text)
     if not table_blocks:
         raise ValueError("SQL snapshot must contain at least one CREATE TABLE statement")
@@ -55,6 +61,8 @@ def list_tables_from_sql_snapshot(sql_text: str) -> list[str]:
 def resolve_selected_table_block(
     table_blocks: list[tuple[str, str]], selected_table: str | None
 ) -> tuple[str, str] | None:
+    """Resolve the requested table name to one extracted CREATE TABLE block."""
+
     if len(table_blocks) == 1 and not selected_table:
         return table_blocks[0]
 
@@ -67,6 +75,8 @@ def resolve_selected_table_block(
 
 
 def build_columns_from_table_block(definition_block: str) -> list[ColumnProfile]:
+    """Build simplified ColumnProfile objects from one SQL table definition block."""
+
     columns: list[ColumnProfile] = []
     for raw_definition in split_sql_definitions(definition_block):
         definition = raw_definition.strip()
@@ -82,6 +92,8 @@ def build_columns_from_table_block(definition_block: str) -> list[ColumnProfile]
 
 
 def extract_create_table_blocks(sql_text: str) -> list[tuple[str, str]]:
+    """Extract CREATE TABLE definition blocks from raw SQL text."""
+
     blocks: list[tuple[str, str]] = []
     for match in CREATE_TABLE_START_RE.finditer(sql_text):
         table_name = match.group(1)
@@ -102,6 +114,8 @@ def extract_create_table_blocks(sql_text: str) -> list[tuple[str, str]]:
 
 
 def split_sql_definitions(block: str) -> list[str]:
+    """Split a CREATE TABLE body into top-level comma-delimited definitions."""
+
     parts: list[str] = []
     current: list[str] = []
     depth = 0
@@ -124,6 +138,8 @@ def split_sql_definitions(block: str) -> list[str]:
 
 
 def parse_column_definition(definition: str) -> ColumnProfile | None:
+    """Parse one SQL column definition into the simplified ColumnProfile used by Semantra."""
+
     tokens = definition.split()
     if len(tokens) < 2:
         return None
@@ -155,6 +171,8 @@ def parse_column_definition(definition: str) -> ColumnProfile | None:
 
 
 def infer_sql_dtype(definition: str) -> str:
+    """Infer Semantra's simplified dtype label from a raw SQL column definition."""
+
     lowered = definition.lower()
     if any(token in lowered for token in ("bigint", "int", "smallint", "serial")):
         return "integer"
@@ -166,4 +184,6 @@ def infer_sql_dtype(definition: str) -> str:
 
 
 def sanitize_identifier(identifier: str) -> str:
+    """Remove common SQL identifier quoting wrappers from a name."""
+
     return identifier.strip().strip('"').strip("`").strip("[]")

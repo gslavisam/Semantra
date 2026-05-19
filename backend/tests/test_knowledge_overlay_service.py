@@ -1,3 +1,5 @@
+"""Tests knowledge overlay validation and lifecycle-related service behavior."""
+
 from app.services.knowledge_overlay_service import knowledge_overlay_validation_service
 
 

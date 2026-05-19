@@ -1,3 +1,5 @@
+"""Tests the main Streamlit workspace helpers and workflow glue logic."""
+
 import pytest
 from types import SimpleNamespace
 

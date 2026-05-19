@@ -1,3 +1,5 @@
+"""Schema profiling logic for column statistics, samples, and detected patterns."""
+
 from __future__ import annotations
 
 import re
@@ -18,6 +20,8 @@ DATE_FORMATS = ("%Y-%m-%d", "%d.%m.%Y", "%d/%m/%Y", "%m/%d/%Y", "%Y/%m/%d")
 
 
 def build_schema_profile(rows: list[dict[str, Any]], dataset_id: str, dataset_name: str) -> SchemaProfile:
+    """Build a schema profile for one uploaded row dataset."""
+
     columns = []
     column_names = list(rows[0].keys()) if rows else []
     for column_name in column_names:
@@ -32,6 +36,8 @@ def build_schema_profile(rows: list[dict[str, Any]], dataset_id: str, dataset_na
 
 
 def profile_column(values: list[Any], column_name: str) -> ColumnProfile:
+    """Profile one column's values into the normalized statistics used by ranking."""
+
     non_null = [value for value in values if not is_nullish(value)]
     stringified = [to_text(value) for value in non_null[: settings.max_profile_samples]]
     distinct_sample = distinct_values(non_null)[: settings.max_profile_samples]
@@ -59,6 +65,8 @@ def profile_column(values: list[Any], column_name: str) -> ColumnProfile:
 
 
 def detect_patterns(non_null: list[Any]) -> list[str]:
+    """Infer high-level data patterns such as email, phone, date, numeric id, or text."""
+
     if not non_null:
         return ["empty"]
 
@@ -95,10 +103,14 @@ def detect_patterns(non_null: list[Any]) -> list[str]:
 
 
 def to_text(value: object) -> str:
+    """Convert a sampled value into a normalized string representation."""
+
     return "" if value is None else str(value)
 
 
 def distinct_values(values: list[Any]) -> list[Any]:
+    """Return values in first-seen order with duplicates removed by string form."""
+
     seen: set[str] = set()
     result: list[Any] = []
     for value in values:
@@ -111,6 +123,8 @@ def distinct_values(values: list[Any]) -> list[Any]:
 
 
 def infer_dtype(values: list[Any]) -> str:
+    """Infer a simplified dtype label from sampled non-null values."""
+
     if not values:
         return "empty"
     if all(safe_int(to_text(value)) is not None for value in values[:10]):
@@ -123,6 +137,8 @@ def infer_dtype(values: list[Any]) -> str:
 
 
 def safe_int(value: str) -> int | None:
+    """Attempt to parse an integer, returning None when parsing fails."""
+
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -130,6 +146,8 @@ def safe_int(value: str) -> int | None:
 
 
 def safe_float(value: str) -> float | None:
+    """Attempt to parse a float, returning None when parsing fails."""
+
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -137,6 +155,8 @@ def safe_float(value: str) -> float | None:
 
 
 def is_date_like(value: str) -> bool:
+    """Return whether a sampled string matches one of the supported date formats."""
+
     for pattern in DATE_FORMATS:
         try:
             datetime.strptime(value, pattern)
@@ -147,6 +167,8 @@ def is_date_like(value: str) -> bool:
 
 
 def match_ratio(values: list[str], predicate: callable) -> float:
+    """Return the fraction of sampled values that satisfy a predicate."""
+
     if not values:
         return 0.0
     matches = sum(1 for value in values if predicate(value))

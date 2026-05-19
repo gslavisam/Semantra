@@ -1,3 +1,5 @@
+"""Core mapping engine for scoring, assignment, explanations, and ranking behavior."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -94,6 +96,8 @@ SIGNAL_WEIGHT_NAMES = tuple(WEIGHTS.keys())
 
 
 def normalize_scoring_profile_name(profile_name: str | None) -> str:
+    """Normalize a scoring profile name into the canonical internal identifier."""
+
     normalized = (profile_name or DEFAULT_SCORING_PROFILE).strip().lower().replace("-", "_")
     return normalized or DEFAULT_SCORING_PROFILE
 
@@ -102,6 +106,8 @@ def resolve_scoring_weights(
     profile_name: str | None = None,
     overrides: dict[str, float] | None = None,
 ) -> dict[str, float]:
+    """Resolve the active scoring weights for a profile plus any runtime overrides."""
+
     resolved_profile = normalize_scoring_profile_name(profile_name or settings.scoring_profile)
     base_weights = SCORING_PROFILES.get(resolved_profile)
     if base_weights is None:
@@ -128,11 +134,15 @@ ProgressCallback = Callable[[str], None]
 
 
 class ProgressCallbackCancelled(RuntimeError):
+    """Raised when a caller cancels an in-flight progress callback during mapping."""
+
     pass
 
 
 @dataclass
 class CandidateScore:
+    """Internal scored candidate bundle used during ranking, validation, and assignment."""
+
     source: ColumnProfile
     target: ColumnProfile
     score: float
@@ -153,6 +163,13 @@ def generate_mapping_candidates(
     description_priority: bool = False,
     candidate_pool_size: int | None = None,
 ) -> AutoMappingResponse:
+    """Generate the full Semantra mapping response for one source-target schema pair.
+
+    The function ranks candidates per source field, optionally applies bounded LLM
+    validation inside the ambiguity band, enforces unique target assignment, and
+    assembles the final response consumed by API and UI workflows.
+    """
+
     source_columns = list(source_schema.columns)
     target_columns = list(target_schema.columns)
     target_embedding_cache: dict[str, list[float] | None] = {}
@@ -352,6 +369,8 @@ def refine_mapping_for_source(
     candidate_pool_size: int | None = None,
     candidate_target_names: list[str] | None = None,
 ) -> SourceMappingResult:
+    """Re-rank one source field and let the bounded validator choose within a closed candidate set."""
+
     rankings = rank_targets_for_source(
         source,
         targets,
@@ -469,6 +488,8 @@ def rank_targets_for_source(
     description_priority: bool = False,
     candidate_pool_size: int | None = None,
 ) -> list[CandidateScore]:
+    """Score and sort viable target fields for a single source column."""
+
     candidate_targets = shortlist_targets_for_source(
         source,
         targets,
@@ -514,6 +535,8 @@ def shortlist_targets_for_source(
     candidate_pool_size: int | None = None,
     description_priority: bool = False,
 ) -> list[ColumnProfile]:
+    """Build a likely-target shortlist before full scoring when candidate pooling is enabled."""
+
     if not candidate_pool_size or candidate_pool_size >= len(targets):
         return targets
 
@@ -567,6 +590,8 @@ def apply_llm_validation(
     llm_provider: LLMProvider | None,
     progress_callback: ProgressCallback | None = None,
 ) -> dict[str, LLMValidationResult]:
+    """Run bounded LLM validation only for rankings that meet Semantra's review gates."""
+
     llm_decisions: dict[str, LLMValidationResult] = {}
 
     if llm_provider is None:
@@ -658,6 +683,8 @@ def _emit_progress(progress_callback: ProgressCallback | None, message: str) -> 
 
 
 def should_run_llm_validation(rankings: list[CandidateScore]) -> bool:
+    """Return whether a ranked candidate list should enter the bounded LLM validation gate."""
+
     if not rankings:
         return False
 
@@ -676,6 +703,8 @@ def should_run_llm_validation(rankings: list[CandidateScore]) -> bool:
 
 
 def has_close_strong_canonical_competitor(rankings: list[CandidateScore]) -> bool:
+    """Return whether the top candidate has a near-tied strong canonical competitor."""
+
     if len(rankings) < 2:
         return False
 
@@ -693,6 +722,8 @@ def has_close_strong_canonical_competitor(rankings: list[CandidateScore]) -> boo
 
 
 def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
+    """Return whether a canonical-looking top candidate should trigger semantic rescue via the LLM."""
+
     if top_candidate.score >= settings.llm_gate_max_score or top_candidate.score < 0.2:
         return False
     if not is_canonical_target_name(top_candidate.target.name):
@@ -705,6 +736,8 @@ def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
 
 
 def is_canonical_target_name(target_name: str) -> bool:
+    """Return whether a target name is itself a canonical concept id."""
+
     return metadata_knowledge_service.resolve_canonical_concept_id(target_name) == target_name
 
 
@@ -715,6 +748,8 @@ def compute_signals(
     target_embedding_cache: dict[str, list[float] | None] | None = None,
     description_priority: bool = False,
 ) -> tuple[ScoringSignals, set[str]]:
+    """Compute the raw multi-signal evidence for one source-target candidate pair."""
+
     source_tokens = set(source.tokenized_name)
     target_tokens = set(target.tokenized_name)
     source_semantic = semantic_token_set(source.name) | metadata_knowledge_service.expand_semantic_tokens(
@@ -810,6 +845,8 @@ def compute_signals(
 
 
 def is_strong_canonical_concept_match(target: ColumnProfile, knowledge_signal: float, canonical_signal: float) -> bool:
+    """Return whether a target is locked by strong canonical concept evidence."""
+
     resolved_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(target.name)
     if resolved_concept_id != target.name:
         return False
@@ -822,6 +859,8 @@ def compute_final_score(
     *,
     profile_name: str | None = None,
 ) -> float:
+    """Combine active scoring signals into the final normalized candidate score."""
+
     weights = resolve_scoring_weights(profile_name=profile_name)
     if active_signal_names is None:
         active_signal_names = {
@@ -853,6 +892,8 @@ def has_strong_identifier_consensus(
     signals: ScoringSignals,
     active_signal_names: set[str] | None = None,
 ) -> bool:
+    """Return whether business, value, pattern, and LLM evidence all align strongly."""
+
     if active_signal_names is None:
         active_signal_names = {
             signal_name
@@ -876,6 +917,8 @@ def has_strong_identifier_consensus(
 
 
 def sample_overlap_score(source_values: set[str], target_values: set[str]) -> float:
+    """Compute simple sample-value overlap between source and target distinct values."""
+
     if not source_values or not target_values:
         return 0.0
     return len(source_values & target_values) / max(len(source_values), len(target_values), 1)
@@ -887,6 +930,8 @@ def embedding_similarity(
     *,
     target_embedding_cache: dict[str, list[float] | None] | None = None,
 ) -> float:
+    """Compute embedding similarity for a source-target pair when embeddings are enabled."""
+
     if not embedding_enabled():
         return 0.0
     source_embedding = get_embedding(source.normalized_name)
@@ -901,6 +946,8 @@ def embedding_similarity(
 
 
 def assign_unique_targets(per_source_scores: dict[str, list[CandidateScore]]) -> dict[str, CandidateScore]:
+    """Choose one final target per source while keeping target assignment unique across the schema."""
+
     assigned_by_source: dict[str, CandidateScore] = {}
     assigned_targets: set[str] = set()
 
@@ -933,6 +980,8 @@ def assign_unique_targets(per_source_scores: dict[str, list[CandidateScore]]) ->
 
 
 def build_candidate_option(score: CandidateScore) -> CandidateOption:
+    """Convert an internal CandidateScore into the API-facing candidate option model."""
+
     return CandidateOption(
         target=score.target.name,
         confidence=round(score.score, 4),
@@ -953,6 +1002,8 @@ def build_selected_mapping(
     llm_result: LLMValidationResult | None = None,
     considered_targets: list[str] | None = None,
 ) -> MappingCandidate:
+    """Convert an internal chosen candidate into the persisted MappingCandidate model."""
+
     return MappingCandidate(
         source=source_name,
         target=score.target.name,
@@ -980,6 +1031,8 @@ def build_llm_decision_proposition(
     final_target: str | None,
     considered_targets: list[str],
 ) -> LLMDecisionProposition | None:
+    """Build a structured summary of how the LLM recommendation related to the final decision."""
+
     if llm_result is None:
         return None
 
@@ -1020,6 +1073,8 @@ def log_decision(
     llm_result: LLMValidationResult | None,
     selected: MappingCandidate,
 ) -> None:
+    """Append one decision-log record for an evaluated source field."""
+
     decision_log_store.append(
         DecisionLogEntry(
             source=source_name,
@@ -1034,6 +1089,8 @@ def log_decision(
 
 
 def format_signal_breakdown(signals: ScoringSignals) -> str:
+    """Format one scoring-signal bundle into the explanation-line breakdown string."""
+
     label_overrides = {"statistical": "stat"}
     parts = []
     for signal_name, signal_value in signals.model_dump().items():
@@ -1043,6 +1100,8 @@ def format_signal_breakdown(signals: ScoringSignals) -> str:
 
 
 def refresh_signal_breakdown(explanation: list[str], signals: ScoringSignals) -> None:
+    """Refresh or append the signal-breakdown line inside a candidate explanation."""
+
     breakdown = format_signal_breakdown(signals)
     for index, line in enumerate(explanation):
         if line.startswith("Signal breakdown:"):
@@ -1058,6 +1117,8 @@ def build_explanation(
     *,
     description_priority: bool = False,
 ) -> list[str]:
+    """Build the human-readable explanation lines that accompany a scored candidate."""
+
     explanation: list[str] = []
     correction_feedback = correction_store.describe_feedback(source.name, target.name)
 
@@ -1137,6 +1198,8 @@ def build_explanation(
 
 
 def score_to_label(score: float) -> str:
+    """Map a numeric confidence score into Semantra's confidence label buckets."""
+
     if score >= settings.high_confidence_threshold:
         return "high_confidence"
     if score >= settings.medium_confidence_threshold:
@@ -1145,6 +1208,8 @@ def score_to_label(score: float) -> str:
 
 
 def label_to_status(score: float) -> str:
+    """Map a numeric score into the default review status for auto-mapping results."""
+
     if score >= settings.auto_accept_threshold:
         return "accepted"
     return "needs_review"

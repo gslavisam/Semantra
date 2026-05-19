@@ -1,3 +1,5 @@
+"""Tests async mapping job lifecycle, limits, cancellation, and runtime status."""
+
 from __future__ import annotations
 
 import threading

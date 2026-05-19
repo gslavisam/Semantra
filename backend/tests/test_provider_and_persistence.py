@@ -1,3 +1,5 @@
+"""Tests provider selection logic and SQLite-backed persistence contracts."""
+
 from __future__ import annotations
 
 import json

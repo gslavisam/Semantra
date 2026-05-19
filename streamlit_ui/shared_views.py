@@ -1,3 +1,5 @@
+"""Reusable Streamlit rendering helpers shared across product surfaces."""
+
 from __future__ import annotations
 
 import streamlit as st
@@ -13,6 +15,8 @@ STATUS_STYLES = {
 
 
 def status_banner(level: str, message: str) -> None:
+    """Render a Streamlit status banner using the requested severity level."""
+
     renderers = {
         "success": st.success,
         "error": st.error,
@@ -23,6 +27,8 @@ def status_banner(level: str, message: str) -> None:
 
 
 def current_step() -> int:
+    """Return the current high-level workspace step from session state."""
+
     if st.session_state.get("mapping_response"):
         return 3
     if st.session_state.get("upload_response"):
@@ -31,6 +37,8 @@ def current_step() -> int:
 
 
 def render_step_status() -> None:
+    """Render the upload/profile/review progress cards for the workspace."""
+
     step = current_step()
     steps = [
         (1, "Upload", "Provide source and target CSV, JSON, XML, XLSX, or SQL files."),
@@ -60,6 +68,8 @@ def render_step_status() -> None:
 
 
 def render_llm_runtime_status() -> None:
+    """Render the current LLM and TTS runtime status visible to the user."""
+
     admin_token_required()
     config = st.session_state.get("runtime_config_snapshot")
     requirement = st.session_state.get("admin_requirement", {"reachable": False, "requires_token": True})
@@ -121,6 +131,8 @@ def render_llm_runtime_status() -> None:
 
 
 def render_dataset_summary(label: str, handle: dict) -> None:
+    """Render one uploaded dataset's schema summary and detected column patterns."""
+
     schema = handle["schema_profile"]
     st.markdown(f"### {label}")
     st.write(f"Dataset: {handle['dataset_name']}")
@@ -140,6 +152,8 @@ def render_dataset_summary(label: str, handle: dict) -> None:
 
 
 def render_last_action_status() -> None:
+    """Render the last session action message and a backend reachability warning if needed."""
+
     last_action = st.session_state.get("last_action")
     if last_action:
         status_banner(last_action.get("level", "info"), last_action.get("message", ""))

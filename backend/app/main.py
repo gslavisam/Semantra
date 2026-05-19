@@ -1,3 +1,5 @@
+"""FastAPI application entry point and router wiring for the Semantra API."""
+
 from __future__ import annotations
 
 from fastapi import FastAPI

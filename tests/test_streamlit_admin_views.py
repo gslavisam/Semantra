@@ -1,3 +1,5 @@
+"""Tests admin and Canonical Console Streamlit helper behavior."""
+
 from __future__ import annotations
 
 from unittest.mock import patch

@@ -1,3 +1,5 @@
+"""Tests reusable Streamlit shared-view helpers and rendering support logic."""
+
 from types import SimpleNamespace
 
 from streamlit_ui import shared_views

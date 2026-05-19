@@ -1,3 +1,5 @@
+"""Text normalization helpers shared across mapping and knowledge matching logic."""
+
 from __future__ import annotations
 
 import re

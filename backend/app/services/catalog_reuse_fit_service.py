@@ -1,3 +1,5 @@
+"""Workspace-to-catalog reuse fit analysis and explanation helpers."""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +17,8 @@ def build_catalog_reuse_fit(
     request: CatalogReuseFitRequest,
     provider: LLMProvider | None = None,
 ) -> CatalogReuseFitResponse:
+    """Build a controlled reuse-fit assessment between one saved mapping set and the current workspace."""
+
     fallback = _build_fallback_fit(request)
     if provider is None:
         return fallback
@@ -39,6 +43,8 @@ def build_catalog_reuse_fit_prompt(
     request: CatalogReuseFitRequest,
     fallback: CatalogReuseFitResponse,
 ) -> str:
+    """Build the bounded prompt used to explain catalog reuse fit from grounded metadata only."""
+
     evidence = {
         "mapping_set_detail": request.mapping_set_detail.model_dump(mode="json"),
         "workspace_context": request.workspace_context.model_dump(mode="json"),

@@ -1,3 +1,5 @@
+"""Canonical-gap extraction and suggestion helpers for stewardship workflows."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -20,6 +22,8 @@ def extract_canonical_gap_candidates(
     *,
     min_confidence: float = 0.65,
 ) -> list[CanonicalGapCandidate]:
+    """Extract candidate rows whose selected mapping lacks a convincing canonical concept path."""
+
     candidates: list[CanonicalGapCandidate] = []
     for mapping in mapping_response.mappings:
         if not mapping.target or mapping.status == "rejected":
@@ -61,6 +65,8 @@ def extract_canonical_gap_candidates(
 
 
 def nearest_canonical_concepts(candidate: CanonicalGapCandidate, *, limit: int = 8) -> list[dict]:
+    """Return the closest canonical glossary entries for one canonical-gap candidate."""
+
     query_tokens = semantic_token_set(candidate.source) | semantic_token_set(candidate.target)
     scored: list[tuple[float, dict]] = []
     for entry in metadata_knowledge_service.list_canonical_glossary_entries():
@@ -95,6 +101,8 @@ def approve_canonical_gap_suggestion(
     approved_by: str | None = None,
     overlay_name: str | None = None,
 ) -> CanonicalGapApproveResponse:
+    """Approve a gap suggestion by materializing it into a validated overlay and activating it."""
+
     if suggestion.action == "no_action":
         raise ValueError("Cannot approve a no_action canonical gap suggestion.")
     if not suggestion.concept_id or not suggestion.display_name:

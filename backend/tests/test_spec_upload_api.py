@@ -1,3 +1,5 @@
+"""API tests for schema-spec upload parsing and validation flows."""
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

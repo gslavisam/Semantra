@@ -1,3 +1,5 @@
+"""Tests Streamlit transformation-related session state and helper behavior."""
+
 from __future__ import annotations
 
 import ast

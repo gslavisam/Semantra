@@ -1,3 +1,5 @@
+"""Persistence and promotion logic for reviewed corrections and reusable rules."""
+
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -39,12 +41,16 @@ def _is_closed_review_status(status: str) -> bool:
 
 
 class UserCorrectionStore:
+    """In-memory facade over persisted user corrections and reusable correction rules."""
+
     def __init__(self) -> None:
         self._entries: list[UserCorrectionEntry] = []
         self._lock = Lock()
         self._feedback_enabled = True
 
     def append(self, entry: UserCorrectionEntry | dict) -> None:
+        """Persist one reviewed correction and mirror it into the in-memory cache."""
+
         if isinstance(entry, dict):
             entry = UserCorrectionEntry.model_validate(entry)
         saved_entry = persistence_service.save_user_correction(entry)
@@ -52,17 +58,23 @@ class UserCorrectionStore:
             self._entries.append(saved_entry)
 
     def list_entries(self) -> list[UserCorrectionEntry]:
+        """Return persisted correction history and refresh the in-memory cache."""
+
         persisted = persistence_service.list_user_corrections()
         with self._lock:
             self._entries = list(persisted)
             return list(self._entries)
 
     def clear(self) -> None:
+        """Clear all persisted and cached user corrections."""
+
         persistence_service.clear_user_corrections()
         with self._lock:
             self._entries.clear()
 
     def list_reusable_rules(self) -> list[ReusableCorrectionRule]:
+        """Return persisted reusable correction rules."""
+
         return persistence_service.list_reusable_correction_rules()
 
     def clear_reusable_rules(self) -> None:
@@ -72,6 +84,8 @@ class UserCorrectionStore:
         self,
         request: ReusableCorrectionRulePromotionRequest | dict,
     ) -> ReusableCorrectionRule:
+        """Promote repeated closed review outcomes into a reusable correction rule."""
+
         payload = request if isinstance(request, ReusableCorrectionRulePromotionRequest) else ReusableCorrectionRulePromotionRequest.model_validate(request)
         if not _is_closed_review_status(payload.status):
             raise ValueError("Reusable correction rules require closed review outcomes (accepted or rejected).")
@@ -100,6 +114,8 @@ class UserCorrectionStore:
         return self.describe_feedback(source, target)["strength"]
 
     def describe_feedback(self, source: str, target: str) -> dict[str, int | float]:
+        """Summarize how correction history should boost or penalize one source-target pair."""
+
         if not self._feedback_enabled:
             return {
                 "strength": 0.0,
@@ -182,6 +198,8 @@ class UserCorrectionStore:
         return grouped
 
     def suggest_reusable_rules(self, min_occurrences: int = 2) -> list[CorrectionRuleCandidate]:
+        """Suggest candidate reusable rules from repeated closed correction outcomes."""
+
         grouped = self._group_corrections()
         promoted_rule_map = {
             _correction_signature(rule.source, rule.suggested_target, rule.corrected_target, rule.status): rule

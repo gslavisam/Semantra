@@ -1,3 +1,5 @@
+"""Benchmark UI for evaluation runs, profile comparison, and explanation surfaces."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -13,6 +15,8 @@ AVAILABLE_SCORING_PROFILES = ["balanced", "schema_only", "data_rich", "canonical
 
 
 def benchmark_dataset_options() -> list[tuple[str, int]]:
+    """Build selectbox labels for saved benchmark datasets loaded into session state."""
+
     datasets = st.session_state.get("benchmark_datasets", [])
     return [
         (
@@ -67,6 +71,8 @@ def render_benchmark_tab(
     build_current_benchmark_case: Callable[[], dict | None],
     api_request: Callable[..., Any],
 ) -> None:
+    """Render benchmark save, run, comparison, and explanation controls."""
+
     st.header("Benchmarks")
     admin_token = st.session_state.get("admin_token", "").strip()
     token_required = admin_token_required()

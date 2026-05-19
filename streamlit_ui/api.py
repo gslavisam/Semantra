@@ -1,3 +1,5 @@
+"""HTTP client helpers used by the Streamlit UI to call the Semantra API."""
+
 from __future__ import annotations
 
 import time
@@ -21,6 +23,8 @@ def api_request(
     params: dict | None = None,
     timeout: float = 60.0,
 ) -> Any:
+    """Send a JSON-oriented request to the backend using the current Streamlit session settings."""
+
     headers = {"Accept": "application/json"}
     admin_token = st.session_state.get("admin_token", "").strip()
     if admin_token:
@@ -55,6 +59,8 @@ def _raise_for_status(response: httpx.Response) -> None:
 
 
 def upload_file_to_request_files(uploaded_file) -> dict | None:
+    """Convert a Streamlit uploaded file into the multipart tuple shape expected by httpx."""
+
     if uploaded_file is None:
         return None
     return {
@@ -67,6 +73,8 @@ def upload_file_to_request_files(uploaded_file) -> dict | None:
 
 
 def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
+    """Detect and cache likely schema-spec columns for an uploaded metadata file."""
+
     if uploaded_file is None or uploaded_file.name.lower().endswith(".sql"):
         return None
 
@@ -97,6 +105,8 @@ def upload_dataset_handle(
     type_col: str | None = None,
     sample_values_col: str | None = None,
 ) -> dict:
+    """Upload a source or target file and return the backend dataset-handle payload."""
+
     if uploaded_file is None:
         raise ValueError("Select a file before uploading.")
 
@@ -129,6 +139,8 @@ def enrich_dataset_metadata(
     type_col: str | None = None,
     sample_values_col: str | None = None,
 ) -> dict:
+    """Attach companion schema or spec metadata to an already-uploaded dataset handle."""
+
     if not dataset_id:
         raise ValueError("Select and upload the dataset before applying companion metadata.")
     if uploaded_file is None:
@@ -152,6 +164,8 @@ def enrich_dataset_metadata(
 
 
 def api_request_content(method: str, path: str, files: dict | None = None, data: dict | None = None) -> bytes:
+    """Send a request and return the raw response body for non-JSON endpoints."""
+
     headers = {}
     admin_token = st.session_state.get("admin_token", "").strip()
     if admin_token:
@@ -173,6 +187,8 @@ def api_request_bytes(
     json: dict | None = None,
     timeout: float = 120.0,
 ) -> tuple[bytes, str]:
+    """Send a request and return raw bytes together with the response content type."""
+
     headers = {}
     admin_token = st.session_state.get("admin_token", "").strip()
     if admin_token:
@@ -193,6 +209,8 @@ def api_request_bytes(
 
 
 def refresh_admin_requirement() -> None:
+    """Refresh cached admin-token requirements and runtime config state from the backend."""
+
     headers = {"Accept": "application/json"}
     admin_token = st.session_state.get("admin_token", "").strip()
     if admin_token:
@@ -220,6 +238,8 @@ def refresh_admin_requirement() -> None:
 
 
 def admin_token_required() -> bool:
+    """Return whether protected admin surfaces currently require a token."""
+
     current_signature = (
         st.session_state.get("api_base_url", DEFAULT_API_BASE_URL),
         st.session_state.get("admin_token", ""),
@@ -236,6 +256,8 @@ def admin_token_required() -> bool:
 
 
 def refresh_backend_reachability() -> None:
+    """Probe the backend root endpoint and cache whether the API is currently reachable."""
+
     base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL).rstrip("/")
     try:
         with httpx.Client(timeout=10.0) as client:
@@ -247,6 +269,8 @@ def refresh_backend_reachability() -> None:
 
 
 def backend_is_reachable() -> bool:
+    """Return cached backend reachability, refreshing it when the URL or cache state changes."""
+
     current_base_url = st.session_state.get("api_base_url", DEFAULT_API_BASE_URL)
     cached_base_url = st.session_state.get("backend_reachable_base_url")
     if (
@@ -260,6 +284,8 @@ def backend_is_reachable() -> bool:
 
 
 def request_llm_transformation_suggestion(source: str, target: str, instruction: str) -> dict:
+    """Request a bounded LLM-generated transformation suggestion for one source-target pair."""
+
     upload_response = st.session_state.get("upload_response")
     if not upload_response:
         raise ValueError("Upload source and target datasets before generating a transformation.")
@@ -290,6 +316,8 @@ def request_llm_mapping_refinement(
     sample_values: list[str] | None = None,
     refinement_instruction: str = "",
 ) -> dict:
+    """Request bounded LLM refinement for one source field against a closed candidate set."""
+
     upload_response = st.session_state.get("upload_response")
     if not upload_response:
         raise ValueError("Upload datasets and generate mapping results before refining a mapping.")
@@ -328,6 +356,8 @@ def request_llm_mapping_refinement(
 
 
 def list_canonical_target_fields(target_system: str = "canonical") -> list[str]:
+    """Load canonical target field ids for the selected virtual target system."""
+
     response = api_request(
         "GET",
         "/mapping/target-fields",
@@ -337,6 +367,8 @@ def list_canonical_target_fields(target_system: str = "canonical") -> list[str]:
 
 
 def current_workspace_scope() -> dict[str, str | None]:
+    """Return the current source-system, business-domain, and integration scope from session state."""
+
     return {
         "source_system": str(st.session_state.get("analysis_source_system") or "").strip() or None,
         "business_domain": str(st.session_state.get("analysis_business_domain") or "").strip() or None,
@@ -352,6 +384,8 @@ def list_source_field_hints(
     source_field: str | None = None,
     active_only: bool = True,
 ) -> list[dict]:
+    """List persisted source-field hints for the current workspace scope."""
+
     params = {"source_system": source_system}
     if business_domain:
         params["business_domain"] = business_domain
@@ -374,6 +408,8 @@ def save_source_field_hint(
     integration_name: str | None = None,
     created_by: str | None = None,
 ) -> dict:
+    """Persist one source-field hint so future mapping runs inherit the same guidance."""
+
     return api_request(
         "POST",
         "/mapping/source-field-hints",
@@ -391,6 +427,8 @@ def save_source_field_hint(
 
 
 def request_mapping_analysis_summary() -> dict:
+    """Request the Mapping Analysis Overview for the current workspace state."""
+
     upload_response = st.session_state.get("upload_response")
     mapping_response = st.session_state.get("mapping_response")
     if not upload_response or not mapping_response:
@@ -436,6 +474,8 @@ def request_review_plan_summary(
     confidence_filter: str,
     source_filter: str,
 ) -> dict:
+    """Request queue-level review guidance for the currently filtered mapping rows."""
+
     mapping_response = st.session_state.get("mapping_response")
     if not mapping_response:
         raise ValueError("Generate mapping results before requesting a review plan.")
@@ -457,6 +497,8 @@ def request_review_plan_summary(
 
 
 def request_mapping_analysis_narration() -> dict:
+    """Request a spoken narration script for the current mapping analysis summary."""
+
     summary = st.session_state.get("mapping_analysis_summary")
     if not summary:
         raise ValueError("Generate the mapping analysis overview before requesting narration.")
@@ -470,6 +512,8 @@ def request_mapping_analysis_narration() -> dict:
 
 
 def request_mapping_analysis_audio(spoken_script: str) -> tuple[bytes, str]:
+    """Convert a spoken narration script into downloadable audio bytes."""
+
     if not spoken_script.strip():
         raise ValueError("Spoken script is empty; generate narration before requesting audio.")
 
@@ -482,6 +526,8 @@ def request_mapping_analysis_audio(spoken_script: str) -> tuple[bytes, str]:
 
 
 def request_transformation_templates() -> list[dict]:
+    """Load and cache reusable transformation templates from the backend."""
+
     cached = st.session_state.get("transformation_templates")
     if cached is not None:
         return cached
@@ -491,10 +537,14 @@ def request_transformation_templates() -> list[dict]:
 
 
 def uploaded_file_bytes(uploaded_file) -> bytes:
+    """Return raw bytes for an uploaded file, or empty bytes when no file is selected."""
+
     return uploaded_file.getvalue() if uploaded_file is not None else b""
 
 
 def sql_tables_for_upload(uploaded_file, cache_key: str) -> list[str]:
+    """Inspect and cache SQL table names discovered in an uploaded schema snapshot."""
+
     if uploaded_file is None or not uploaded_file.name.lower().endswith(".sql"):
         return []
 

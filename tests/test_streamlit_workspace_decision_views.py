@@ -1,3 +1,5 @@
+"""Tests Streamlit workspace decision and governance helper behavior."""
+
 from streamlit_ui.workspace_decision_views import _saved_mapping_set_apply_block_reason, _section_label
 
 

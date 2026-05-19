@@ -1,3 +1,5 @@
+"""Main Streamlit entry point and thin adapter layer for the Semantra UI."""
+
 from __future__ import annotations
 
 import streamlit as st

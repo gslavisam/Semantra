@@ -1,3 +1,5 @@
+"""Tests virtual canonical target schema generation for canonical-only mode."""
+
 from __future__ import annotations
 
 from app.services.virtual_target_service import build_virtual_target_schema

@@ -1,3 +1,5 @@
+"""Canonical glossary and knowledge runtime management for matching and stewardship."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -65,6 +67,8 @@ def _split_values(value: str) -> list[str]:
 
 @dataclass(frozen=True)
 class KnowledgeFieldContext:
+    """Describes one system, object, and field context attached to a knowledge concept."""
+
     system: str
     object_name: str
     field_name: str
@@ -76,6 +80,8 @@ class KnowledgeFieldContext:
 
 @dataclass(frozen=True)
 class KnowledgeConcept:
+    """Knowledge-layer concept with aliases and optional field contexts used during matching."""
+
     concept_id: str
     domain: str
     canonical_name: str
@@ -86,6 +92,8 @@ class KnowledgeConcept:
 
 @dataclass(frozen=True)
 class ConceptMatch:
+    """Scored knowledge-concept match result for a profiled schema field."""
+
     concept_id: str
     strength: float
     matched_aliases: tuple[str, ...] = ()
@@ -94,6 +102,8 @@ class ConceptMatch:
 
 @dataclass(frozen=True)
 class CanonicalBusinessConcept:
+    """Canonical business concept entry loaded from the glossary and overlay runtime."""
+
     concept_id: str
     entity: str
     attribute: str
@@ -105,12 +115,16 @@ class CanonicalBusinessConcept:
 
 @dataclass(frozen=True)
 class CanonicalConceptMatch:
+    """Scored canonical-concept match result for one profiled field."""
+
     concept_id: str
     strength: float
     matched_aliases: tuple[str, ...] = ()
 
 
 class MetadataKnowledgeService:
+    """Owns the knowledge and canonical runtime used by mapping, stewardship, and reuse flows."""
+
     def __init__(self, csv_path: Path | None = None) -> None:
         self.csv_path = csv_path or DEFAULT_METADATA_DICT_PATH
         self.metadata_workbook_path = DEFAULT_METADATA_WORKBOOK_PATH
@@ -152,12 +166,16 @@ class MetadataKnowledgeService:
         return self._compute_source_hash()
 
     def concepts_for_alias(self, alias: str) -> list[str]:
+        """Return knowledge concept ids currently linked to a normalized alias."""
+
         normalized_alias = _normalize_alias(alias)
         if not normalized_alias:
             return []
         return sorted(self._alias_to_concepts.get(normalized_alias, set()))
 
     def resolve_canonical_concept_id(self, term: str) -> str | None:
+        """Resolve free text, display name, or alias text to a canonical concept id when possible."""
+
         normalized_term = _normalize_alias(term)
         if not normalized_term:
             return None
@@ -356,6 +374,8 @@ class MetadataKnowledgeService:
         return tokens
 
     def knowledge_alignment(self, source: ColumnProfile, target: ColumnProfile, *, prefer_metadata_text: bool = False) -> float:
+        """Score how strongly the source field's knowledge concepts align with the target field."""
+
         source_matches = {match.concept_id: match for match in self.match_concepts(source, prefer_metadata_text=prefer_metadata_text)}
         target_matches = {match.concept_id: match for match in self.match_concepts(target, prefer_metadata_text=prefer_metadata_text)}
         shared = set(source_matches) & set(target_matches)
@@ -384,6 +404,8 @@ class MetadataKnowledgeService:
         return round(max(candidate_scores), 4) if candidate_scores else 0.0
 
     def canonical_alignment(self, source: ColumnProfile, target: ColumnProfile, *, prefer_metadata_text: bool = False) -> float:
+        """Score how strongly the source and target align on canonical business concepts."""
+
         source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source, prefer_metadata_text=prefer_metadata_text)}
         target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target, prefer_metadata_text=prefer_metadata_text)}
         shared = set(source_matches) & set(target_matches)
@@ -399,6 +421,8 @@ class MetadataKnowledgeService:
         *,
         prefer_metadata_text: bool = False,
     ) -> CanonicalMappingDetails:
+        """Build the canonical detail payload attached to mapping candidates and explanations."""
+
         source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source, prefer_metadata_text=prefer_metadata_text)}
         target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target, prefer_metadata_text=prefer_metadata_text)}
         shared = set(source_matches) & set(target_matches)
@@ -557,6 +581,8 @@ class MetadataKnowledgeService:
         return descriptions
 
     def match_concepts(self, profile: ColumnProfile, *, prefer_metadata_text: bool = False) -> list[ConceptMatch]:
+        """Match one schema profile against the knowledge-layer concept index."""
+
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
         profile_tokens = {token for token in normalized_profile_name.split() if token}
@@ -612,6 +638,8 @@ class MetadataKnowledgeService:
         ]
 
     def match_canonical_concepts(self, profile: ColumnProfile, *, prefer_metadata_text: bool = False) -> list[CanonicalConceptMatch]:
+        """Match one schema profile against the canonical business concept registry."""
+
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
         profile_tokens = {token for token in normalized_profile_name.split() if token}
