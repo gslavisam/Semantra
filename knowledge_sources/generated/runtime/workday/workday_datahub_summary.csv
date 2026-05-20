@@ -1,0 +1,4 @@
+bucket,count,percentage
+weak_canonical_candidate,104,50.7%
+direct_alias_match,95,46.3%
+unmapped,6,2.9%

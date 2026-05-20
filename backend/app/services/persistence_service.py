@@ -20,6 +20,7 @@ from app.models.knowledge import (
     SourceFieldHintUpsertRequest,
 )
 from app.models.mapping import (
+    AutoMappingResponse,
     BenchmarkDatasetRecord,
     CatalogConceptDetail,
     CatalogConceptUsageRecord,
@@ -192,6 +193,39 @@ class SQLitePersistenceService:
                     payload TEXT NOT NULL
                 )
                 """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mapping_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    status TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    created_at_monotonic REAL NOT NULL,
+                    updated_at_monotonic REAL NOT NULL,
+                    retry_count INTEGER NOT NULL DEFAULT 0,
+                    cancel_requested INTEGER NOT NULL DEFAULT 0,
+                    canceled_at TEXT,
+                    response_payload TEXT,
+                    error TEXT
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_jobs_status_updated ON mapping_jobs (status, updated_at_monotonic)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS mapping_job_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    message TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_mapping_job_events_job_id ON mapping_job_events (job_id, id)"
             )
             connection.execute(
                 """
@@ -392,6 +426,8 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM benchmark_datasets")
             connection.execute("DELETE FROM evaluation_runs")
             connection.execute("DELETE FROM transformation_test_sets")
+            connection.execute("DELETE FROM mapping_job_events")
+            connection.execute("DELETE FROM mapping_jobs")
             connection.execute("DELETE FROM knowledge_overlay_entries")
             connection.execute("DELETE FROM knowledge_overlay_versions")
             connection.execute("DELETE FROM knowledge_audit_logs")
@@ -405,6 +441,220 @@ class SQLitePersistenceService:
     def clear_user_corrections(self) -> None:
         with self.connection() as connection:
             connection.execute("DELETE FROM user_corrections")
+
+    def save_mapping_job(
+        self,
+        *,
+        job_id: str,
+        status: str,
+        created_at: str,
+        updated_at: str,
+        created_at_monotonic: float,
+        updated_at_monotonic: float,
+        retry_count: int = 0,
+        cancel_requested: bool = False,
+        canceled_at: str | None = None,
+        response: AutoMappingResponse | None = None,
+        error: str | None = None,
+    ) -> None:
+        response_payload = response.model_dump_json() if response is not None else None
+        with self.connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO mapping_jobs (
+                    job_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    created_at_monotonic,
+                    updated_at_monotonic,
+                    retry_count,
+                    cancel_requested,
+                    canceled_at,
+                    response_payload,
+                    error
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(job_id) DO UPDATE SET
+                    status = excluded.status,
+                    created_at = excluded.created_at,
+                    updated_at = excluded.updated_at,
+                    created_at_monotonic = excluded.created_at_monotonic,
+                    updated_at_monotonic = excluded.updated_at_monotonic,
+                    retry_count = excluded.retry_count,
+                    cancel_requested = excluded.cancel_requested,
+                    canceled_at = excluded.canceled_at,
+                    response_payload = excluded.response_payload,
+                    error = excluded.error
+                """,
+                (
+                    job_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    created_at_monotonic,
+                    updated_at_monotonic,
+                    retry_count,
+                    1 if cancel_requested else 0,
+                    canceled_at,
+                    response_payload,
+                    error,
+                ),
+            )
+
+    def get_mapping_job(self, job_id: str) -> dict | None:
+        with self.connection() as connection:
+            row = connection.execute(
+                """
+                SELECT
+                    job_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    created_at_monotonic,
+                    updated_at_monotonic,
+                    retry_count,
+                    cancel_requested,
+                    canceled_at,
+                    response_payload,
+                    error
+                FROM mapping_jobs
+                WHERE job_id = ?
+                """,
+                (job_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._mapping_job_from_row(row)
+
+    def list_mapping_jobs(self) -> list[dict]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT
+                    job_id,
+                    status,
+                    created_at,
+                    updated_at,
+                    created_at_monotonic,
+                    updated_at_monotonic,
+                    retry_count,
+                    cancel_requested,
+                    canceled_at,
+                    response_payload,
+                    error
+                FROM mapping_jobs
+                ORDER BY created_at_monotonic ASC, job_id ASC
+                """
+            ).fetchall()
+        return [self._mapping_job_from_row(row) for row in rows]
+
+    def append_mapping_job_event(self, job_id: str, *, created_at: str, message: str) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                "INSERT INTO mapping_job_events (job_id, created_at, message) VALUES (?, ?, ?)",
+                (job_id, created_at, message),
+            )
+
+    def list_mapping_job_events(self, job_id: str, *, limit: int | None = None) -> list[str]:
+        query = "SELECT created_at, message FROM mapping_job_events WHERE job_id = ? ORDER BY id ASC"
+        params: tuple[object, ...]
+        params = (job_id,)
+        if limit is not None:
+            query = """
+                SELECT created_at, message
+                FROM (
+                    SELECT id, created_at, message
+                    FROM mapping_job_events
+                    WHERE job_id = ?
+                    ORDER BY id DESC
+                    LIMIT ?
+                ) recent_events
+                ORDER BY id ASC
+            """
+            params = (job_id, limit)
+        with self.connection() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [f"{self._time_only(row[0])} | {row[1]}" for row in rows]
+
+    def trim_mapping_job_events(self, job_id: str, *, keep_last: int) -> None:
+        with self.connection() as connection:
+            connection.execute(
+                """
+                DELETE FROM mapping_job_events
+                WHERE job_id = ?
+                  AND id NOT IN (
+                      SELECT id
+                      FROM mapping_job_events
+                      WHERE job_id = ?
+                      ORDER BY id DESC
+                      LIMIT ?
+                  )
+                """,
+                (job_id, job_id, keep_last),
+            )
+
+    def delete_mapping_jobs(self, job_ids: list[str]) -> None:
+        if not job_ids:
+            return
+        placeholders = ",".join("?" for _ in job_ids)
+        with self.connection() as connection:
+            connection.execute(f"DELETE FROM mapping_job_events WHERE job_id IN ({placeholders})", job_ids)
+            connection.execute(f"DELETE FROM mapping_jobs WHERE job_id IN ({placeholders})", job_ids)
+
+    def clear_mapping_jobs(self) -> None:
+        with self.connection() as connection:
+            connection.execute("DELETE FROM mapping_job_events")
+            connection.execute("DELETE FROM mapping_jobs")
+
+    def fail_active_mapping_jobs(self, *, updated_at: str, updated_at_monotonic: float, message: str, error: str) -> int:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT job_id FROM mapping_jobs WHERE status IN ('queued', 'running', 'cancel_requested') ORDER BY job_id ASC"
+            ).fetchall()
+            job_ids = [str(row[0]) for row in rows]
+            if not job_ids:
+                return 0
+            for job_id in job_ids:
+                connection.execute(
+                    "INSERT INTO mapping_job_events (job_id, created_at, message) VALUES (?, ?, ?)",
+                    (job_id, updated_at, message),
+                )
+                connection.execute(
+                    """
+                    UPDATE mapping_jobs
+                    SET status = 'failed',
+                        updated_at = ?,
+                        updated_at_monotonic = ?,
+                        error = ?,
+                        cancel_requested = 0
+                    WHERE job_id = ?
+                    """,
+                    (updated_at, updated_at_monotonic, error, job_id),
+                )
+        return len(job_ids)
+
+    def _mapping_job_from_row(self, row: sqlite3.Row | tuple[object, ...]) -> dict:
+        response_payload = row[9]
+        return {
+            "job_id": str(row[0]),
+            "status": str(row[1]),
+            "created_at": str(row[2]),
+            "updated_at": str(row[3]),
+            "created_at_monotonic": float(row[4]),
+            "updated_at_monotonic": float(row[5]),
+            "retry_count": int(row[6]),
+            "cancel_requested": bool(row[7]),
+            "canceled_at": row[8],
+            "response": AutoMappingResponse.model_validate(json.loads(response_payload)) if response_payload else None,
+            "error": row[10],
+        }
+
+    def _time_only(self, timestamp: str) -> str:
+        try:
+            return datetime.fromisoformat(timestamp).strftime("%H:%M:%S")
+        except ValueError:
+            return str(timestamp)
 
     def save_source_field_hint(
         self,
@@ -2281,6 +2531,66 @@ class SQLitePersistenceService:
                         ctx.note,
                     ),
                 )
+
+    def sync_canonical_runtime(
+        self,
+        canonical_concepts: list,
+        canonical_field_contexts: list[tuple[str, object]],
+        *,
+        source_hash: str,
+        concept_count: int,
+        seeded_at: str | None = None,
+    ) -> None:
+        """Refresh only canonical runtime tables while preserving persisted knowledge concepts."""
+
+        with self.connection() as connection:
+            connection.execute("DELETE FROM canonical_field_contexts")
+            connection.execute("DELETE FROM canonical_concepts")
+
+            for cc in canonical_concepts:
+                connection.execute(
+                    """
+                    INSERT INTO canonical_concepts
+                        (concept_id, entity, attribute, display_name, description, data_type, aliases_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        cc.concept_id,
+                        cc.entity,
+                        cc.attribute,
+                        cc.display_name,
+                        cc.description,
+                        cc.data_type,
+                        json.dumps(sorted(cc.aliases)),
+                    ),
+                )
+
+            for concept_id, ctx in canonical_field_contexts:
+                connection.execute(
+                    """
+                    INSERT INTO canonical_field_contexts
+                        (concept_id, system, object_name, field_name,
+                         category, object_description, field_description, note)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        concept_id,
+                        ctx.system,
+                        ctx.object_name,
+                        ctx.field_name,
+                        ctx.category,
+                        ctx.object_description,
+                        ctx.field_description,
+                        ctx.note,
+                    ),
+                )
+
+        self.save_knowledge_seed_meta(
+            source_hash=source_hash,
+            concept_count=concept_count,
+            canonical_count=len(canonical_concepts),
+            seeded_at=seeded_at,
+        )
 
     def load_knowledge_concepts(self) -> tuple[list, list, list]:
         """Return persisted knowledge concepts, canonical concepts, and canonical field contexts."""

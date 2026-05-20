@@ -467,7 +467,9 @@ def test_mapping_job_runtime_status_endpoint_reports_capacity_contract() -> None
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["storage_mode"] == "in_memory"
+    assert payload["storage_mode"] == "sqlite_status"
+    assert payload["restart_safe"] is False
+    assert payload["cross_process_safe"] is False
     assert payload["max_active_jobs"] == 4
     assert payload["max_finished_jobs"] == 32
     assert payload["finished_job_ttl_seconds"] == 900

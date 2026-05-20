@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from collections.abc import Callable
+from datetime import UTC, datetime
 
-from app.core.config import settings
+from app.core.config import backend_code_fingerprint, settings
 from app.models.mapping import (
     AutoMappingResponse,
     CanonicalCoverageReport,
@@ -14,6 +16,7 @@ from app.models.mapping import (
     DecisionLogEntry,
     LLMDecisionProposition,
     LLMValidationResult,
+    MappingRuntimeFingerprint,
     MappingCandidate,
     ScoringSignals,
     SourceMappingResult,
@@ -29,6 +32,7 @@ from app.utils.similarity import clamp_score, fuzzy_similarity, jaccard_similari
 
 
 DEFAULT_SCORING_PROFILE = "balanced"
+AUTO_DESCRIPTION_PRIORITY_MIN_METADATA_COLUMNS = 1
 SCORING_PROFILES = {
     "balanced": {
         "name": 0.20,
@@ -127,9 +131,19 @@ def resolve_scoring_weights(
     return merged
 
 
+def build_mapping_runtime_fingerprint(*, description_priority: bool) -> MappingRuntimeFingerprint:
+    """Build a short fingerprint describing the scoring/runtime code used for one mapping response."""
+
+    return MappingRuntimeFingerprint(
+        generated_at=datetime.now(UTC).isoformat(),
+        app_version=settings.app_version,
+        scoring_profile=settings.scoring_profile,
+        description_priority=bool(description_priority),
+        code_fingerprint=backend_code_fingerprint(),
+    )
+
+
 TOTAL_WEIGHT = sum(WEIGHTS.values())
-STRONG_CANONICAL_LLM_MARGIN = 0.05
-STRONG_IDENTIFIER_LLM_MIN_CONFIDENCE = 0.70
 ProgressCallback = Callable[[str], None]
 
 
@@ -154,6 +168,15 @@ class CandidateScore:
     llm_selected: bool = False
 
 
+@dataclass(frozen=True)
+class SourceSapContextProfile:
+    """Precomputed SAP context hints for a source column used in confidence calibration."""
+
+    exact_canonical_concept_id: str | None = None
+    has_sap_table_field_context: bool = False
+    has_pir_table_field_context: bool = False
+
+
 def generate_mapping_candidates(
     source_schema: SchemaProfile,
     target_schema: SchemaProfile,
@@ -170,6 +193,7 @@ def generate_mapping_candidates(
     assembles the final response consumed by API and UI workflows.
     """
 
+    effective_description_priority = description_priority or should_auto_enable_description_priority(target_schema)
     source_columns = list(source_schema.columns)
     target_columns = list(target_schema.columns)
     target_embedding_cache: dict[str, list[float] | None] = {}
@@ -189,7 +213,7 @@ def generate_mapping_candidates(
             source_column,
             target_columns,
             target_embedding_cache=target_embedding_cache,
-            description_priority=description_priority,
+            description_priority=effective_description_priority,
             candidate_pool_size=candidate_pool_size,
         )
 
@@ -301,7 +325,7 @@ def generate_mapping_candidates(
             selected = build_selected_mapping(
                 source_column.name,
                 selected_score,
-                status=label_to_status(selected_score.score),
+                status=label_to_status(selected_score.score, source=source_column),
                 extra_explanation=extra_explanation,
                 alternatives=[
                     candidate.target.name
@@ -355,6 +379,7 @@ def generate_mapping_candidates(
         mappings=selected_mappings,
         ranked_mappings=ranked_results,
         canonical_coverage=canonical_coverage,
+        mapping_runtime=build_mapping_runtime_fingerprint(description_priority=effective_description_priority),
     )
     _emit_progress(progress_callback, "Mapping response assembled.")
     return response
@@ -456,6 +481,8 @@ def refine_mapping_for_source(
         selected_score.signals,
         selected_score.active_signal_names,
         profile_name="description_priority" if description_priority else None,
+        source=source,
+        target=selected_score.target,
     )
     selected_score.llm_result = llm_result
     selected_score.llm_selected = True
@@ -490,6 +517,8 @@ def rank_targets_for_source(
 ) -> list[CandidateScore]:
     """Score and sort viable target fields for a single source column."""
 
+    sap_source_anchor = has_strong_sap_source_anchor(source, prefer_metadata_text=description_priority)
+    source_sap_profile = build_source_sap_context_profile(source, prefer_metadata_text=description_priority)
     candidate_targets = shortlist_targets_for_source(
         source,
         targets,
@@ -504,12 +533,32 @@ def rank_targets_for_source(
             target_embedding_cache=target_embedding_cache,
             description_priority=description_priority,
         )
+        deemphasized_signal_names = strong_concept_lock_deemphasized_signals(signals, active_signal_names, source)
+        if deemphasized_signal_names:
+            active_signal_names = set(active_signal_names)
+            active_signal_names.difference_update(deemphasized_signal_names)
         final_score = compute_final_score(
             signals,
             active_signal_names,
             profile_name="description_priority" if description_priority else None,
+            source=source,
+            target=target,
+            source_sap_profile=source_sap_profile,
         )
         explanation = build_explanation(source, target, signals, description_priority=description_priority)
+        sap_boost = compute_sap_confidence_boost(signals, source_sap_profile)
+        if sap_boost > 0:
+            explanation.append(
+                f"SAP context prior boosted confidence by +{sap_boost:.2f} (table+field and/or exact SAP code canonical evidence)."
+            )
+        if deemphasized_signal_names:
+            explanation.append(
+                "Weak physical evidence was de-emphasized because semantic, knowledge, and canonical signals already formed a strong business concept lock."
+            )
+        if sap_source_anchor and is_sap_anchor_preserved(signals):
+            explanation.append(
+                "Strong SAP source-alias evidence is preserved as a business anchor for this candidate; weak heuristic signals cannot heavily dilute the concept match."
+            )
         scored.append(
             CandidateScore(
                 source=source,
@@ -607,6 +656,7 @@ def apply_llm_validation(
 
         candidate_scores = rankings[: settings.top_k_candidates]
         source_column = candidate_scores[0].source
+        source_sap_profile = build_source_sap_context_profile(source_column)
         _emit_progress(progress_callback, f"LLM validating {source_name} against top {len(candidate_scores)} candidates.")
         llm_result = call_validator(
             source_field={
@@ -651,7 +701,13 @@ def apply_llm_validation(
                 continue
             candidate.signals.llm = round(llm_result.confidence, 4)
             candidate.active_signal_names.add("llm")
-            candidate.score = compute_final_score(candidate.signals, candidate.active_signal_names)
+            candidate.score = compute_final_score(
+                candidate.signals,
+                candidate.active_signal_names,
+                source=candidate.source,
+                target=candidate.target,
+                source_sap_profile=source_sap_profile,
+            )
             candidate.llm_result = llm_result
             candidate.llm_selected = True
             refresh_signal_breakdown(candidate.explanation, candidate.signals)
@@ -716,7 +772,7 @@ def has_close_strong_canonical_competitor(rankings: list[CandidateScore]) -> boo
             challenger.signals.canonical,
         ):
             continue
-        if (top_candidate.score - challenger.score) < STRONG_CANONICAL_LLM_MARGIN:
+        if (top_candidate.score - challenger.score) < settings.strong_canonical_llm_margin:
             return True
     return False
 
@@ -733,6 +789,15 @@ def should_run_canonical_semantic_rescue(top_candidate: CandidateScore) -> bool:
     if top_candidate.signals.knowledge > 0 or top_candidate.signals.canonical > 0:
         return False
     return True
+
+
+def should_auto_enable_description_priority(target_schema: SchemaProfile) -> bool:
+    """Return whether a schema-spec target should automatically prefer descriptive metadata."""
+
+    if target_schema.row_count != 0:
+        return False
+    described_columns = sum(1 for column in target_schema.columns if column.description or column.declared_type)
+    return described_columns >= AUTO_DESCRIPTION_PRIORITY_MIN_METADATA_COLUMNS
 
 
 def is_canonical_target_name(target_name: str) -> bool:
@@ -858,6 +923,9 @@ def compute_final_score(
     active_signal_names: set[str] | None = None,
     *,
     profile_name: str | None = None,
+    source: ColumnProfile | None = None,
+    target: ColumnProfile | None = None,
+    source_sap_profile: SourceSapContextProfile | None = None,
 ) -> float:
     """Combine active scoring signals into the final normalized candidate score."""
 
@@ -868,6 +936,10 @@ def compute_final_score(
             for signal_name in weights
             if float(getattr(signals, signal_name, 0.0) or 0.0) != 0.0
         }
+    deemphasized_signal_names = strong_concept_lock_deemphasized_signals(signals, active_signal_names, source)
+    if deemphasized_signal_names:
+        active_signal_names = set(active_signal_names)
+        active_signal_names.difference_update(deemphasized_signal_names)
 
     raw_score = (
         (signals.name * weights["name"] if "name" in active_signal_names else 0.0)
@@ -885,7 +957,163 @@ def compute_final_score(
     normalized_score = raw_score / active_total_weight if active_total_weight else 0.0
     if has_strong_identifier_consensus(signals, active_signal_names):
         return 1.0
-    return round(clamp_score(normalized_score), 4)
+    adjusted_score = clamp_score(normalized_score)
+    if source is not None and target is not None:
+        if source_sap_profile is None:
+            source_sap_profile = build_source_sap_context_profile(source)
+        adjusted_score = clamp_score(adjusted_score + compute_sap_confidence_boost(signals, source_sap_profile))
+        adjusted_score = max(adjusted_score, sap_business_anchor_floor(source, signals))
+    return round(clamp_score(adjusted_score), 4)
+
+
+def should_deemphasize_name_signal(
+    signals: ScoringSignals,
+    active_signal_names: set[str],
+    source: ColumnProfile | None,
+) -> bool:
+    """Return whether weak lexical name evidence should be excluded from the active score.
+
+    This is intentionally narrow: only strong SAP source-anchor cases with an explicit
+    semantic/knowledge/canonical concept lock qualify.
+    """
+
+    if source is None or "name" not in active_signal_names:
+        return False
+    if signals.name > settings.name_signal_deemphasis_max:
+        return False
+    required_signals = {"semantic", "knowledge", "canonical"}
+    if not required_signals.issubset(active_signal_names):
+        return False
+    has_semantic_concept_lock = (
+        signals.semantic >= settings.strong_concept_lock_min
+        and signals.knowledge >= settings.strong_concept_lock_min
+        and signals.canonical >= settings.strong_concept_lock_min
+    )
+    has_business_concept_lock = (
+        signals.semantic >= 0.60
+        and signals.knowledge >= 0.95
+        and signals.canonical >= 0.75
+    )
+    return has_semantic_concept_lock or has_business_concept_lock
+
+
+def strong_concept_lock_deemphasized_signals(
+    signals: ScoringSignals,
+    active_signal_names: set[str],
+    source: ColumnProfile | None,
+) -> set[str]:
+    """Return the weak physical signals that should not dilute a strong concept lock."""
+
+    if not should_deemphasize_name_signal(signals, active_signal_names, source):
+        return set()
+
+    deemphasized = {"name"}
+    if "pattern" in active_signal_names and signals.pattern <= 0.2:
+        deemphasized.add("pattern")
+    if "overlap" in active_signal_names and signals.overlap <= 0.1:
+        deemphasized.add("overlap")
+    return deemphasized
+
+
+def has_strong_sap_source_anchor(
+    source: ColumnProfile,
+    *,
+    prefer_metadata_text: bool = False,
+) -> bool:
+    """Return whether the source field is explicitly recognized as a SAP field alias."""
+
+    return any(
+        match.strength >= 0.9 and any(context.system.upper() == "SAP" for context in match.contexts)
+        for match in metadata_knowledge_service.match_concepts(source, prefer_metadata_text=prefer_metadata_text)
+    )
+
+
+def build_source_sap_context_profile(
+    source: ColumnProfile,
+    *,
+    prefer_metadata_text: bool = False,
+) -> SourceSapContextProfile:
+    """Resolve reusable SAP context hints for one source field."""
+
+    normalized_source_name = source.name.strip().lower()
+    has_sap_table_field_context = False
+    for match in metadata_knowledge_service.match_concepts(source, prefer_metadata_text=prefer_metadata_text):
+        for context in match.contexts:
+            if context.system.upper() != "SAP":
+                continue
+            if context.field_name.strip().lower() != normalized_source_name:
+                continue
+            has_sap_table_field_context = True
+
+    exact_canonical_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(source.name)
+    if exact_canonical_concept_id == source.name:
+        exact_canonical_concept_id = None
+
+    # Confidence calibration is reserved for precise SAP technical-code fields
+    # with explicit table+field context and an exact canonical concept resolution.
+    is_sap_technical_code = source.name.isupper() and len(source.name) <= 10
+    has_pir_table_field_context = (
+        has_sap_table_field_context and exact_canonical_concept_id is not None and is_sap_technical_code
+    )
+
+    return SourceSapContextProfile(
+        exact_canonical_concept_id=exact_canonical_concept_id,
+        has_sap_table_field_context=has_sap_table_field_context,
+        has_pir_table_field_context=has_pir_table_field_context,
+    )
+
+
+def compute_sap_confidence_boost(signals: ScoringSignals, sap_profile: SourceSapContextProfile | None) -> float:
+    """Compute additive confidence boost from SAP field-context and exact-code evidence."""
+
+    if sap_profile is None:
+        return 0.0
+
+    boost = 0.0
+    if sap_profile.has_sap_table_field_context and signals.knowledge >= 0.65 and signals.canonical >= 0.45:
+        boost = settings.sap_table_field_context_boost
+        if sap_profile.has_pir_table_field_context and signals.knowledge >= 0.75 and signals.canonical >= 0.55:
+            boost = settings.sap_pir_table_field_context_boost
+
+    exact_code_boost = 0.0
+    if sap_profile.exact_canonical_concept_id:
+        if signals.canonical >= 0.85:
+            exact_code_boost = settings.sap_exact_code_canonical_strong_boost
+        elif signals.canonical >= 0.70 and signals.knowledge >= 0.60:
+            exact_code_boost = settings.sap_exact_code_canonical_medium_boost
+        elif sap_profile.has_pir_table_field_context and signals.canonical >= 0.55 and signals.knowledge >= 0.55:
+            exact_code_boost = settings.sap_exact_code_canonical_pir_boost
+
+    return boost + exact_code_boost
+
+
+def is_sap_pir_slice_source(source: ColumnProfile) -> bool:
+    """Return whether this source column belongs to the SAP PIR mapping slice."""
+
+    sap_profile = build_source_sap_context_profile(source, prefer_metadata_text=True)
+    return sap_profile.has_pir_table_field_context
+
+
+def is_sap_anchor_preserved(signals: ScoringSignals) -> bool:
+    """Return whether a candidate has enough business evidence to preserve a SAP anchor."""
+
+    return signals.knowledge >= 0.75 or signals.canonical >= 0.6
+
+
+def sap_business_anchor_floor(source: ColumnProfile, signals: ScoringSignals) -> float:
+    """Return the minimum score preserved for strong SAP business matches."""
+
+    if not has_strong_sap_source_anchor(source):
+        return 0.0
+    if not is_sap_anchor_preserved(signals):
+        return 0.0
+
+    business_anchor = max(
+        signals.knowledge,
+        (0.85 * signals.knowledge) + (0.15 * signals.canonical),
+        (0.70 * signals.knowledge) + (0.30 * signals.canonical),
+    )
+    return clamp_score(business_anchor - settings.sap_business_signal_max_dilution)
 
 
 def has_strong_identifier_consensus(
@@ -912,7 +1140,7 @@ def has_strong_identifier_consensus(
         and signals.statistical >= 0.95
     )
     has_pattern_consensus = "pattern" not in active_signal_names or signals.pattern >= 0.95
-    has_llm_consensus = "llm" in active_signal_names and signals.llm >= STRONG_IDENTIFIER_LLM_MIN_CONFIDENCE
+    has_llm_consensus = "llm" in active_signal_names and signals.llm >= settings.strong_identifier_llm_min_confidence
     return has_business_consensus and has_value_consensus and has_pattern_consensus and has_llm_consensus
 
 
@@ -948,35 +1176,115 @@ def embedding_similarity(
 def assign_unique_targets(per_source_scores: dict[str, list[CandidateScore]]) -> dict[str, CandidateScore]:
     """Choose one final target per source while keeping target assignment unique across the schema."""
 
-    assigned_by_source: dict[str, CandidateScore] = {}
-    assigned_targets: set[str] = set()
+    source_names = list(per_source_scores)
+    if not source_names:
+        return {}
 
-    all_edges = []
-    for source_name, rankings in per_source_scores.items():
-        for score in rankings:
-            all_edges.append((source_name, score))
-
-    all_edges.sort(
-        key=lambda item: (
-            item[1].llm_selected,
-            item[1].score,
-            item[1].signals.pattern,
-            item[1].signals.canonical,
-            item[1].signals.semantic,
-            item[1].signals.embedding,
-        ),
-        reverse=True,
+    target_names = list(
+        dict.fromkeys(
+            score.target.name
+            for rankings in per_source_scores.values()
+            for score in rankings
+        )
     )
+    if not target_names:
+        return {}
 
-    for source_name, score in all_edges:
-        if source_name in assigned_by_source:
+    source_count = len(source_names)
+    target_count = len(target_names)
+    matrix_size = max(source_count, target_count)
+    target_index = {name: index for index, name in enumerate(target_names, start=1)}
+    score_lookup: dict[tuple[str, str], CandidateScore] = {}
+    max_weight = 0.0
+    weights = [[0.0] * (matrix_size + 1) for _ in range(matrix_size + 1)]
+
+    for row_index, source_name in enumerate(source_names, start=1):
+        for score in per_source_scores[source_name]:
+            column_index = target_index[score.target.name]
+            weight = assignment_weight(score)
+            weights[row_index][column_index] = weight
+            score_lookup[(source_name, score.target.name)] = score
+            max_weight = max(max_weight, weight)
+
+    costs = [[0.0] * (matrix_size + 1) for _ in range(matrix_size + 1)]
+    for row_index in range(1, matrix_size + 1):
+        for column_index in range(1, matrix_size + 1):
+            costs[row_index][column_index] = max_weight - weights[row_index][column_index]
+
+    assignment = solve_min_cost_assignment(costs)
+    assigned_by_source: dict[str, CandidateScore] = {}
+    for row_index, source_name in enumerate(source_names, start=1):
+        column_index = assignment[row_index]
+        if column_index < 1 or column_index > target_count:
             continue
-        if score.target.name in assigned_targets:
-            continue
-        assigned_by_source[source_name] = score
-        assigned_targets.add(score.target.name)
+        target_name = target_names[column_index - 1]
+        selected = score_lookup.get((source_name, target_name))
+        if selected is not None:
+            assigned_by_source[source_name] = selected
 
     return assigned_by_source
+
+
+def assignment_weight(score: CandidateScore) -> float:
+    """Return the global-assignment objective weight for one source-target edge."""
+
+    return (
+        float(score.score)
+        + (0.000001 if score.llm_selected else 0.0)
+        + (float(score.signals.canonical) * 0.0000001)
+        + (float(score.signals.semantic) * 0.00000001)
+    )
+
+
+def solve_min_cost_assignment(costs: list[list[float]]) -> list[int]:
+    """Solve a square assignment matrix with the Hungarian algorithm."""
+
+    size = len(costs) - 1
+    u = [0.0] * (size + 1)
+    v = [0.0] * (size + 1)
+    p = [0] * (size + 1)
+    way = [0] * (size + 1)
+
+    for row in range(1, size + 1):
+        p[0] = row
+        minv = [float("inf")] * (size + 1)
+        used = [False] * (size + 1)
+        column = 0
+        while True:
+            used[column] = True
+            row0 = p[column]
+            delta = float("inf")
+            next_column = 0
+            for candidate_column in range(1, size + 1):
+                if used[candidate_column]:
+                    continue
+                cur = costs[row0][candidate_column] - u[row0] - v[candidate_column]
+                if cur < minv[candidate_column]:
+                    minv[candidate_column] = cur
+                    way[candidate_column] = column
+                if minv[candidate_column] < delta:
+                    delta = minv[candidate_column]
+                    next_column = candidate_column
+            for candidate_column in range(size + 1):
+                if used[candidate_column]:
+                    u[p[candidate_column]] += delta
+                    v[candidate_column] -= delta
+                else:
+                    minv[candidate_column] -= delta
+            column = next_column
+            if p[column] == 0:
+                break
+        while True:
+            next_column = way[column]
+            p[column] = p[next_column]
+            column = next_column
+            if column == 0:
+                break
+
+    assignment = [0] * (size + 1)
+    for column in range(1, size + 1):
+        assignment[p[column]] = column
+    return assignment
 
 
 def build_candidate_option(score: CandidateScore) -> CandidateOption:
@@ -985,7 +1293,7 @@ def build_candidate_option(score: CandidateScore) -> CandidateOption:
     return CandidateOption(
         target=score.target.name,
         confidence=round(score.score, 4),
-        confidence_label=score_to_label(score.score),
+        confidence_label=score_to_label(score.score, source=score.source),
         method="multi_signal_heuristic",
         signals=score.signals,
         explanation=list(score.explanation),
@@ -1008,7 +1316,7 @@ def build_selected_mapping(
         source=source_name,
         target=score.target.name,
         confidence=round(score.score, 4),
-        confidence_label=score_to_label(score.score),
+        confidence_label=score_to_label(score.score, source=score.source),
         status=status,
         method="llm_validated" if score.llm_selected else "multi_signal_heuristic",
         signals=score.signals,
@@ -1197,19 +1505,29 @@ def build_explanation(
     return explanation
 
 
-def score_to_label(score: float) -> str:
+def score_to_label(score: float, *, source: ColumnProfile | None = None) -> str:
     """Map a numeric confidence score into Semantra's confidence label buckets."""
 
-    if score >= settings.high_confidence_threshold:
+    high_threshold = settings.high_confidence_threshold
+    medium_threshold = settings.medium_confidence_threshold
+    if source is not None and is_sap_pir_slice_source(source):
+        high_threshold = settings.sap_pir_high_confidence_threshold
+        medium_threshold = settings.sap_pir_medium_confidence_threshold
+
+    if score >= high_threshold:
         return "high_confidence"
-    if score >= settings.medium_confidence_threshold:
+    if score >= medium_threshold:
         return "medium_confidence"
     return "low_confidence"
 
 
-def label_to_status(score: float) -> str:
+def label_to_status(score: float, *, source: ColumnProfile | None = None) -> str:
     """Map a numeric score into the default review status for auto-mapping results."""
 
-    if score >= settings.auto_accept_threshold:
+    auto_accept_threshold = settings.auto_accept_threshold
+    if source is not None and is_sap_pir_slice_source(source):
+        auto_accept_threshold = settings.sap_pir_auto_accept_threshold
+
+    if score >= auto_accept_threshold:
         return "accepted"
     return "needs_review"

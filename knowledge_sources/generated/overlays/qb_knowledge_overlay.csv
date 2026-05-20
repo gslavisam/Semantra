@@ -1,0 +1,65 @@
+entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note
+concept_alias,FullName,contact.name,FullName,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Customer.FullName - Hierarchical name (Parent:Child)
+concept_alias,IsActive,account.status,IsActive,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Customer.IsActive - Active flag
+concept_alias,Salutation,party.salutation,Salutation,Accounts Receivable,QuickBooks,"Wave-1 Direct/Description: Customer.Salutation - Salutation / title (Mr., Dr., etc.)"
+concept_alias,JobTitle,employee.position,JobTitle,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Customer.JobTitle - Contact job title
+concept_alias,Cc,cost_center.id,Cc,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Customer.Cc - CC email address(es)
+concept_alias,CreditLimit,customer.credit_limit,CreditLimit,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Customer.CreditLimit - Approved credit limit
+concept_alias,PONumber,purchase_order.id,PONumber,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Invoice.PONumber - Customer purchase order number
+concept_alias,DueDate,invoice.due_date,DueDate,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Invoice.DueDate - Payment due date
+concept_alias,ShipDate,shipment.planned_ship_date,ShipDate,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Invoice.ShipDate - Scheduled ship date
+concept_alias,ExchangeRate,exchange_rate.rate,ExchangeRate,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: Invoice.ExchangeRate - Exchange rate vs home currency
+concept_alias,SerialNumber,asset.serial_number,SerialNumber,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: InvoiceLine.SerialNumber - Serial number (inventory tracking)
+concept_alias,LotNumber,batch.id,LotNumber,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: InvoiceLine.LotNumber - Lot number (inventory tracking)
+concept_alias,RefNumber,goods_receipt.id,RefNumber,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: SalesReceipt.RefNumber - Receipt number
+concept_alias,TxnDate,payment.date,TxnDate,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: ReceivePayment.TxnDate - Payment date
+concept_alias,PaymentMethodRef_FullName,payment.method_code,PaymentMethodRef_FullName,Accounts Receivable,QuickBooks,Wave-1 Direct/Description: ReceivePayment.PaymentMethodRef_FullName - Payment method
+concept_alias,VendorAddress_Addr1,address.line1,VendorAddress_Addr1,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.VendorAddress_Addr1 - Address line 1
+concept_alias,VendorAddress_Addr2,address.line2,VendorAddress_Addr2,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.VendorAddress_Addr2 - Address line 2
+concept_alias,VendorAddress_City,supplier.address,VendorAddress_City,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.VendorAddress_City - City
+concept_alias,VendorAddress_PostalCode,address.postal_code,VendorAddress_PostalCode,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.VendorAddress_PostalCode - Postal code
+concept_alias,VendorAddress_Country,supplier.address,VendorAddress_Country,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.VendorAddress_Country - Country
+concept_alias,Email,contact.email,Email,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Vendor.Email - Email address
+concept_alias,VendorRef_FullName,supplier.name,VendorRef_FullName,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Bill.VendorRef_FullName - Vendor name
+concept_alias,VendorAddress_City,supplier.city,VendorAddress_City,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Bill.VendorAddress_City - Vendor city
+concept_alias,VendorAddress_PostalCode,supplier.postal_code,VendorAddress_PostalCode,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Bill.VendorAddress_PostalCode - Vendor postal code
+concept_alias,RefNumber,supplier_invoice.id,RefNumber,Accounts Payable,QuickBooks,Wave-1 Direct/Description: Bill.RefNumber - Vendor invoice number
+concept_alias,ItemRef_FullName,material.name,ItemRef_FullName,Accounts Payable,QuickBooks,Wave-1 Direct/Description: BillItemLine.ItemRef_FullName - Item name
+concept_alias,UnitOfMeasure,material.base_uom_code,UnitOfMeasure,Accounts Payable,QuickBooks,Wave-1 Direct/Description: BillItemLine.UnitOfMeasure - Unit of measure
+concept_alias,PayeeEntityRef_FullName,supplier.name,PayeeEntityRef_FullName,Accounts Payable,QuickBooks,Wave-1 Direct/Description: BillPayment.PayeeEntityRef_FullName - Vendor name
+concept_alias,RefNumber,purchase_order.id,RefNumber,Accounts Payable,QuickBooks,Wave-1 Direct/Description: PurchaseOrder.RefNumber - PO number
+concept_alias,RoutingNumber,bank_account.routing_number,RoutingNumber,General Ledger,QuickBooks,Wave-1 Direct/Description: Account.RoutingNumber - Bank routing / transit number
+concept_alias,TxnDate,accounting.posting_date,TxnDate,General Ledger,QuickBooks,Wave-1 Direct/Description: JournalEntry.TxnDate - Posting date
+concept_alias,AccountRef_FullName,account.name,AccountRef_FullName,General Ledger,QuickBooks,Wave-1 Direct/Description: JournalEntryLine.AccountRef_FullName - Account name
+concept_alias,ReorderPoint,inventory_policy.reorder_point,ReorderPoint,Inventory,QuickBooks,Wave-1 Direct/Description: Item.ReorderPoint - Reorder trigger quantity
+concept_alias,QuantityOnHand,stock.quantity,QuantityOnHand,Inventory,QuickBooks,Wave-1 Direct/Description: Item.QuantityOnHand - Current stock quantity
+concept_alias,CustomerRef_FullName,customer.name,CustomerRef_FullName,Inventory,QuickBooks,Wave-1 Direct/Description: SalesOrder.CustomerRef_FullName - Customer name
+concept_alias,RefNumber,sales_order.id,RefNumber,Inventory,QuickBooks,Wave-1 Direct/Description: SalesOrder.RefNumber - SO number
+concept_alias,Department,department.name,Department,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.Department - Department name
+concept_alias,EmployeeAddress_City,supplier.address,EmployeeAddress_City,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.EmployeeAddress_City - City
+concept_alias,EmployeeAddress_State,supplier.region_code,EmployeeAddress_State,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.EmployeeAddress_State - State
+concept_alias,EmployeeAddress_PostalCode,address.postal_code,EmployeeAddress_PostalCode,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.EmployeeAddress_PostalCode - Postal code
+concept_alias,EmployeeAddress_Country,supplier.address,EmployeeAddress_Country,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.EmployeeAddress_Country - Country
+concept_alias,Mobile,employee.phone,Mobile,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.Mobile - Mobile phone
+concept_alias,SSN,employee.national_id,SSN,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.SSN - Social security number (encrypted)
+concept_alias,Gender,employee.gender,Gender,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.Gender - Gender (M/F)
+concept_alias,BirthDate,employee.birth_date,BirthDate,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.BirthDate - Date of birth
+concept_alias,HireDate,employee.hire_date,HireDate,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.HireDate - Employment start date
+concept_alias,ReleasedDate,employee.termination_date,ReleasedDate,Payroll,QuickBooks,Wave-1 Direct/Description: Employee.ReleasedDate - Termination date
+concept_alias,EmployeeRef_FullName,employee.name,EmployeeRef_FullName,Payroll,QuickBooks,Wave-1 Direct/Description: Paycheck.EmployeeRef_FullName - Employee name
+concept_alias,WagePeriodStart,payroll.period_start_date,WagePeriodStart,Payroll,QuickBooks,Wave-1 Direct/Description: Paycheck.WagePeriodStart - Pay period start date
+concept_alias,WagePeriodEnd,payroll.period_end_date,WagePeriodEnd,Payroll,QuickBooks,Wave-1 Direct/Description: Paycheck.WagePeriodEnd - Pay period end date
+concept_alias,ItemServiceRef_FullName,service.name,ItemServiceRef_FullName,Payroll,QuickBooks,Wave-1 Direct/Description: TimeTracking.ItemServiceRef_FullName - Service item name
+concept_alias,Name,attachment.file_name,Name,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: Customer.Name - Customer name as it appears in lists
+concept_alias,CompanyName,account.name,CompanyName,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: Customer.CompanyName - Company / business name
+concept_alias,Phone,customer.phone,Phone,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: Customer.Phone - Primary phone number
+concept_alias,Email,supplier.commercial_contact_email,Email,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: Customer.Email - Primary email address
+concept_alias,AccountNumber,bank_account.account_number,AccountNumber,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: Customer.AccountNumber - Customer account number (user-defined)
+concept_alias,Quantity,bom.quantity,Quantity,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: InvoiceLine.Quantity - Quantity
+concept_alias,Rate,exchange_rate.rate,Rate,Accounts Receivable,QuickBooks,Wave-2 Strong/Knowledge: InvoiceLine.Rate - Unit selling price
+concept_alias,Balance,absence.balance,Balance,General Ledger,QuickBooks,Wave-2 Strong/Knowledge: Account.Balance - Current balance (local currency)
+concept_alias,Type,account.industry,Type,Inventory,QuickBooks,"Wave-2 Strong/Knowledge: Item.Type - Item type (Inventory, Service, Assembly, etc.)"
+concept_alias,SalesPrice,price.unit,SalesPrice,Inventory,QuickBooks,Wave-2 Strong/Knowledge: Item.SalesPrice - Default selling price
+concept_alias,AverageCost,material.base_price,AverageCost,Inventory,QuickBooks,Wave-2 Strong/Knowledge: Item.AverageCost - Weighted average cost per unit
+concept_alias,Hours,absence.hours,Hours,Payroll,QuickBooks,Wave-2 Strong/Knowledge: PaycheckLine.Hours - Hours worked (hourly items)
+concept_alias,CurrencyCode,accounting.document_currency_code,CurrencyCode,Reporting,QuickBooks,"Wave-2 Strong/Knowledge: Currency.CurrencyCode - ISO 4217 code (USD, EUR, etc.)"

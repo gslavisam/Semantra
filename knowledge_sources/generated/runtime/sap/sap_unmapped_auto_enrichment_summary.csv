@@ -1,0 +1,9 @@
+metric,value
+input_rows,9116
+candidates,1355
+overlay_rows,1355
+min_strength,0.60
+min_margin,0.05
+include_buckets,"knowledge_only,unmapped,weak_canonical_candidate"
+tier_high,1
+tier_medium,1354

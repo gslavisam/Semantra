@@ -1,0 +1,15 @@
+source_field,expected_target,final_target,final_confidence,final_label,top1_target,top1_confidence
+LIFNR,supplier_id,supplier_id,0.95,high_confidence,supplier_id,0.95
+KTOKK,supplier_group_id,supplier_group_id,0.56,low_confidence,supplier_group_id,0.56
+NAME1,supplier_name,supplier_name,0.95,high_confidence,supplier_name,0.95
+LAND1,country_code,country_code,0.31,low_confidence,country_code,0.31
+REGIO,region_code,region_code,0.22,low_confidence,region_code,0.22
+ORT01,city_name,city_name,0.30,low_confidence,city_name,0.30
+PSTLZ,postal_code,postal_code,0.95,high_confidence,postal_code,0.95
+STRAS,street_address,street_address,0.95,high_confidence,street_address,0.95
+STCD1,tax_id_number,tax_id_number,0.95,high_confidence,tax_id_number,0.95
+ZTERM,payment_terms_id,payment_terms_id,0.70,medium_confidence,payment_terms_id,0.70
+AKONT,reconciliation_account,reconciliation_account,0.59,low_confidence,reconciliation_account,0.59
+SPERR,posting_block_flag,posting_block_flag,0.70,medium_confidence,posting_block_flag,0.70
+LOEVM,deletion_mark,deletion_mark,0.74,medium_confidence,deletion_mark,0.74
+TELF1,phone_number,phone_number,0.95,high_confidence,phone_number,0.95

@@ -1,0 +1,4 @@
+wave,action,bucket,row_count,percentage
+2,promoted,weak_canonical_candidate,104,50.7%
+2,review_queue,direct_alias_match,95,46.3%
+2,review_queue,unmapped,6,2.9%

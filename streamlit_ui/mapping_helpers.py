@@ -156,7 +156,10 @@ def canonical_path_label(
 ) -> str:
     """Format a canonical path label showing source, concept bridge, and target."""
 
-    concept_labels = canonical_concept_labels_func(canonical_details)
+    details = canonical_details or {}
+    if not (details.get("shared_concepts") or []):
+        return ""
+    concept_labels = canonical_concept_labels_func({"shared_concepts": details.get("shared_concepts") or []})
     if not concept_labels:
         return ""
     target_label = str(target or "unmapped").strip() or "unmapped"

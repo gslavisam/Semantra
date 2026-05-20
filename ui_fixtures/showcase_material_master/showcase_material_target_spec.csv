@@ -5,8 +5,8 @@ material_type_code,Normalized material type code,VARCHAR,10
 material_group_id,Normalized material group identifier,VARCHAR,20
 material_description,Normalized material description,VARCHAR,120
 base_uom_code,Base unit of measure code,VARCHAR,10
-gross_weight,Gross material weight,DECIMAL(10,3),
-net_weight,Net material weight,DECIMAL(10,3),
+gross_weight,Gross material weight,"DECIMAL(10,3)",
+net_weight,Net material weight,"DECIMAL(10,3)",
 weight_unit_code,Weight unit code,VARCHAR,5
 created_date,Material creation date,DATE,
 batch_managed_flag,Indicator that the material is batch managed,BOOLEAN,

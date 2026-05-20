@@ -50,6 +50,7 @@ from app.services.mapping_analysis_service import build_mapping_analysis_narrati
 from app.services.mapping_audio_service import synthesize_orpheus_wav
 from app.services.codegen_service import generate_pandas_code, generate_pyspark_code
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
+from app.services.mapping_governance_repository import mapping_governance_repository
 from app.services.review_plan_service import build_review_plan
 from app.services.mapping_service import generate_mapping_candidates, refine_mapping_for_source
 from app.services.persistence_service import persistence_service
@@ -105,7 +106,7 @@ def append_mapping_set_audit(
 ) -> MappingSetAuditEntry:
     """Append one audit entry for a mapping-set lifecycle action."""
 
-    return persistence_service.append_mapping_set_audit_log(
+    return mapping_governance_repository.append_audit_log(
         MappingSetAuditEntry(
             mapping_set_id=mapping_set.mapping_set_id,
             mapping_set_name=mapping_set.name,
@@ -530,7 +531,7 @@ async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> Artifac
 async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetRecord:
     """Persist a reviewed mapping set together with metadata and audit history."""
 
-    saved = persistence_service.save_mapping_set(
+    saved = mapping_governance_repository.save_mapping_set(
         request.name,
         request.mapping_decisions,
         source_dataset_id=request.source_dataset_id,
@@ -558,7 +559,7 @@ async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetReco
 async def list_mapping_sets() -> list[MappingSetRecord]:
     """List persisted mapping sets available for governance and reuse."""
 
-    return persistence_service.list_mapping_sets()
+    return mapping_governance_repository.list_mapping_sets()
 
 
 @router.get("/sets/{mapping_set_id}", response_model=MappingSetDetail, dependencies=[Depends(require_admin)])
@@ -566,7 +567,7 @@ async def get_mapping_set(mapping_set_id: int) -> MappingSetDetail:
     """Return one persisted mapping set with full decision and governance detail."""
 
     try:
-        return persistence_service.get_mapping_set(mapping_set_id)
+        return mapping_governance_repository.get_mapping_set(mapping_set_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -579,7 +580,7 @@ async def update_mapping_set_status(
     """Update governance status and ownership fields for one mapping set."""
 
     try:
-        updated = persistence_service.update_mapping_set_status(
+        updated = mapping_governance_repository.update_mapping_set_status(
             mapping_set_id,
             request.status,
             owner=request.owner,
@@ -600,7 +601,7 @@ async def apply_mapping_set(
     """Mark an approved mapping set as applied for downstream workspace reuse flows."""
 
     try:
-        mapping_set = persistence_service.get_mapping_set(mapping_set_id)
+        mapping_set = mapping_governance_repository.get_mapping_set(mapping_set_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     if mapping_set.status != "approved":
@@ -619,7 +620,7 @@ async def apply_mapping_set(
 async def get_mapping_set_audit(mapping_set_id: int) -> list[MappingSetAuditEntry]:
     """Return the audit trail for one persisted mapping set."""
 
-    return persistence_service.list_mapping_set_audit_logs(mapping_set_id)
+    return mapping_governance_repository.list_audit_logs(mapping_set_id)
 
 
 @router.get("/sets/{mapping_set_id}/diff", response_model=MappingSetDiffResponse, dependencies=[Depends(require_admin)])
@@ -630,7 +631,7 @@ async def get_mapping_set_diff(
     """Compare one mapping set against another persisted version."""
 
     try:
-        return persistence_service.diff_mapping_sets(mapping_set_id, against_id)
+        return mapping_governance_repository.diff_mapping_sets(mapping_set_id, against_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

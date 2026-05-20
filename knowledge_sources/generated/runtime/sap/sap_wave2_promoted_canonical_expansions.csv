@@ -1,0 +1,2 @@
+action_type,rule_name,sap_module,sap_table,sap_field,sap_description,source_bucket,canonical_concept_id,alias_added,concept_created,context_added
+new_canonical_concept,party_salutation_anred,SD,KNA1,ANRED,Title,description_alias_match,party.salutation,true,false,false

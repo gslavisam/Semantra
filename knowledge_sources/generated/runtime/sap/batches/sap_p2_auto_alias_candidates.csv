@@ -1,0 +1,21 @@
+sap_module,sap_table,sap_field,sap_description,top_canonical_concept_id,top_canonical_strength,top_canonical_matches,candidate_reason
+SD,KNB1,ZWELS,List of Respected Payment Methods,payment.method_code,1.00,payment.method_code:1.00,single_top_canonical_candidate
+SD,LIKP,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,0.80,supplier.region_code:0.80,single_top_canonical_candidate
+SD,LIKP,VSART,Shipping Type,shipment.carrier,0.80,shipment.carrier:0.80,single_top_canonical_candidate
+SD,VBAK,BNAME,Name of orderer,account.name,0.80,account.name:0.80,single_top_canonical_candidate
+SD,VBAK,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,0.80,supplier.region_code:0.80,single_top_canonical_candidate
+SD,VBAK,KTEXT,Search term for product proposal,cost_center.name,0.80,cost_center.name:0.80,single_top_canonical_candidate
+SD,VBAP,TAXM1,Tax Classification for Material,tax.id,0.80,tax.id:0.80,single_top_canonical_candidate
+SD,VBKD,VSART,Shipping Type,shipment.carrier,0.80,shipment.carrier:0.80,single_top_canonical_candidate
+SD,VBRK,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,0.80,supplier.region_code:0.80,single_top_canonical_candidate
+SD,VBRP,TAXM1,Tax Classification of Material,tax.id,0.80,tax.id:0.80,single_top_canonical_candidate
+MM,EKKO,CONT,Contract,container.id,0.80,container.id:0.80,single_top_canonical_candidate
+MM,EKKO,VSART,Shipping Type,shipment.carrier,0.80,shipment.carrier:0.80,single_top_canonical_candidate
+MM,EKPO,UNIQUEID,Concatenation of EBELN and EBELP,system.guid,0.80,system.guid:0.80,single_top_canonical_candidate
+MM,EKPO,VSART,Shipping Type,shipment.carrier,0.80,shipment.carrier:0.80,single_top_canonical_candidate
+MM,MAKT,MAKTG,Material Description in Uppercase for Matchcodes,address.city,0.80,address.city:0.80,single_top_canonical_candidate
+MM,MARC,BEARZ,Processing time,route.id,0.80,route.id:0.80,single_top_canonical_candidate
+FI,LFB1,ZWELS,List of Respected Payment Methods,payment.method_code,1.00,payment.method_code:1.00,single_top_canonical_candidate
+PP,PLKO,KTEXT,Routing Description,cost_center.name,0.80,cost_center.name:0.80,single_top_canonical_candidate
+PP,PLPO,LTXA1,Operation Short Text,address.city,0.80,address.city:0.80,single_top_canonical_candidate
+PP,STPO,DOKVR,Document Version,version.number,0.80,version.number:0.80,single_top_canonical_candidate

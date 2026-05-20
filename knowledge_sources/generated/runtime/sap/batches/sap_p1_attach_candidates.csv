@@ -1,0 +1,46 @@
+sap_module,sap_table,sap_field,sap_description,top_knowledge_concept_id,top_knowledge_strength,top_knowledge_matches,candidate_reason
+SD,KNA1,CRTN,CRT Number,carton number,1.00,carton number:1.00,single_top_knowledge_candidate
+SD,KNA1,ORT02,District,district,0.90,district:0.90,single_top_knowledge_candidate
+SD,KNA1,PFACH,PO Box,po box,0.90,po box:0.90,single_top_knowledge_candidate
+SD,KNA1,TELFX,Fax Number,fax number,1.00,fax number:1.00,single_top_knowledge_candidate
+SD,KNB1,VRSNR,Insurance Number,insurance number,0.90,insurance number:0.90,single_top_knowledge_candidate
+SD,KNVV,VKBUR,Sales Office,sales rep,1.00,sales rep:1.00,single_top_knowledge_candidate
+SD,LIKP,BOLNR,Bill of Lading,bill of lading,0.90,bill of lading:0.90,single_top_knowledge_candidate
+SD,LIKP,LDDAT,Loading Date,loading date,0.90,loading date:0.90,single_top_knowledge_candidate
+SD,LIKP,LFDAT,Delivery Date,delivery date,1.00,delivery date:1.00,single_top_knowledge_candidate
+SD,LIKP,SPE_WAZONE_IST,Time Zone,timezone,0.90,timezone:0.90,single_top_knowledge_candidate
+SD,LIKP,VKBUR,Sales Office,sales rep,1.00,sales rep:1.00,single_top_knowledge_candidate
+SD,LIPS,LGTYP,Storage Type,zone,1.00,zone:1.00,single_top_knowledge_candidate
+SD,LIPS,VKBUR,Sales Office,sales rep,1.00,sales rep:1.00,single_top_knowledge_candidate
+SD,VBAK,VKBUR,Sales Office,sales rep,1.00,sales rep:1.00,single_top_knowledge_candidate
+SD,VBAP,/DMBE/EFFECTIVEDATETO,Effective To,address valid to,0.90,address valid to:0.90,single_top_knowledge_candidate
+SD,VBRP,VKBUR,Sales Office,sales rep,1.00,sales rep:1.00,single_top_knowledge_candidate
+MM,EBAN,LFDAT,Item Delivery Date,delivery date,1.00,delivery date:1.00,single_top_knowledge_candidate
+MM,EBAN,STACODE,Status Code,status code,0.90,status code:0.90,single_top_knowledge_candidate
+MM,EKKO,DESP_DAT,Date,time entry date,0.90,time entry date:0.90,single_top_knowledge_candidate
+MM,EKKO,PARE_DAT,Date,time entry date,0.90,time entry date:0.90,single_top_knowledge_candidate
+MM,EKPO,/DMBE/EFFECTIVEDATETO,Effective To,address valid to,0.90,address valid to:0.90,single_top_knowledge_candidate
+MM,MARA,BREIT,Width,width,1.00,width:1.00,single_top_knowledge_candidate
+MM,MARA,GROES,Size/dimensions,size,1.00,size:1.00,single_top_knowledge_candidate
+MM,MARA,HAZMAT,Relevant for Hazardous Substances,hazardous material,1.00,hazardous material:1.00,single_top_knowledge_candidate
+MM,MARA,HOEHE,Height,height,1.00,height:1.00,single_top_knowledge_candidate
+MM,MARA,MEDIUM,Medium,channel,1.00,channel:1.00,single_top_knowledge_candidate
+MM,MARA,RAUBE,Storage conditions,storage conditions,0.90,storage conditions:0.90,single_top_knowledge_candidate
+MM,MARC,/CWM/TRAME,Stock in Transit,stock in transit,0.90,stock in transit:0.90,single_top_knowledge_candidate
+MM,MARC,TRAME,Stock in Transit,stock in transit,0.90,stock in transit:0.90,single_top_knowledge_candidate
+MM,MARD,INSME,Stock in Quality Inspection,quantity in quality,1.00,quantity in quality:1.00,single_top_knowledge_candidate
+MM,MARM,BREIT,Width,width,1.00,width:1.00,single_top_knowledge_candidate
+MM,MARM,HOEHE,Height,height,1.00,height:1.00,single_top_knowledge_candidate
+MM,MKPF,SPE_BUDAT_ZONE,Time Zone,timezone,0.90,timezone:0.90,single_top_knowledge_candidate
+MM,MSEG,LGTYP,Storage Type,zone,1.00,zone:1.00,single_top_knowledge_candidate
+FI,ANLC,ANSWL,Transactions for the Year Affecting Asset Values,acquisition cost,1.00,acquisition cost:1.00,single_top_knowledge_candidate
+FI,BSAK,MANST,Dunning Level,aging bucket,0.90,aging bucket:0.90,single_top_knowledge_candidate
+FI,BSEG,MANST,Dunning Level,aging bucket,0.90,aging bucket:0.90,single_top_knowledge_candidate
+FI,BSID,MANST,Dunning Level,aging bucket,0.90,aging bucket:0.90,single_top_knowledge_candidate
+FI,BSIK,MANST,Dunning Level,aging bucket,0.90,aging bucket:0.90,single_top_knowledge_candidate
+FI,LFA1,CRTN,CRT Number,carton number,1.00,carton number:1.00,single_top_knowledge_candidate
+FI,LFA1,ORT02,District,district,0.90,district:0.90,single_top_knowledge_candidate
+FI,LFA1,PFACH,PO Box,po box,0.90,po box:0.90,single_top_knowledge_candidate
+FI,LFA1,TELFX,Fax Number,fax number,1.00,fax number:1.00,single_top_knowledge_candidate
+PP,PLPO,ANZMA,Number of employees,number of employees,0.90,number of employees:0.90,single_top_knowledge_candidate
+PP,STPO,AUSCH,Component Scrap in Percent,bom scrap percentage,1.00,bom scrap percentage:1.00,single_top_knowledge_candidate

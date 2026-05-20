@@ -1,0 +1,7 @@
+action,bucket,row_count,percentage
+promoted,description_alias_match,46,5.0%
+promoted,direct_alias_match,55,6.0%
+review_queue,knowledge_only,44,4.8%
+review_queue,strong_canonical_candidate,44,4.8%
+review_queue,unmapped,492,53.4%
+review_queue,weak_canonical_candidate,241,26.1%

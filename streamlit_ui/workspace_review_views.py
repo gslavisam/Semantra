@@ -795,6 +795,18 @@ def display_trust_layer(
             source_field_hint_map = {}
     low_confidence_count = sum(1 for mapping in trust_rows if float(mapping.get("confidence", 0.0) or 0.0) < 0.7)
     st.subheader(_section_label("🎯 Mapping Trust Layer", f"{low_confidence_count} low-confidence" if low_confidence_count else None))
+    runtime = mapping_response.get("mapping_runtime") or {}
+    if runtime.get("code_fingerprint"):
+        st.info(
+            "Scoring runtime: "
+            f"build={runtime.get('code_fingerprint')} | "
+            f"profile={runtime.get('scoring_profile') or 'n/a'} | "
+            f"description_priority={'on' if runtime.get('description_priority') else 'off'}"
+        )
+    else:
+        st.warning(
+            "This mapping result has no runtime fingerprint. Generate mapping again after the backend restart to verify the active scoring build."
+        )
     canonical_only = (st.session_state.get("upload_response") or {}).get("mapping_mode") == "canonical"
     canonical_coverage = mapping_response.get("canonical_coverage") or {}
     source_coverage = canonical_coverage.get("source") or {}
@@ -999,10 +1011,32 @@ def display_trust_layer(
                 for reason_line in llm_recommendation.get("reasoning", []) or []:
                     st.write(f"- LLM: {reason_line}")
 
-            canonical_labels = canonical_concept_labels(mapping.get("canonical_details"))
-            if canonical_labels:
-                st.write("**Canonical path:**")
-                st.write(f"- {source} -> {', '.join(canonical_labels)} -> {mapping.get('target') or 'unmapped'}")
+            canonical_details = mapping.get("canonical_details") or {}
+            shared_concepts = canonical_details.get("shared_concepts") or []
+            source_concepts = canonical_details.get("source_concepts") or []
+            target_concepts = canonical_details.get("target_concepts") or []
+            if shared_concepts:
+                canonical_labels = canonical_concept_labels({"shared_concepts": shared_concepts})
+                if canonical_labels:
+                    st.write("**Canonical path:**")
+                    st.write(f"- {source} -> {', '.join(canonical_labels)} -> {mapping.get('target') or 'unmapped'}")
+            elif source_concepts or target_concepts:
+                st.write("**Canonical evidence:**")
+                if source_concepts and target_concepts:
+                    st.write("- Source and target resolve to different canonical concepts.")
+                elif source_concepts:
+                    st.write("- Source resolved canonically, but the current target did not resolve to the same concept.")
+                else:
+                    st.write("- Target resolved canonically, but the source did not resolve to the same concept.")
+
+                if source_concepts:
+                    source_labels = canonical_concept_labels({"source_concepts": source_concepts})
+                    if source_labels:
+                        st.write(f"- Source concepts: {', '.join(source_labels)}")
+                if target_concepts:
+                    target_labels = canonical_concept_labels({"target_concepts": target_concepts})
+                    if target_labels:
+                        st.write(f"- Target concepts: {', '.join(target_labels)}")
 
             st.write("**Persistent source field hint:**")
             source_system, business_domain, integration_name = _current_hint_scope()

@@ -1,0 +1,15 @@
+source_field,expected_target,final_target,final_confidence,final_label,top1_target,top1_confidence
+KUNNR,customer_id,customer_id,0.95,high_confidence,customer_id,0.95
+NAME1,customer_name,customer_name,0.95,high_confidence,customer_name,0.95
+VKORG,sales_organization_id,sales_organization_id,0.78,medium_confidence,sales_organization_id,0.78
+VTWEG,distribution_channel_id,distribution_channel_id,0.25,low_confidence,distribution_channel_id,0.25
+SPART,division_id,division_id,0.25,low_confidence,division_id,0.25
+KDGRP,customer_group_id,customer_group_id,0.22,low_confidence,customer_group_id,0.22
+BZIRK,sales_district_id,customer_pricing_procedure_code,0.16,low_confidence,incoterm_code,0.17
+VSBED,shipping_condition_code,shipping_condition_code,0.06,low_confidence,customer_id,0.08
+INCO1,incoterm_code,incoterm_code,0.39,low_confidence,incoterm_code,0.39
+INCO2,incoterm_location,incoterm_location,0.33,low_confidence,incoterm_location,0.33
+WAERS,document_currency_code,document_currency_code,0.70,medium_confidence,document_currency_code,0.70
+ZTERM,payment_terms_id,payment_terms_id,0.70,medium_confidence,payment_terms_id,0.70
+KALKS,customer_pricing_procedure_code,sales_district_id,0.08,low_confidence,sales_district_id,0.08
+PLTYP,price_list_type_id,price_list_type_id,0.30,low_confidence,price_list_type_id,0.30

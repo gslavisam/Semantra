@@ -1,0 +1,4 @@
+sap_module,sap_table,sap_field,sap_description,canonical_concept_id,normalized_alias,top_canonical_matches,alias_added,context_added,promotion_status
+MM,MARA,LAENG,Length,opportunity.probability,laeng,opportunity.probability:0.90,true,true,promoted
+MM,MARM,LAENG,Length,opportunity.probability,laeng,opportunity.probability:0.90,false,true,promoted
+,VEKP,LAENG,Length,opportunity.probability,laeng,opportunity.probability:0.90,false,true,promoted

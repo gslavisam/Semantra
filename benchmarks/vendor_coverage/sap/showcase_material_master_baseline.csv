@@ -1,0 +1,2 @@
+benchmark_id,system,slice,fixture_path,source_format,target_format,source_field_count,mapped_field_count,knowledge_coverage_ratio,canonical_coverage_ratio,top1_accuracy,final_accuracy,auto_accept_ratio,low_confidence_ratio,primary_failure_mode,notes
+sap_material_master_baseline_2026_05_19_default,SAP,material_master,ui_fixtures/showcase_material_master,xml,spec,12,12,1.00,0.75,1.00,1.00,0.75,0.00,mixed,Material master is currently the strongest SAP slice with perfect top-1 and final accuracy plus broad knowledge and canonical support.

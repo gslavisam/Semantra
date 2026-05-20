@@ -1,0 +1,80 @@
+priority_rank,priority_tier,sap_module,sap_table,sap_field,sap_description,classification_bucket,top_canonical_concept_id,top_canonical_matches,top_knowledge_concept_id,top_knowledge_matches,suggested_action
+11,P1,SD,KNA1,CRTN,CRT Number,knowledge_only,,,carton number,carton number:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,DELIVERY_DATE_RULE,Delivery Date Rule,knowledge_only,,,delivery date,delivery date:0.70,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,INSPATDEBI,Inspection for a Delivery Note After Outbound Delivery,knowledge_only,,,delivery instructions,delivery instructions:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,JMJAH,Year for which the number of employees is given,knowledge_only,,,number of employees,number of employees:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,JMZAH,Yearly number of employees,knowledge_only,,,number of employees,number of employees:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,ORT02,District,knowledge_only,,,district,district:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,PFACH,PO Box,knowledge_only,,,po box,po box:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,PFORT,PO Box city,knowledge_only,,,po box,po box:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,PSOHS,House number: is no longer used from Release 4.6B,knowledge_only,,,street number,street number:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,PSOST,Street: No longer used from Release 4.6B,knowledge_only,,,street number,street number:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNA1,TELFX,Fax Number,knowledge_only,,,fax number,fax number:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNB1,VRBKZ,Export Credit Insurance Institution Number,knowledge_only,,,insurance number,insurance number:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNB1,VRSNR,Insurance Number,knowledge_only,,,insurance number,insurance number:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,KNVV,VKBUR,Sales Office,knowledge_only,,,sales rep,sales rep:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,BOLNR,Bill of Lading,knowledge_only,,,bill of lading,bill of lading:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,BORGR_GRP,Inbound Dely Group: Multi-Level Goods Receipt Automotive,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,CONT_DG,Indicator: Document contains dangerous goods,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,EXT_PLAN_DATE_TOCD,External Planned Transfer of Control Date,knowledge_only,,,expected delivery,expected delivery:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,EXT_TZONE_TOCD,Time zone for external Transfer of Control Date,knowledge_only,,,time entry date,time entry date:0.55 | timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,FKDAT,Billing Date,knowledge_only,,,ar invoice date,ar invoice date:1.00 | invoice date:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,HANDOVERTZONE,Time Zone of Handover Location,knowledge_only,,,timezone,timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,IDT_CUR_ESTTST,Base Date for Estimation of the Delivery Date in Tracking,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,IDT_PRE_ESTTST,Base Date for Estimation of the Delivery Date in Tracking,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,INT_PLAN_DATE_TOCD,Internal Planned Transfer of Control Date,knowledge_only,,,expected delivery,expected delivery:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,INT_TZONE_TOCD,Time zone for internal Transfer of Control Date,knowledge_only,,,time entry date,time entry date:0.55 | timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,LDDAT,Loading Date,knowledge_only,,,loading date,loading date:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,LFDAT,Delivery Date,knowledge_only,,,delivery date,delivery date:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,LIFEX,External Identification of Delivery Note,knowledge_only,,,delivery instructions,delivery instructions:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,OID_EXTBOL,External bill of lading,knowledge_only,,,bill of lading,bill of lading:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,PODAT,Date (Proof of Delivery),knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,PROLI,Dangerous Goods Management Profile in SD Documents,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,SITKZ_DB,Specification for Issuing Valuated Stock in Transit,knowledge_only,,,stock in transit,stock in transit:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,SPE_INV_BFR_GI,Invoice Creation Before Goods Issue,knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,SPE_WAUHR_IST,"Time of Goods Issue (Local, Relating to a Plant)",knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,SPE_WAZONE_IST,Time Zone,knowledge_only,,,timezone,timezone:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,TRATY,Means-of-Transport Type,knowledge_only,,,vehicle type,vehicle type:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,TZONIS,Time zone of delivering location,knowledge_only,,,timezone,timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,TZONRC,Time zone of recipient location,knowledge_only,,,timezone,timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,VESTK,Handling Unit Placed in Stock,knowledge_only,,,handling unit,handling unit:0.55 | license plate number:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,VKBUR,Sales Office,knowledge_only,,,sales rep,sales rep:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIKP,WAUHR,"Time of Goods Issue (Local, Relating to a Plant)",knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,DGSTA,Dangerous Goods Check Status,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,KZUML,Stock transfer/transfer posting,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,LFIMG,Actual quantity delivered (in sales units),knowledge_only,,,quantity shipped,quantity shipped:1.00 | actual quantity:0.55 | quantity delivered:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,LGMNG,Actual quantity delivered in stockkeeping units,knowledge_only,,,actual quantity,actual quantity:0.55 | quantity delivered:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,LGTYP,Storage Type,knowledge_only,,,zone,zone:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,NACHL,Customer has not posted goods receipt,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,NOPCK,Indicator: not relevant for picking,knowledge_only,,,pick list number,pick list number:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,PROFL,Dangerous Goods Indicator Profile,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,SITKZ,Specification for Issuing Valuated Stock in Transit,knowledge_only,,,stock in transit,stock in transit:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,UMSOK,Special stock indicator for physical stock transfer,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,LIPS,VKBUR,Sales Office,knowledge_only,,,sales rep,sales rep:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,AGRZR,Accrual period for order-related billing docs.to be accrued,knowledge_only,,,period to,period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,CMNUP,Date of Next Credit Check of Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,CONT_DG,Indicator: Document contains dangerous goods,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,DELIVERY_DATE_TYPE_RULE,Delivery Date Rule,knowledge_only,,,delivery date,delivery date:0.70,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,GUEEN,"Valid-To Date (Outline Agreements, Product Proposals)",knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,PROLI,Dangerous Goods Management Profile in SD Documents,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAK,VKBUR,Sales Office,knowledge_only,,,sales rep,sales rep:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,/DMBE/EFFECTIVEDATETO,Effective To,knowledge_only,,,address valid to,address valid to:0.90,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,AUDAT_ANA,Document Date (Date Received/Sent),knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,BONUS,Volume rebate group,knowledge_only,,,bonus,bonus:1.00 | loyalty points:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,CMTD_DELIV_DATE,Delivery Date that the Supplier Has Committed To,knowledge_only,,,address valid to,address valid to:0.55 | delivery date:0.55 | leave to:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,DELIVERY_DATE_TYPE_RULE,Delivery Date Rule,knowledge_only,,,delivery date,delivery date:0.70,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,FIXMG,Delivery Date and Quantity Fixed,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,J_3GDATBI,To Date,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,LFMNG,Minimum Delivery Quantity in Delivery Note Processing,knowledge_only,,,delivery instructions,delivery instructions:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,NACHL,Customer has not posted goods receipt,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBAP,SLOCTYPE,Type of First Inventory-Managing Location,knowledge_only,,,address type,address type:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBKD,FKDAT,Billing Date,knowledge_only,,,ar invoice date,ar invoice date:1.00 | invoice date:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBKD,TRATY,Means-of-Transport Type,knowledge_only,,,vehicle type,vehicle type:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRK,FKDAT,Billing Date,knowledge_only,,,ar invoice date,ar invoice date:1.00 | invoice date:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRK,FKDAT_RL,Billing date for the invoice list,knowledge_only,,,ap invoice date,ap invoice date:0.55 | ar invoice date:0.55 | invoice date:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRP,ABRBG,Start of accounting settlement period,knowledge_only,,,period from,period from:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRP,BONUS,Volume rebate group,knowledge_only,,,bonus,bonus:1.00 | loyalty points:1.00,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRP,FKIMG,Actual billed quantity,knowledge_only,,,actual quantity,actual quantity:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRP,LMENG,Required quantity for mat.management in stockkeeping units,knowledge_only,,,quantity required,quantity required:0.55,promote_new_canonical_concept_or_attach_to_existing
+11,P1,SD,VBRP,VKBUR,Sales Office,knowledge_only,,,sales rep,sales rep:1.00,promote_new_canonical_concept_or_attach_to_existing

@@ -1,0 +1,3 @@
+source_bucket,context_count,percentage_of_total
+direct_alias_match,95,46.3%
+weak_canonical_candidate,104,50.7%

@@ -1,0 +1,5 @@
+slice,fixture_path,domain,recommended_source,recommended_target,expected_source_fields,notes
+supplier_master,ui_fixtures/showcase_supplier_master,vendor_master_ap,showcase_supplier_source.xml,showcase_supplier_target_spec.csv,14,Primary supplier/AP baseline and regression anchor
+customer_sales_area,ui_fixtures/showcase_customer_sales_area,sd_sales_area,showcase_customer_sales_area_source.xml,showcase_customer_sales_area_target_spec.csv,14,Configuration-heavy SD slice with likely knowledge-only fields
+material_master,ui_fixtures/showcase_material_master,material_master,showcase_material_source.xml,showcase_material_target_spec.csv,12,Material identity and lifecycle validation slice
+purchasing_info_record,ui_fixtures/showcase_purchasing_info_record,procurement_purchasing,showcase_pir_source.xml,showcase_pir_target_spec.csv,14,Procurement slice mixing vendor, material, and org context

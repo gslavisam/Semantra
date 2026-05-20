@@ -1,17 +1,23 @@
 """Core regression tests for Semantra mapping, scoring, and assignment logic."""
 
+from pathlib import Path
+
 from app.core.config import settings
 from app.models.mapping import ScoringSignals
 from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import (
+    CandidateScore,
     TOTAL_WEIGHT,
+    assignment_weight,
+    assign_unique_targets,
     build_explanation,
     compute_final_score,
     generate_mapping_candidates,
     label_to_status,
     resolve_scoring_weights,
     score_to_label,
+    should_deemphasize_name_signal,
 )
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
@@ -406,6 +412,31 @@ def test_compute_final_score_uses_selected_scoring_profile() -> None:
         settings.scoring_weight_overrides = previous_overrides
 
 
+def test_compute_final_score_preserves_strong_sap_business_anchor() -> None:
+    source = make_column("LIFNR", ["numeric_id"], ["V0001", "V0002"])
+    target = make_column("supplier_id", ["numeric_id"], ["V0001", "V0002"])
+
+    score = compute_final_score(
+        ScoringSignals(
+            name=0.12,
+            semantic=0.86,
+            knowledge=1.0,
+            canonical=1.0,
+            pattern=0.0,
+            statistical=0.0,
+            overlap=0.0,
+            embedding=0.0,
+            correction=0.0,
+            llm=0.0,
+        ),
+        {"name", "semantic", "knowledge", "canonical", "pattern", "statistical"},
+        source=source,
+        target=target,
+    )
+
+    assert score >= 0.95
+
+
 def test_compute_final_score_promotes_strong_identifier_consensus_to_full_confidence() -> None:
     score = compute_final_score(
         ScoringSignals(
@@ -424,6 +455,81 @@ def test_compute_final_score_promotes_strong_identifier_consensus_to_full_confid
     )
 
     assert score == 1.0
+
+
+def test_assign_unique_targets_uses_global_optimum_not_greedy_edge_order() -> None:
+    source_a = make_column("source_a", ["text"], ["A"])
+    source_b = make_column("source_b", ["text"], ["B"])
+    target_a = make_column("target_a", ["text"], ["A"])
+    target_b = make_column("target_b", ["text"], ["B"])
+
+    score_a1 = CandidateScore(
+        source=source_a,
+        target=target_a,
+        score=0.90,
+        signals=ScoringSignals(name=0.90),
+        explanation=[],
+    )
+    score_a2 = CandidateScore(
+        source=source_a,
+        target=target_b,
+        score=0.89,
+        signals=ScoringSignals(name=0.89),
+        explanation=[],
+    )
+    score_b1 = CandidateScore(
+        source=source_b,
+        target=target_a,
+        score=0.88,
+        signals=ScoringSignals(name=0.88),
+        explanation=[],
+    )
+    score_b2 = CandidateScore(
+        source=source_b,
+        target=target_b,
+        score=0.10,
+        signals=ScoringSignals(name=0.10),
+        explanation=[],
+    )
+
+    assigned = assign_unique_targets(
+        {
+            "source_a": [score_a1, score_a2],
+            "source_b": [score_b1, score_b2],
+        }
+    )
+
+    assert assigned["source_a"].target.name == "target_b"
+    assert assigned["source_b"].target.name == "target_a"
+    assert assignment_weight(assigned["source_a"]) + assignment_weight(assigned["source_b"]) > 1.7
+
+
+def test_supplier_showcase_auto_description_priority_and_global_assignment_fix() -> None:
+    from app.services.profiling_service import build_schema_profile
+    from app.services.spec_upload_service import parse_spec_payload
+    from app.services.tabular_upload_service import read_xml_payload
+
+    fixture_root = Path(__file__).resolve().parents[2] / "ui_fixtures" / "showcase_supplier_master"
+    source_rows = read_xml_payload((fixture_root / "showcase_supplier_source.xml").read_bytes())
+    source_schema = build_schema_profile(
+        source_rows,
+        dataset_id="source",
+        dataset_name="showcase_supplier_source.xml",
+    )
+    target_schema = parse_spec_payload(
+        (fixture_root / "showcase_supplier_target_spec.csv").read_bytes(),
+        "showcase_supplier_target_spec.csv",
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    selected_by_source = {item.source: item for item in result.mappings}
+
+    assert selected_by_source["LIFNR"].target == "supplier_id"
+    assert selected_by_source["LIFNR"].confidence >= 0.95
+    assert selected_by_source["PSTLZ"].target == "postal_code"
+    assert selected_by_source["TELF1"].target == "phone_number"
+    assert selected_by_source["ORT01"].target == "city_name"
+    assert any("business anchor" in line.lower() for line in selected_by_source["LIFNR"].explanation)
 
 
 def test_scoring_weight_overrides_replace_profile_weights() -> None:
@@ -751,6 +857,58 @@ def test_canonical_virtual_target_keeps_strong_concept_lock_high_confidence() ->
     assert any("Canonical glossary aligns both fields to business concept 'Customer ID'" in line for line in selected.explanation)
 
 
+def test_sap_concept_lock_deemphasizes_weak_name_signal() -> None:
+    source = make_column("ZTERM", ["text"], ["0001", "0002", "0003"])
+    target = make_column("payment_terms_id", ["text"], ["0001", "0002", "0003"])
+    signals = ScoringSignals(
+        name=0.23,
+        semantic=0.80,
+        knowledge=0.75,
+        canonical=0.75,
+        statistical=0.71,
+        llm=0.70,
+    )
+    active_signal_names = {"name", "semantic", "knowledge", "canonical", "statistical", "llm"}
+
+    assert should_deemphasize_name_signal(signals, active_signal_names, source) is True
+
+    score = compute_final_score(
+        signals,
+        active_signal_names,
+        profile_name="description_priority",
+        source=source,
+        target=target,
+    )
+
+    assert 0.75 <= score <= 0.77
+
+
+def test_sap_payment_terms_mapping_explains_name_signal_deemphasis() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=3,
+        columns=[make_column("ZTERM", ["text"], ["0001", "0002", "0003"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=3,
+        columns=[
+            make_column("payment_terms_id", ["text"], ["0001", "0002", "0003"]),
+            make_column("tax_id_number", ["text"], ["1001", "1002", "1003"]),
+            make_column("postal_code", ["text"], ["11000", "21000", "31000"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema, description_priority=True)
+
+    selected = result.mappings[0]
+    assert selected.target == "payment_terms_id"
+    assert selected.confidence >= 0.75
+    assert any("Weak physical evidence was de-emphasized" in line for line in selected.explanation)
+
+
 def test_label_to_status_auto_accepts_scores_above_auto_accept_threshold() -> None:
     score = 0.8193
 
@@ -790,8 +948,11 @@ def test_description_priority_mode_uses_source_description_for_canonical_matchin
         prefer_metadata_text=True,
     )
 
-    assert not any(match.concept_id == "employee.phone" for match in baseline_matches)
-    assert any(match.concept_id == "employee.phone" for match in priority_matches)
+    baseline_match = next(match for match in baseline_matches if match.concept_id == "employee.phone")
+    priority_match = next(match for match in priority_matches if match.concept_id == "employee.phone")
+
+    assert baseline_match.strength > 0
+    assert priority_match.strength > baseline_match.strength
 
     source_schema = SchemaProfile(
         dataset_id="source",
@@ -807,6 +968,170 @@ def test_description_priority_mode_uses_source_description_for_canonical_matchin
 
     assert result.mappings[0].target == "employee.phone"
     assert any("Description-priority mode injected source description/type metadata" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_matching_uses_target_metadata_without_description_priority() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=3,
+        columns=[make_column("REGIO", ["text"], ["CA", "TX", "AZ"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=3,
+        columns=[
+            ColumnProfile(
+                name="region_code",
+                normalized_name="region code",
+                description="Supplier Region Code",
+                declared_type="VARCHAR",
+                dtype="object",
+                null_ratio=0.0,
+                unique_ratio=1.0,
+                avg_length=5.0,
+                non_null_count=3,
+                sample_values=["CA", "TX", "AZ"],
+                distinct_sample_values=["CA", "TX", "AZ"],
+                detected_patterns=["text"],
+                tokenized_name=["region", "code"],
+            )
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    selected = result.mappings[0]
+    assert selected.target == "region_code"
+    assert selected.signals.knowledge > 0
+    assert selected.signals.canonical > 0
+    assert any(
+        "Internal metadata dictionary aligns" in line or "Canonical glossary aligns" in line
+        for line in selected.explanation
+    )
+
+
+def test_generic_target_attribute_bridge_lifts_regio_without_target_metadata() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=3,
+        columns=[make_column("REGIO", ["text"], ["CA", "TX", "AZ"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=3,
+        columns=[make_column("region_code", ["text"], ["CA", "TX", "AZ"])],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    selected = result.mappings[0]
+    assert selected.target == "region_code"
+    assert selected.signals.knowledge > 0
+    assert selected.signals.canonical > 0
+    assert selected.confidence >= 0.55
+    assert any("attribute bridge" in line.lower() for line in selected.explanation)
+
+
+def test_strong_concept_lock_deemphasizes_name_without_sap_anchor() -> None:
+    source = make_column("legacy_pay_code", ["text"], ["0001", "0002", "0003"])
+    target = make_column("payment_terms_id", ["text"], ["0001", "0002", "0003"])
+    signals = ScoringSignals(
+        name=0.23,
+        semantic=0.80,
+        knowledge=0.75,
+        canonical=0.75,
+        statistical=0.71,
+        llm=0.70,
+    )
+    active_signal_names = {"name", "semantic", "knowledge", "canonical", "statistical", "llm"}
+
+    assert should_deemphasize_name_signal(signals, active_signal_names, source) is True
+
+    score = compute_final_score(
+        signals,
+        active_signal_names,
+        profile_name="description_priority",
+        source=source,
+        target=target,
+    )
+
+    assert 0.75 <= score <= 0.77
+
+
+def test_strong_concept_lock_deemphasizes_weak_pattern_and_overlap() -> None:
+    source = make_column("legacy_pay_code", ["text"], ["0001", "0002", "0003"])
+    target = make_column("payment_terms_id", ["numeric_id"], ["A1", "B2", "C3"])
+    signals = ScoringSignals(
+        name=0.23,
+        semantic=0.80,
+        knowledge=0.75,
+        canonical=0.75,
+        pattern=0.0,
+        statistical=0.71,
+        overlap=0.0,
+    )
+    active_signal_names = {"name", "semantic", "knowledge", "canonical", "pattern", "statistical", "overlap"}
+
+    score = compute_final_score(
+        signals,
+        active_signal_names,
+        profile_name="description_priority",
+        source=source,
+        target=target,
+    )
+
+    assert 0.75 <= score <= 0.77
+
+
+def test_business_first_concept_lock_deemphasizes_weak_physical_signals() -> None:
+    source = make_column("AKONT", ["numeric_id"], ["140000", "150000"])
+    target = make_column("reconciliation_account", ["text"], ["A", "B"])
+    signals = ScoringSignals(
+        name=0.13,
+        semantic=0.60,
+        knowledge=1.00,
+        canonical=0.80,
+        pattern=0.0,
+        statistical=0.63,
+        overlap=0.0,
+    )
+    active_signal_names = {"name", "semantic", "knowledge", "canonical", "pattern", "statistical", "overlap"}
+
+    score = compute_final_score(
+        signals,
+        active_signal_names,
+        profile_name="description_priority",
+        source=source,
+        target=target,
+    )
+
+    assert 0.76 <= score <= 0.78
+
+
+def test_mapping_response_includes_runtime_fingerprint() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=2,
+        columns=[make_column("AKONT", ["numeric_id"], ["140000", "150000"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=2,
+        columns=[make_column("reconciliation_account", ["numeric_id"], ["140000", "150000"])],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+
+    assert result.mapping_runtime.code_fingerprint
+    assert result.mapping_runtime.generated_at
+    assert result.mapping_runtime.scoring_profile == settings.scoring_profile
+    assert result.mapping_runtime.description_priority is False
 
 
 def test_canonical_candidate_pool_limits_full_scoring_to_shortlist(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,0 +1,7 @@
+scope,label,row_count,ratio
+promotion_status,promoted,3,0.0003
+review_reason,competing_top_canonical_candidate_present,40,0.0037
+review_reason,knowledge_only,324,0.0302
+review_reason,strong_canonical_candidate,224,0.0209
+review_reason,unmapped,5104,0.4753
+review_reason,weak_canonical_candidate,3690,0.3436

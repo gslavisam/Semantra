@@ -1,0 +1,12 @@
+metric,value
+preset,aggressive
+input_rows,3214
+candidates,197
+overlay_rows,197
+min_strength,0.60
+min_margin,0.05
+include_buckets,"knowledge_only,unmapped,weak_canonical_candidate"
+include_modules,"FI,MM"
+output_stem,sap_unmapped_auto_enrichment_aggressive_fi_mm
+tier_high,0
+tier_medium,197

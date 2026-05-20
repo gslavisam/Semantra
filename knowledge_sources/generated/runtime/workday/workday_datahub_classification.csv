@@ -1,0 +1,206 @@
+wd_table,wd_column,wd_type,wd_max_length,wd_is_identity,wd_is_nullable,classification_bucket,direct_field_canonical_concept_id,description_canonical_concept_id,top_canonical_concept_id,top_canonical_strength,top_knowledge_concept_id,top_knowledge_strength
+CR_DIM_APPLICANT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_APPLICANT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMP_ELEMENT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMP_ELEMENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMP_GRADE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMP_GRADE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMP_GRADE_PROFILE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMP_GRADE_PROFILE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMP_PLAN,ID,int,4,True,False,direct_alias_match,account.id,,absence.end_date,0.500,account.id,1.000
+CR_DIM_COMP_PLAN Total,,,,False,False,weak_canonical_candidate,,,compensation.plan,0.600,gross amount,0.550
+CR_DIM_COMP_STEP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMP_STEP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMPANIES,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMPANIES Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMPANIES_CHANGES_MDS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMPANIES_CHANGES_MDS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COMPANIES_MDS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COMPANIES_MDS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_CONTINGENT_WORKER_CONTRACT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_CONTINGENT_WORKER_CONTRACT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_COST_CENTER,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_COST_CENTER Total,,,,False,False,weak_canonical_candidate,,,cost_center.code,0.500,cost center,0.550
+CR_DIM_CUSTOM_DEPARTMENT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_CUSTOM_DEPARTMENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_DATE_KPI,date_id,int,4,False,False,weak_canonical_candidate,,,absence.start_date,0.500,activity id,0.550
+CR_DIM_DATE_KPI Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_DEPARTMENT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_DEPARTMENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EEPPP,,,,False,False,unmapped,,,,,,
+CR_DIM_EMPLOYEE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_ADDRESS_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_ADDRESS_EVENTS Total,,,,False,False,weak_canonical_candidate,,,account.industry,0.500,account.owner_employee_id,0.550
+CR_DIM_EMPLOYEE_CONTRACT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_CONTRACT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_CONTRACT_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_CONTRACT_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS Total,,,,False,False,weak_canonical_candidate,,,employee.department,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_ENCRYPTED,,,,False,False,unmapped,,,,,,
+CR_DIM_EMPLOYEE_JOB_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_JOB_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_KPI,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_KPI Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_MANAGER_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_MANAGER_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_ORG_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_ORG_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_STAFFING_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_STAFFING_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EMPLOYEE_WORK_SCHEDULES,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EMPLOYEE_WORK_SCHEDULES Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EOS_DL,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EOS_DL Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EVENT_CLASSIFICATION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.600,absence.start_date,0.550
+CR_DIM_EVENT_CLASSIFICATION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EXTERNAL_PAYROLL_MAPPING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EXTERNAL_PAYROLL_MAPPING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025 Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423 Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_GEM_ID_MAPPING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_GEM_ID_MAPPING Total,,,,False,False,weak_canonical_candidate,,,absence.start_date,0.500,activity id,0.550
+CR_DIM_IAM_AD_ACCOUNT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_IAM_AD_ACCOUNT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_JOB,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_JOB Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_KPI,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_KPI Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_LOA,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_LOA Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_LOCATION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_LOCATION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_PAYGROUP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_PAYGROUP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_PERFORMANCE_TEMPLATE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_PERFORMANCE_TEMPLATE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_PERIOD_SCHEDULE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_PERIOD_SCHEDULE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_POSITION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_POSITION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_REQUISITION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_REQUISITION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_RETIREMENT_BENEFIT_ELECTION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_RETIREMENT_BENEFIT_ELECTION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_SAP_EE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_SAP_EE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_SAP_ORG,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_SAP_ORG Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_TO,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_TO Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_UNION_MEMBERSHIP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_UNION_MEMBERSHIP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_UNION_MEMBERSHIP_HISTORY,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_UNION_MEMBERSHIP_HISTORY Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511 Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_WD_COMPANY_ORG,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_WD_COMPANY_ORG Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_WORKDAY_PUBLIC_HOLIDAYS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_WORKDAY_PUBLIC_HOLIDAYS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_WORKER_ADDRESSES,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_WORKER_ADDRESSES Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_DIM_WORKER_IDENTIFIERS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_DIM_WORKER_IDENTIFIERS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_COMPANIES,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_COMPANIES Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_COMPANIES_MDS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_COMPANIES_MDS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_COMPENSATION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_COMPENSATION Total,,,,False,False,weak_canonical_candidate,,,absence.start_date,0.500,gross amount,0.550
+CR_FCT_COMPENSATION_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_COMPENSATION_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,absence.start_date,0.500,gross amount,0.550
+CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT Total,,,,False,False,weak_canonical_candidate,,,absence.start_date,0.500,gross amount,0.550
+CR_FCT_EMPLOYEE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EMPLOYEE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EQUIFAX,ID_COMPANIES,int,4,False,False,weak_canonical_candidate,,,absence.start_date,0.500,activity id,0.550
+CR_FCT_EQUIFAX Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EXTERNAL_PAYROLL_ELECTIONS,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EXTERNAL_PAYROLL_ELECTIONS Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EXTERNAL_PAYROLL_OTP,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EXTERNAL_PAYROLL_OTP Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318 Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_IAM_AD_ACCOUNT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_IAM_AD_ACCOUNT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_IAM_AD_ACCOUNT_CURRENT,ID,bigint,8,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_IAM_AD_ACCOUNT_CURRENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_IAM_AD_ACCOUNT_DELTA,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_IAM_AD_ACCOUNT_DELTA Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_KPI,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_KPI Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_LOA,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_LOA Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_LOA_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_LOA_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PERFORMANCE_TEMPLATE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_PERFORMANCE_TEMPLATE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PN_BILLING_EMPLOYEES_DETAILED,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_PN_BILLING_EMPLOYEES_DETAILED Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PN_BILLING_LMS_HEADCOUNT_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_LMS_HEADCOUNT_DETAILED Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PN_BILLING_PERFORMANCE_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_PERFORMANCE_DETAILED Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PN_BILLING_REQUISITIONS_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_REQUISITIONS_DETAILED Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_PN_BILLING_SUCCESSION_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_SUCCESSION_DETAILED Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629 Total,,,,False,False,weak_canonical_candidate,,,absence.end_date,0.500,compensation.base_salary,0.550
+CR_FCT_POSITION_ASSIGNMENT_CURRENT,ID,bigint,8,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_CURRENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX,ID,bigint,8,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX,ID,int,4,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT,ID,bigint,8,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT,ID,bigint,8,False,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT Total,,,,False,False,weak_canonical_candidate,,,employee.position,0.500,gross amount,0.550
+CR_FCT_REQUISITION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_REQUISITION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_SUCCESSION,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_SUCCESSION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_TALENT_CONFIRMATION,ID_EMPLOYEE,int,4,False,True,direct_alias_match,employee.id,,absence.start_date,0.800,activity id,0.550
+CR_FCT_TALENT_CONFIRMATION Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_TO,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_TO Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_TO_BALANCE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_TO_BALANCE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_TO_BALANCE_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_TO_BALANCE_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_FCT_TO_PROCESSING,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_FCT_TO_PROCESSING Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_MDI_PERFORMANCE_TEMPLATE,ID,int,4,True,False,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_MDI_PERFORMANCE_TEMPLATE Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+CR_Preformance_Template_Hierarchy,ID,nvarchar,510,False,True,direct_alias_match,account.id,,absence.start_date,0.800,account.id,1.000
+CR_Preformance_Template_Hierarchy Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550
+Grand Total,,,,False,False,weak_canonical_candidate,,,invoice.amount,0.600,gross amount,0.550

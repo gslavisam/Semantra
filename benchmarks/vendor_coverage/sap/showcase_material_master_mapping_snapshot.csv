@@ -1,0 +1,13 @@
+source_field,expected_target,final_target,final_confidence,final_label,top1_target,top1_confidence
+MATNR,material_id,material_id,0.95,high_confidence,material_id,0.95
+BISMT,engineering_part_number,engineering_part_number,0.95,high_confidence,engineering_part_number,0.95
+MTART,material_type_code,material_type_code,0.70,medium_confidence,material_type_code,0.70
+MATKL,material_group_id,material_group_id,0.78,medium_confidence,material_group_id,0.78
+MAKTX,material_description,material_description,0.95,high_confidence,material_description,0.95
+MEINS,base_uom_code,base_uom_code,0.77,medium_confidence,base_uom_code,0.77
+BRGEW,gross_weight,gross_weight,0.95,high_confidence,gross_weight,0.95
+NTGEW,net_weight,net_weight,0.95,high_confidence,net_weight,0.95
+GEWEI,weight_unit_code,weight_unit_code,0.70,medium_confidence,weight_unit_code,0.70
+ERSDA,created_date,created_date,0.74,medium_confidence,created_date,0.74
+XCHPF,batch_managed_flag,batch_managed_flag,0.78,medium_confidence,batch_managed_flag,0.78
+LVORM,deletion_mark,deletion_mark,0.78,medium_confidence,deletion_mark,0.78

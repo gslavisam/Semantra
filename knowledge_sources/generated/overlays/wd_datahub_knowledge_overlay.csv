@@ -1,0 +1,5 @@
+entry_type,canonical_term,canonical_concept_id,alias,domain,source_system,note
+concept_alias,ID,account.id,ID,Human Capital Management,Workday_HRDH,Wave-1 Direct: CR_DIM_APPLICANT.ID (int)
+concept_alias,ID_EMPLOYEE,employee.id,ID_EMPLOYEE,Human Capital Management,Workday_HRDH,Wave-1 Direct: CR_FCT_TALENT_CONFIRMATION.ID_EMPLOYEE (int)
+concept_alias,date_id,absence.start_date,date_id,Human Capital Management,Workday_HRDH,Wave-2 Knowledge/Weak: CR_DIM_DATE_KPI.date_id (int)
+concept_alias,ID_COMPANIES,absence.start_date,ID_COMPANIES,Human Capital Management,Workday_HRDH,Wave-2 Knowledge/Weak: CR_FCT_EQUIFAX.ID_COMPANIES (int)

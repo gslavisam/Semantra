@@ -1,0 +1,21 @@
+system,artifact_path,classification,runtime_wired,target_layer,notes
+SAP,metadata_dict/sap_tables_mostUsed.xlsx,runtime_wired,yes,knowledge_sources/raw/sap,Current SAP workbook source already used by metadata_knowledge_service
+QAD,metadata_dict/qad_tables_mostUsed.xlsx,runtime_wired,yes,knowledge_sources/raw/qad,Current QAD workbook source already used by metadata_knowledge_service
+Workday,metadata_dict/WD_entities_mostUsed.xlsx,runtime_wired,yes,knowledge_sources/raw/workday,Current Workday entity workbook source already used by metadata_knowledge_service
+Workday,metadata_dict/HRDH_Table_Columns.xlsx,runtime_wired,yes,knowledge_sources/raw/workday,Primary Workday datahub table-column inventory; parsed by support/workday/generate_workday_datahub_inventory.py
+Workday,knowledge_sources/raw/workday/hr_wd.xml,runtime_wired,yes,knowledge_sources/raw/workday,Primary Workday webservice XSD source; parsed by support/workday/generate_workday_webservice_inventory.py
+Workday,metadata_dict/wd_datahub_knowledge_overlay.csv,generated_overlay_source,yes,knowledge_sources/generated/overlays,Generated Workday datahub overlay from promotion waves auto-loaded by runtime
+Workday,metadata_dict/hrdh_knowledge_overlay.csv,generated_overlay_source,yes,knowledge_sources/generated/overlays,Current HRDH overlay source auto-loaded by runtime
+Workday,metadata_dict/wd_hr_knowledge_overlay.csv,generated_overlay_source,yes,knowledge_sources/generated/overlays,Generated Workday webservice overlay (wave-1/wave-2) auto-loaded by runtime
+Workday,knowledge_sources/generated/overlays/wd_webservice_knowledge_overlay.csv,generated_overlay_artifact,yes,knowledge_sources/generated/overlays,Generated durable Workday webservice overlay artifact from canonical promotion waves
+QuickBooks,metadata_dict/quickbooks_tables_reference.xlsx,runtime_wired,yes,knowledge_sources/raw/quickbooks,Primary QuickBooks table-field reference wired into runtime; parsed by support/quickbooks/generate_quickbooks_tables_inventory.py
+QuickBooks,metadata_dict/qb_knowledge_overlay.csv,generated_overlay_source,yes,knowledge_sources/generated/overlays,Generated QuickBooks overlay from promotion waves auto-loaded by runtime
+KnowledgeBase,metadata_dict/metadata_dict.csv,runtime_wired,yes,metadata_dict,Current curated base dictionary remains active runtime source of truth
+KnowledgeBase,metadata_dict/metadata_dictionary.xlsx,runtime_wired,yes,metadata_dict,Current workbook enrichment source remains active runtime source of truth
+Canonical,metadata_dict/canonical_glossary_erp.csv,runtime_wired,yes,metadata_dict,Canonical source of truth and not part of vendor raw ingest
+Canonical,metadata_dict/canonical_field_context_enrichment.csv,runtime_wired,yes,metadata_dict,Canonical context enrichment source and not part of vendor raw ingest
+SAP,ui_fixtures/showcase_supplier_master,benchmark_fixture,no,benchmarks/vendor_coverage/sap,Primary supplier/AP benchmark family
+Generic,ui_fixtures/showcase_customer_mapping,benchmark_fixture,no,benchmarks/vendor_coverage,Generic customer benchmark family kept outside the SAP-only wave
+SAP,ui_fixtures/showcase_customer_sales_area,benchmark_fixture,no,benchmarks/vendor_coverage/sap,Primary SD sales-area benchmark family
+SAP,ui_fixtures/showcase_material_master,benchmark_fixture,no,benchmarks/vendor_coverage/sap,Primary material master benchmark family
+SAP,ui_fixtures/showcase_purchasing_info_record,benchmark_fixture,no,benchmarks/vendor_coverage/sap,Primary purchasing benchmark family

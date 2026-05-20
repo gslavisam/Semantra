@@ -1,0 +1,4 @@
+scope,label,row_count,ratio
+action_type,new_canonical_concept,1,0.0001
+rule_name,party_salutation_anred,1,0.0001
+concept_created,false,1,0.0001

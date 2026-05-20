@@ -1,0 +1,81 @@
+priority_rank,priority_tier,sap_module,sap_table,sap_field,sap_description,classification_bucket,top_canonical_concept_id,top_canonical_matches,top_knowledge_concept_id,top_knowledge_matches,suggested_action
+21,P1,MM,EBAN,DELIVERYADDRTYPE,Purchasing Delivery Address Type,knowledge_only,,,address type,address type:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,LFDAT,Item Delivery Date,knowledge_only,,,delivery date,delivery date:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,LPEIN,Category of delivery date,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,MHDRZ,Minimum Remaining Shelf Life,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,STACODE,Status Code,knowledge_only,,,status code,status code:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,UMSOK,Special stock indicator for physical stock transfer,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,UZEIT,Delivery Date Time-Spot,knowledge_only,,,delivery date,delivery date:0.55 | time entry date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,WEPOS,Goods Receipt Indicator,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EBAN,WEUNB,"Goods Receipt, Non-Valuated",knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,DESP_DAT,Date,knowledge_only,,,time entry date,time entry date:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,EINDT_ALLOW,Take Account of Delivery Date,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,EQ_EINDT,Delivery Date Header: All Items Have Same Delivery Date,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,IHRAN,Quotation Submission Date,knowledge_only,,,quote date,quote date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,PARE_DAT,Date,knowledge_only,,,time entry date,time entry date:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKKO,WEAKT,Indicator: Goods Receipt Message,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,/DMBE/EFFECTIVEDATETO,Effective To,knowledge_only,,,address valid to,address valid to:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,DELIVERY_ADDRESS_TYPE,Purchasing Delivery Address Type,knowledge_only,,,address type,address type:0.70,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,EBONF,Item Relevant to Subsequent (Period-End Rebate) Settlement,knowledge_only,,,period to,period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,FIXMG,Delivery Date and Quantity Fixed,knowledge_only,,,delivery date,delivery date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,LEWED,Latest Possible Goods Receipt,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,LIFEX,External Identification of Delivery Note,knowledge_only,,,delivery instructions,delivery instructions:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,MHDRZ,Minimum Remaining Shelf Life,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,TZONRC,Time zone of recipient location,knowledge_only,,,timezone,timezone:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,UMSOK,Special stock indicator for physical stock transfer,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,WABWE,Indicator for GI-based goods receipt,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,WEPOS,Goods Receipt Indicator,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,EKPO,WEUNB,"Goods Receipt, Non-Valuated",knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,/VSO/R_STACK_NO,Stacking Factor (Vehicle Space Optimization),knowledge_only,,,vehicle number,vehicle number:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,AEKLK,Stock Transfer Net Change Costing,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,BREIT,Width,knowledge_only,,,width,width:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,GROES,Size/dimensions,knowledge_only,,,size,size:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,HAZMAT,Relevant for Hazardous Substances,knowledge_only,,,hazardous material,hazardous material:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,HOEHE,Height,knowledge_only,,,height,height:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,HUTYP,Handling Unit Type,knowledge_only,,,handling unit,handling unit:0.55 | license plate number:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,MATFI,Material Is Locked,knowledge_only,,,locked,locked:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,MAXC_TOL,Overcapacity Tolerance of the Handling Unit,knowledge_only,,,handling unit,handling unit:0.55 | license plate number:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,MEDIUM,Medium,knowledge_only,,,channel,channel:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,MHDRZ,Minimum Remaining Shelf Life,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,PROFL,Dangerous Goods Indicator Profile,knowledge_only,,,hazardous material,hazardous material:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,RAUBE,Storage conditions,knowledge_only,,,storage conditions,storage conditions:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,SCM_SHLF_LFE_REQ_MAX,Required Maximum Shelf Life,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,SCM_SHLF_LFE_REQ_MIN,Obsolete. Use /SAPAPO/MATKEY-/SAPAPO/SHELF_LIFE_REQ_MIN.,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARA,XGRDT,Goods Receipt to Posted Single-Unit Batch Allowed,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,/CWM/TRAME,Stock in Transit,knowledge_only,,,stock in transit,stock in transit:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,/CWM/UMLMC,Stock in transfer (plant to plant),knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,ABCIN,Physical Inventory Indicator for Cycle Counting,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,CONF_GMSYNC,Synchronous Posting of Goods Issue,knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,NKMPR,Date according to check sampling inspection (deactivated),knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,PREND,Exemption certificate: Issue date of exemption certificate,knowledge_only,,,issue date,issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,RUEZT,Setup and teardown time,knowledge_only,,,setup time,setup time:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_GES_MNG_USE,Use/Consume Entire Quantity of a Receipt Element,knowledge_only,,,receipt quantity,receipt quantity:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_NDCOSTWA,Goods Issue Costs,knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_RELDT,Replenishment Lead Time in Calendar Days,knowledge_only,,,lead time,lead time:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_SHELF_LIFE_DUR,Location-Dependent Shelf Life,knowledge_only,,,shelf life,shelf life:0.70,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_SHELF_LIFE_LOC,Use Location-Dependent Shelf Life of Product when Planning,knowledge_only,,,shelf life,shelf life:0.70,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_SHLF_LFE_REQ_MAX,Maximum Shelf Life Required: Location-Dependent,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,SCM_SHLF_LFE_REQ_MIN,Minimum Shelf Life Required: Location-Dependent,knowledge_only,,,shelf life,shelf life:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,TRAME,Stock in Transit,knowledge_only,,,stock in transit,stock in transit:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,UMLMC,Stock in transfer (plant to plant),knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,VRBDT,To date of the material to be copied for consumption,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARC,VRVEZ,Shipping setup time,knowledge_only,,,setup time,setup time:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,/CWM/VMUML,Stock in Transfer in Previous Period,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,INSME,Stock in Quality Inspection,knowledge_only,,,quantity in quality,quantity in quality:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,KZILE,Physical inventory indicator for restricted-use stock,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,KZILL,Physical inventory indicator for whse stock in current year,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,KZVLE,"Physical inventory ind. for restricted-use stock, prev.pd",knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,KZVLL,Physical inventory indicator for stock in previous year,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARD,VMUML,Stock in Transfer in Previous Period,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARM,BREIT,Width,knowledge_only,,,width,width:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MARM,HOEHE,Height,knowledge_only,,,height,height:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MBEW,ABCIW,Physical Inventory Indicator for Cycle Counting,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MBEW,SPERW,Physical Inventory Blocking Indicator,knowledge_only,,,inventory count,inventory count:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MKPF,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MKPF,SPE_BUDAT_UHR,"Time of Goods Issue (Local, Relating to a Plant)",knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MKPF,SPE_BUDAT_ZONE,Time Zone,knowledge_only,,,timezone,timezone:0.90,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MSEG,J_1AGIRUPD,Goods issue revaluation performed,knowledge_only,,,goods issue,goods issue:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MSEG,LGTYP,Storage Type,knowledge_only,,,zone,zone:1.00,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MSEG,TANUM,Transfer Order Number,knowledge_only,,,pick list number,pick list number:1.00 | stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MSEG,UMSOK,Special stock indicator for physical stock transfer,knowledge_only,,,stock transfer,stock transfer:0.55,promote_new_canonical_concept_or_attach_to_existing
+21,P1,MM,MSEG,WEUNB,"Goods Receipt, Non-Valuated",knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing

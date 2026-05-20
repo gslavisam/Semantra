@@ -285,6 +285,35 @@ Ishod:
 
 - bounded guidance, reuse i governance surface-i su productized i pilot-hardened kao jedan završen execution wave, a naredni rad se vraća na uži post-pilot hardening backlog umesto na isti Run0518 checklist
 
+## 2026-05-19
+
+### Persistence and runtime separation hardening: durable mapping job status slice
+
+Isporučeno:
+
+- mapping job runtime sada čuva status, progress tail i cancel state u SQLite-u, uz isti `start / poll / cancel` API contract i lokalni thread-backed execution model
+- uveden je state-store sloj iznad job runtime-a tako da isti service surface može da radi nad in-memory i SQLite-backed status store-om
+- zadržani su active-job cap, finished-job TTL i retention cap, ali durable cleanup i observability u SQLite modu sada računaju wall-clock starost umesto perzistiranog monotonic sata
+- startup recovery sada prebacuje prekinute aktivne job-ove u `failed`, a activity polling vraća najnoviji zadržani event tail
+- observability runtime surface prijavljuje `sqlite_status` storage mode i iste durable-backend trigger-e kao pre ovog refactora
+
+Ishod:
+
+- mapping progress lifecycle je sada durable na nivou status/progress read modela za lokalni i pilot režim, bez prerane introdukcije lease/dequeue ili spoljnog brokera
+
+### Persistence and runtime separation hardening: targeted SQLite normalization slice
+
+Isporučeno:
+
+- canonical authoring sync više ne radi full knowledge runtime rewrite kada se menja samo glossary/promoted canonical slice, nego osvežava samo canonical runtime tabele nad postojećim persisted knowledge snapshot-om
+- uvedeni su uski repository slojevi za knowledge runtime snapshot, stewardship queue, catalog discovery i mapping-set governance surface-e
+- route i service call-site-ovi za Canonical Console, stewardship, catalog i mapping-set governance više ne zavise direktno od širokog persistence service surface-a za ove ciljane read modele
+- dodati su fokusirani backend testovi za canonical authoring sync bez full runtime replace-a, stewardship queue filter read model i catalog projection posle governance update-a
+
+Ishod:
+
+- persistence separation wave je zatvoren za trenutni pilot scope: canonical authoring, governance i discovery sada imaju jasnije SQLite read/write granice, dok lease/dequeue i širi DB-only authoring ostaju sledeća faza kada zaista zatrebaju
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

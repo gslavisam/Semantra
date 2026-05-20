@@ -1,0 +1,7 @@
+module,review_row_count,top_5_fields_by_freq
+AR,265,"TimeCreated(7), TimeModified(7), EditSequence(7), ClassRef_ListID(6), ExternalGUID(6)"
+AP,140,"TxnID(6), ClassRef_ListID(5), SalesTaxCodeRef_ListID(5), TimeCreated(4), TimeModified(4)"
+GL,101,"TimeCreated(5), TimeModified(5), TxnID(5), EditSequence(4), ExternalGUID(4)"
+INV,98,"TimeCreated(4), TimeModified(4), EditSequence(4), ClassRef_ListID(3), ExternalGUID(3)"
+PAY,89,"TimeCreated(4), TimeModified(4), EditSequence(4), ExternalGUID(3), TxnID(3)"
+RPT,40,"ListID(5), TimeCreated(5), TimeModified(5), EditSequence(5), TxnType(1)"

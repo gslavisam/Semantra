@@ -1,0 +1,200 @@
+concept_id,system,object_name,field_name,category,object_description,field_description,note
+account.id,Workday,CR_DIM_APPLICANT,ID,HR,,CR_DIM_APPLICANT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_APPLICANT Total,,HR,,CR_DIM_APPLICANT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMP_ELEMENT,ID,HR,,CR_DIM_COMP_ELEMENT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMP_ELEMENT Total,,HR,,CR_DIM_COMP_ELEMENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMP_GRADE,ID,HR,,CR_DIM_COMP_GRADE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMP_GRADE Total,,HR,,CR_DIM_COMP_GRADE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMP_GRADE_PROFILE,ID,HR,,CR_DIM_COMP_GRADE_PROFILE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMP_GRADE_PROFILE Total,,HR,,CR_DIM_COMP_GRADE_PROFILE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMP_PLAN,ID,HR,,CR_DIM_COMP_PLAN HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+compensation.plan,Workday,CR_DIM_COMP_PLAN Total,,HR,,CR_DIM_COMP_PLAN Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMP_STEP,ID,HR,,CR_DIM_COMP_STEP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMP_STEP Total,,HR,,CR_DIM_COMP_STEP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMPANIES,ID,HR,,CR_DIM_COMPANIES HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMPANIES Total,,HR,,CR_DIM_COMPANIES Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMPANIES_CHANGES_MDS,ID,HR,,CR_DIM_COMPANIES_CHANGES_MDS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMPANIES_CHANGES_MDS Total,,HR,,CR_DIM_COMPANIES_CHANGES_MDS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COMPANIES_MDS,ID,HR,,CR_DIM_COMPANIES_MDS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_COMPANIES_MDS Total,,HR,,CR_DIM_COMPANIES_MDS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_CONTINGENT_WORKER_CONTRACT,ID,HR,,CR_DIM_CONTINGENT_WORKER_CONTRACT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_CONTINGENT_WORKER_CONTRACT Total,,HR,,CR_DIM_CONTINGENT_WORKER_CONTRACT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_COST_CENTER,ID,HR,,CR_DIM_COST_CENTER HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+cost_center.code,Workday,CR_DIM_COST_CENTER Total,,HR,,CR_DIM_COST_CENTER Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_CUSTOM_DEPARTMENT,ID,HR,,CR_DIM_CUSTOM_DEPARTMENT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_CUSTOM_DEPARTMENT Total,,HR,,CR_DIM_CUSTOM_DEPARTMENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+absence.start_date,Workday,CR_DIM_DATE_KPI,date_id,HR,,CR_DIM_DATE_KPI HRDH datahub: int,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_DATE_KPI Total,,HR,,CR_DIM_DATE_KPI Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_DEPARTMENT,ID,HR,,CR_DIM_DEPARTMENT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_DEPARTMENT Total,,HR,,CR_DIM_DEPARTMENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE,ID,HR,,CR_DIM_EMPLOYEE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE Total,,HR,,CR_DIM_EMPLOYEE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_ADDRESS_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_ADDRESS_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+account.industry,Workday,CR_DIM_EMPLOYEE_ADDRESS_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_ADDRESS_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_CONTRACT,ID,HR,,CR_DIM_EMPLOYEE_CONTRACT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_CONTRACT Total,,HR,,CR_DIM_EMPLOYEE_CONTRACT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_CONTRACT_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_CONTRACT_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_CONTRACT_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_CONTRACT_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+employee.department,Workday,CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_DAYFORCE_DEPARTMENT_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_JOB_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_JOB_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_JOB_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_JOB_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_KPI,ID,HR,,CR_DIM_EMPLOYEE_KPI HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_KPI Total,,HR,,CR_DIM_EMPLOYEE_KPI Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_MANAGER_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_MANAGER_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_MANAGER_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_MANAGER_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_ORG_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_ORG_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_ORG_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_ORG_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS,ID,HR,,CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS Total,,HR,,CR_DIM_EMPLOYEE_PAYMENT_ELECTIONS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_STAFFING_EVENTS,ID,HR,,CR_DIM_EMPLOYEE_STAFFING_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_STAFFING_EVENTS Total,,HR,,CR_DIM_EMPLOYEE_STAFFING_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EMPLOYEE_WORK_SCHEDULES,ID,HR,,CR_DIM_EMPLOYEE_WORK_SCHEDULES HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EMPLOYEE_WORK_SCHEDULES Total,,HR,,CR_DIM_EMPLOYEE_WORK_SCHEDULES Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EOS_DL,ID,HR,,CR_DIM_EOS_DL HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EOS_DL Total,,HR,,CR_DIM_EOS_DL Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EVENT_CLASSIFICATION,ID,HR,,CR_DIM_EVENT_CLASSIFICATION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EVENT_CLASSIFICATION Total,,HR,,CR_DIM_EVENT_CLASSIFICATION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EXTERNAL_PAYROLL_MAPPING,ID,HR,,CR_DIM_EXTERNAL_PAYROLL_MAPPING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EXTERNAL_PAYROLL_MAPPING Total,,HR,,CR_DIM_EXTERNAL_PAYROLL_MAPPING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS,ID,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS Total,,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025,ID,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025 HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025 Total,,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_bk_ts_04032025 Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423,ID,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423 HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423 Total,,HR,,CR_DIM_EXTERNAL_PAYROLL_OTP_STATUS_fh_20250423 Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP,ID,HR,,CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP Total,,HR,,CR_DIM_GBL_0000_CERIDIAN_EXTERNAL_PAYSLIP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR,ID,HR,,CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR Total,,HR,,CR_DIM_GBL_0000_CERIDIAN_PAYGROUP_CALENDAR Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP,ID,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP Total,,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD,ID,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD Total,,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_PAYSLIP_OLD Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS,ID,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS Total,,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP,ID,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP Total,,HR,,CR_DIM_GBL_0000_SAGE_EXTERNAL_TIMESLIPS_CLEANUP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_GEM_ID_MAPPING,ID,HR,,CR_DIM_GEM_ID_MAPPING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+absence.start_date,Workday,CR_DIM_GEM_ID_MAPPING Total,,HR,,CR_DIM_GEM_ID_MAPPING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_IAM_AD_ACCOUNT,ID,HR,,CR_DIM_IAM_AD_ACCOUNT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_IAM_AD_ACCOUNT Total,,HR,,CR_DIM_IAM_AD_ACCOUNT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_JOB,ID,HR,,CR_DIM_JOB HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_JOB Total,,HR,,CR_DIM_JOB Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_KPI,ID,HR,,CR_DIM_KPI HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_KPI Total,,HR,,CR_DIM_KPI Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_LOA,ID,HR,,CR_DIM_LOA HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_LOA Total,,HR,,CR_DIM_LOA Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_LOCATION,ID,HR,,CR_DIM_LOCATION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_LOCATION Total,,HR,,CR_DIM_LOCATION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_PAYGROUP,ID,HR,,CR_DIM_PAYGROUP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_PAYGROUP Total,,HR,,CR_DIM_PAYGROUP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_PERFORMANCE_TEMPLATE,ID,HR,,CR_DIM_PERFORMANCE_TEMPLATE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_PERFORMANCE_TEMPLATE Total,,HR,,CR_DIM_PERFORMANCE_TEMPLATE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_PERIOD_SCHEDULE,ID,HR,,CR_DIM_PERIOD_SCHEDULE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_PERIOD_SCHEDULE Total,,HR,,CR_DIM_PERIOD_SCHEDULE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_POSITION,ID,HR,,CR_DIM_POSITION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_POSITION Total,,HR,,CR_DIM_POSITION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_REQUISITION,ID,HR,,CR_DIM_REQUISITION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_REQUISITION Total,,HR,,CR_DIM_REQUISITION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_RETIREMENT_BENEFIT_ELECTION,ID,HR,,CR_DIM_RETIREMENT_BENEFIT_ELECTION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_RETIREMENT_BENEFIT_ELECTION Total,,HR,,CR_DIM_RETIREMENT_BENEFIT_ELECTION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_SAP_EE,ID,HR,,CR_DIM_SAP_EE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_SAP_EE Total,,HR,,CR_DIM_SAP_EE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_SAP_ORG,ID,HR,,CR_DIM_SAP_ORG HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_SAP_ORG Total,,HR,,CR_DIM_SAP_ORG Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_TO,ID,HR,,CR_DIM_TO HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_TO Total,,HR,,CR_DIM_TO Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_UNION_MEMBERSHIP,ID,HR,,CR_DIM_UNION_MEMBERSHIP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_UNION_MEMBERSHIP Total,,HR,,CR_DIM_UNION_MEMBERSHIP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_UNION_MEMBERSHIP_HISTORY,ID,HR,,CR_DIM_UNION_MEMBERSHIP_HISTORY HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_UNION_MEMBERSHIP_HISTORY Total,,HR,,CR_DIM_UNION_MEMBERSHIP_HISTORY Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511,ID,HR,,CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511 HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511 Total,,HR,,CR_DIM_UNION_MEMBERSHIP_HISTORY_fh_20250511 Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_WD_COMPANY_ORG,ID,HR,,CR_DIM_WD_COMPANY_ORG HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_WD_COMPANY_ORG Total,,HR,,CR_DIM_WD_COMPANY_ORG Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_WORKDAY_PUBLIC_HOLIDAYS,ID,HR,,CR_DIM_WORKDAY_PUBLIC_HOLIDAYS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_WORKDAY_PUBLIC_HOLIDAYS Total,,HR,,CR_DIM_WORKDAY_PUBLIC_HOLIDAYS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_WORKER_ADDRESSES,ID,HR,,CR_DIM_WORKER_ADDRESSES HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_WORKER_ADDRESSES Total,,HR,,CR_DIM_WORKER_ADDRESSES Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS,ID,HR,,CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS Total,,HR,,CR_DIM_WORKER_COLLECTIVE_AGREEMENT_EVENTS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_DIM_WORKER_IDENTIFIERS,ID,HR,,CR_DIM_WORKER_IDENTIFIERS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_DIM_WORKER_IDENTIFIERS Total,,HR,,CR_DIM_WORKER_IDENTIFIERS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_COMPANIES,ID,HR,,CR_FCT_COMPANIES HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_COMPANIES Total,,HR,,CR_FCT_COMPANIES Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_COMPANIES_MDS,ID,HR,,CR_FCT_COMPANIES_MDS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_COMPANIES_MDS Total,,HR,,CR_FCT_COMPANIES_MDS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_COMPENSATION,ID,HR,,CR_FCT_COMPENSATION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+absence.start_date,Workday,CR_FCT_COMPENSATION Total,,HR,,CR_FCT_COMPENSATION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_COMPENSATION_PROCESSING,ID,HR,,CR_FCT_COMPENSATION_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+absence.start_date,Workday,CR_FCT_COMPENSATION_PROCESSING Total,,HR,,CR_FCT_COMPENSATION_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT,ID,HR,,CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+absence.start_date,Workday,CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT Total,,HR,,CR_FCT_COMPENSATION_PROCESSING_STG_0000_PECI_STG_DAYFORCE_PILOT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EMPLOYEE,ID,HR,,CR_FCT_EMPLOYEE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EMPLOYEE Total,,HR,,CR_FCT_EMPLOYEE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+absence.start_date,Workday,CR_FCT_EQUIFAX,ID_COMPANIES,HR,,CR_FCT_EQUIFAX HRDH datahub: int,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EQUIFAX Total,,HR,,CR_FCT_EQUIFAX Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS,ID,HR,,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS Total,,HR,,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING,ID,HR,,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING Total,,HR,,CR_FCT_EXTERNAL_PAYROLL_ELECTIONS_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP,ID,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP Total,,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318,ID,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318 HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318 Total,,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP_fh_20250318 Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING,ID,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING Total,,HR,,CR_FCT_EXTERNAL_PAYROLL_OTP_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_IAM_AD_ACCOUNT,ID,HR,,CR_FCT_IAM_AD_ACCOUNT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_IAM_AD_ACCOUNT Total,,HR,,CR_FCT_IAM_AD_ACCOUNT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_IAM_AD_ACCOUNT_CURRENT,ID,HR,,CR_FCT_IAM_AD_ACCOUNT_CURRENT HRDH datahub: bigint,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_IAM_AD_ACCOUNT_CURRENT Total,,HR,,CR_FCT_IAM_AD_ACCOUNT_CURRENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_IAM_AD_ACCOUNT_DELTA,ID,HR,,CR_FCT_IAM_AD_ACCOUNT_DELTA HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_IAM_AD_ACCOUNT_DELTA Total,,HR,,CR_FCT_IAM_AD_ACCOUNT_DELTA Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_KPI,ID,HR,,CR_FCT_KPI HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_KPI Total,,HR,,CR_FCT_KPI Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_LOA,ID,HR,,CR_FCT_LOA HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_LOA Total,,HR,,CR_FCT_LOA Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_LOA_PROCESSING,ID,HR,,CR_FCT_LOA_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_LOA_PROCESSING Total,,HR,,CR_FCT_LOA_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_PERFORMANCE_TEMPLATE,ID,HR,,CR_FCT_PERFORMANCE_TEMPLATE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PERFORMANCE_TEMPLATE Total,,HR,,CR_FCT_PERFORMANCE_TEMPLATE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_PN_BILLING_EMPLOYEES_DETAILED,ID,HR,,CR_FCT_PN_BILLING_EMPLOYEES_DETAILED HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PN_BILLING_EMPLOYEES_DETAILED Total,,HR,,CR_FCT_PN_BILLING_EMPLOYEES_DETAILED Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PN_BILLING_LMS_HEADCOUNT_DETAILED Total,,HR,,CR_FCT_PN_BILLING_LMS_HEADCOUNT_DETAILED Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PN_BILLING_PERFORMANCE_DETAILED Total,,HR,,CR_FCT_PN_BILLING_PERFORMANCE_DETAILED Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PN_BILLING_REQUISITIONS_DETAILED Total,,HR,,CR_FCT_PN_BILLING_REQUISITIONS_DETAILED Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_PN_BILLING_SUCCESSION_DETAILED Total,,HR,,CR_FCT_PN_BILLING_SUCCESSION_DETAILED Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT,ID,HR,,CR_FCT_POSITION_ASSIGNMENT HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_POSITION_ASSIGNMENT Total,,HR,,CR_FCT_POSITION_ASSIGNMENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629 HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+absence.end_date,Workday,CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629 Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_BAK_INT_CHANGE_20250629 Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT HRDH datahub: bigint,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX HRDH datahub: bigint,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT_HRDX Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_CURRENT_SNAPSHOT_HRDX Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT HRDH datahub: bigint,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_HRDX_CURRENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT,ID,HR,,CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT HRDH datahub: bigint,Materialized from direct_alias_match; Workday HRDH datahub.
+employee.position,Workday,CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT Total,,HR,,CR_FCT_POSITION_ASSIGNMENT_INCL_JOB_MGMT_CURRENT Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_REQUISITION,ID,HR,,CR_FCT_REQUISITION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_REQUISITION Total,,HR,,CR_FCT_REQUISITION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_SUCCESSION,ID,HR,,CR_FCT_SUCCESSION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_SUCCESSION Total,,HR,,CR_FCT_SUCCESSION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+employee.id,Workday,CR_FCT_TALENT_CONFIRMATION,ID_EMPLOYEE,HR,,CR_FCT_TALENT_CONFIRMATION HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_TALENT_CONFIRMATION Total,,HR,,CR_FCT_TALENT_CONFIRMATION Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_TO,ID,HR,,CR_FCT_TO HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_TO Total,,HR,,CR_FCT_TO Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_TO_BALANCE,ID,HR,,CR_FCT_TO_BALANCE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_TO_BALANCE Total,,HR,,CR_FCT_TO_BALANCE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_TO_BALANCE_PROCESSING,ID,HR,,CR_FCT_TO_BALANCE_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_TO_BALANCE_PROCESSING Total,,HR,,CR_FCT_TO_BALANCE_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_FCT_TO_PROCESSING,ID,HR,,CR_FCT_TO_PROCESSING HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_FCT_TO_PROCESSING Total,,HR,,CR_FCT_TO_PROCESSING Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_MDI_PERFORMANCE_TEMPLATE,ID,HR,,CR_MDI_PERFORMANCE_TEMPLATE HRDH datahub: int,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_MDI_PERFORMANCE_TEMPLATE Total,,HR,,CR_MDI_PERFORMANCE_TEMPLATE Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+account.id,Workday,CR_Preformance_Template_Hierarchy,ID,HR,,CR_Preformance_Template_Hierarchy HRDH datahub: nvarchar,Materialized from direct_alias_match; Workday HRDH datahub.
+invoice.amount,Workday,CR_Preformance_Template_Hierarchy Total,,HR,,CR_Preformance_Template_Hierarchy Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.
+invoice.amount,Workday,Grand Total,,HR,,Grand Total HRDH datahub: ,Materialized from weak_canonical_candidate; Workday HRDH datahub.

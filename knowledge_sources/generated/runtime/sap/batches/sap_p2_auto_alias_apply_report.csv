@@ -1,0 +1,21 @@
+sap_module,sap_table,sap_field,sap_description,concept_id,alias_added,context_added,status
+SD,KNB1,ZWELS,List of Respected Payment Methods,payment.method_code,true,false,applied
+SD,LIKP,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,true,true,applied
+SD,LIKP,VSART,Shipping Type,shipment.carrier,true,true,applied
+SD,VBAK,BNAME,Name of orderer,account.name,true,true,applied
+SD,VBAK,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,false,true,applied
+SD,VBAK,KTEXT,Search term for product proposal,cost_center.name,true,true,applied
+SD,VBAP,TAXM1,Tax Classification for Material,tax.id,true,true,applied
+SD,VBKD,VSART,Shipping Type,shipment.carrier,false,true,applied
+SD,VBRK,GBSTK,Overall Processing Status (Header/All Items),supplier.region_code,false,true,applied
+SD,VBRP,TAXM1,Tax Classification of Material,tax.id,false,true,applied
+MM,EKKO,CONT,Contract,container.id,true,true,applied
+MM,EKKO,VSART,Shipping Type,shipment.carrier,false,true,applied
+MM,EKPO,UNIQUEID,Concatenation of EBELN and EBELP,system.guid,true,true,applied
+MM,EKPO,VSART,Shipping Type,shipment.carrier,false,true,applied
+MM,MAKT,MAKTG,Material Description in Uppercase for Matchcodes,address.city,true,true,applied
+MM,MARC,BEARZ,Processing time,route.id,true,true,applied
+FI,LFB1,ZWELS,List of Respected Payment Methods,payment.method_code,false,false,already_present
+PP,PLKO,KTEXT,Routing Description,cost_center.name,false,true,applied
+PP,PLPO,LTXA1,Operation Short Text,address.city,true,true,applied
+PP,STPO,DOKVR,Document Version,version.number,true,true,applied

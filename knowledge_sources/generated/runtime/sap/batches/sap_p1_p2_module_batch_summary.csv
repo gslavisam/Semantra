@@ -1,0 +1,5 @@
+sap_module,p1_rows,p2_rows,p1_p2_total,knowledge_only,strong_canonical_candidate,p1_file,p2_file
+SD,79,45,124,79,45,knowledge_sources/generated/runtime/sap/batches/modules/SD_p1_batch.csv,knowledge_sources/generated/runtime/sap/batches/modules/SD_p2_batch.csv
+MM,80,41,121,80,41,knowledge_sources/generated/runtime/sap/batches/modules/MM_p1_batch.csv,knowledge_sources/generated/runtime/sap/batches/modules/MM_p2_batch.csv
+FI,37,33,70,37,33,knowledge_sources/generated/runtime/sap/batches/modules/FI_p1_batch.csv,knowledge_sources/generated/runtime/sap/batches/modules/FI_p2_batch.csv
+PP,23,20,43,23,20,knowledge_sources/generated/runtime/sap/batches/modules/PP_p1_batch.csv,knowledge_sources/generated/runtime/sap/batches/modules/PP_p2_batch.csv

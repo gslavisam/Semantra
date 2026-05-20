@@ -49,9 +49,12 @@ from app.services.canonical_gap_service import (
     extract_canonical_gap_candidates,
     nearest_canonical_concepts,
 )
+from app.services.catalog_repository import catalog_repository
+from app.services.knowledge_runtime_repository import knowledge_runtime_repository
 from app.services.llm_service import build_provider_from_settings, call_canonical_gap_assistant
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.services.stewardship_repository import stewardship_repository
 from app.utils.knowledge_text import filter_canonical_aliases
 
 
@@ -103,7 +106,7 @@ def _require_canonical_gap_ready_for_approval(candidate: object) -> None:
 def build_runtime_status() -> KnowledgeRuntimeStatus:
     """Build a runtime status snapshot for the active knowledge base and overlay state."""
 
-    seed_meta = persistence_service.get_knowledge_seed_meta()
+    seed_meta = knowledge_runtime_repository.get_seed_meta()
     if seed_meta is None:
         source_hash_state = "missing"
     elif seed_meta["source_hash"] == metadata_knowledge_service.current_source_hash():
@@ -139,7 +142,7 @@ def build_runtime_status() -> KnowledgeRuntimeStatus:
 
 def _list_canonical_gap_proposal_state_records() -> list[CanonicalGapProposalStateRecord]:
     latest_by_candidate_key: dict[str, CanonicalGapProposalStateRecord] = {}
-    for item in persistence_service.list_knowledge_stewardship_items(item_type="canonical_gap"):
+    for item in stewardship_repository.list_items(item_type="canonical_gap"):
         if item.status not in {"new", "needs_review", "ready_for_approval"}:
             continue
         record = CanonicalGapProposalStateRecord(
@@ -206,9 +209,9 @@ def _active_canonical_overlay_entries() -> tuple[KnowledgeOverlayVersion | None,
 
 
 def _canonical_concept_registry() -> tuple[dict[str, CanonicalConceptSummary], dict[str, list[CanonicalConceptFieldContext]], KnowledgeOverlayVersion | None, dict[str, list[KnowledgeOverlayEntry]]]:
-    _, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
-    usage_counts = persistence_service.list_catalog_concept_usage_counts()
-    usage_facets = persistence_service.list_catalog_concept_usage_facets()
+    _, canonical_dicts, canonical_context_dicts = knowledge_runtime_repository.load_runtime_snapshot()
+    usage_counts = catalog_repository.list_concept_usage_counts()
+    usage_facets = catalog_repository.list_concept_usage_facets()
     active_overlay_version, overlay_entries_by_concept = _active_canonical_overlay_entries()
 
     contexts_by_concept: dict[str, list[CanonicalConceptFieldContext]] = {}
@@ -343,7 +346,7 @@ async def get_canonical_concept(concept_id: str) -> CanonicalConceptDetailRespon
         active_overlay_entries=active_overlay_entries,
         integrations=[
             CanonicalConceptUsageRecord.model_validate(record.model_dump(mode="json"))
-            for record in persistence_service.list_catalog_concept_usage_records(concept_id)
+            for record in catalog_repository.list_concept_usage_records(concept_id)
         ],
         audit_entries=audit_entries,
     )
@@ -447,7 +450,7 @@ async def list_knowledge_stewardship_items(
 ) -> list[KnowledgeStewardshipItemRecord]:
     """List stewardship items filtered by type, status, owner, or assignee."""
 
-    return persistence_service.list_knowledge_stewardship_items(
+    return stewardship_repository.list_items(
         item_type=item_type,
         status=status,
         owner=owner,
@@ -460,7 +463,7 @@ async def get_knowledge_stewardship_item(item_id: int) -> KnowledgeStewardshipIt
     """Return one stewardship item with its persisted detail payloads."""
 
     try:
-        return persistence_service.get_knowledge_stewardship_item(item_id)
+        return stewardship_repository.get_item(item_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -469,8 +472,8 @@ async def get_knowledge_stewardship_item(item_id: int) -> KnowledgeStewardshipIt
 async def upsert_knowledge_stewardship_item(request: KnowledgeStewardshipItemCreateRequest) -> KnowledgeStewardshipItemDetail:
     """Create or update a stewardship item and append the matching audit trail entry."""
 
-    existing = persistence_service.get_knowledge_stewardship_item_by_key(request.item_type, request.item_key)
-    saved = persistence_service.upsert_knowledge_stewardship_item(request)
+    existing = stewardship_repository.get_item_by_key(request.item_type, request.item_key)
+    saved = stewardship_repository.upsert_item(request)
     action = "Created" if existing is None else "Updated"
     message_parts = [
         f"{action} stewardship item {saved.item_type}:{saved.item_key}.",
@@ -496,7 +499,7 @@ async def update_knowledge_stewardship_item_status(
     """Update stewardship status, ownership, or review notes for one item."""
 
     try:
-        updated = persistence_service.update_knowledge_stewardship_item_status(
+        updated = stewardship_repository.update_item_status(
             item_id,
             request.status,
             changed_by=request.changed_by,
@@ -536,7 +539,7 @@ async def promote_knowledge_stewardship_item_to_glossary(
     """Promote an approved overlay stewardship item into the canonical glossary."""
 
     try:
-        item = persistence_service.get_knowledge_stewardship_item(item_id)
+        item = stewardship_repository.get_item(item_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -574,7 +577,7 @@ async def promote_knowledge_stewardship_item_to_glossary(
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    updated = persistence_service.update_knowledge_stewardship_item_status(
+    updated = stewardship_repository.update_item_status(
         item_id,
         "promoted",
         changed_by=request.changed_by,
@@ -768,7 +771,7 @@ async def save_canonical_gap_proposal_state(request: CanonicalGapProposalStateRe
     reviewed_by = (request.reviewed_by or "").strip() or "unknown"
     note = (request.note or "").strip() or None
     candidate_key = _canonical_gap_candidate_key(request.candidate.source, request.candidate.target)
-    saved = persistence_service.upsert_knowledge_stewardship_item(
+    saved = stewardship_repository.upsert_item(
         _canonical_gap_stewardship_request(
             candidate_key,
             request.candidate,

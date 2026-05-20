@@ -1,0 +1,24 @@
+priority_rank,priority_tier,sap_module,sap_table,sap_field,sap_description,classification_bucket,top_canonical_concept_id,top_canonical_matches,top_knowledge_concept_id,top_knowledge_matches,suggested_action
+41,P1,PP,AFPO,IAMNG,Expected Surplus/Deficit For Goods Receipt,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,AFPO,KSBIS,Cost collector valid to,knowledge_only,,,address valid to,address valid to:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,AFPO,WEAED,Indicator: Goods receipt indicator can be changed,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,AFPO,WEBAZ,Goods Receipt Processing Duration in Days,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,AFPO,WEPOS,Goods Receipt Indicator,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,AFPO,WEUNB,"Goods Receipt, Non-Valuated",knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,CRHD,FORT1,Formula for setup time,knowledge_only,,,setup time,setup time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,CRHD,LASTCHANGE_DATETIME,Date and Time of Last Change,knowledge_only,,,time entry date,time entry date:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,CRHD,MTRVP,Additional time percentage for setup,knowledge_only,,,setup time,setup time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,MDKP,MTWZT,Material replenishment lead time,knowledge_only,,,lead time,lead time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,MDTB,UKZ01,Indicator: MRP element can be brought forward,knowledge_only,,,opening balance,opening balance:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,PLAF,WEBAZ,Goods Receipt Processing Duration in Days,knowledge_only,,,goods receipt,goods receipt:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,PLKO,VALID_TO,Valid-to date,knowledge_only,,,address valid to,address valid to:1.00 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,PLPO,ANZMA,Number of employees,knowledge_only,,,number of employees,number of employees:0.90,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,PLPO,KALKZ,Cost,knowledge_only,,,cost price,cost price:0.90 | project cost:0.90,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,PLPO,VALID_TO,Valid-to date,knowledge_only,,,address valid to,address valid to:1.00 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STKO,VALID_TO,Valid-to date,knowledge_only,,,address valid to,address valid to:1.00 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,AUSCH,Component Scrap in Percent,knowledge_only,,,bom scrap percentage,bom scrap percentage:1.00,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,NLFMV,Unit for lead-time offset for operation,knowledge_only,,,lead time,lead time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,NLFZT,Lead-time offset,knowledge_only,,,lead time,lead time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,NLFZV,Lead-time offset for operation,knowledge_only,,,lead time,lead time:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,VALID_TO,Valid-to date,knowledge_only,,,address valid to,address valid to:1.00 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+41,P1,PP,STPO,VALID_TO_RKEY,Valid-to date,knowledge_only,,,address valid to,address valid to:0.70 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing

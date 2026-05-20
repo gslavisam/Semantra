@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.api.deps import require_admin
 from app.models.mapping import CatalogConceptDetail, CatalogIntegrationDetail, CatalogIntegrationRecord, CatalogReuseFitRequest, CatalogReuseFitResponse
 from app.services.catalog_reuse_fit_service import build_catalog_reuse_fit
+from app.services.catalog_repository import catalog_repository
 from app.services.llm_service import build_provider_from_settings
-from app.services.persistence_service import persistence_service
 
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
@@ -26,7 +26,7 @@ async def list_catalog_integrations(
 ) -> list[CatalogIntegrationRecord]:
     """List cataloged integrations using optional admin filters."""
 
-    return persistence_service.list_catalog_integrations(
+    return catalog_repository.list_integrations(
         source_system=source_system,
         target_system=target_system,
         business_domain=business_domain,
@@ -49,7 +49,7 @@ async def search_catalog_integrations(
 ) -> list[CatalogIntegrationRecord]:
     """Search cataloged integrations by free text plus optional admin filters."""
 
-    return persistence_service.search_catalog_integrations(
+    return catalog_repository.search_integrations(
         q,
         source_system=source_system,
         target_system=target_system,
@@ -65,7 +65,7 @@ async def get_catalog_integration_detail(integration_name: str) -> CatalogIntegr
     """Return one catalog integration with its detailed reuse metadata."""
 
     try:
-        return persistence_service.get_catalog_integration_detail(integration_name)
+        return catalog_repository.get_integration_detail(integration_name)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
@@ -81,7 +81,7 @@ async def get_catalog_concept_detail(
     """Return one catalog concept with filtered usage and integration detail."""
 
     try:
-        return persistence_service.get_catalog_concept_detail(
+        return catalog_repository.get_concept_detail(
             concept_id,
             source_system=source_system,
             target_system=target_system,

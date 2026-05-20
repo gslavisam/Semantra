@@ -1,0 +1,2 @@
+system,module,object_name,object_description,field_name,field_description,normalized_field_name,data_type,length_or_format,sample_value,domain,source_artifact,source_type,source_scope,parser_name,last_verified_at,candidate_concept_id,promotion_status,notes
+SAP,FI-AP,LFA1,Vendor Master General Data,LIFNR,Vendor account number,lifnr,VARCHAR,10,V0001,procurement,sap_vendor_master.xlsx,workbook,internal,,2026-05-19,supplier.id,candidate,Example row template only

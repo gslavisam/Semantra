@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 import threading
 import time
 
 import pytest
 
 from app.models.mapping import AutoMappingResponse
+import app.services.mapping_job_service as mapping_job_service_module
 from app.services.mapping_job_service import (
     FINISHED_JOB_TTL_SECONDS,
     MAX_ACTIVE_JOBS,
@@ -15,7 +17,13 @@ from app.services.mapping_job_service import (
     MappingJob,
     MappingJobCapacityError,
     MappingJobStore,
+    SQLiteMappingJobStateStore,
 )
+from app.services.persistence_service import SQLitePersistenceService, persistence_service
+
+
+def setup_function() -> None:
+    persistence_service.clear_mapping_jobs()
 
 
 def test_mapping_job_store_rejects_new_job_when_active_limit_is_reached() -> None:
@@ -138,3 +146,92 @@ def test_mapping_job_store_runtime_status_surfaces_durable_backend_triggers() ->
         "finished_retention_saturated",
         "long_running_job_exceeds_retention_window",
     }
+
+
+def test_sqlite_mapping_job_state_store_recovers_interrupted_active_jobs() -> None:
+    persistence_service.save_mapping_job(
+        job_id="job-1",
+        status="running",
+        created_at="2026-05-19T10:00:00+00:00",
+        updated_at="2026-05-19T10:01:00+00:00",
+        created_at_monotonic=1.0,
+        updated_at_monotonic=2.0,
+    )
+
+    store = MappingJobStore(state_store=SQLiteMappingJobStateStore())
+
+    status = store.get_status("job-1")
+
+    assert store.runtime_status().storage_mode == "sqlite_status"
+    assert status.status == "failed"
+    assert status.error == "Mapping job interrupted before completion because the local worker runtime restarted."
+    assert any("worker runtime restarted" in line for line in status.activity)
+
+
+def test_sqlite_persistence_lists_latest_mapping_job_events_in_chronological_order(tmp_path) -> None:
+    persistence = SQLitePersistenceService(str(tmp_path / "mapping_jobs.sqlite3"))
+    created_at = datetime.now(UTC).isoformat()
+    persistence.save_mapping_job(
+        job_id="job-1",
+        status="running",
+        created_at=created_at,
+        updated_at=created_at,
+        created_at_monotonic=1.0,
+        updated_at_monotonic=1.0,
+    )
+
+    for index in range(1, 502):
+        persistence.append_mapping_job_event(
+            "job-1",
+            created_at=created_at,
+            message=f"event {index}",
+        )
+
+    activity = persistence.list_mapping_job_events("job-1", limit=500)
+
+    assert len(activity) == 500
+    assert activity[0].endswith("event 2")
+    assert activity[-1].endswith("event 501")
+
+
+def test_sqlite_mapping_job_store_prunes_finished_jobs_by_wall_clock_after_restart(monkeypatch, tmp_path) -> None:
+    persistence = SQLitePersistenceService(str(tmp_path / "mapping_jobs.sqlite3"))
+    monkeypatch.setattr(mapping_job_service_module, "persistence_service", persistence)
+    monkeypatch.setattr(mapping_job_service_module.time, "monotonic", lambda: 100.0)
+
+    old_timestamp = (datetime.now(UTC) - timedelta(seconds=FINISHED_JOB_TTL_SECONDS + 60)).isoformat()
+    persistence.save_mapping_job(
+        job_id="finished-1",
+        status="completed",
+        created_at=old_timestamp,
+        updated_at=old_timestamp,
+        created_at_monotonic=0.0,
+        updated_at_monotonic=1_000_000.0,
+    )
+
+    store = MappingJobStore(state_store=SQLiteMappingJobStateStore())
+
+    with pytest.raises(KeyError):
+        store.get_status("finished-1")
+
+
+def test_sqlite_mapping_job_store_runtime_status_uses_wall_clock_age_after_restart(monkeypatch, tmp_path) -> None:
+    persistence = SQLitePersistenceService(str(tmp_path / "mapping_jobs.sqlite3"))
+    monkeypatch.setattr(mapping_job_service_module, "persistence_service", persistence)
+    monkeypatch.setattr(mapping_job_service_module.time, "monotonic", lambda: 100.0)
+
+    store = MappingJobStore(state_store=SQLiteMappingJobStateStore())
+    old_timestamp = (datetime.now(UTC) - timedelta(seconds=FINISHED_JOB_TTL_SECONDS + 30)).isoformat()
+    persistence.save_mapping_job(
+        job_id="active-1",
+        status="running",
+        created_at=old_timestamp,
+        updated_at=old_timestamp,
+        created_at_monotonic=1_000_000.0,
+        updated_at_monotonic=1_000_000.0,
+    )
+
+    status = store.runtime_status()
+
+    assert status.oldest_active_job_age_seconds >= FINISHED_JOB_TTL_SECONDS
+    assert "long_running_job_exceeds_retention_window" in status.durable_backend_triggers

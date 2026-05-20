@@ -1,0 +1,38 @@
+priority_rank,priority_tier,sap_module,sap_table,sap_field,sap_description,classification_bucket,top_canonical_concept_id,top_canonical_matches,top_knowledge_concept_id,top_knowledge_matches,suggested_action
+31,P1,FI,ANLC,ANSWL,Transactions for the Year Affecting Asset Values,knowledge_only,,,acquisition cost,acquisition cost:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,ANLC,PSTPER,FI-AA: Depreciation calculation from period X,knowledge_only,,,period from,period from:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,CO_VALDT,Special Valuation Date for Cost Accounting,knowledge_only,,,document date,document date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,GLO_DAT1_HD,Country/Region Specific Date 1 in the Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,GLO_DAT2_HD,Country/Region Specific Date 2 in the Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,GLO_DAT3_HD,Country/Region Specific Date 3 in the Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,GLO_DAT4_HD,Country/Region Specific Date 4 in the Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,GLO_DAT5_HD,Country/Region Specific Date 5 in the Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,INWARDDT_HD,Incoming Document Date,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,OFFSET_REFER_DAT,Date Record Referred to Treasury,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,REPROCESSING_STATUS_CODE,Reprocessing status code,knowledge_only,,,status code,status code:0.70,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,UPDDT,Date of the Last Document Update,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BKPF,XRUEB,Indicator: Document Is Posted to a Previous Period,knowledge_only,,,period to,period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSAK,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSAK,MANST,Dunning Level,knowledge_only,,,aging bucket,aging bucket:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSAK,UEBGDAT,Transfer date of an item to legal dunning proceeding,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSEG,H_BLDAT,Document Date in Document,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSEG,INWARD_DT,Incoming Document Date,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSEG,MANST,Dunning Level,knowledge_only,,,aging bucket,aging bucket:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSEG,UEBGDAT,Transfer Date of an Item to Legal Dunning Proceeding,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSID,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSID,MANST,Dunning Level,knowledge_only,,,aging bucket,aging bucket:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSID,UEBGDAT,Transfer date of an item to legal dunning proceeding,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSIK,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSIK,MANST,Dunning Level,knowledge_only,,,aging bucket,aging bucket:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSIK,UEBGDAT,Transfer date of an item to legal dunning proceeding,knowledge_only,,,address valid to,address valid to:0.55 | leave to:0.55 | period to:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,BSIS,BLDAT,Document Date in Document,knowledge_only,,,ap invoice date,ap invoice date:1.00 | document date:1.00 | issue date:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,BORGR_DATUN,Date Limit for External Document Identification,knowledge_only,,,document date,document date:0.55 | issue date:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,CRTN,CRT Number,knowledge_only,,,carton number,carton number:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,ORT02,District,knowledge_only,,,district,district:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,PFACH,PO Box,knowledge_only,,,po box,po box:0.90,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,PFORT,PO Box city,knowledge_only,,,po box,po box:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,PSOHS,House number: is no longer used from Release 4.6B,knowledge_only,,,street number,street number:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,PSOST,Street: No longer used from Release 4.6B,knowledge_only,,,street number,street number:0.55,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFA1,TELFX,Fax Number,knowledge_only,,,fax number,fax number:1.00,promote_new_canonical_concept_or_attach_to_existing
+31,P1,FI,LFB1,US_CHAP4_STATUS_CODE,US Chapter 4 Status Code,knowledge_only,,,status code,status code:0.70,promote_new_canonical_concept_or_attach_to_existing

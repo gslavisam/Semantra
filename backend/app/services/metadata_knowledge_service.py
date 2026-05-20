@@ -19,6 +19,7 @@ from app.models.mapping import (
     CanonicalMappingDetails,
 )
 from app.models.schema import ColumnProfile, SchemaProfile
+from app.services.knowledge_runtime_repository import knowledge_runtime_repository
 from app.services.persistence_service import persistence_service
 from app.utils.knowledge_text import filter_canonical_aliases, normalize_alias_text, normalize_canonical_alias_text, split_csv_values
 from app.utils.normalization import clear_normalization_overrides, configure_normalization_overrides, semantic_token_set
@@ -31,11 +32,26 @@ DEFAULT_CANONICAL_GLOSSARY_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_gl
 DEFAULT_SAP_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "sap_tables_mostUsed.xlsx"
 DEFAULT_QAD_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "qad_tables_mostUsed.xlsx"
 DEFAULT_WORKDAY_ENTITIES_PATH = PROJECT_ROOT / "metadata_dict" / "WD_entities_mostUsed.xlsx"
+DEFAULT_HRDH_TABLE_COLUMNS_PATH = PROJECT_ROOT / "metadata_dict" / "HRDH_Table_Columns.xlsx"
+DEFAULT_QUICKBOOKS_TABLES_PATH = PROJECT_ROOT / "metadata_dict" / "quickbooks_tables_reference.xlsx"
 DEFAULT_WD_XSD_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "wd_hr_knowledge_overlay.csv"
 DEFAULT_HRDH_OVERLAY_PATH   = PROJECT_ROOT / "metadata_dict" / "hrdh_knowledge_overlay.csv"
+DEFAULT_WD_DATAHUB_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "wd_datahub_knowledge_overlay.csv"
+DEFAULT_QB_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "qb_knowledge_overlay.csv"
 DEFAULT_CANONICAL_FIELD_CONTEXT_ENRICHMENT_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_field_context_enrichment.csv"
 MULTI_VALUE_FIELDS = ("Skracenice", "Alternativni nazivi")
 CANONICAL_GLOSSARY_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
+DEFAULT_METADATA_EXACT_MATCH_STRENGTH = 0.75
+PRIORITY_METADATA_EXACT_MATCH_STRENGTH = 0.9
+DEFAULT_METADATA_TOKEN_MATCH_STRENGTH = 0.45
+PRIORITY_METADATA_TOKEN_MATCH_STRENGTH = 0.55
+DEFAULT_CANONICAL_METADATA_EXACT_MATCH_STRENGTH = 0.75
+PRIORITY_CANONICAL_METADATA_EXACT_MATCH_STRENGTH = 0.9
+DEFAULT_CANONICAL_METADATA_TOKEN_MATCH_STRENGTH = 0.5
+PRIORITY_CANONICAL_METADATA_TOKEN_MATCH_STRENGTH = 0.6
+DEFAULT_CANONICAL_BRIDGE_METADATA_MATCH_STRENGTH = 0.6
+PRIORITY_CANONICAL_BRIDGE_METADATA_MATCH_STRENGTH = 0.7
+GENERIC_ATTRIBUTE_CANONICAL_BRIDGE_STRENGTH = 0.6
 ALIAS_FIELDS = (
     "Naziv (Engleski)",
     "Naziv (Srpski)",
@@ -63,6 +79,27 @@ def _normalize_canonical_alias(value: str) -> str:
 
 def _split_values(value: str) -> list[str]:
     return split_csv_values(value)
+
+
+def _parse_context_patch_note(value: str) -> dict[str, str] | None:
+    parts = [segment.strip() for segment in str(value or "").split(";") if segment.strip()]
+    if not parts:
+        return None
+
+    parsed: dict[str, str] = {}
+    for part in parts:
+        if "=" not in part:
+            continue
+        key, raw_value = part.split("=", 1)
+        normalized_key = key.strip().lower()
+        if not normalized_key:
+            continue
+        parsed[normalized_key] = raw_value.strip()
+
+    enabled = parsed.get("context_patch", "").strip().lower()
+    if enabled not in {"true", "1", "yes"}:
+        return None
+    return parsed
 
 
 @dataclass(frozen=True)
@@ -332,7 +369,7 @@ class MetadataKnowledgeService:
 
         # --- DB-first loading (skip expensive file parsing when DB is current) ---
         current_hash = self._compute_source_hash()
-        seed_meta = persistence_service.get_knowledge_seed_meta()
+        seed_meta = knowledge_runtime_repository.get_seed_meta()
         if seed_meta and seed_meta["source_hash"] == current_hash:
             self._load_from_db()
             self._last_runtime_source = "sqlite_cache"
@@ -358,6 +395,59 @@ class MetadataKnowledgeService:
             metadata_tokens.update(semantic_token_set(text))
         return metadata_candidates, metadata_tokens
 
+    def _metadata_match_strengths(self, *, prefer_metadata_text: bool = False) -> tuple[float, float, float, float, float]:
+        if prefer_metadata_text:
+            return (
+                PRIORITY_METADATA_EXACT_MATCH_STRENGTH,
+                PRIORITY_METADATA_TOKEN_MATCH_STRENGTH,
+                PRIORITY_CANONICAL_METADATA_EXACT_MATCH_STRENGTH,
+                PRIORITY_CANONICAL_METADATA_TOKEN_MATCH_STRENGTH,
+                PRIORITY_CANONICAL_BRIDGE_METADATA_MATCH_STRENGTH,
+            )
+        return (
+            DEFAULT_METADATA_EXACT_MATCH_STRENGTH,
+            DEFAULT_METADATA_TOKEN_MATCH_STRENGTH,
+            DEFAULT_CANONICAL_METADATA_EXACT_MATCH_STRENGTH,
+            DEFAULT_CANONICAL_METADATA_TOKEN_MATCH_STRENGTH,
+            DEFAULT_CANONICAL_BRIDGE_METADATA_MATCH_STRENGTH,
+        )
+
+    def _profile_matches_canonical_attribute(self, profile: ColumnProfile, concept: CanonicalBusinessConcept) -> bool:
+        attribute_alias = _normalize_canonical_alias(concept.attribute)
+        if not attribute_alias or len(attribute_alias.split()) < 2:
+            return False
+        profile_names = {
+            _normalize_canonical_alias(profile.name),
+            _normalize_canonical_alias(profile.normalized_name),
+        }
+        return attribute_alias in profile_names
+
+    def _pairwise_canonical_attribute_bridge(
+        self,
+        source: ColumnProfile,
+        target: ColumnProfile,
+        *,
+        prefer_metadata_text: bool = False,
+    ) -> dict[str, float]:
+        """Return weak canonical bridge scores when a generic target name matches a source concept attribute.
+
+        This keeps generic targets like `region_code` or `payment_terms_id` from losing all
+        business-meaning evidence when the source already resolves strongly to a richer canonical concept.
+        """
+
+        bridges: dict[str, float] = {}
+        for match in self.match_canonical_concepts(source, prefer_metadata_text=prefer_metadata_text):
+            concept = self._canonical_concepts_by_id.get(match.concept_id)
+            if concept is None:
+                continue
+            if not self._profile_matches_canonical_attribute(target, concept):
+                continue
+            bridges[match.concept_id] = max(
+                bridges.get(match.concept_id, 0.0),
+                min(match.strength, GENERIC_ATTRIBUTE_CANONICAL_BRIDGE_STRENGTH),
+            )
+        return bridges
+
     def expand_semantic_tokens(self, profile: ColumnProfile, *, prefer_metadata_text: bool = False) -> set[str]:
         tokens = set(profile.tokenized_name)
         if prefer_metadata_text:
@@ -378,6 +468,12 @@ class MetadataKnowledgeService:
 
         source_matches = {match.concept_id: match for match in self.match_concepts(source, prefer_metadata_text=prefer_metadata_text)}
         target_matches = {match.concept_id: match for match in self.match_concepts(target, prefer_metadata_text=prefer_metadata_text)}
+        source_canonical_matches = {
+            match.concept_id: match for match in self.match_canonical_concepts(source, prefer_metadata_text=prefer_metadata_text)
+        }
+        target_canonical_matches = {
+            match.concept_id: match for match in self.match_canonical_concepts(target, prefer_metadata_text=prefer_metadata_text)
+        }
         shared = set(source_matches) & set(target_matches)
 
         candidate_scores: list[float] = []
@@ -401,6 +497,51 @@ class MetadataKnowledgeService:
                 if target_cc_id in self._kc_to_cc.get(kc_id, set()):
                     candidate_scores.append(source_match.strength * 0.85)
 
+        # Metadata-driven canonical matches should also feed the KC->CC bridge,
+        # otherwise the same concept can show up in canonical_details while the
+        # knowledge score incorrectly stays at zero.
+        for kc_id, source_match in source_matches.items():
+            for target_cc_id, target_cc_match in target_canonical_matches.items():
+                if target_cc_id in self._kc_to_cc.get(kc_id, set()):
+                    candidate_scores.append(min(source_match.strength * 0.85, target_cc_match.strength))
+
+        for kc_id, target_match in target_matches.items():
+            for source_cc_id, source_cc_match in source_canonical_matches.items():
+                if source_cc_id in self._kc_to_cc.get(kc_id, set()):
+                    candidate_scores.append(min(target_match.strength * 0.85, source_cc_match.strength))
+
+        for concept_id, bridge_strength in self._pairwise_canonical_attribute_bridge(
+            source,
+            target,
+            prefer_metadata_text=prefer_metadata_text,
+        ).items():
+            linked_source_strength = max(
+                (
+                    source_match.strength
+                    for kc_id, source_match in source_matches.items()
+                    if concept_id in self._kc_to_cc.get(kc_id, set())
+                ),
+                default=0.0,
+            )
+            if linked_source_strength > 0:
+                candidate_scores.append(min(linked_source_strength * 0.85, bridge_strength))
+
+        for concept_id, bridge_strength in self._pairwise_canonical_attribute_bridge(
+            target,
+            source,
+            prefer_metadata_text=prefer_metadata_text,
+        ).items():
+            linked_target_strength = max(
+                (
+                    target_match.strength
+                    for kc_id, target_match in target_matches.items()
+                    if concept_id in self._kc_to_cc.get(kc_id, set())
+                ),
+                default=0.0,
+            )
+            if linked_target_strength > 0:
+                candidate_scores.append(min(linked_target_strength * 0.85, bridge_strength))
+
         return round(max(candidate_scores), 4) if candidate_scores else 0.0
 
     def canonical_alignment(self, source: ColumnProfile, target: ColumnProfile, *, prefer_metadata_text: bool = False) -> float:
@@ -409,10 +550,25 @@ class MetadataKnowledgeService:
         source_matches = {match.concept_id: match for match in self.match_canonical_concepts(source, prefer_metadata_text=prefer_metadata_text)}
         target_matches = {match.concept_id: match for match in self.match_canonical_concepts(target, prefer_metadata_text=prefer_metadata_text)}
         shared = set(source_matches) & set(target_matches)
-        if not shared:
+        candidate_scores = [min(source_matches[concept_id].strength, target_matches[concept_id].strength) for concept_id in shared]
+        candidate_scores.extend(
+            self._pairwise_canonical_attribute_bridge(
+                source,
+                target,
+                prefer_metadata_text=prefer_metadata_text,
+            ).values()
+        )
+        candidate_scores.extend(
+            self._pairwise_canonical_attribute_bridge(
+                target,
+                source,
+                prefer_metadata_text=prefer_metadata_text,
+            ).values()
+        )
+        if not candidate_scores:
             return 0.0
 
-        return round(max(min(source_matches[concept_id].strength, target_matches[concept_id].strength) for concept_id in shared), 4)
+        return round(max(candidate_scores), 4)
 
     def canonical_mapping_details(
         self,
@@ -535,6 +691,20 @@ class MetadataKnowledgeService:
                 source_label = ", ".join(self._format_context(context) for context in source_contexts[:2]) or "no explicit source context"
                 target_label = ", ".join(self._format_context(context) for context in target_contexts[:2]) or "no explicit target context"
                 explanations.append(f"Context prior: source {source_label}; target {target_label}.")
+        if not shared:
+            for concept_id in sorted(
+                self._pairwise_canonical_attribute_bridge(
+                    source,
+                    target,
+                    prefer_metadata_text=prefer_metadata_text,
+                )
+            ):
+                concept = self._canonical_concepts_by_id.get(concept_id)
+                if concept is None:
+                    continue
+                explanations.append(
+                    f"Internal metadata dictionary reused the source business concept bridge because target name '{target.name}' exactly matches canonical attribute '{concept.attribute}' for '{concept.display_name}'."
+                )
         return explanations
 
     def explain_canonical_alignment(
@@ -564,6 +734,20 @@ class MetadataKnowledgeService:
                 explanations.append(
                     f"Custom knowledge overlay '{self._active_overlay_name}' extended canonical concept '{concept.display_name}' with alias(es): {', '.join(matched_overlay_aliases)}."
                 )
+        if not shared:
+            for concept_id in sorted(
+                self._pairwise_canonical_attribute_bridge(
+                    source,
+                    target,
+                    prefer_metadata_text=prefer_metadata_text,
+                )
+            ):
+                concept = self._canonical_concepts_by_id.get(concept_id)
+                if concept is None:
+                    continue
+                explanations.append(
+                    f"Canonical glossary attribute bridge aligns source concept '{concept.display_name}' ({concept.concept_id}) to the generic target attribute '{concept.attribute}'."
+                )
         return explanations
 
     def describe_profile(self, profile: ColumnProfile) -> list[str]:
@@ -586,7 +770,10 @@ class MetadataKnowledgeService:
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
         profile_tokens = {token for token in normalized_profile_name.split() if token}
-        metadata_candidates, metadata_tokens = self._profile_metadata_candidates(profile) if prefer_metadata_text else (set(), set())
+        metadata_candidates, metadata_tokens = self._profile_metadata_candidates(profile)
+        metadata_exact_strength, metadata_token_strength, _canonical_metadata_exact_strength, _canonical_metadata_token_strength, _canonical_bridge_metadata_strength = self._metadata_match_strengths(
+            prefer_metadata_text=prefer_metadata_text
+        )
 
         strengths: dict[str, float] = {}
         matched_aliases: dict[str, set[str]] = {}
@@ -602,10 +789,10 @@ class MetadataKnowledgeService:
 
         for candidate_name in metadata_candidates:
             for concept_id in self._alias_to_concepts.get(candidate_name, set()):
-                strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.9)
+                strengths[concept_id] = max(strengths.get(concept_id, 0.0), metadata_exact_strength)
                 matched_aliases.setdefault(concept_id, set()).add(candidate_name)
             for concept_id, context in self._field_alias_to_contexts.get(candidate_name, []):
-                strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.9)
+                strengths[concept_id] = max(strengths.get(concept_id, 0.0), metadata_exact_strength)
                 matched_aliases.setdefault(concept_id, set()).add(candidate_name)
                 matched_contexts.setdefault(concept_id, []).append(context)
 
@@ -624,7 +811,7 @@ class MetadataKnowledgeService:
                 continue
             if alias_tokens.issubset(metadata_tokens):
                 for concept_id in concept_ids:
-                    strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.55)
+                    strengths[concept_id] = max(strengths.get(concept_id, 0.0), metadata_token_strength)
                     matched_aliases.setdefault(concept_id, set()).add(alias)
 
         return [
@@ -643,7 +830,10 @@ class MetadataKnowledgeService:
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
         profile_tokens = {token for token in normalized_profile_name.split() if token}
-        metadata_candidates, metadata_tokens = self._profile_metadata_candidates(profile) if prefer_metadata_text else (set(), set())
+        metadata_candidates, metadata_tokens = self._profile_metadata_candidates(profile)
+        _metadata_exact_strength, _metadata_token_strength, canonical_metadata_exact_strength, canonical_metadata_token_strength, canonical_bridge_metadata_strength = self._metadata_match_strengths(
+            prefer_metadata_text=prefer_metadata_text
+        )
 
         strengths: dict[str, float] = {}
         matched_aliases: dict[str, set[str]] = {}
@@ -656,7 +846,7 @@ class MetadataKnowledgeService:
 
         for candidate_name in metadata_candidates:
             for concept_id in self._canonical_alias_to_concepts.get(candidate_name, set()):
-                strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.9)
+                strengths[concept_id] = max(strengths.get(concept_id, 0.0), canonical_metadata_exact_strength)
                 matched_aliases.setdefault(concept_id, set()).add(candidate_name)
 
         # --- Phase 1b: token-subset direct CC match ---
@@ -675,7 +865,7 @@ class MetadataKnowledgeService:
                 continue
             if alias_tokens.issubset(metadata_tokens):
                 for concept_id in concept_ids:
-                    strengths[concept_id] = max(strengths.get(concept_id, 0.0), 0.6)
+                    strengths[concept_id] = max(strengths.get(concept_id, 0.0), canonical_metadata_token_strength)
                     matched_aliases.setdefault(concept_id, set()).add(alias)
 
         # --- Phase 2a: KC→CC bridge — exact alias match via KC space ---
@@ -692,7 +882,7 @@ class MetadataKnowledgeService:
             for kc_id in self._alias_to_concepts.get(candidate_name, set()):
                 for cc_id in self._kc_to_cc.get(kc_id, set()):
                     if cc_id not in strengths:
-                        strengths[cc_id] = 0.7
+                        strengths[cc_id] = canonical_bridge_metadata_strength
                         matched_aliases.setdefault(cc_id, set()).add(candidate_name)
 
         # --- Phase 2b: KC→CC bridge — token-subset via KC aliases ---
@@ -769,11 +959,13 @@ class MetadataKnowledgeService:
         # Also bridge through field_alias_to_contexts where the stored concept_id
         # happens to be a CC concept_id (registered by _auto_register_sap_field_aliases).
         for alias, entries in self._field_alias_to_contexts.items():
-            for stored_id, _ctx in entries:
-                if stored_id in self._canonical_concepts_by_id:
-                    # stored_id IS a CC concept_id — register a direct CC alias too
-                    # so Phase-1 direct lookup in match_canonical_concepts works.
-                    self._canonical_alias_to_concepts.setdefault(alias, set()).add(stored_id)
+            canonical_ids = {stored_id for stored_id, _ctx in entries if stored_id in self._canonical_concepts_by_id}
+            has_noncanonical_entry = any(stored_id not in self._canonical_concepts_by_id for stored_id, _ctx in entries)
+            if len(canonical_ids) != 1 or has_noncanonical_entry:
+                continue
+            # Promote a field-context alias into the direct canonical alias index only
+            # when the alias is unambiguous across the loaded runtime.
+            self._canonical_alias_to_concepts.setdefault(alias, set()).update(canonical_ids)
 
     def reseed_from_files(self) -> dict:
         """Force reload from all source files and re-persist to DB.
@@ -805,7 +997,12 @@ class MetadataKnowledgeService:
         "DEFAULT_SAP_TABLES_PATH",
         "DEFAULT_QAD_TABLES_PATH",
         "DEFAULT_WORKDAY_ENTITIES_PATH",
+        "DEFAULT_HRDH_TABLE_COLUMNS_PATH",
+        "DEFAULT_QUICKBOOKS_TABLES_PATH",
+        "DEFAULT_WD_XSD_OVERLAY_PATH",
         "DEFAULT_HRDH_OVERLAY_PATH",
+        "DEFAULT_WD_DATAHUB_OVERLAY_PATH",
+        "DEFAULT_QB_OVERLAY_PATH",
         "DEFAULT_CANONICAL_FIELD_CONTEXT_ENRICHMENT_PATH",
     )
 
@@ -844,8 +1041,8 @@ class MetadataKnowledgeService:
 
     def _refresh_after_canonical_authoring_change(self) -> None:
         """Reload the canonical slice without reparsing the full metadata source stack."""
-        seed_meta = persistence_service.get_knowledge_seed_meta()
-        knowledge_dicts, _canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
+        seed_meta = knowledge_runtime_repository.get_seed_meta()
+        knowledge_dicts, _canonical_dicts, canonical_context_dicts = knowledge_runtime_repository.load_runtime_snapshot()
         if seed_meta is None or not knowledge_dicts:
             self.refresh()
             return
@@ -854,14 +1051,40 @@ class MetadataKnowledgeService:
         self._load_persisted_knowledge_concepts(knowledge_dicts)
         self._load_canonical_glossary()
         self._load_persisted_canonical_field_contexts(canonical_context_dicts)
-        self._seed_to_db(self._compute_source_hash())
+        canonical_field_contexts: list[tuple[str, KnowledgeFieldContext]] = []
+        seen_canonical_contexts: set[tuple[str, str, str, str, str, str, str, str]] = set()
+        for entries in self._field_alias_to_contexts.values():
+            for concept_id, context in entries:
+                if concept_id not in self._canonical_concepts_by_id:
+                    continue
+                context_key = (
+                    concept_id,
+                    context.system,
+                    context.object_name,
+                    context.field_name,
+                    context.category,
+                    context.object_description,
+                    context.field_description,
+                    context.note,
+                )
+                if context_key in seen_canonical_contexts:
+                    continue
+                seen_canonical_contexts.add(context_key)
+                canonical_field_contexts.append((concept_id, context))
+
+        knowledge_runtime_repository.sync_canonical_runtime(
+            list(self._canonical_concepts_by_id.values()),
+            canonical_field_contexts,
+            source_hash=self._compute_source_hash(),
+            concept_count=len(self._concepts_by_id),
+        )
         self._last_runtime_source = "canonical_authoring_sync"
         self._apply_active_overlay()
         self._rebuild_kc_cc_bridge()
 
     def _load_from_db(self) -> None:
         """Populate in-memory knowledge state directly from the SQLite DB."""
-        knowledge_dicts, canonical_dicts, canonical_context_dicts = persistence_service.load_knowledge_concepts()
+        knowledge_dicts, canonical_dicts, canonical_context_dicts = knowledge_runtime_repository.load_runtime_snapshot()
 
         self._load_persisted_canonical_concepts(canonical_dicts)
         self._load_persisted_knowledge_concepts(knowledge_dicts)
@@ -953,15 +1176,11 @@ class MetadataKnowledgeService:
                 seen_canonical_contexts.add(context_key)
                 canonical_field_contexts.append((concept_id, context))
 
-        persistence_service.seed_knowledge_concepts(
+        knowledge_runtime_repository.replace_runtime_snapshot(
             list(self._concepts_by_id.values()),
             list(self._canonical_concepts_by_id.values()),
             canonical_field_contexts,
-        )
-        persistence_service.save_knowledge_seed_meta(
             source_hash=source_hash,
-            concept_count=len(self._concepts_by_id),
-            canonical_count=len(self._canonical_concepts_by_id),
         )
 
     def _load_canonical_glossary(self) -> None:
@@ -1044,6 +1263,26 @@ class MetadataKnowledgeService:
                     aliases={alias},
                 )
                 self._overlay_aliases_by_concept.setdefault(canonical_term, set()).add(alias)
+
+                context_patch = _parse_context_patch_note(entry.note or "")
+                canonical_concept_id = entry.canonical_concept_id or self.resolve_canonical_concept_id(entry.canonical_term)
+                if context_patch and canonical_concept_id and canonical_concept_id in self._canonical_concepts_by_id:
+                    object_name = str(context_patch.get("object") or "").strip()
+                    field_name = str(context_patch.get("field") or "").strip()
+                    if (not object_name or not field_name) and "." in entry.alias:
+                        object_part, field_part = entry.alias.split(".", 1)
+                        object_name = object_name or object_part.strip()
+                        field_name = field_name or field_part.strip()
+                    context = KnowledgeFieldContext(
+                        system=str(context_patch.get("system") or entry.source_system or "").strip(),
+                        object_name=object_name,
+                        field_name=field_name or entry.alias,
+                        category=self._canonical_concepts_by_id[canonical_concept_id].entity,
+                        object_description=str(context_patch.get("object_description") or "").strip(),
+                        field_description=str(context_patch.get("field_description") or "").strip(),
+                        note=str(context_patch.get("note") or "").strip(),
+                    )
+                    self._register_field_context(context.field_name, canonical_concept_id, context)
             elif entry.entry_type == "concept_alias":
                 canonical_concept_id = entry.canonical_concept_id or self.resolve_canonical_concept_id(entry.canonical_term)
                 if canonical_concept_id is None:
@@ -1081,7 +1320,10 @@ class MetadataKnowledgeService:
         workday_entities, workday_fields = self._load_workday_entity_descriptions()
         self._load_metadata_mapping_sheet(sap_descriptions, sap_field_descriptions, qad_descriptions, workday_entities, workday_fields)
         self._auto_register_sap_field_aliases(sap_field_descriptions)
+        self._load_csv_knowledge_overlay(DEFAULT_WD_XSD_OVERLAY_PATH, source_tag="Workday_Webservice")
         self._load_csv_knowledge_overlay(DEFAULT_HRDH_OVERLAY_PATH, source_tag="HRDH")
+        self._load_csv_knowledge_overlay(DEFAULT_WD_DATAHUB_OVERLAY_PATH, source_tag="Workday_HRDH")
+        self._load_csv_knowledge_overlay(DEFAULT_QB_OVERLAY_PATH, source_tag="QuickBooks")
         self._load_canonical_field_context_enrichment(DEFAULT_CANONICAL_FIELD_CONTEXT_ENRICHMENT_PATH)
 
     def _load_canonical_field_context_enrichment(self, csv_path: Path) -> None:
@@ -1109,6 +1351,18 @@ class MetadataKnowledgeService:
 
     def _auto_register_sap_field_aliases(self, field_descriptions: dict[tuple[str, str], str]) -> None:
         """Auto-register SAP fields from Tbls_Clm as canonical concept aliases and field contexts."""
+        field_canonical_targets: dict[str, set[str]] = {}
+        field_has_unresolved_meaning: dict[str, bool] = {}
+        for (_table, field), description in field_descriptions.items():
+            normalized_field = _normalize_alias(field)
+            if not normalized_field:
+                continue
+            canonical_id = self.resolve_canonical_concept_id(description)
+            if canonical_id is None:
+                field_has_unresolved_meaning[normalized_field] = True
+                continue
+            field_canonical_targets.setdefault(normalized_field, set()).add(canonical_id)
+
         registered_field_aliases: set[str] = set()
         for (table, field), description in field_descriptions.items():
             canonical_id = self.resolve_canonical_concept_id(description)
@@ -1127,7 +1381,12 @@ class MetadataKnowledgeService:
                 note="",
             )
             self._register_field_context(field, canonical_id, context)
-            if field not in registered_field_aliases:
+            normalized_field = _normalize_alias(field)
+            is_unambiguous_canonical_field = (
+                len(field_canonical_targets.get(normalized_field, set())) == 1
+                and not field_has_unresolved_meaning.get(normalized_field, False)
+            )
+            if field not in registered_field_aliases and is_unambiguous_canonical_field:
                 self._register_canonical_concept(
                     concept_id=canonical_id,
                     entity=existing.entity,
@@ -1198,12 +1457,24 @@ class MetadataKnowledgeService:
         if not self.sap_tables_path.exists():
             return table_descriptions, field_descriptions
         workbook = load_workbook(self.sap_tables_path, read_only=True, data_only=True)
-        # Load field-level data from Tbls_Clm sheet (Table, #, Field, Description, ...)
+        # Load field-level data from Tbls_Clm using the actual header names.
         if "Tbls_Clm" in workbook.sheetnames:
-            for row in workbook["Tbls_Clm"].iter_rows(min_row=2, values_only=True):
-                table_name = _normalize_alias(str(row[0] or ""))
-                field_name = _normalize_alias(str(row[2] or ""))
-                description = str(row[3] or "").strip()
+            worksheet = workbook["Tbls_Clm"]
+            header_row = next(worksheet.iter_rows(min_row=1, max_row=1, values_only=True), ())
+            header_index = {
+                str(value or "").strip(): index
+                for index, value in enumerate(header_row)
+                if str(value or "").strip()
+            }
+            table_index = header_index.get("Table")
+            field_index = header_index.get("Field")
+            description_index = header_index.get("Description")
+            if table_index is None or field_index is None or description_index is None:
+                return table_descriptions, field_descriptions
+            for row in worksheet.iter_rows(min_row=2, values_only=True):
+                table_name = _normalize_alias(str(row[table_index] or ""))
+                field_name = _normalize_alias(str(row[field_index] or ""))
+                description = str(row[description_index] or "").strip()
                 if table_name and field_name and description:
                     field_descriptions[(table_name, field_name)] = description
         # Load table-level descriptions from module sheets (header at row 4, col 0 == "Table")

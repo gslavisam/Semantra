@@ -810,6 +810,19 @@ def render_workspace_tab(
                     "\u2705 Mapping is ready \u2013 switch to the **Review** tab to inspect trust scores and candidates, "
                     "or **Decisions** to manage overrides and export."
                 )
+                runtime = mapping_response.get("mapping_runtime") or {}
+                if runtime.get("code_fingerprint"):
+                    st.info(
+                        "Mapping runtime: "
+                        f"build={runtime.get('code_fingerprint')} | "
+                        f"profile={runtime.get('scoring_profile') or 'n/a'} | "
+                        f"description_priority={'on' if runtime.get('description_priority') else 'off'}"
+                    )
+                else:
+                    st.warning(
+                        "This mapping result does not include a runtime fingerprint. "
+                        "Generate a fresh mapping result after restarting the backend; resuming an older job or reviewing an older cached result will not show build=."
+                    )
         else:
             if canonical_mode:
                 st.info("Upload and profile the source dataset to unlock canonical review and decision export.")

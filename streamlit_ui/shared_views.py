@@ -94,11 +94,19 @@ def render_llm_runtime_status() -> None:
     llm_endpoint = str(config.get("lmstudio_base_url", "")).strip()
     gate_min = config.get("llm_gate_min_score", "?")
     gate_max = config.get("llm_gate_max_score", "?")
+    app_version = str(config.get("app_version", "")).strip() or "n/a"
+    backend_build = str(config.get("backend_build", "")).strip() or "n/a"
+    scoring_profile = str(config.get("scoring_profile", "balanced")).strip() or "balanced"
     tts_provider = str(config.get("tts_provider", "none")).strip() or "none"
     tts_timeout = config.get("tts_timeout_seconds", "?")
     tts_endpoint = str(config.get("lmstudio_tts_base_url", "")).strip()
     tts_model = str(config.get("lmstudio_orpheus_model", "")).strip() or "n/a"
     tts_voice = str(config.get("lmstudio_orpheus_voice", "")).strip() or "n/a"
+
+    st.write("**Backend**")
+    st.caption(f"Version: {app_version}")
+    st.caption(f"Build: {backend_build}")
+    st.caption(f"Scoring profile: {scoring_profile}")
 
     st.write("**LLM**")
     if llm_provider.lower() == "none":

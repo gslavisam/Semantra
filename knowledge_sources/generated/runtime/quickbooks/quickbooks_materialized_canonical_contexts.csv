@@ -1,0 +1,102 @@
+concept_id,system,object_name,field_name,category,object_description,field_description,note
+contact.name,QuickBooks,Customer,FullName,AR,,Hierarchical name (Parent:Child),Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Customer,IsActive,AR,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+party.salutation,QuickBooks,Customer,Salutation,AR,,"Salutation / title (Mr., Dr., etc.)",Materialized from direct_alias_match; QBO table-field context only.
+employee.position,QuickBooks,Customer,JobTitle,AR,,Contact job title,Materialized from direct_alias_match; QBO table-field context only.
+cost_center.id,QuickBooks,Customer,Cc,AR,,CC email address(es),Materialized from direct_alias_match; QBO table-field context only.
+customer.credit_limit,QuickBooks,Customer,CreditLimit,AR,,Approved credit limit,Materialized from direct_alias_match; QBO table-field context only.
+purchase_order.id,QuickBooks,Invoice,PONumber,AR,,Customer purchase order number,Materialized from direct_alias_match; QBO table-field context only.
+invoice.due_date,QuickBooks,Invoice,DueDate,AR,,Payment due date,Materialized from description_alias_match; context from QBO field description.
+shipment.planned_ship_date,QuickBooks,Invoice,ShipDate,AR,,Scheduled ship date,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,Invoice,ExchangeRate,AR,,Exchange rate vs home currency,Materialized from direct_alias_match; QBO table-field context only.
+asset.serial_number,QuickBooks,InvoiceLine,SerialNumber,AR,,Serial number (inventory tracking),Materialized from direct_alias_match; QBO table-field context only.
+batch.id,QuickBooks,InvoiceLine,LotNumber,AR,,Lot number (inventory tracking),Materialized from direct_alias_match; QBO table-field context only.
+goods_receipt.id,QuickBooks,SalesReceipt,RefNumber,AR,,Receipt number,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,SalesReceipt,ExchangeRate,AR,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+payment.date,QuickBooks,ReceivePayment,TxnDate,AR,,Payment date,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,ReceivePayment,ExchangeRate,AR,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+payment.method_code,QuickBooks,ReceivePayment,PaymentMethodRef_FullName,AR,,Payment method,Materialized from description_alias_match; context from QBO field description.
+purchase_order.id,QuickBooks,CreditMemo,PONumber,AR,,PO number reference,Materialized from direct_alias_match; QBO table-field context only.
+exchange_rate.rate,QuickBooks,CreditMemo,ExchangeRate,AR,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Terms,IsActive,AR,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+purchase_order.id,QuickBooks,Estimate,PONumber,AR,,Customer PO number,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Estimate,IsActive,AR,,Active (open) flag,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Vendor,IsActive,AP,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+party.salutation,QuickBooks,Vendor,Salutation,AP,,Salutation,Materialized from direct_alias_match; QBO table-field context only.
+employee.position,QuickBooks,Vendor,JobTitle,AP,,Contact job title,Materialized from direct_alias_match; QBO table-field context only.
+address.line1,QuickBooks,Vendor,VendorAddress_Addr1,AP,,Address line 1,Materialized from description_alias_match; context from QBO field description.
+address.line2,QuickBooks,Vendor,VendorAddress_Addr2,AP,,Address line 2,Materialized from description_alias_match; context from QBO field description.
+supplier.address,QuickBooks,Vendor,VendorAddress_City,AP,,City,Materialized from description_alias_match; context from QBO field description.
+address.postal_code,QuickBooks,Vendor,VendorAddress_PostalCode,AP,,Postal code,Materialized from description_alias_match; context from QBO field description.
+supplier.address,QuickBooks,Vendor,VendorAddress_Country,AP,,Country,Materialized from description_alias_match; context from QBO field description.
+contact.email,QuickBooks,Vendor,Email,AP,,Email address,Materialized from description_alias_match; context from QBO field description.
+cost_center.id,QuickBooks,Vendor,Cc,AP,,CC email,Materialized from direct_alias_match; QBO table-field context only.
+customer.credit_limit,QuickBooks,Vendor,CreditLimit,AP,,Credit limit with this vendor,Materialized from direct_alias_match; QBO table-field context only.
+supplier.name,QuickBooks,Bill,VendorRef_FullName,AP,,Vendor name,Materialized from description_alias_match; context from QBO field description.
+supplier.city,QuickBooks,Bill,VendorAddress_City,AP,,Vendor city,Materialized from description_alias_match; context from QBO field description.
+supplier.postal_code,QuickBooks,Bill,VendorAddress_PostalCode,AP,,Vendor postal code,Materialized from description_alias_match; context from QBO field description.
+invoice.due_date,QuickBooks,Bill,DueDate,AP,,Payment due date,Materialized from description_alias_match; context from QBO field description.
+supplier_invoice.id,QuickBooks,Bill,RefNumber,AP,,Vendor invoice number,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,Bill,ExchangeRate,AP,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+material.name,QuickBooks,BillItemLine,ItemRef_FullName,AP,,Item name,Materialized from description_alias_match; context from QBO field description.
+material.base_uom_code,QuickBooks,BillItemLine,UnitOfMeasure,AP,,Unit of measure,Materialized from description_alias_match; context from QBO field description.
+asset.serial_number,QuickBooks,BillItemLine,SerialNumber,AP,,Serial number,Materialized from direct_alias_match; QBO table-field context only.
+batch.id,QuickBooks,BillItemLine,LotNumber,AP,,Lot number,Materialized from direct_alias_match; QBO table-field context only.
+supplier.name,QuickBooks,BillPayment,PayeeEntityRef_FullName,AP,,Vendor name,Materialized from description_alias_match; context from QBO field description.
+payment.date,QuickBooks,BillPayment,TxnDate,AP,,Payment date,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,BillPayment,ExchangeRate,AP,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+supplier.name,QuickBooks,PurchaseOrder,VendorRef_FullName,AP,,Vendor name,Materialized from description_alias_match; context from QBO field description.
+supplier.city,QuickBooks,PurchaseOrder,VendorAddress_City,AP,,Vendor city,Materialized from description_alias_match; context from QBO field description.
+purchase_order.id,QuickBooks,PurchaseOrder,RefNumber,AP,,PO number,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,PurchaseOrder,ExchangeRate,AP,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+material.name,QuickBooks,PurchaseOrderLine,ItemRef_FullName,AP,,Item name,Materialized from description_alias_match; context from QBO field description.
+material.base_uom_code,QuickBooks,PurchaseOrderLine,UnitOfMeasure,AP,,Unit of measure,Materialized from description_alias_match; context from QBO field description.
+contact.name,QuickBooks,Account,FullName,GL,,Full hierarchical name,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Account,IsActive,GL,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+bank_account.routing_number,QuickBooks,Account,RoutingNumber,GL,,Bank routing / transit number,Materialized from direct_alias_match; QBO table-field context only.
+accounting.posting_date,QuickBooks,JournalEntry,TxnDate,GL,,Posting date,Materialized from description_alias_match; context from QBO field description.
+exchange_rate.rate,QuickBooks,JournalEntry,ExchangeRate,GL,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+account.name,QuickBooks,JournalEntryLine,AccountRef_FullName,GL,,Account name,Materialized from description_alias_match; context from QBO field description.
+material.name,QuickBooks,JournalEntryLine,ItemRef_FullName,GL,,Item name,Materialized from description_alias_match; context from QBO field description.
+material.base_uom_code,QuickBooks,JournalEntryLine,UnitOfMeasure,GL,,Unit of measure,Materialized from description_alias_match; context from QBO field description.
+contact.name,QuickBooks,Class,FullName,GL,,Full hierarchical name,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Class,IsActive,GL,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+exchange_rate.rate,QuickBooks,Deposit,ExchangeRate,GL,,Exchange rate,Materialized from direct_alias_match; QBO table-field context only.
+contact.name,QuickBooks,Item,FullName,INV,,Hierarchical name,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Item,IsActive,INV,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+inventory_policy.reorder_point,QuickBooks,Item,ReorderPoint,INV,,Reorder trigger quantity,Materialized from direct_alias_match; QBO table-field context only.
+stock.quantity,QuickBooks,Item,QuantityOnHand,INV,,Current stock quantity,Materialized from direct_alias_match; QBO table-field context only.
+material.name,QuickBooks,InventoryAdjustmentLine,ItemRef_FullName,INV,,Item name,Materialized from description_alias_match; context from QBO field description.
+asset.serial_number,QuickBooks,InventoryAdjustmentLine,SerialNumber,INV,,Serial number,Materialized from direct_alias_match; QBO table-field context only.
+batch.id,QuickBooks,InventoryAdjustmentLine,LotNumber,INV,,Lot number,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,PriceLevel,IsActive,INV,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+customer.name,QuickBooks,SalesOrder,CustomerRef_FullName,INV,,Customer name,Materialized from description_alias_match; context from QBO field description.
+sales_order.id,QuickBooks,SalesOrder,RefNumber,INV,,SO number,Materialized from description_alias_match; context from QBO field description.
+purchase_order.id,QuickBooks,SalesOrder,PONumber,INV,,Customer PO number,Materialized from direct_alias_match; QBO table-field context only.
+shipment.planned_ship_date,QuickBooks,SalesOrder,ShipDate,INV,,Scheduled ship date,Materialized from description_alias_match; context from QBO field description.
+account.status,QuickBooks,Employee,IsActive,PAY,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+party.salutation,QuickBooks,Employee,Salutation,PAY,,Salutation,Materialized from direct_alias_match; QBO table-field context only.
+employee.position,QuickBooks,Employee,JobTitle,PAY,,Job title,Materialized from direct_alias_match; QBO table-field context only.
+department.name,QuickBooks,Employee,Department,PAY,,Department name,Materialized from description_alias_match; context from QBO field description.
+supplier.address,QuickBooks,Employee,EmployeeAddress_City,PAY,,City,Materialized from description_alias_match; context from QBO field description.
+supplier.region_code,QuickBooks,Employee,EmployeeAddress_State,PAY,,State,Materialized from description_alias_match; context from QBO field description.
+address.postal_code,QuickBooks,Employee,EmployeeAddress_PostalCode,PAY,,Postal code,Materialized from description_alias_match; context from QBO field description.
+supplier.address,QuickBooks,Employee,EmployeeAddress_Country,PAY,,Country,Materialized from description_alias_match; context from QBO field description.
+employee.phone,QuickBooks,Employee,Mobile,PAY,,Mobile phone,Materialized from description_alias_match; context from QBO field description.
+contact.email,QuickBooks,Employee,Email,PAY,,Email address,Materialized from description_alias_match; context from QBO field description.
+employee.national_id,QuickBooks,Employee,SSN,PAY,,Social security number (encrypted),Materialized from direct_alias_match; QBO table-field context only.
+employee.gender,QuickBooks,Employee,Gender,PAY,,Gender (M/F),Materialized from direct_alias_match; QBO table-field context only.
+employee.birth_date,QuickBooks,Employee,BirthDate,PAY,,Date of birth,Materialized from description_alias_match; context from QBO field description.
+employee.hire_date,QuickBooks,Employee,HireDate,PAY,,Employment start date,Materialized from direct_alias_match; QBO table-field context only.
+employee.termination_date,QuickBooks,Employee,ReleasedDate,PAY,,Termination date,Materialized from description_alias_match; context from QBO field description.
+employee.name,QuickBooks,Paycheck,EmployeeRef_FullName,PAY,,Employee name,Materialized from description_alias_match; context from QBO field description.
+payroll.period_start_date,QuickBooks,Paycheck,WagePeriodStart,PAY,,Pay period start date,Materialized from description_alias_match; context from QBO field description.
+payroll.period_end_date,QuickBooks,Paycheck,WagePeriodEnd,PAY,,Pay period end date,Materialized from description_alias_match; context from QBO field description.
+account.status,QuickBooks,PayrollItem,IsActive,PAY,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+service.name,QuickBooks,TimeTracking,ItemServiceRef_FullName,PAY,,Service item name,Materialized from description_alias_match; context from QBO field description.
+account.status,QuickBooks,MemorizedTransaction,IsActive,RPT,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,SalesTaxCode,IsActive,RPT,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,PaymentMethod,IsActive,RPT,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,ShipMethod,IsActive,RPT,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+account.status,QuickBooks,Currency,IsActive,RPT,,Active flag,Materialized from direct_alias_match; QBO table-field context only.
+exchange_rate.rate,QuickBooks,Currency,ExchangeRate,RPT,,Current exchange rate vs home currency,Materialized from direct_alias_match; QBO table-field context only.

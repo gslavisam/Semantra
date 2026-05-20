@@ -1,0 +1,7 @@
+bucket,count,percentage
+direct_alias_match,4885,78.6%
+unmapped,753,12.1%
+weak_canonical_candidate,484,7.8%
+knowledge_only,69,1.1%
+strong_canonical_candidate,17,0.3%
+description_alias_match,4,0.1%

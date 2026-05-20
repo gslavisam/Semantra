@@ -1,0 +1,2 @@
+benchmark_id,system,slice,fixture_path,source_format,target_format,source_field_count,mapped_field_count,knowledge_coverage_ratio,canonical_coverage_ratio,top1_accuracy,final_accuracy,auto_accept_ratio,low_confidence_ratio,primary_failure_mode,notes
+sap_customer_sales_area_baseline_2026_05_19_default,SAP,customer_sales_area,ui_fixtures/showcase_customer_sales_area,xml,spec,14,14,0.36,0.79,0.79,0.86,0.21,0.64,score_fusion,Good SAP concept coverage exists but customer sales area still shows low-confidence tails and a few wrong final selections in configuration-heavy fields.

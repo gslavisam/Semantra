@@ -129,6 +129,28 @@ Otvoreno:
 - jasnije surfacing razlike između explanation, triage i refinement tokova
 - širi pilot feedback o tome koji od ovih guidance panela stvarno menjaju odluke korisnika
 
+### Epic 5B: Knowledge expansion and canonical coverage
+
+Status: active planning.
+
+Cilj:
+
+- sistematski proširiti vendor/system knowledge coverage i disciplinovano izvući nove canonical gap-ove i canonical promotion kandidate iz SAP-first wave-a
+
+Trenutno stanje:
+
+- `metadata_dict.csv`, workbook contexti i canonical glossary već daju korisne SAP, QAD i Workday signale
+- poslednji supplier SAP showcase je pokazao da knowledge coverage direktno podiže mapping quality i da i dalje postoje pravi vendor-specific gap-ovi
+- runtime separation, Canonical Console i stewardship tokovi sada daju dovoljno stabilnu osnovu za veći curated refresh wave
+
+Otvoreno:
+
+- staging/provenance pipeline za vendor specifikacije
+- SAP-first field/object/context ingest preko 10k+ polja
+- canonical gap mining i promotion disciplina iznad proširenog knowledge sloja
+- benchmark/eval harness po sistemu i modulu
+- proširenje istog modela na Workday, QAD, QuickBooks i druge javno dostupne ERP izvore
+
 ### Epic 12B: System-specific virtual targets
 
 Status: planned.
@@ -140,6 +162,7 @@ Cilj:
 Napomena:
 
 - ne gurati ovo pre reuse discovery i operational hardening talasa
+- ne širiti ga agresivno pre nego što `Epic 5B` podigne vendor knowledge coverage i canonical gap disciplinu
 
 ### Epic 13: Enterprise Integration Catalog
 

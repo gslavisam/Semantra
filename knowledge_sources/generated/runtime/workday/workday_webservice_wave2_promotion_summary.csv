@@ -1,0 +1,7 @@
+wave,action,bucket,row_count,percentage
+2,promoted,knowledge_only,184,3.0%
+2,promoted,weak_canonical_candidate,2363,38.0%
+2,review_queue,description_alias_match,3,0.0%
+2,review_queue,direct_alias_match,1523,24.5%
+2,review_queue,strong_canonical_candidate,44,0.7%
+2,review_queue,unmapped,2095,33.7%

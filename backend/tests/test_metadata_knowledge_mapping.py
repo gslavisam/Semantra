@@ -159,6 +159,17 @@ def test_metadata_workbook_adds_cross_system_material_context() -> None:
     assert any(context.system == "SAP" and context.object_name == "MARA" and context.field_name == "MATNR" for context in material_number_match.contexts)
 
 
+def test_sap_workbook_loader_reads_tbls_clm_field_and_description_columns() -> None:
+    service = MetadataKnowledgeService()
+
+    table_descriptions, field_descriptions = service._load_sap_table_descriptions()
+
+    assert field_descriptions[("mara", "matnr")] == "Material Number"
+    assert field_descriptions[("mara", "ersda")] == "Created On"
+    assert ("mara", "1") not in field_descriptions
+    assert table_descriptions["mara"]
+
+
 def test_metadata_workbook_links_sap_material_to_workday_item_id() -> None:
     source_schema = SchemaProfile(
         dataset_id="source",
@@ -285,6 +296,40 @@ def test_supplier_master_sperr_gains_supplier_posting_block_support() -> None:
     )
 
 
+def test_supplier_master_sap_field_aliases_gain_knowledge_support() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=5,
+        columns=[
+            make_column("AKONT", ["text"], ["160000", "160001"]),
+            make_column("KTOKK", ["text"], ["0001", "0002"]),
+            make_column("LOEVM", ["text"], ["X", ""]),
+        ],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=5,
+        columns=[
+            make_column("reconciliation_account", ["text"], ["160000", "160001"]),
+            make_column("supplier_group_id", ["text"], ["0001", "0002"]),
+            make_column("deletion_mark", ["text"], ["X", ""]),
+            make_column("country_code", ["text"], ["RS", "DE"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema)
+    selected_by_source = {item.source: item for item in result.mappings}
+
+    assert selected_by_source["AKONT"].target == "reconciliation_account"
+    assert selected_by_source["KTOKK"].target == "supplier_group_id"
+    assert selected_by_source["LOEVM"].target == "deletion_mark"
+    assert selected_by_source["AKONT"].signals.knowledge > 0 or selected_by_source["AKONT"].signals.canonical > 0
+    assert selected_by_source["KTOKK"].signals.knowledge > 0 or selected_by_source["KTOKK"].signals.canonical > 0
+    assert selected_by_source["LOEVM"].signals.knowledge > 0 or selected_by_source["LOEVM"].signals.canonical > 0
+
+
 def test_canonical_only_sap_field_context_survives_cold_start_db_reload() -> None:
     metadata_knowledge_service.reseed_from_files()
     file_seed_matches = metadata_knowledge_service.match_concepts(make_column("LSTEL", ["text"], ["A01", "A02"]))
@@ -298,6 +343,39 @@ def test_canonical_only_sap_field_context_survives_cold_start_db_reload() -> Non
     assert tuple((context.system, context.object_name, context.field_name) for context in cold_start_match.contexts) == tuple(
         (context.system, context.object_name, context.field_name) for context in file_seed_match.contexts
     )
+
+
+def test_ambiguous_sap_field_alias_does_not_become_global_canonical_alias() -> None:
+    metadata_knowledge_service.reseed_from_files()
+
+    cold_start_service = MetadataKnowledgeService()
+
+    assert metadata_knowledge_service.resolve_canonical_concept_id("TXT50") is None
+    assert cold_start_service.resolve_canonical_concept_id("TXT50") is None
+    assert metadata_knowledge_service.resolve_canonical_concept_id("PRDHA") == "product.category"
+    assert cold_start_service.resolve_canonical_concept_id("PRDHA") == "product.category"
+
+
+def test_curated_sap_follow_on_promotions_resolve_directly() -> None:
+    metadata_knowledge_service.reseed_from_files()
+
+    assert metadata_knowledge_service.resolve_canonical_concept_id("VRKME") == "uom.code"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("ANLKL") == "asset.class_code"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("HERST") == "asset.manufacturer_name"
+
+
+def test_final_sap_utility_wave_resolves_directly() -> None:
+    metadata_knowledge_service.reseed_from_files()
+
+    assert metadata_knowledge_service.resolve_canonical_concept_id("BLART") == "document.type"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("PS_POSID") == "project.wbs_element_id"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("RSTGR") == "reason.code"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("VCM_CHAIN_UUID") == "system.guid"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("EXTERNALREFERENCEID") == "external_reference.id"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("NUMVR") == "version.number"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("PLNNR") == "route.id"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("HANDLE") == "system.guid"
+    assert metadata_knowledge_service.resolve_canonical_concept_id("VERSN") == "version.number"
 
 
 def test_generated_workday_overlay_is_not_auto_loaded_into_base_knowledge() -> None:

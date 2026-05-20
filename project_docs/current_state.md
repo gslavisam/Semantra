@@ -49,6 +49,7 @@ Implemented:
 - canonical-only source-to-business-concept mapping without a real target dataset
 - configurable canonical candidate shortlisting before full canonical scoring
 - sync and async mapping job flows with progress polling
+- SQLite-backed durable status and progress persistence for async mapping jobs, while execution remains local and thread-backed
 - active-job limits, TTL cleanup, and cooperative cancel support for mapping jobs
 - one-to-one target assignment across the full target schema
 - optional LLM closed-set validation layered on top of heuristic ranking
@@ -60,6 +61,8 @@ Important current behavior:
 - confidence labels remain `high >= 0.85`, `medium >= 0.65`, otherwise `low`
 - mappings with score `>= 0.75` are currently auto-accepted even if the label remains `medium_confidence`
 - canonical mode can narrow the initial search to a configurable likely-candidate pool before full scoring; the UI default is currently `10`
+- async job API contract stays `start`, `poll status`, and `cancel`, but runtime state now survives ordinary in-process object churn because status/progress are read from SQLite
+- finished jobs keep the same retention contract: up to `32` retained finished rows with a `900s` TTL; interrupted active jobs are marked `failed` on restart instead of remaining stuck in `running`
 
 Main code surfaces:
 
@@ -142,10 +145,13 @@ Implemented:
 - mapping-set apply/reuse flow back into Workspace state
 - reuse/apply gating so only approved mapping sets can be used in workspace flows
 - catalog persistence projection over saved mapping sets
+- normalized SQLite repository surfaces for mapping-set governance, catalog listing/search/detail, and concept-centric discovery reads
 
 Main code surfaces:
 
 - `backend/app/api/routes/mapping.py`
+- `backend/app/services/mapping_governance_repository.py`
+- `backend/app/services/catalog_repository.py`
 - `backend/app/services/persistence_service.py`
 - `streamlit_ui/workspace_decision_views.py`
 - `streamlit_ui/catalog_views.py`
@@ -179,6 +185,7 @@ Implemented:
 
 - file-backed canonical glossary import/export
 - canonical concept runtime with aliases, field contexts, and usage overlays
+- DB-first canonical runtime bootstrap with seed-hash detection and SQLite reload support
 - overlay CSV validation preview before save
 - overlay version create/list/detail lifecycle
 - overlay activate, deactivate, archive, rollback, reload, and reseed flows
@@ -189,10 +196,13 @@ Implemented:
 - explicit promotion from overlay stewardship item into stable canonical glossary
 - active overlay aliases merged into the runtime and surfaced in the console
 - numeric-only canonical aliases filtered out of canonical registry and glossary promotion/import paths
+- canonical glossary import and overlay-promotion authoring sync now refresh only the canonical runtime tables over persisted knowledge concepts, instead of forcing a full metadata reseed path
 
 Main code surfaces:
 
 - `backend/app/api/routes/knowledge.py`
+- `backend/app/services/knowledge_runtime_repository.py`
+- `backend/app/services/stewardship_repository.py`
 - `backend/app/services/metadata_knowledge_service.py`
 - `backend/app/services/knowledge_overlay_service.py`
 - `backend/app/services/canonical_gap_service.py`
@@ -283,7 +293,7 @@ Implemented:
 - admin-token-aware UI behavior
 - Admin / Debug surface separate from Canonical Console
 - knowledge runtime status now surfaces cache/source separation via `runtime_source`, `source_hash_state`, and seeded-count metadata
-- mapping job runtime observability now surfaces in-memory durability pressure and explicit durable-backend trigger flags
+- mapping job runtime now persists status/progress in SQLite while keeping local thread-backed execution, and observability surfaces durable-backend pressure plus explicit trigger flags
 
 Main code surfaces:
 

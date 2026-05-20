@@ -1,0 +1,15 @@
+source_field,expected_target,final_target,final_confidence,final_label,top1_target,top1_confidence
+INFNR,purchasing_info_record_id,info_category_code,0.07,low_confidence,planned_delivery_days,0.09
+LIFNR,supplier_id,supplier_id,0.95,high_confidence,supplier_id,0.95
+MATNR,material_id,material_id,0.95,high_confidence,material_id,0.95
+EKORG,purchasing_organization_id,purchasing_organization_id,0.32,low_confidence,purchasing_organization_id,0.32
+WERKS,plant_id,plant_id,0.95,high_confidence,plant_id,0.95
+ESOKZ,info_category_code,planned_delivery_days,0.17,low_confidence,planned_delivery_days,0.17
+NETPR,net_price_amount,price_unit_quantity,0.70,medium_confidence,price_unit_quantity,0.70
+WAERS,currency_code,currency_code,0.95,high_confidence,currency_code,0.95
+PEINH,price_unit_quantity,net_price_amount,0.19,low_confidence,price_unit_quantity,0.20
+MINBM,minimum_order_quantity,minimum_order_quantity,0.07,low_confidence,planned_delivery_days,0.10
+APLFZ,planned_delivery_days,purchasing_info_record_id,0.06,low_confidence,planned_delivery_days,0.11
+INCO1,incoterm_code,incoterm_code,0.39,low_confidence,incoterm_code,0.39
+INCO2,incoterm_location,incoterm_location,0.33,low_confidence,incoterm_location,0.33
+BPRME,order_unit_code,order_unit_code,0.17,low_confidence,incoterm_code,0.19

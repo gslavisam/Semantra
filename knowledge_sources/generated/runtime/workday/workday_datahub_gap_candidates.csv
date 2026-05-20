@@ -1,0 +1,7 @@
+wd_table,wd_column,wd_type,wd_max_length,wd_is_identity,wd_is_nullable,classification_bucket,direct_field_canonical_concept_id,description_canonical_concept_id,top_canonical_concept_id,top_canonical_strength,top_knowledge_concept_id,top_knowledge_strength
+CR_DIM_EEPPP,,,,False,False,unmapped,,,,,,
+CR_DIM_EMPLOYEE_ENCRYPTED,,,,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_LMS_HEADCOUNT_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_PERFORMANCE_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_REQUISITIONS_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,
+CR_FCT_PN_BILLING_SUCCESSION_DETAILED,ReportingMonth,nvarchar,8000,False,False,unmapped,,,,,,

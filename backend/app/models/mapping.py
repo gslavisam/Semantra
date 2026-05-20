@@ -222,6 +222,16 @@ class CanonicalCoverageReport(BaseModel):
     project: CanonicalCoverageProjectSummary = Field(default_factory=CanonicalCoverageProjectSummary)
 
 
+class MappingRuntimeFingerprint(BaseModel):
+    """Runtime metadata describing the scoring code and settings used for one mapping run."""
+
+    generated_at: str = ""
+    app_version: str = ""
+    scoring_profile: str = ""
+    description_priority: bool = False
+    code_fingerprint: str = ""
+
+
 class AutoMappingResponse(BaseModel):
     """Response returned after generating ranked mapping candidates."""
 
@@ -229,6 +239,7 @@ class AutoMappingResponse(BaseModel):
     ranked_mappings: list[SourceMappingResult] = Field(default_factory=list)
     canonical_coverage: CanonicalCoverageReport = Field(default_factory=CanonicalCoverageReport)
     applied_source_field_hints: list[dict[str, Any]] = Field(default_factory=list)
+    mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
 
 
 MappingAnalysisAudience = Literal["technical_implementor"]
@@ -444,7 +455,7 @@ class ReviewPlanResponse(BaseModel):
 
 
 MappingJobStatus = Literal["queued", "running", "cancel_requested", "completed", "failed", "canceled"]
-MappingJobStorageMode = Literal["in_memory"]
+MappingJobStorageMode = Literal["in_memory", "sqlite_status"]
 
 
 class MappingJobStartResponse(BaseModel):
@@ -939,6 +950,8 @@ class MappingSetDiffResponse(BaseModel):
 class RuntimeConfigSnapshot(BaseModel):
     """Admin-facing runtime configuration snapshot for backend observability."""
 
+    app_version: str = ""
+    backend_build: str = ""
     llm_provider: str
     llm_model: str
     llm_timeout_seconds: float

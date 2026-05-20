@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from dataclasses import dataclass, field
@@ -11,6 +12,11 @@ from typing import Any, get_args, get_origin, get_type_hints
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_DOTENV_PATH = BASE_DIR / ".env"
+BACKEND_FINGERPRINT_FILES = (
+    BASE_DIR / "app" / "core" / "config.py",
+    BASE_DIR / "app" / "services" / "mapping_service.py",
+    BASE_DIR / "app" / "services" / "metadata_knowledge_service.py",
+)
 
 
 @dataclass(slots=True)
@@ -35,6 +41,19 @@ class Settings:
     llm_min_confidence: float = 0.5
     llm_gate_min_score: float = 0.3
     llm_gate_max_score: float = 0.75
+    strong_canonical_llm_margin: float = 0.05
+    strong_identifier_llm_min_confidence: float = 0.70
+    name_signal_deemphasis_max: float = 0.35
+    strong_concept_lock_min: float = 0.75
+    sap_business_signal_max_dilution: float = 0.05
+    sap_table_field_context_boost: float = 0.04
+    sap_pir_table_field_context_boost: float = 0.08
+    sap_exact_code_canonical_strong_boost: float = 0.10
+    sap_exact_code_canonical_medium_boost: float = 0.07
+    sap_exact_code_canonical_pir_boost: float = 0.05
+    sap_pir_medium_confidence_threshold: float = 0.58
+    sap_pir_high_confidence_threshold: float = 0.82
+    sap_pir_auto_accept_threshold: float = 0.72
     tts_provider: str = "lmstudio_orpheus"
     tts_timeout_seconds: float = 300.0
     admin_api_token: str = ""
@@ -72,8 +91,23 @@ def reload_settings(dotenv_path: str | Path | None = None) -> Settings:
     return settings
 
 
+def backend_code_fingerprint() -> str:
+    """Return a short fingerprint for the active backend scoring/runtime code."""
+
+    digest = hashlib.sha256()
+    for path in BACKEND_FINGERPRINT_FILES:
+        digest.update(str(path.name).encode("utf-8"))
+        digest.update(path.read_bytes())
+    digest.update(settings.app_version.encode("utf-8"))
+    digest.update(settings.scoring_profile.encode("utf-8"))
+    digest.update(repr(sorted(settings.scoring_weight_overrides.items())).encode("utf-8"))
+    return digest.hexdigest()[:12]
+
+
 def settings_snapshot() -> dict[str, Any]:
     return {
+        "app_version": settings.app_version,
+        "backend_build": backend_code_fingerprint(),
         "llm_provider": settings.llm_provider,
         "llm_model": settings.llm_model,
         "llm_timeout_seconds": settings.llm_timeout_seconds,
@@ -89,6 +123,19 @@ def settings_snapshot() -> dict[str, Any]:
         "sqlite_path": settings.sqlite_path,
         "llm_gate_min_score": settings.llm_gate_min_score,
         "llm_gate_max_score": settings.llm_gate_max_score,
+        "strong_canonical_llm_margin": settings.strong_canonical_llm_margin,
+        "strong_identifier_llm_min_confidence": settings.strong_identifier_llm_min_confidence,
+        "name_signal_deemphasis_max": settings.name_signal_deemphasis_max,
+        "strong_concept_lock_min": settings.strong_concept_lock_min,
+        "sap_business_signal_max_dilution": settings.sap_business_signal_max_dilution,
+        "sap_table_field_context_boost": settings.sap_table_field_context_boost,
+        "sap_pir_table_field_context_boost": settings.sap_pir_table_field_context_boost,
+        "sap_exact_code_canonical_strong_boost": settings.sap_exact_code_canonical_strong_boost,
+        "sap_exact_code_canonical_medium_boost": settings.sap_exact_code_canonical_medium_boost,
+        "sap_exact_code_canonical_pir_boost": settings.sap_exact_code_canonical_pir_boost,
+        "sap_pir_medium_confidence_threshold": settings.sap_pir_medium_confidence_threshold,
+        "sap_pir_high_confidence_threshold": settings.sap_pir_high_confidence_threshold,
+        "sap_pir_auto_accept_threshold": settings.sap_pir_auto_accept_threshold,
         "admin_api_token_configured": bool(settings.admin_api_token.strip()),
         "gemini_api_key_configured": bool(settings.gemini_api_key.strip()),
     }

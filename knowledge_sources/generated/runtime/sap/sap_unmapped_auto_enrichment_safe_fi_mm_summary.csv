@@ -1,0 +1,12 @@
+metric,value
+preset,safe
+input_rows,1862
+candidates,0
+overlay_rows,0
+min_strength,0.75
+min_margin,0.15
+include_buckets,"knowledge_only,unmapped"
+include_modules,"FI,MM"
+output_stem,sap_unmapped_auto_enrichment_safe_fi_mm
+tier_high,0
+tier_medium,0

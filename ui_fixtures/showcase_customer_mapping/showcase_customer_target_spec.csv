@@ -6,4 +6,4 @@ phone_number,Normalized phone number for the main contact,VARCHAR,32
 country_iso,Two-letter ISO country code,CHAR,2
 created_date,Date the customer account was created,DATE,
 customer_segment,Commercial segment used for reporting,VARCHAR,40
-annual_revenue_usd,Annual revenue measure in USD,DECIMAL(14,2),
+annual_revenue_usd,Annual revenue measure in USD,"DECIMAL(14,2)",

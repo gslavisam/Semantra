@@ -27,6 +27,9 @@ def test_render_llm_runtime_status_shows_llm_and_tts_details(monkeypatch) -> Non
         {
             "admin_requirement": {"reachable": True, "requires_token": False},
             "runtime_config_snapshot": {
+                "app_version": "0.1.0",
+                "backend_build": "abc123def456",
+                "scoring_profile": "balanced",
                 "llm_provider": "lmstudio",
                 "llm_model": "gemma-4-e2b-it",
                 "llm_resolved_model": "gemma-4-e2b-it",
@@ -52,6 +55,9 @@ def test_render_llm_runtime_status_shows_llm_and_tts_details(monkeypatch) -> Non
     assert captured["subheader"] == ["Runtime"]
     assert "LLM reachable: lmstudio / gemma-4-e2b-it" in captured["success"]
     assert "TTS configured: lmstudio_orpheus / orpheus-3b-0.1-ft" in captured["success"]
+    assert "Version: 0.1.0" in captured["caption"]
+    assert "Build: abc123def456" in captured["caption"]
+    assert "Scoring profile: balanced" in captured["caption"]
     assert "LLM endpoint: http://127.0.0.1:1234/v1/chat/completions" in captured["caption"]
     assert "TTS endpoint: http://127.0.0.1:1234" in captured["caption"]
     assert "TTS voice: tara | timeout=300.0s" in captured["caption"]
@@ -62,6 +68,9 @@ def test_render_llm_runtime_status_handles_disabled_tts(monkeypatch) -> None:
         {
             "admin_requirement": {"reachable": True, "requires_token": False},
             "runtime_config_snapshot": {
+                "app_version": "0.1.0",
+                "backend_build": "abc123def456",
+                "scoring_profile": "balanced",
                 "llm_provider": "none",
                 "llm_model": "mock-validator",
                 "llm_status": "disabled",

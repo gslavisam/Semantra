@@ -1,0 +1,2 @@
+benchmark_id,system,slice,fixture_path,source_format,target_format,source_field_count,mapped_field_count,knowledge_coverage_ratio,canonical_coverage_ratio,top1_accuracy,final_accuracy,auto_accept_ratio,low_confidence_ratio,primary_failure_mode,notes
+sap_supplier_baseline_001,SAP,supplier_master,ui_fixtures/showcase_supplier_master,xml,spec,14,14,0.00,0.00,0.00,0.00,0.00,0.00,mixed,Example manifest row template only

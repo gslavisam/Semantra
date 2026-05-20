@@ -50,8 +50,12 @@ Two practical boundaries matter while developing:
 ## Root-Level Python Files
 
 - `streamlit_app.py`: main Streamlit entrypoint and top-level UI shell; keeps many helper imports local so AST-based tests can load specific functions without importing the whole UI stack.
-- `parse_hrdh_columns.py`: offline utility that parses an HR Data Hub Excel export and emits a knowledge overlay CSV plus candidate canonical additions.
-- `parse_workday_xsd.py`: offline utility that parses Workday XSD metadata and produces a knowledge overlay CSV plus canonical concept suggestions.
+
+## Support Utilities
+
+- `support/vendor_ingest/parse_hrdh_columns.py`: offline utility that parses an HR Data Hub Excel export and emits a knowledge overlay CSV plus candidate canonical additions.
+- `support/vendor_ingest/parse_workday_xsd.py`: offline utility that parses Workday XSD metadata and produces a knowledge overlay CSV plus canonical concept suggestions.
+- `support/sap/*`: offline SAP inventory, promotion, prioritization, and context-materialization scripts used to produce reviewable runtime artifacts without polluting the repo root.
 
 ## Backend Application
 

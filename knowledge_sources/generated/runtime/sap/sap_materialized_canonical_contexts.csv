@@ -1,0 +1,1397 @@
+sap_module,sap_table,sap_field,sap_description,classification_bucket,canonical_concept_id,context_added,status
+MM,MARA,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MARA,ERSDA,Created On,direct_alias_match,document.created_date,false,already_present
+MM,MARA,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+MM,MARA,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+MM,MARA,LVORM,Flag Material for Deletion at Client Level,direct_alias_match,material.deletion_mark,false,already_present
+MM,MARA,MTART,Material Type,direct_alias_match,material.type_code,false,already_present
+MM,MARA,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+MM,MARA,BISMT,Old material number,direct_alias_match,material.engineering_part_number,false,already_present
+MM,MARA,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+MM,MARA,ZEINR,Document number (without document management system),direct_alias_match,material.drawing_number,false,already_present
+MM,MARA,BRGEW,Gross Weight,direct_alias_match,material.gross_weight,false,already_present
+MM,MARA,NTGEW,Net Weight,direct_alias_match,material.net_weight,false,already_present
+MM,MARA,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+MM,MARA,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+MM,MARA,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+MM,MARA,SPART,Division,direct_alias_match,division.id,false,already_present
+MM,MARA,KUNNR,Competitor,direct_alias_match,customer.id,false,already_present
+MM,MARA,LAENG,Length,description_alias_match,opportunity.probability,false,already_present
+MM,MARA,PRDHA,Product Hierarchy,direct_alias_match,product.category,false,already_present
+MM,MARA,XCHPF,Batch Management Requirement Indicator,direct_alias_match,material.batch_managed_flag,false,already_present
+MM,MARA,DATAB,Valid-From Date,direct_alias_match,validity.start_date,false,already_present
+MM,MARA,MFRPN,Manufacturer Part Number,direct_alias_match,material.manufacturer_part_number,false,already_present
+MM,MARA,MFRNR,Number of a Manufacturer,direct_alias_match,manufacturer.id,false,already_present
+MM,MARA,SLED_BBD,Expiration Date,direct_alias_match,inventory_lot.expiration_date,false,already_present
+MM,MARA,HERKL,Country/Region of Origin of Material (Non-Preferential Ori.),direct_alias_match,material.country_of_origin_code,false,already_present
+MM,MARA,PRD_STARTDT,Production Start Date,direct_alias_match,production_order.planned_start_date,false,already_present
+MM,MARA,/STTPEC/PRDCAT,Product Category,direct_alias_match,material_group.id,false,already_present
+MM,MAKT,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MAKT,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+MM,MARC,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MARC,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+MM,MARC,LVORM,Flag Material for Deletion at Plant Level,direct_alias_match,material.deletion_mark,false,already_present
+MM,MARC,MMSTA,Plant-Specific Material Status,direct_alias_match,product.lifecycle_status,false,already_present
+MM,MARC,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+MM,MARC,BESKZ,Procurement Type,direct_alias_match,make_or_buy.indicator,false,already_present
+MM,MARC,MINBE,Reorder Point,direct_alias_match,inventory_policy.reorder_point,false,already_present
+MM,MARC,EISBE,Safety Stock,direct_alias_match,inventory_policy.safety_stock_quantity,false,already_present
+MM,MARC,XCHPF,Batch Management Requirement Indicator for Plant,direct_alias_match,material.batch_managed_flag,false,already_present
+MM,MARC,STAWN,Commodity Code,direct_alias_match,material.hts_code,false,already_present
+MM,MARC,HERKL,Country/Region of Origin of Material (Non-Preferential Ori.),direct_alias_match,material.country_of_origin_code,false,already_present
+MM,MARC,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+MM,MARC,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+MM,MARD,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MARD,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+MM,MARD,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+MM,MARD,LVORM,Flag Material for Deletion at Storage Location Level,direct_alias_match,material.deletion_mark,false,already_present
+MM,MARD,SPERR,Physical Inventory Blocking Indicator,direct_alias_match,supplier.posting_block_flag,false,already_present
+MM,MARD,LABST,Valuated Unrestricted-Use Stock,direct_alias_match,stock.quantity,false,already_present
+MM,MARD,HERKL,Country/Region of Origin of Material (Non-Preferential Ori.),direct_alias_match,material.country_of_origin_code,false,already_present
+MM,MARD,LGPBE,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+MM,MARD,PRCTL,Profit Center,direct_alias_match,profit_center.id,false,already_present
+MM,MARD,ERSDA,Created On,direct_alias_match,document.created_date,false,already_present
+MM,MARD,FSH_SALLOC_QTY_S,Allocated Stock Quantity,direct_alias_match,inventory_reservation.quantity,false,already_present
+MM,MBEW,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MBEW,LVORM,Deletion flag for all material data of a valuation type,direct_alias_match,material.deletion_mark,false,already_present
+MM,MBEW,LBKUM,Total Valuated Stock,direct_alias_match,stock.quantity,false,already_present
+MM,MBEW,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+MM,MBEW,PDATV,Fiscal Year of Previous Standard Cost Estimate,direct_alias_match,quote.valid_from_date,false,already_present
+MM,MARM,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MARM,MEINH,Alternative Unit of Measure for Stockkeeping Unit,direct_alias_match,uom.code,false,already_present
+MM,MARM,LAENG,Length,description_alias_match,opportunity.probability,false,already_present
+MM,MARM,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+MM,MARM,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+MM,MARM,BRGEW,Gross Weight,direct_alias_match,material.gross_weight,false,already_present
+MM,MARM,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+MM,EBAN,BANFN,Purchase Requisition Number,direct_alias_match,requisition.id,false,already_present
+MM,EBAN,BNFPO,Item number of purchase requisition,direct_alias_match,requisition.line_item_number,false,already_present
+MM,EBAN,BSART,Purchase Requisition Document Type,direct_alias_match,purchase_order.document_type,false,already_present
+MM,EBAN,LOEKZ,Deletion Indicator in Purchasing Document,direct_alias_match,material.deletion_mark,false,already_present
+MM,EBAN,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+MM,EBAN,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+MM,EBAN,ERDAT,Last Changed On,direct_alias_match,document.created_date,false,already_present
+MM,EBAN,AFNAM,Name of requisitioner/requester,direct_alias_match,requisition.requester_id,false,already_present
+MM,EBAN,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,EBAN,EMATN,Material number corresponding to manufacturer part number,direct_alias_match,material.number,false,already_present
+MM,EBAN,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+MM,EBAN,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+MM,EBAN,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+MM,EBAN,MENGE,Purchase requisition quantity,direct_alias_match,bom.quantity,false,already_present
+MM,EBAN,MEINS,Purchase requisition unit of measure,direct_alias_match,material.base_uom_code,false,already_present
+MM,EBAN,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+MM,EBAN,LIFNR,Desired Vendor,direct_alias_match,supplier.id,false,already_present
+MM,EBAN,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+MM,EBAN,KONNR,Number of principal purchase agreement,direct_alias_match,contract.id,false,already_present
+MM,EBAN,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+MM,EBAN,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+MM,EBAN,EBELN,Purchase order number,direct_alias_match,purchase_order.id,false,already_present
+MM,EBAN,EBELP,Purchase order item number,direct_alias_match,purchase_order.line_item_number,false,already_present
+MM,EBAN,BEDAT,Purchase Order Date,direct_alias_match,purchase_order.document_date,false,already_present
+MM,EBAN,REVLV,Revision Level,direct_alias_match,material.drawing_revision,false,already_present
+MM,EBAN,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+MM,EBAN,ADRNR,Manual address number in purchasing document item,direct_alias_match,address.id,false,already_present
+MM,EBAN,ADRN2,Number of delivery address,direct_alias_match,address.id,false,already_present
+MM,EBAN,KUNNR,Customer,direct_alias_match,customer.id,false,already_present
+MM,EBAN,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+MM,EBAN,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+MM,EBAN,MFRPN,Manufacturer Part Number,direct_alias_match,material.manufacturer_part_number,false,already_present
+MM,EBAN,MFRNR,Number of a Manufacturer,direct_alias_match,manufacturer.id,false,already_present
+MM,EBAN,REVNO,Version number in Purchasing,direct_alias_match,version.number,false,already_present
+MM,EBAN,EXTPURGORGFORPURG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+MM,EBAN,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+MM,EBAN,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+MM,EBAN,DISUB_PSPNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+MM,EBAN,DISUB_KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+MM,EBAN,FLDLOGSVERSION,Version,direct_alias_match,version.number,false,already_present
+MM,EBAN,FSH_ITEM,Item Number,direct_alias_match,material.number,false,already_present
+MM,EKKO,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+MM,EKKO,BUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+MM,EKKO,BSART,Purchasing Document Type,direct_alias_match,purchase_order.document_type,false,already_present
+MM,EKKO,LOEKZ,Deletion Indicator in Purchasing Document,direct_alias_match,material.deletion_mark,false,already_present
+MM,EKKO,AEDAT,Creation Date of Purchasing Document,direct_alias_match,document.changed_date,false,already_present
+MM,EKKO,ERNAM,User of person who created a purchasing document,direct_alias_match,audit.created_by,false,already_present
+MM,EKKO,LIFNR,Vendor's account number,direct_alias_match,supplier.id,false,already_present
+MM,EKKO,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+MM,EKKO,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+MM,EKKO,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+MM,EKKO,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+MM,EKKO,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+MM,EKKO,WKURS,Exchange Rate,direct_alias_match,exchange_rate.rate,false,already_present
+MM,EKKO,BEDAT,Purchasing Document Date,direct_alias_match,purchase_order.document_date,false,already_present
+MM,EKKO,KDATB,Start of Validity Period,direct_alias_match,purchase_contract.valid_from_date,false,already_present
+MM,EKKO,KDATE,End of Validity Period,direct_alias_match,purchase_contract.valid_to_date,false,already_present
+MM,EKKO,ANGNR,Quotation Number,direct_alias_match,quote.id,false,already_present
+MM,EKKO,TELF1,Supplier's Telephone Number,direct_alias_match,contact.phone,false,already_present
+MM,EKKO,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+MM,EKKO,KONNR,Number of principal purchase agreement,direct_alias_match,contract.id,false,already_present
+MM,EKKO,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+MM,EKKO,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+MM,EKKO,KTWRT,Target Value for Header Area per Distribution,direct_alias_match,purchase_contract.value,false,already_present
+MM,EKKO,ADRNR,Address Number,direct_alias_match,address.id,false,already_present
+MM,EKKO,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+MM,EKKO,REVNO,Version number in Purchasing,direct_alias_match,version.number,false,already_present
+MM,EKKO,REASON_CODE,Goods Receipt Reason Code,direct_alias_match,reason.code,false,already_present
+MM,EKKO,DESCRIPTION,Contract Name,direct_alias_match,address.city,true,added
+MM,EKKO,RELEASE_DATE,Release Date of Contract,direct_alias_match,approval.approved_date,false,already_present
+MM,EKKO,EXTERNALREFERENCEID,External Reference ID,direct_alias_match,external_reference.id,false,already_present
+MM,EKKO,HASHCAL_EXISTS,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+MM,EKPO,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+MM,EKPO,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+MM,EKPO,LOEKZ,Deletion Indicator in Purchasing Document,direct_alias_match,material.deletion_mark,false,already_present
+MM,EKPO,AEDAT,Purchasing Document Item Change Date,direct_alias_match,document.changed_date,false,already_present
+MM,EKPO,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,EKPO,EMATN,Material number,direct_alias_match,material.number,false,already_present
+MM,EKPO,BUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+MM,EKPO,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+MM,EKPO,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+MM,EKPO,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+MM,EKPO,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+MM,EKPO,MENGE,Purchase Order Quantity,direct_alias_match,bom.quantity,false,already_present
+MM,EKPO,MEINS,Purchase Order Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+MM,EKPO,BPRME,Order Price Unit (Purchasing),direct_alias_match,order_unit.code,true,added
+MM,EKPO,NETPR,Net Price in Purchasing Document (in Document Currency),direct_alias_match,net_price_amount,true,added
+MM,EKPO,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+MM,EKPO,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+MM,EKPO,KONNR,Number of principal purchase agreement,direct_alias_match,contract.id,false,already_present
+MM,EKPO,LMEIN,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+MM,EKPO,KUNNR,Customer,direct_alias_match,customer.id,false,already_present
+MM,EKPO,ADRNR,Manual address number in purchasing document item,direct_alias_match,address.id,false,already_present
+MM,EKPO,NTGEW,Net Weight,direct_alias_match,material.net_weight,false,already_present
+MM,EKPO,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+MM,EKPO,REVLV,Revision Level,direct_alias_match,material.drawing_revision,false,already_present
+MM,EKPO,KO_PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+MM,EKPO,BRGEW,Gross Weight,direct_alias_match,material.gross_weight,false,already_present
+MM,EKPO,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+MM,EKPO,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+MM,EKPO,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+MM,EKPO,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+MM,EKPO,ADRN2,Number of delivery address,direct_alias_match,address.id,false,already_present
+MM,EKPO,ANFNR,RFQ Number,direct_alias_match,rfq.id,false,already_present
+MM,EKPO,BANFN,Purchase Requisition Number,direct_alias_match,requisition.id,false,already_present
+MM,EKPO,BNFPO,Item number of purchase requisition,direct_alias_match,requisition.line_item_number,false,already_present
+MM,EKPO,MTART,Material Type,direct_alias_match,material.type_code,false,already_present
+MM,EKPO,MFRPN,Manufacturer Part Number,direct_alias_match,material.manufacturer_part_number,false,already_present
+MM,EKPO,MFRNR,Number of a Manufacturer,direct_alias_match,manufacturer.id,false,already_present
+MM,EKPO,AFNAM,Name of requisitioner/requester,direct_alias_match,requisition.requester_id,false,already_present
+MM,EKPO,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+MM,EKPO,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+MM,EKPO,REASON_CODE,Goods Receipt Reason Code,direct_alias_match,reason.code,false,already_present
+MM,EKPO,BLK_REASON_ID,Blocking Reason - ID,direct_alias_match,reason.code,false,already_present
+MM,EKPO,STAWN,Commodity Code,direct_alias_match,material.hts_code,false,already_present
+MM,EKPO,TARGET_VALUE,Target Value at Item Level in Procurement Hub,direct_alias_match,purchase_contract.value,false,already_present
+MM,EKPO,EXTERNALREFERENCEID,External Reference ID,direct_alias_match,external_reference.id,false,already_present
+MM,EKPO,/DMBE/EFFECTIVEDATEFROM,Effective From,direct_alias_match,validity.start_date,false,already_present
+MM,EKPO,HASHCAL_EXISTS,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+MM,EKPO,AUDAT,Document Date (Date Received/Sent),direct_alias_match,sales_order.document_date,false,already_present
+MM,EKPO,ANGNR,Quotation number,direct_alias_match,quote.id,false,already_present
+MM,EKPO,DISUB_PSPNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+MM,EKPO,DISUB_KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+MM,EKPO,FSH_ITEM,Item Number,direct_alias_match,material.number,false,already_present
+MM,EKPO,ADDRNUM,Address Number,direct_alias_match,address.id,false,already_present
+MM,EKPO,BELNR,Document Number for Earmarked Funds,direct_alias_match,accounting.document_number,false,already_present
+MM,EKPO,WBS_ELEMENT,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+MM,EKPO,SOURCE_ID,Origin Profile,direct_alias_match,lead.source,false,already_present
+MM,MKPF,MBLNR,Number of Material Document,direct_alias_match,goods_receipt.id,false,already_present
+MM,MKPF,BLART,Document Type,direct_alias_match,document.type,false,already_present
+MM,MKPF,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+MM,MKPF,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+MM,MKPF,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+MM,MKPF,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+MM,MSEG,MBLNR,Number of Material Document,direct_alias_match,goods_receipt.id,false,already_present
+MM,MSEG,BWART,Movement Type (Inventory Management),direct_alias_match,goods_movement.type,false,already_present
+MM,MSEG,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+MM,MSEG,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+MM,MSEG,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+MM,MSEG,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+MM,MSEG,LIFNR,Vendor's account number,direct_alias_match,supplier.id,false,already_present
+MM,MSEG,KUNNR,Account number of customer,direct_alias_match,customer.id,false,already_present
+MM,MSEG,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+MM,MSEG,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+MM,MSEG,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+MM,MSEG,DMBTR,Amount in Local Currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+MM,MSEG,MENGE,Quantity,direct_alias_match,bom.quantity,false,already_present
+MM,MSEG,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+MM,MSEG,BPRME,Order Price Unit (Purchasing),direct_alias_match,order_unit.code,true,added
+MM,MSEG,EBELN,Purchase order number,direct_alias_match,purchase_order.id,false,already_present
+MM,MSEG,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+MM,MSEG,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+MM,MSEG,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+MM,MSEG,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+MM,MSEG,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+MM,MSEG,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+MM,MSEG,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+MM,MSEG,BUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+MM,MSEG,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+MM,MSEG,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+MM,MSEG,UMWRK,Receiving plant/issuing plant,direct_alias_match,plant.id,false,already_present
+MM,MSEG,LGNUM,Warehouse Number / Warehouse Complex,direct_alias_match,warehouse.id,false,already_present
+MM,MSEG,LGPLA,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+MM,MSEG,GRUND,Reason for Movement,direct_alias_match,reason.code,false,already_present
+MM,MSEG,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+MM,MSEG,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+MM,MSEG,VFDAT,Shelf Life Expiration or Best-Before Date,direct_alias_match,inventory_lot.expiration_date,false,already_present
+MM,MSEG,LBKUM,Total valuated stock before the posting,direct_alias_match,stock.quantity,false,already_present
+MM,MSEG,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+MM,MSEG,EMATN,Material number corresponding to manufacturer part number,direct_alias_match,material.number,false,already_present
+MM,MSEG,HSDAT,Date of Manufacture,direct_alias_match,inventory_lot.manufacture_date,false,already_present
+MM,MSEG,MAT_PSPNR,Valuated Sales Order Stock WBS Element,direct_alias_match,project.wbs_element_id,false,already_present
+MM,MSEG,USNAM_MKPF,User Name,description_alias_match,account.name,true,added
+MM,MSEG,XBLNR_MKPF,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+MM,MSEG,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+SD,VBAK,VBELN,Sales Document,direct_alias_match,invoice.number,false,already_present
+SD,VBAK,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,VBAK,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,VBAK,AUDAT,Document Date (Date Received/Sent),direct_alias_match,sales_order.document_date,false,already_present
+SD,VBAK,AUART,Sales Document Type,direct_alias_match,sales_order.document_type,false,already_present
+SD,VBAK,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,VBAK,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,VBAK,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,VBAK,VDATU,Requested Delivery Date,direct_alias_match,delivery.requested_delivery_date,false,already_present
+SD,VBAK,TELF1,Telephone Number,direct_alias_match,contact.phone,false,already_present
+SD,VBAK,KUNNR,Sold-to Party,direct_alias_match,customer.id,false,already_present
+SD,VBAK,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+SD,VBAK,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+SD,VBAK,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+SD,VBAK,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+SD,VBAK,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+SD,VBAK,HANDLE,International unique key for VBAK-VBELN,direct_alias_match,system.guid,false,already_present
+SD,VBAK,PAY_METHOD,List of Respected Payment Methods,direct_alias_match,payment.method_code,false,already_present
+SD,VBAK,BPN,Business Partner Number,direct_alias_match,business_partner.id,false,already_present
+SD,VBAP,VBELN,Sales Document,direct_alias_match,invoice.number,false,already_present
+SD,VBAP,POSNR,Sales Document Item,direct_alias_match,sales_order.line_item_number,false,already_present
+SD,VBAP,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+SD,VBAP,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+SD,VBAP,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+SD,VBAP,PRODH,Product Hierarchy,direct_alias_match,product.category,false,already_present
+SD,VBAP,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+SD,VBAP,KDMAT,Material Number Used by Customer,direct_alias_match,material.customer_part_number,false,already_present
+SD,VBAP,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,VBAP,RESOURCE_ID,Resource Name (Stock Identifier),direct_alias_match,resource.id,false,already_present
+SD,VBAP,VRKME,Sales Unit,direct_alias_match,uom.code,false,already_present
+SD,VBAP,BRGEW,Gross Weight of the Item,direct_alias_match,material.gross_weight,false,already_present
+SD,VBAP,NTGEW,Net Weight of the Item,direct_alias_match,material.net_weight,false,already_present
+SD,VBAP,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+SD,VBAP,VOLUM,Volume of the item,direct_alias_match,shipment.volume,false,already_present
+SD,VBAP,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+SD,VBAP,WERKS,Plant (Own or External),direct_alias_match,plant.id,false,already_present
+SD,VBAP,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+SD,VBAP,VSTEL,Shipping Point / Receiving Point,direct_alias_match,shipping_point.id,false,already_present
+SD,VBAP,ROUTE,Route,direct_alias_match,route.id,false,already_present
+SD,VBAP,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+SD,VBAP,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,VBAP,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,VBAP,NETPR,Net Price,direct_alias_match,net_price_amount,true,added
+SD,VBAP,SHKZG,Returns Item,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+SD,VBAP,XCHPF,Batch Management Requirement Indicator,direct_alias_match,material.batch_managed_flag,false,already_present
+SD,VBAP,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+SD,VBAP,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+SD,VBAP,KMPMG,Component Quantity,direct_alias_match,bom.quantity,false,already_present
+SD,VBAP,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+SD,VBAP,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+SD,VBAP,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+SD,VBAP,MWSBP,Tax Amount in Document Currency,direct_alias_match,payroll.tax_amount,false,already_present
+SD,VBAP,HANDLE,GUID in 'CHAR' Format in Uppercase,direct_alias_match,system.guid,false,already_present
+SD,VBAP,VCM_CHAIN_UUID,GUID in 'CHAR' Format in Uppercase,direct_alias_match,system.guid,false,already_present
+SD,VBAP,REASON_CODE,Reason for Return or Expected Delivery Quantity Change,direct_alias_match,reason.code,false,already_present
+SD,VBAP,AUART_ANA,Sales Document Type,direct_alias_match,sales_order.document_type,false,already_present
+SD,VBAP,VKORG_ANA,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,VBAP,VTWEG_ANA,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,VBAP,SPART_ANA,Division,direct_alias_match,division.id,false,already_present
+SD,VBAP,VDATU_ANA,Requested Delivery Date,direct_alias_match,delivery.requested_delivery_date,false,already_present
+SD,VBAP,KDGRP_ANA,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,VBAP,/DMBE/EFFECTIVEDATEFROM,Effective From,direct_alias_match,validity.start_date,false,already_present
+SD,VBAP,FSH_ITEM,Item Number,direct_alias_match,material.number,false,already_present
+SD,VBAP,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+SD,VBAP,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+SD,VBAP,J_3GBELNRI,Document Number,description_alias_match,account.owner_employee_id,true,added
+SD,VBAP,PAY_METHOD,List of Respected Payment Methods,direct_alias_match,payment.method_code,false,already_present
+SD,VBAP,BPN,Business Partner Number,direct_alias_match,business_partner.id,false,already_present
+SD,VBPA,VBELN,Sales and Distribution Document Number,direct_alias_match,invoice.number,false,already_present
+SD,VBPA,POSNR,Item number of the SD document,direct_alias_match,sales_order.line_item_number,false,already_present
+SD,VBPA,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+SD,VBPA,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+SD,VBPA,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+SD,VBPA,PARNR,Number of Contact Person,direct_alias_match,contact.id,false,already_present
+SD,VBPA,ADRNR,Address Number,direct_alias_match,address.id,false,already_present
+SD,VBPA,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+SD,VBPA,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+SD,VBPA,ASSIGNED_BP,Business Partner Number,direct_alias_match,business_partner.id,false,already_present
+SD,VBKD,VBELN,Sales and Distribution Document Number,direct_alias_match,invoice.number,false,already_present
+SD,VBKD,POSNR,Item number of the SD document,direct_alias_match,sales_order.line_item_number,false,already_present
+SD,VBKD,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,VBKD,PLTYP,Price List Type,direct_alias_match,price.list,false,already_present
+SD,VBKD,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+SD,VBKD,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+SD,VBKD,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+SD,VBKD,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+SD,VBKD,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+SD,VBKD,POPER,Posting Period,direct_alias_match,fiscal_period.id,false,already_present
+SD,VBKD,PAY_TYPE,Mandate: Payment Type,direct_alias_match,payment.method_code,false,already_present
+SD,LIKP,VBELN,Delivery,direct_alias_match,invoice.number,false,already_present
+SD,LIKP,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,LIKP,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,LIKP,VSTEL,Shipping Point / Receiving Point,direct_alias_match,shipping_point.id,false,already_present
+SD,LIKP,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,LIKP,WADAT,Planned Goods Movement Date,direct_alias_match,delivery.goods_issue_date,false,already_present
+SD,LIKP,KODAT,Picking Date,direct_alias_match,picking.date,false,already_present
+SD,LIKP,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+SD,LIKP,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+SD,LIKP,ROUTE,Route,direct_alias_match,route.id,false,already_present
+SD,LIKP,KUNNR,Ship-to Party,direct_alias_match,customer.id,false,already_present
+SD,LIKP,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,LIKP,NTGEW,Net Weight,direct_alias_match,material.net_weight,false,already_present
+SD,LIKP,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+SD,LIKP,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+SD,LIKP,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+SD,LIKP,LSTEL,Loading Point,direct_alias_match,shipping_point.id,false,already_present
+SD,LIKP,ROUTA,Route,direct_alias_match,route.id,false,already_present
+SD,LIKP,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+SD,LIKP,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+SD,LIKP,LGNUM,Warehouse Number / Warehouse Complex,direct_alias_match,warehouse.id,false,already_present
+SD,LIKP,LIFNR,Vendor's account number,direct_alias_match,supplier.id,false,already_present
+SD,LIKP,WERKS,Receiving Plant for Deliveries,direct_alias_match,plant.id,false,already_present
+SD,LIKP,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+SD,LIKP,HANDLE,Worldwide unique key for LIKP-VBELN,direct_alias_match,system.guid,false,already_present
+SD,LIKP,VBUND,Company ID,direct_alias_match,company.id,false,already_present
+SD,LIKP,TM_WHSE_EXEC,Warehouse Execution Status,direct_alias_match,warehouse_task.status,false,already_present
+SD,LIPS,VBELN,Delivery,direct_alias_match,invoice.number,false,already_present
+SD,LIPS,POSNR,Delivery Item,direct_alias_match,sales_order.line_item_number,false,already_present
+SD,LIPS,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,LIPS,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,LIPS,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+SD,LIPS,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+SD,LIPS,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+SD,LIPS,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+SD,LIPS,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+SD,LIPS,KDMAT,Customer Material,direct_alias_match,material.customer_part_number,false,already_present
+SD,LIPS,PRODH,Product Hierarchy,direct_alias_match,product.category,false,already_present
+SD,LIPS,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+SD,LIPS,VRKME,Sales Unit,direct_alias_match,uom.code,false,already_present
+SD,LIPS,NTGEW,Net Weight,direct_alias_match,material.net_weight,false,already_present
+SD,LIPS,BRGEW,Gross Weight,direct_alias_match,material.gross_weight,false,already_present
+SD,LIPS,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+SD,LIPS,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+SD,LIPS,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+SD,LIPS,LGPBE,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+SD,LIPS,LGNUM,Warehouse Number / Warehouse Complex,direct_alias_match,warehouse.id,false,already_present
+SD,LIPS,LGPLA,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+SD,LIPS,BWART,Movement Type (Inventory Management),direct_alias_match,goods_movement.type,false,already_present
+SD,LIPS,MTART,Material Type,direct_alias_match,material.type_code,false,already_present
+SD,LIPS,XCHPF,Batch Management Requirement Indicator,direct_alias_match,material.batch_managed_flag,false,already_present
+SD,LIPS,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,LIPS,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,LIPS,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+SD,LIPS,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+SD,LIPS,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+SD,LIPS,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+SD,LIPS,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+SD,LIPS,VORNR,Operation/Activity Number,direct_alias_match,production_operation.number,false,already_present
+SD,LIPS,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+SD,LIPS,KCVOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+SD,LIPS,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+SD,LIPS,SHKZG,Returns Item,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+SD,LIPS,KMPMG,Component Quantity,direct_alias_match,bom.quantity,false,already_present
+SD,LIPS,NETPR,Net Price,direct_alias_match,net_price_amount,true,added
+SD,LIPS,PSPNR,Project (internal),direct_alias_match,project.wbs_element_id,false,already_present
+SD,LIPS,EMATN,Material number corresponding to manufacturer part number,direct_alias_match,material.number,false,already_present
+SD,LIPS,HANDLE,Worldwide unique key for LIPS-VBELN & LIPS_POSNR,direct_alias_match,system.guid,false,already_present
+SD,LIPS,UMWRK,Receiving plant/issuing plant,direct_alias_match,plant.id,false,already_present
+SD,LIPS,HSDAT,Date of Manufacture,direct_alias_match,inventory_lot.manufacture_date,false,already_present
+SD,LIPS,VFDAT,Shelf Life Expiration or Best-Before Date,direct_alias_match,inventory_lot.expiration_date,false,already_present
+SD,LIPS,GRUND,Reason for goods movment,direct_alias_match,reason.code,false,already_present
+SD,LIPS,RESOURCE_ID,Resource Name (Stock Identifier),direct_alias_match,resource.id,false,already_present
+SD,LIPS,LOADING_POINT,Loading/Unloading Point,direct_alias_match,shipping_point.id,false,already_present
+SD,LIPS,ITM_COMCO,Commodity Code,direct_alias_match,material.hts_code,false,already_present
+SD,LIPS,VCM_CHAIN_UUID,GUID in 'CHAR' Format in Uppercase,direct_alias_match,system.guid,false,already_present
+SD,LIPS,FSH_ITEM,Item Number,direct_alias_match,material.number,false,already_present
+SD,VBRK,VBELN,Billing Document,direct_alias_match,invoice.number,false,already_present
+SD,VBRK,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,VBRK,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,VBRK,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+SD,VBRK,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+SD,VBRK,POPER,Posting Period,direct_alias_match,fiscal_period.id,false,already_present
+SD,VBRK,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,VBRK,PLTYP,Price List Type,direct_alias_match,price.list,false,already_present
+SD,VBRK,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+SD,VBRK,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+SD,VBRK,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+SD,VBRK,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+SD,VBRK,LAND1,Destination Country/Region,direct_alias_match,address.country_code,false,already_present
+SD,VBRK,REGIO,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+SD,VBRK,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+SD,VBRK,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,VBRK,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,VBRK,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+SD,VBRK,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+SD,VBRK,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,VBRK,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+SD,VBRK,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+SD,VBRK,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+SD,VBRK,FK_SOURCE_SYS,Source System,direct_alias_match,audit.source_system,false,already_present
+SD,VBRK,BLART,Document Type,direct_alias_match,document.type,false,already_present
+SD,VBRK,PAY_TYPE,Mandate: Payment Type,direct_alias_match,payment.method_code,false,already_present
+SD,VBRP,VBELN,Billing Document,direct_alias_match,invoice.number,false,already_present
+SD,VBRP,POSNR,Billing Item,direct_alias_match,sales_order.line_item_number,false,already_present
+SD,VBRP,VRKME,Sales Unit,direct_alias_match,uom.code,false,already_present
+SD,VBRP,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+SD,VBRP,NTGEW,Net Weight,direct_alias_match,material.net_weight,false,already_present
+SD,VBRP,BRGEW,Gross Weight,direct_alias_match,material.gross_weight,false,already_present
+SD,VBRP,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+SD,VBRP,VOLUM,Volume,direct_alias_match,shipment.volume,false,already_present
+SD,VBRP,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+SD,VBRP,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+SD,VBRP,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+SD,VBRP,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+SD,VBRP,PRODH,Product Hierarchy,direct_alias_match,product.category,false,already_present
+SD,VBRP,VSTEL,Shipping Point / Receiving Point,direct_alias_match,shipping_point.id,false,already_present
+SD,VBRP,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,VBRP,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+SD,VBRP,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+SD,VBRP,SHKZG,Returns item,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+SD,VBRP,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,VBRP,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,VBRP,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+SD,VBRP,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+SD,VBRP,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+SD,VBRP,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+SD,VBRP,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+SD,VBRP,MWSBP,Tax Amount in Document Currency,direct_alias_match,payroll.tax_amount,false,already_present
+SD,VBRP,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+SD,VBRP,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+SD,VBRP,VCM_CHAIN_UUID,GUID in 'CHAR' Format in Uppercase,direct_alias_match,system.guid,false,already_present
+SD,VBRP,REASON_CODE,Reason for Return or Expected Delivery Quantity Change,direct_alias_match,reason.code,false,already_present
+SD,VBRP,ITM_COMCO,Commodity Code,direct_alias_match,material.hts_code,false,already_present
+SD,VBRP,VKORG_ANA,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,VBRP,VTWEG_ANA,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,VBRP,KDGRP_ANA,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,VBRP,BUKRS_ANA,Company Code,direct_alias_match,company_code.id,false,already_present
+SD,VBRP,DP_BUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+SD,VBRP,DP_GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+SD,VBRP,J_3GBELNRI,Document Number,description_alias_match,account.owner_employee_id,true,added
+SD,KNA1,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+SD,KNA1,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+SD,KNA1,NAME1,Name 1,direct_alias_match,contact.name,false,already_present
+SD,KNA1,ORT01,City,direct_alias_match,supplier.address,false,already_present
+SD,KNA1,PSTLZ,Postal Code,direct_alias_match,supplier.address,true,added
+SD,KNA1,REGIO,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+SD,KNA1,STRAS,Street and House Number,direct_alias_match,address.line1,false,already_present
+SD,KNA1,TELF1,First telephone number,direct_alias_match,contact.phone,false,already_present
+SD,KNA1,ADRNR,Address,direct_alias_match,address.id,false,already_present
+SD,KNA1,ANRED,Title,description_alias_match,case.subject,false,already_present
+SD,KNA1,BRSCH,Industry key,direct_alias_match,account.industry,false,already_present
+SD,KNA1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,KNA1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+SD,KNA1,KUKLA,Customer Classification,direct_alias_match,customer.classification,false,already_present
+SD,KNA1,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+SD,KNA1,SPERR,Central posting block,direct_alias_match,supplier.posting_block_flag,false,already_present
+SD,KNA1,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+SD,KNA1,STCD1,Tax Number 1,direct_alias_match,tax.id,false,already_present
+SD,KNA1,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+SD,KNA1,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+SD,KNA1,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+SD,KNA1,UF,State,direct_alias_match,supplier.region_code,false,already_present
+SD,KNA1,DUNS,DUNS Number,direct_alias_match,supplier.duns_number,false,already_present
+SD,KNA1,PSOVN,First Name,description_alias_match,employee.name,true,added
+SD,KNA1,PSOTL,Title,direct_alias_match,case.subject,false,already_present
+SD,KNA1,PSOO1,Description,description_alias_match,address.city,true,added
+SD,KNA1,PSOO2,Description,description_alias_match,address.city,true,added
+SD,KNA1,PSOO3,Description,description_alias_match,address.city,true,added
+SD,KNA1,PSOO4,Description,description_alias_match,address.city,true,added
+SD,KNA1,PSOO5,Description,description_alias_match,address.city,true,added
+SD,KNA1,AEDAT,(Obsolete) Last Changed On – do not use,direct_alias_match,document.changed_date,false,already_present
+SD,KNA1,USNAM,(Obsolete) Changed by the user – do not use,direct_alias_match,audit.created_by,false,already_present
+SD,KNA1,PSPNR,WBS Element,direct_alias_match,project.wbs_element_id,false,already_present
+SD,KNA1,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+SD,KNA1,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+SD,KNB1,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+SD,KNB1,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+SD,KNB1,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+SD,KNB1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,KNB1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+SD,KNB1,SPERR,Posting block for company code,direct_alias_match,supplier.posting_block_flag,false,already_present
+SD,KNB1,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+SD,KNVV,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+SD,KNVV,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+SD,KNVV,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+SD,KNVV,SPART,Division,direct_alias_match,division.id,false,already_present
+SD,KNVV,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+SD,KNVV,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+SD,KNVV,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+SD,KNVV,PLTYP,Price List Type,direct_alias_match,price.list,false,already_present
+SD,KNVV,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+SD,KNVV,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+SD,KNVV,WAERS,Currency,direct_alias_match,accounting.document_currency_code,false,already_present
+SD,KNVV,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+SD,KNVV,STATUS_OBJ_GUID,Globally Unique Identifier,direct_alias_match,system.guid,false,already_present
+S/4HANA,PRCD_ELEMENTS,KBETR,Condition Amount or Percentage,direct_alias_match,price.unit,false,already_present
+S/4HANA,PRCD_ELEMENTS,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+S/4HANA,PRCD_ELEMENTS,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+S/4HANA,PRCD_ELEMENTS,KUNNR,Customer number (rebate recipient),direct_alias_match,customer.id,false,already_present
+S/4HANA,BUT000,PARTNER,Business Partner Number,direct_alias_match,business_partner.id,false,already_present
+S/4HANA,BUT000,TITLE,Form-of-Address Key,direct_alias_match,case.subject,false,already_present
+S/4HANA,BUT000,TITLE_LET,Salutation,direct_alias_match,party.salutation,false,already_present
+S/4HANA,BUT000,CONTACT,Business Partner: Contact Permission,direct_alias_match,contact.phone,true,added
+S/4HANA,BUT000,NAME1_TEXT,Full Name,direct_alias_match,contact.name,false,already_present
+S/4HANA,BUT000,NATIO,Nationality,direct_alias_match,employee.nationality,false,already_present
+S/4HANA,BUT000,GENDER,Sex of business partner (person),direct_alias_match,employee.gender,false,already_present
+S/4HANA,BUT000,PERNO,Personnel Number,direct_alias_match,employee.id,false,already_present
+S/4HANA,BUT000,ADDRCOMM,Address Number,direct_alias_match,address.id,false,already_present
+S/4HANA,BUT001,PARTNER,Business Partner Number,direct_alias_match,business_partner.id,false,already_present
+S/4HANA,BUT001,LGNUM,Identification number of legitimation document,direct_alias_match,warehouse.id,false,already_present
+S/4HANA,MATDOC,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+S/4HANA,MATDOC,MAT_PSPNR,Valuated Sales Order Stock WBS Element,direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,MATDOC,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+S/4HANA,MATDOC,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+S/4HANA,MATDOC,DMBTR,Amount in Local Currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+S/4HANA,MATDOC,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+S/4HANA,MATDOC,MENGE,Quantity,direct_alias_match,bom.quantity,false,already_present
+S/4HANA,MATDOC,LBKUM,Total valuated stock before the posting,direct_alias_match,stock.quantity,false,already_present
+S/4HANA,MATDOC,STOCK_QTY,Stock Quantity,direct_alias_match,stock.quantity,false,already_present
+S/4HANA,MATDOC,BPRME,Order Price Unit (Purchasing),direct_alias_match,order_unit.code,true,added
+S/4HANA,MATDOC,UMWRK_CID,Plant,direct_alias_match,plant.id,false,already_present
+S/4HANA,MATDOC,UMBUK_CG,Company Code,direct_alias_match,company_code.id,false,already_present
+S/4HANA,MATDOC,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+S/4HANA,MATDOC,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+S/4HANA,MATDOC,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+S/4HANA,MATDOC,VFDAT,Shelf Life Expiration or Best-Before Date,direct_alias_match,inventory_lot.expiration_date,false,already_present
+S/4HANA,MATDOC,HSDAT,Date of Manufacture,direct_alias_match,inventory_lot.manufacture_date,false,already_present
+S/4HANA,MATDOC,MBLNR,Number of Material Document,direct_alias_match,goods_receipt.id,false,already_present
+S/4HANA,MATDOC,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+S/4HANA,MATDOC,EBELN,Purchase order number,direct_alias_match,purchase_order.id,false,already_present
+S/4HANA,MATDOC,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+S/4HANA,MATDOC,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+S/4HANA,MATDOC,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+S/4HANA,MATDOC,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+S/4HANA,MATDOC,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+S/4HANA,MATDOC,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+S/4HANA,MATDOC,EWM_LGPLA,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+S/4HANA,MATDOC,BWART,Movement Type (Inventory Management),direct_alias_match,goods_movement.type,false,already_present
+S/4HANA,MATDOC,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+S/4HANA,MATDOC,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+S/4HANA,MATDOC,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+S/4HANA,MATDOC,LIFNR,Vendor's account number,direct_alias_match,supplier.id,false,already_present
+S/4HANA,MATDOC,KUNNR,Account number of customer,direct_alias_match,customer.id,false,already_present
+S/4HANA,MATDOC,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+S/4HANA,MATDOC,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+S/4HANA,MATDOC,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+S/4HANA,MATDOC,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,MATDOC,LGNUM,Warehouse Number / Warehouse Complex,direct_alias_match,warehouse.id,false,already_present
+S/4HANA,MATDOC,LGPLA,Storage Bin,direct_alias_match,warehouse_bin.id,false,already_present
+S/4HANA,MATDOC,GRUND,Reason for Movement,direct_alias_match,reason.code,false,already_present
+S/4HANA,MATDOC,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+S/4HANA,MATDOC,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,MATDOC,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+S/4HANA,MATDOC,EMATN,Material number corresponding to manufacturer part number,direct_alias_match,material.number,false,already_present
+S/4HANA,MATDOC,UMWRK,Plant,direct_alias_match,plant.id,false,already_present
+S/4HANA,MATDOC,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+S/4HANA,MATDOC,BLART,Document Type,direct_alias_match,document.type,false,already_present
+S/4HANA,MATDOC,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+S/4HANA,ACDOCP,RLDNR,Ledger in General Ledger Accounting,direct_alias_match,ledger.id,false,already_present
+S/4HANA,ACDOCP,RACCT,Account Number,direct_alias_match,account.id,false,already_present
+S/4HANA,ACDOCP,RBUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+S/4HANA,ACDOCP,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+S/4HANA,ACDOCP,AWREF,Reference document number,direct_alias_match,journal_entry.reference,false,already_present
+S/4HANA,ACDOCP,RCNTR,Cost Center,direct_alias_match,cost_center.id,false,already_present
+S/4HANA,ACDOCP,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+S/4HANA,ACDOCP,POPER,Posting Period,direct_alias_match,fiscal_period.id,false,already_present
+S/4HANA,ACDOCP,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+S/4HANA,ACDOCP,KTOPL,Chart of Accounts,direct_alias_match,chart_of_accounts.id,false,already_present
+S/4HANA,ACDOCP,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+S/4HANA,ACDOCP,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+S/4HANA,ACDOCP,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+S/4HANA,ACDOCP,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+S/4HANA,ACDOCP,PS_POSID,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCP,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+S/4HANA,ACDOCP,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+S/4HANA,ACDOCP,RSRCE,Resource,direct_alias_match,resource.id,false,already_present
+S/4HANA,ACDOCP,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCP,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+S/4HANA,ACDOCP,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+S/4HANA,ACDOCP,SPART,Division,direct_alias_match,division.id,false,already_present
+S/4HANA,ACDOCP,MATKL,Product Sold Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCP,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+S/4HANA,ACDOCP,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+S/4HANA,ACDOCP,BRSCH,Industry key,direct_alias_match,account.industry,false,already_present
+S/4HANA,ACDOCP,KMMAKL_PA,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCP,KMKDGR_PA,Customer Group,direct_alias_match,customer_group.id,false,already_present
+S/4HANA,ACDOCP,PRODH_PA,Product Hierarchy,direct_alias_match,product.category,false,already_present
+S/4HANA,ACDOCP,WWREG_PA,Region,direct_alias_match,supplier.address,false,already_present
+S/4HANA,ACDOCP,WWRGN_PA,REGIO,direct_alias_match,supplier.region_code,false,already_present
+S/4HANA,ACDOCP,VORNR,Operation/Activity Number,direct_alias_match,production_operation.number,false,already_present
+S/4HANA,ACDOCP,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+S/4HANA,ACDOCP,MATKL_MM,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCP,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+S/4HANA,ACDOCP,ANLKL,Asset Class,direct_alias_match,asset.class_code,false,already_present
+S/4HANA,ACDOCP,RECNNR,Contract Number,direct_alias_match,contract.id,false,already_present
+S/4HANA,ACDOCP,PMATNR,Product Number,direct_alias_match,product.id,false,already_present
+S/4HANA,ACDOCP,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+S/4HANA,ACDOCP,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+S/4HANA,ACDOCP,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+S/4HANA,ACDOCP,ESOKZ,Purchasing info record category,direct_alias_match,info_record_category.code,true,added
+S/4HANA,ACDOCP,TYPPS,Item Category,direct_alias_match,product.category,false,already_present
+S/4HANA,ACDOCP,SCRAP_QTY,Scrap Quantity,direct_alias_match,scrap.quantity,false,already_present
+S/4HANA,ACDOCA,RLDNR,Ledger in General Ledger Accounting,direct_alias_match,ledger.id,false,already_present
+S/4HANA,ACDOCA,RBUKRS,Company Code,direct_alias_match,company_code.id,false,already_present
+S/4HANA,ACDOCA,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+S/4HANA,ACDOCA,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+S/4HANA,ACDOCA,AWREF,Reference document number,direct_alias_match,journal_entry.reference,false,already_present
+S/4HANA,ACDOCA,RUNIT,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+S/4HANA,ACDOCA,RACCT,Account Number,direct_alias_match,account.id,false,already_present
+S/4HANA,ACDOCA,RCNTR,Cost Center,direct_alias_match,cost_center.id,false,already_present
+S/4HANA,ACDOCA,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+S/4HANA,ACDOCA,LBKUM,Inventory Quantity,direct_alias_match,stock.quantity,false,already_present
+S/4HANA,ACDOCA,DRCRK,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+S/4HANA,ACDOCA,POPER,Posting Period,direct_alias_match,fiscal_period.id,false,already_present
+S/4HANA,ACDOCA,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+S/4HANA,ACDOCA,BLART,Document Type,direct_alias_match,document.type,false,already_present
+S/4HANA,ACDOCA,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+S/4HANA,ACDOCA,LINETYPE,Item Category,direct_alias_match,product.category,false,already_present
+S/4HANA,ACDOCA,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+S/4HANA,ACDOCA,KTOPL,Chart of Accounts,direct_alias_match,chart_of_accounts.id,false,already_present
+S/4HANA,ACDOCA,RCOMP,Company,description_alias_match,company.id,true,added
+S/4HANA,ACDOCA,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+S/4HANA,ACDOCA,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+S/4HANA,ACDOCA,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+S/4HANA,ACDOCA,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+S/4HANA,ACDOCA,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+S/4HANA,ACDOCA,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+S/4HANA,ACDOCA,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+S/4HANA,ACDOCA,KOART,Account type,direct_alias_match,account.type,false,already_present
+S/4HANA,ACDOCA,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+S/4HANA,ACDOCA,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+S/4HANA,ACDOCA,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+S/4HANA,ACDOCA,ANLKL,Asset Class,direct_alias_match,asset.class_code,false,already_present
+S/4HANA,ACDOCA,MAT_PSPNR,WBS Element (internal) of Valuated Special Inventory,direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCA,MAT_PS_POSID,WBS Element (external) of Valuated Special Inventory,direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCA,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+S/4HANA,ACDOCA,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+S/4HANA,ACDOCA,PS_PSP_PNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCA,PS_POSID,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+S/4HANA,ACDOCA,RSRCE,Resource,direct_alias_match,resource.id,false,already_present
+S/4HANA,ACDOCA,CO_BELNR,Document Number,description_alias_match,account.owner_employee_id,true,added
+S/4HANA,ACDOCA,VORNR,Operation/Activity Number,direct_alias_match,production_operation.number,false,already_present
+S/4HANA,ACDOCA,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+S/4HANA,ACDOCA,MATKL_MM,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCA,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+S/4HANA,ACDOCA,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+S/4HANA,ACDOCA,SPART,Division,direct_alias_match,division.id,false,already_present
+S/4HANA,ACDOCA,MATKL,Product Sold Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCA,KDGRP,Customer Group,direct_alias_match,customer_group.id,false,already_present
+S/4HANA,ACDOCA,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+S/4HANA,ACDOCA,BRSCH,Industry key,direct_alias_match,account.industry,false,already_present
+S/4HANA,ACDOCA,KMMAKL_PA,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+S/4HANA,ACDOCA,KMKDGR_PA,Customer Group,direct_alias_match,customer_group.id,false,already_present
+S/4HANA,ACDOCA,PRODH_PA,Product Hierarchy,direct_alias_match,product.category,false,already_present
+S/4HANA,ACDOCA,WWREG_PA,Region,direct_alias_match,supplier.address,false,already_present
+S/4HANA,ACDOCA,WWRGN_PA,REGIO,direct_alias_match,supplier.region_code,false,already_present
+S/4HANA,ACDOCA,RECNNR,Contract Number,direct_alias_match,contract.id,false,already_present
+S/4HANA,ACDOCA,NETDT,Net Due Date,direct_alias_match,invoice.due_date,false,already_present
+FI,LFA1,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+FI,LFA1,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+FI,LFA1,NAME1,Name 1,direct_alias_match,contact.name,false,already_present
+FI,LFA1,ORT01,City,direct_alias_match,supplier.address,false,already_present
+FI,LFA1,PSTLZ,Postal Code,direct_alias_match,supplier.address,true,added
+FI,LFA1,REGIO,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+FI,LFA1,STRAS,Street and House Number,direct_alias_match,address.line1,false,already_present
+FI,LFA1,ADRNR,Address,direct_alias_match,address.id,false,already_present
+FI,LFA1,ANRED,Title,description_alias_match,case.subject,false,already_present
+FI,LFA1,BRSCH,Industry key,direct_alias_match,account.industry,false,already_present
+FI,LFA1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+FI,LFA1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+FI,LFA1,KTOKK,Vendor account group,direct_alias_match,vendor_group.id,false,already_present
+FI,LFA1,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+FI,LFA1,SPERR,Central posting block,direct_alias_match,supplier.posting_block_flag,false,already_present
+FI,LFA1,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+FI,LFA1,STCD1,Tax Number 1,direct_alias_match,tax.id,false,already_present
+FI,LFA1,TELF1,First telephone number,direct_alias_match,contact.phone,false,already_present
+FI,LFA1,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+FI,LFA1,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,LFA1,GBDAT,Date of Birth of the Person Subject to Withholding Tax,direct_alias_match,employee.birth_date,false,already_present
+FI,LFA1,KRAUS,Credit Information Number,direct_alias_match,supplier.duns_number,false,already_present
+FI,LFA1,WERKS,Plant (Own or External),direct_alias_match,plant.id,false,already_present
+FI,LFA1,UF,State,direct_alias_match,supplier.region_code,false,already_present
+FI,LFA1,J_SC_CURRENCY,Currency,direct_alias_match,bank_account.currency_code,false,already_present
+FI,LFA1,PSOVN,First Name,description_alias_match,employee.name,true,added
+FI,LFA1,PSOTL,Title,direct_alias_match,case.subject,false,already_present
+FI,LFA1,ADDR2_STREET,Street,direct_alias_match,supplier.address,false,already_present
+FI,LFA1,ADDR2_CITY,City,direct_alias_match,supplier.address,false,already_present
+FI,LFA1,AEDAT,(Obsolete) Last Changed On – do not use,direct_alias_match,document.changed_date,false,already_present
+FI,LFA1,USNAM,(Obsolete) Changed by the user – do not use,direct_alias_match,audit.created_by,false,already_present
+FI,LFA1,SC_CURRENCY,Currency,direct_alias_match,bank_account.currency_code,false,already_present
+FI,LFB1,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+FI,LFB1,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,LFB1,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+FI,LFB1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+FI,LFB1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+FI,LFB1,SPERR,Posting block for company code,direct_alias_match,supplier.posting_block_flag,false,already_present
+FI,LFB1,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+FI,LFB1,BRSCH,Industry key,direct_alias_match,account.industry,false,already_present
+FI,LFB1,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,LFB1,ACTIVE,"Boolean Variable ('X'=Shareholder is active, ''=not active)",direct_alias_match,account.status,true,added
+,LFBK,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+,LFBK,BANKL,Bank Keys,direct_alias_match,bank_account.routing_number,false,already_present
+,LFBK,BANKN,Bank account number,direct_alias_match,bank_account.account_number,false,already_present
+,EINA,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+,EINA,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+,EINA,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+,EINA,LIFNR,Vendor's account number,direct_alias_match,supplier.id,false,already_present
+,EINA,LOEKZ,Purchasing info: General data flagged for deletion,direct_alias_match,material.deletion_mark,false,already_present
+,EINA,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,EINA,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,EINA,MEINS,Purchase Order Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+,EINA,TELF1,Supplier's Telephone Number,direct_alias_match,contact.phone,false,already_present
+,EINA,URZNR,Certificate Number,direct_alias_match,certificate.id,false,already_present
+,EINA,LMEIN,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+,EINA,REGIO,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+,EINA,MFRNR,Manufacturer,direct_alias_match,manufacturer.id,false,already_present
+,EINE,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,false,already_present
+,EINE,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+,EINE,ESOKZ,Purchasing info record category,direct_alias_match,info_record_category.code,false,already_present
+,EINE,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+,EINE,LOEKZ,Purch. info: Purch. organization data flagged for deletion,direct_alias_match,material.deletion_mark,false,already_present
+,EINE,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,EINE,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,EINE,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+,EINE,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+,EINE,MINBM,Minimum Purchase Order Quantity,direct_alias_match,minimum_order_quantity,false,already_present
+,EINE,APLFZ,Planned Delivery Time in Days,direct_alias_match,supplier_lead_time.days,false,already_present
+,EINE,ANGNR,Quotation Number,direct_alias_match,quote.id,false,already_present
+,EINE,ANFNR,RFQ Number,direct_alias_match,rfq.id,false,already_present
+,EINE,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+,EINE,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+,EINE,NETPR,Net Price in Purchasing Info Record,direct_alias_match,net_price_amount,false,already_present
+,EINE,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+,EINE,BPRME,Order Price Unit (Purchasing),direct_alias_match,order_unit.code,false,already_present
+,EINE,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+,EINE,INCO1,Incoterms (Part 1),direct_alias_match,incoterm.code,false,already_present
+,EINE,INCO2,Incoterms (Part 2),direct_alias_match,incoterm.location,false,already_present
+,T001,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+,T001,ORT01,City,direct_alias_match,supplier.address,false,already_present
+,T001,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+,T001,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+,T001,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+,T001,KTOPL,Chart of Accounts,direct_alias_match,chart_of_accounts.id,false,already_present
+,T001,RCOMP,Company,description_alias_match,company.id,true,added
+,T001,ADRNR,Address,direct_alias_match,address.id,false,already_present
+,T001,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,BKPF,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BKPF,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+FI,BKPF,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BKPF,BLART,Document Type,direct_alias_match,document.type,false,already_present
+FI,BKPF,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+FI,BKPF,MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BKPF,AEDAT,Date of the Last Document Change by Transaction,direct_alias_match,document.changed_date,false,already_present
+FI,BKPF,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+FI,BKPF,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+FI,BKPF,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,BKPF,KURSF,Exchange rate,direct_alias_match,exchange_rate.rate,false,already_present
+FI,BKPF,RLDNR,Ledger in General Ledger Accounting,direct_alias_match,ledger.id,false,already_present
+FI,BKPF,PSOAK,Reason,description_alias_match,invoice.amount,true,added
+FI,BKPF,PSOKS,Region,direct_alias_match,supplier.address,false,already_present
+FI,BKPF,SNAME,User Name,description_alias_match,account.name,true,added
+FI,BKPF,CNT,Contract number,direct_alias_match,contract.id,false,already_present
+,BKDF,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+,BKDF,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+,BKDF,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+,BKDF,LAST_OCCUR_DATE,Recurrence End Date,description_alias_match,absence.end_date,true,added
+,BKDF,BLOCKED_FOR_POSTING,Blocked For Posting,direct_alias_match,supplier.posting_block_flag,false,already_present
+,BNKA,BANKL,Bank Keys,direct_alias_match,bank_account.routing_number,false,already_present
+,BNKA,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,BNKA,ERNAM,Name of person who created the object,direct_alias_match,audit.created_by,false,already_present
+,BNKA,BANKA,Name of Financial Institution,direct_alias_match,supplier_bank_account.bank_name,false,already_present
+,BNKA,STRAS,Street and House Number,direct_alias_match,address.line1,false,already_present
+,BNKA,ORT01,City,direct_alias_match,supplier.address,false,already_present
+,BNKA,SWIFT,SWIFT/BIC for International Payments,direct_alias_match,supplier_bank_account.swift_bic,false,already_present
+,BNKA,ADRNR,Address Number,direct_alias_match,address.id,false,already_present
+,KONH,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,KONH,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,KONH,DATAB,Valid-From Date,direct_alias_match,validity.start_date,false,already_present
+,KONP,KBETR,Condition amount or percentage where no scale exists,direct_alias_match,price.unit,false,already_present
+,KONP,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+,KONP,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+,KONP,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+,KONP,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+,KONP,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+,KONP,KFRST,Release Status,direct_alias_match,approval.status,false,already_present
+SD,KONV,KBETR,Condition Amount or Percentage,direct_alias_match,price.unit,false,already_present
+SD,KONV,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+SD,KONV,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+SD,KONV,KUNNR,Customer number (rebate recipient),direct_alias_match,customer.id,false,already_present
+,KONA,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+,KONA,VTWEG,Distribution Channel,direct_alias_match,distribution_channel.id,false,already_present
+,KONA,SPART,Division,direct_alias_match,division.id,false,already_present
+,KONA,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,KONA,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,KONA,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+,KONA,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+,KONA,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+,KONA,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+,KONA,DATAB,Agreement valid-from date,direct_alias_match,validity.start_date,false,already_present
+,KONA,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+,KONA,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+,KONA,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+,KONA,BUKRS,Company code for subsequent settlement,direct_alias_match,company_code.id,true,added
+,KONA,KFRST,Release Status,direct_alias_match,approval.status,false,already_present
+,KONA,BON_ENH_CNO,Contract Number,direct_alias_match,contract.id,false,already_present
+,VTTK,TKNUM,Shipment Number,direct_alias_match,shipment.id,false,already_present
+,VTTK,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,VTTK,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,VTTK,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+,VTTK,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+,VTTK,ROUTE,Shipment route,direct_alias_match,route.id,false,already_present
+,VTTK,SIGNI,Container ID,direct_alias_match,container.id,false,already_present
+,VTTK,HANDLE,"Globally unique identifier (linked to time segment, etc)",direct_alias_match,system.guid,false,already_present
+,VTTK,TNDRST,Tender Status,direct_alias_match,sourcing_event.status,false,already_present
+,VTTP,TKNUM,Shipment Number,direct_alias_match,shipment.id,false,already_present
+,VTTP,VBELN,Delivery,direct_alias_match,invoice.number,false,already_present
+,VTTP,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,VTTP,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,VEKP,VENUM,Internal Handling Unit Number,direct_alias_match,handling_unit.id,false,already_present
+,VEKP,VSTEL,Shipping Point / Receiving Point,direct_alias_match,shipping_point.id,false,already_present
+,VEKP,LSTEL,Loading Point,direct_alias_match,shipping_point.id,false,already_present
+,VEKP,BRGEW,Total Weight of Handling Unit,direct_alias_match,material.gross_weight,false,already_present
+,VEKP,NTGEW,Loading Weight of Handling Unit,direct_alias_match,material.net_weight,false,already_present
+,VEKP,GEWEI,Unit of Weight,direct_alias_match,material.weight_unit_code,false,already_present
+,VEKP,VOLEH,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+,VEKP,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+,VEKP,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+,VEKP,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+,VEKP,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+,VEKP,LAENG,Length,description_alias_match,opportunity.probability,false,already_present
+,VEKP,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+,VEKP,VOLEH_MAX,Volume Unit,direct_alias_match,volume.unit_code,false,already_present
+,VEKP,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+,VEKP,VKORG,Sales Organization,direct_alias_match,sales_organization.id,false,already_present
+,VEKP,VTWEG,Reference distrib.channel for cust.and material masters,direct_alias_match,distribution_channel.id,false,already_present
+,VEKP,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+,VEKP,HANDLE,Worldwide unique key for VEKP-VENUM,direct_alias_match,system.guid,false,already_present
+,VEKP,LGNUM,Warehouse Number/Warehouse Complex,direct_alias_match,warehouse.id,false,already_present
+,VEKP,UUID,UUID datatype raw 16,direct_alias_match,system.guid,false,already_present
+,VEKP,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+,VEKP,YLOCT,Location,description_alias_match,address.country,true,added
+,VEKP,RSNCD,Reason Code,direct_alias_match,reason.code,false,already_present
+,VEKP,SIGNI,Container ID,direct_alias_match,container.id,false,already_present
+HR,PA0000,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA0000,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA0000,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA0000,STAT2,Employment Status,direct_alias_match,employee.employment_status,false,already_present
+HR,PA0001,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA0001,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA0001,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA0001,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+HR,PA0001,WERKS,Personnel Area,direct_alias_match,plant.id,false,already_present
+HR,PA0001,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+HR,PA0001,ORGEH,Organizational Unit,direct_alias_match,org_unit.id,false,already_present
+HR,PA0001,PLANS,Position,direct_alias_match,employee.position,false,already_present
+HR,PA0002,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA0002,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA0002,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA0002,NACHN,Last Name,description_alias_match,employee.name,true,added
+HR,PA0002,VORNA,First Name,description_alias_match,employee.name,true,added
+HR,PA0002,TITEL,Title,direct_alias_match,case.subject,false,already_present
+HR,PA0002,MIDNM,Middle Name,description_alias_match,address.country,true,added
+HR,PA0002,GESCH,Gender,direct_alias_match,employee.gender,false,already_present
+HR,PA0002,GBDAT,Date of Birth,direct_alias_match,employee.birth_date,false,already_present
+HR,PA0002,GBDEP,State,direct_alias_match,supplier.region_code,false,already_present
+HR,PA0002,NATIO,Nationality,direct_alias_match,employee.nationality,false,already_present
+HR,PA0002,FAMST,Marital Status Key,direct_alias_match,employee.marital_status,false,already_present
+HR,PA0006,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA0006,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA0006,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA0006,NAME2,Contact Name,description_alias_match,contact.name,false,already_present
+HR,PA0006,STRAS,Street and House Number,direct_alias_match,address.line1,false,already_present
+HR,PA0006,ORT01,City,direct_alias_match,supplier.address,false,already_present
+HR,PA0006,PSTLZ,Postal Code,direct_alias_match,supplier.address,true,added
+HR,PA0006,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+HR,PA0006,STATE,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+HR,PA0008,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA0008,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA0008,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA0008,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+HR,PA0008,ANSAL,Annual salary,direct_alias_match,compensation.base_salary,false,already_present
+HR,PA0008,LGA01,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA02,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA03,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA04,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA05,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA06,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA07,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA08,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA09,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA10,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA11,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA12,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA13,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA14,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA15,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA16,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA17,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA18,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA19,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA20,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA21,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA22,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA23,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA24,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA25,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA26,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA27,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA28,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA29,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA30,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA31,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA32,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA33,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA34,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA35,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA36,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA37,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA38,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA39,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA0008,LGA40,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,HRP1001,ISTAT,Planning Status,direct_alias_match,demand_plan.status,false,already_present
+HR,HRP1001,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,HRP1001,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,HRP1001,UNAME,User Name,description_alias_match,account.name,true,added
+HR,HRP1001,REASN,Reason,description_alias_match,invoice.amount,true,added
+HR,PA2001,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA2001,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA2001,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA2001,BEGUZ,Start Time,description_alias_match,invoice.amount,true,added
+HR,PA2001,ENDUZ,End Time,description_alias_match,invoice.amount,true,added
+HR,PA2001,AWART,Attendance or Absence Type,direct_alias_match,absence.type,false,already_present
+HR,PA2001,STDAZ,Absence hours,direct_alias_match,absence.hours,false,already_present
+HR,PA2001,PLANS,Position,direct_alias_match,employee.position,false,already_present
+HR,PA2001,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+HR,PA2001,AWREF,Reference document number,direct_alias_match,journal_entry.reference,false,already_present
+HR,PA2002,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+HR,PA2002,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,PA2002,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,PA2002,BEGUZ,Start Time,description_alias_match,invoice.amount,true,added
+HR,PA2002,ENDUZ,End Time,description_alias_match,invoice.amount,true,added
+HR,PA2002,AWART,Attendance or Absence Type,direct_alias_match,absence.type,false,already_present
+HR,PA2002,STDAZ,Attendance hours,direct_alias_match,absence.hours,false,already_present
+HR,PA2002,LGART,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,PA2002,PLANS,Position,direct_alias_match,employee.position,false,already_present
+HR,PA2002,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+HR,PA2002,AWREF,Reference document number,direct_alias_match,journal_entry.reference,false,already_present
+HR,PCL2,UNAME,User Name,description_alias_match,account.name,true,added
+HR,PCL2,VERSN,Version of an Area in a PCLx Cluster,direct_alias_match,version.number,false,already_present
+HR,T512W,LGART,Wage Type,direct_alias_match,payroll.component,false,already_present
+HR,T512W,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+HR,T512W,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+HR,T512W,GVPRO,Percentage,description_alias_match,compensation.plan,true,added
+HR,T512W,PZPRO,Percentage,description_alias_match,compensation.plan,true,added
+HR,T512W,FZPRO,Percentage,description_alias_match,compensation.plan,true,added
+FI,BSEG,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BSEG,BELNR,Document Number of an Accounting Document,direct_alias_match,accounting.document_number,false,already_present
+FI,BSEG,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BSEG,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+FI,BSEG,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+FI,BSEG,KOART,Account type,direct_alias_match,account.type,false,already_present
+FI,BSEG,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+FI,BSEG,MWSKZ,Tax on sales/purchases code,direct_alias_match,tax.rate,false,already_present
+FI,BSEG,DMBTR,Amount in local currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+FI,BSEG,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+FI,BSEG,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+FI,BSEG,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSEG,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+FI,BSEG,VBELN,Billing Document,direct_alias_match,invoice.number,false,already_present
+FI,BSEG,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,BSEG,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+FI,BSEG,HKONT,General Ledger Account,direct_alias_match,gl_account.id,false,already_present
+FI,BSEG,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+FI,BSEG,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+FI,BSEG,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+FI,BSEG,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+FI,BSEG,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+FI,BSEG,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+FI,BSEG,MENGE,Quantity,direct_alias_match,bom.quantity,false,already_present
+FI,BSEG,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+FI,BSEG,BPRME,Order Price Unit (Purchasing),direct_alias_match,order_unit.code,true,added
+FI,BSEG,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+FI,BSEG,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+FI,BSEG,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+FI,BSEG,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,BSEG,RSTGR,Reason Code for Payments,direct_alias_match,reason.code,false,already_present
+FI,BSEG,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+FI,BSEG,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+FI,BSEG,PROJK,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSEG,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+FI,BSEG,POSNR,Accounting Document Line Item Number,direct_alias_match,sales_order.line_item_number,false,already_present
+FI,BSEG,H_MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BSEG,H_BLART,Document Type,direct_alias_match,document.type,false,already_present
+FI,BSEG,NETDT,Net Due Date,direct_alias_match,invoice.due_date,false,already_present
+FI,SKA1,KTOPL,Chart of Accounts,direct_alias_match,chart_of_accounts.id,false,already_present
+FI,SKA1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+FI,SKA1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+FI,SKA1,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+FI,SKB1,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,SKB1,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+FI,SKB1,ERNAM,Name of Person who Created the Object,direct_alias_match,audit.created_by,false,already_present
+FI,SKB1,MWSKZ,Tax Category in Account Master Record,direct_alias_match,tax.rate,false,already_present
+FI,SKB1,WAERS,Account Currency,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,SKAT,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+FI,SKAT,KTOPL,Chart of Accounts,direct_alias_match,chart_of_accounts.id,false,already_present
+FI,SKAT,TXT20,Banka,direct_alias_match,supplier_bank_account.bank_name,false,already_present
+FI,SKAT,TXT50,G/L Account Long Text,direct_alias_match,account.name,false,already_present
+FI,BSIS,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BSIS,HKONT,General Ledger Account,direct_alias_match,gl_account.id,false,already_present
+FI,BSIS,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+FI,BSIS,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BSIS,BELNR,Accounting Document Number,direct_alias_match,accounting.document_number,false,already_present
+FI,BSIS,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+FI,BSIS,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+FI,BSIS,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,BSIS,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+FI,BSIS,BLART,Document type,direct_alias_match,document.type,false,already_present
+FI,BSIS,MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BSIS,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+FI,BSIS,MWSKZ,Tax on Sales/Purchases Code,direct_alias_match,tax.rate,false,already_present
+FI,BSIS,DMBTR,Amount in local currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+FI,BSIS,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSIS,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+FI,BSIS,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+FI,BSIS,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+FI,BSIS,VBUND,Company ID of trading partner,direct_alias_match,company.id,false,already_present
+FI,BSIS,PROJK,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSIS,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+FI,BSIS,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+FI,BSID,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BSID,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+FI,BSID,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+FI,BSID,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BSID,BELNR,Accounting Document Number,direct_alias_match,accounting.document_number,false,already_present
+FI,BSID,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+FI,BSID,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+FI,BSID,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,BSID,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+FI,BSID,BLART,Document type,direct_alias_match,document.type,false,already_present
+FI,BSID,MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BSID,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+FI,BSID,MWSKZ,Tax on Sales/Purchases Code,direct_alias_match,tax.rate,false,already_present
+FI,BSID,DMBTR,Amount in local currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+FI,BSID,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSID,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+FI,BSID,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,BSID,HKONT,General Ledger Account,direct_alias_match,gl_account.id,false,already_present
+FI,BSID,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+FI,BSID,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+FI,BSID,VBUND,Company ID of trading partner,direct_alias_match,company.id,false,already_present
+FI,BSID,VBELN,Billing Document,direct_alias_match,invoice.number,false,already_present
+FI,BSID,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,BSID,RSTGR,Reason Code for Payments,direct_alias_match,reason.code,false,already_present
+FI,BSID,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+FI,BSID,PROJK,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSID,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+FI,BSID,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+FI,BSID,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+FI,BSIK,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BSIK,LIFNR,Account Number of Vendor or Creditor,direct_alias_match,supplier.id,false,already_present
+FI,BSIK,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+FI,BSIK,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BSIK,BELNR,Accounting Document Number,direct_alias_match,accounting.document_number,false,already_present
+FI,BSIK,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+FI,BSIK,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+FI,BSIK,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,BSIK,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+FI,BSIK,BLART,Document type,direct_alias_match,document.type,false,already_present
+FI,BSIK,MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BSIK,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+FI,BSIK,MWSKZ,Tax on Sales/Purchases Code,direct_alias_match,tax.rate,false,already_present
+FI,BSIK,DMBTR,Amount in local currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+FI,BSIK,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSIK,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+FI,BSIK,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,BSIK,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+FI,BSIK,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+FI,BSIK,HKONT,General Ledger Account,direct_alias_match,gl_account.id,false,already_present
+FI,BSIK,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+FI,BSIK,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+FI,BSIK,VBUND,Company ID of trading partner,direct_alias_match,company.id,false,already_present
+FI,BSIK,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,BSIK,PROJK,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSIK,RSTGR,Reason Code for Payments,direct_alias_match,reason.code,false,already_present
+FI,BSIK,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+FI,BSIK,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+FI,BSIK,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+FI,BSIK,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+FI,BSAK,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,BSAK,LIFNR,Account Number of Vendor or Creditor,direct_alias_match,supplier.id,false,already_present
+FI,BSAK,AUGDT,Clearing Date,direct_alias_match,payment.date,false,already_present
+FI,BSAK,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+FI,BSAK,BELNR,Accounting Document Number,direct_alias_match,accounting.document_number,false,already_present
+FI,BSAK,BUZEI,Number of Line Item Within Accounting Document,direct_alias_match,journal_entry.line_item_number,false,already_present
+FI,BSAK,BUDAT,Posting Date in the Document,direct_alias_match,accounting.posting_date,false,already_present
+FI,BSAK,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+FI,BSAK,XBLNR,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+FI,BSAK,BLART,Document type,direct_alias_match,document.type,false,already_present
+FI,BSAK,MONAT,Fiscal period,direct_alias_match,fiscal_period.id,false,already_present
+FI,BSAK,SHKZG,Debit/Credit Indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+FI,BSAK,MWSKZ,Tax on Sales/Purchases Code,direct_alias_match,tax.rate,false,already_present
+FI,BSAK,DMBTR,Amount in local currency,direct_alias_match,accounting.local_currency_amount,false,already_present
+FI,BSAK,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSAK,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+FI,BSAK,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,BSAK,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+FI,BSAK,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+FI,BSAK,HKONT,General Ledger Account,direct_alias_match,gl_account.id,false,already_present
+FI,BSAK,ZTERM,Terms of Payment Key,direct_alias_match,payment_term.id,false,already_present
+FI,BSAK,ZLSCH,Payment Method,direct_alias_match,payment.method_code,false,already_present
+FI,BSAK,VBUND,Company ID of trading partner,direct_alias_match,company.id,false,already_present
+FI,BSAK,STCEG,VAT Registration Number,direct_alias_match,supplier.tax_registration_id,false,already_present
+FI,BSAK,PROJK,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+FI,BSAK,RSTGR,Reason Code for Payments,direct_alias_match,reason.code,false,already_present
+FI,BSAK,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+FI,BSAK,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+FI,BSAK,KIDNO,Payment Reference,direct_alias_match,payment.reference,false,already_present
+FI,BSAK,VERTN,Contract Number,direct_alias_match,contract.id,false,already_present
+FI,ANLA,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,ANLA,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,ANLA,ANLKL,Asset Class,direct_alias_match,asset.class_code,false,already_present
+FI,ANLA,ERNAM,Name of Person Responsible for Creating the Object,direct_alias_match,audit.created_by,false,already_present
+FI,ANLA,ERDAT,Record Created On,direct_alias_match,document.created_date,false,already_present
+FI,ANLA,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+FI,ANLA,AEDAT,Changed On,direct_alias_match,document.changed_date,false,already_present
+FI,ANLA,LIFNR,Account number of vendor (other key word),direct_alias_match,supplier.id,false,already_present
+FI,ANLA,LAND1,Asset's Country/Region of Origin,direct_alias_match,address.country_code,false,already_present
+FI,ANLA,HERST,Manufacturer of Asset,direct_alias_match,asset.manufacturer_name,false,already_present
+FI,ANLA,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+FI,ANLA,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+FI,ANLA,MENGE,Quantity,direct_alias_match,bom.quantity,false,already_present
+FI,ANLA,STADT,Municipality,description_alias_match,address.city,true,added
+FI,ANLA,GRUND,Reason for Manual Valuation of Net Assets,direct_alias_match,reason.code,false,already_present
+FI,ANLA,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+FI,ANLA,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+FI,ANLA,TXT50,Asset Description,direct_alias_match,account.name,false,already_present
+FI,ANLA,POSNR,WBS element investment project,direct_alias_match,sales_order.line_item_number,false,already_present
+FI,ANLA,SERNR,Serial number,direct_alias_match,asset.serial_number,false,already_present
+FI,ANLC,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+FI,ANLC,ANLN1,Main Asset Number,direct_alias_match,asset.id,false,already_present
+FI,ANLC,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+CO,COBK,BELNR,Document Number,direct_alias_match,accounting.document_number,false,already_present
+CO,COBK,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+CO,COBK,VERSN,Version in CO Document Header,direct_alias_match,version.number,false,already_present
+CO,COBK,BUDAT,Posting Date,direct_alias_match,accounting.posting_date,false,already_present
+CO,COBK,USNAM,User Name,direct_alias_match,audit.created_by,false,already_present
+CO,COBK,REFBN,Reference Document Number,direct_alias_match,journal_entry.reference,false,already_present
+CO,COBK,BLART,Document Type of FI Reference Document,direct_alias_match,document.type,false,already_present
+CO,COEP,BELNR,Document Number,direct_alias_match,accounting.document_number,false,already_present
+CO,COEP,BUZEI,Posting Row,direct_alias_match,journal_entry.line_item_number,false,already_present
+CO,COEP,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+CO,COEP,VERSN,Version,direct_alias_match,version.number,false,already_present
+CO,COEP,VBUND,Company ID of Trading Partner,direct_alias_match,company.id,false,already_present
+CO,COEP,BEKNZ,Debit/credit indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+CO,COEP,MEINH,Unit of Measure,direct_alias_match,uom.code,false,already_present
+CO,COEP,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+CO,COEP,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+CO,COEP,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+CO,COEP,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+CO,COEP,PERNR,Personnel Number,direct_alias_match,contact.id,false,already_present
+CO,COEP,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+CO,COEP,POSNR,Accounting Document Line Item Number,direct_alias_match,sales_order.line_item_number,false,already_present
+CO,COEP,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+CO,COEP,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+CO,COEP,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+CO,COEP,PSPNR,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+CO,COEP,PSPID,Project definition,direct_alias_match,project.id,false,already_present
+CO,COEP,VBELN,Sales Document,direct_alias_match,invoice.number,false,already_present
+CO,COSP,GJAHR,Fiscal Year,direct_alias_match,fiscal_year.id,false,already_present
+CO,COSP,VERSN,Version,direct_alias_match,version.number,false,already_present
+CO,COSP,VBUND,Company ID of trading partner,direct_alias_match,company.id,false,already_present
+CO,COSP,BEKNZ,Debit/credit indicator,direct_alias_match,journal_entry.debit_credit_indicator,false,already_present
+CO,COSP,MEINH,Unit of Measure,direct_alias_match,uom.code,false,already_present
+CO,COSP,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+CO,CSKB,DATAB,Valid-From Date,direct_alias_match,validity.start_date,false,already_present
+CO,CSKB,ERSDA,Entered On,direct_alias_match,document.created_date,false,already_present
+CO,CSKB,USNAM,Entered By,direct_alias_match,audit.created_by,false,already_present
+CO,CSKB,KOSTL,Cost Center,direct_alias_match,cost_center.id,false,already_present
+CO,CSKB,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+CO,CEPC,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+CO,CEPC,DATAB,Valid-From Date,direct_alias_match,validity.start_date,false,already_present
+CO,CEPC,ERSDA,Entered On,direct_alias_match,document.created_date,false,already_present
+CO,CEPC,USNAM,Entered By,direct_alias_match,audit.created_by,false,already_present
+CO,CEPC,ABTEI,Department,direct_alias_match,employee.department,false,already_present
+CO,CEPC,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+CO,CEPC,LAND1,Country/Region Key,direct_alias_match,address.country_code,false,already_present
+CO,CEPC,ANRED,Title,description_alias_match,case.subject,false,already_present
+CO,CEPC,NAME1,Name 1,direct_alias_match,contact.name,false,already_present
+CO,CEPC,ORT01,City,direct_alias_match,supplier.address,false,already_present
+CO,CEPC,STRAS,Street and House Number,direct_alias_match,address.line1,false,already_present
+CO,CEPC,PSTLZ,Postal Code,direct_alias_match,supplier.address,true,added
+CO,CEPC,SPRAS,Language Key,direct_alias_match,customer.language_code,false,already_present
+CO,CEPC,TELF1,First telephone number,direct_alias_match,contact.phone,false,already_present
+CO,CEPC,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+CO,CEPC,REGIO,"Region (State, Province, County)",direct_alias_match,supplier.region_code,false,already_present
+PP,MAST,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+PP,MAST,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+PP,MAST,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+PP,MAST,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+PP,MAST,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+PP,STKO,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+PP,STKO,DATUV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,STKO,LOEKZ,Deletion flag for BOMs,direct_alias_match,material.deletion_mark,false,already_present
+PP,STKO,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+PP,STKO,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+PP,STPO,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+PP,STPO,DATUV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,STPO,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+PP,STPO,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+PP,STPO,IDNRK,BOM component,direct_alias_match,bom.component,false,already_present
+PP,STPO,POSNR,BOM Item Number,direct_alias_match,sales_order.line_item_number,false,already_present
+PP,STPO,MEINS,Component Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+PP,STPO,MENGE,Component Quantity,direct_alias_match,bom.quantity,false,already_present
+PP,STPO,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+PP,STPO,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+PP,STPO,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+PP,STPO,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+PP,STPO,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+PP,STPO,DOKAR,Document Type,direct_alias_match,document.type,false,already_present
+PP,STPO,DOKNR,Document number,description_alias_match,account.owner_employee_id,true,added
+PP,STPO,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+PP,STPO,LGORT,Issue Location for Production Order,direct_alias_match,storage_location.id,false,already_present
+PP,STPO,GUID,Temporarily not used,direct_alias_match,system.guid,false,already_present
+PP,PLKO,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+PP,PLKO,DATUV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,PLKO,LOEKZ,Deletion Indicator,direct_alias_match,material.deletion_mark,false,already_present
+PP,PLKO,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+PP,PLKO,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+PP,PLKO,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+PP,PLKO,PSPNR,Standard WBS element,direct_alias_match,project.wbs_element_id,false,already_present
+PP,PLKO,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+PP,PLKO,MEINH,Unit of measure for activity,direct_alias_match,uom.code,false,already_present
+PP,PLKO,VERSN,Routing Version,direct_alias_match,version.number,false,already_present
+PP,PLPO,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+PP,PLPO,DATUV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,PLPO,LOEKZ,Deletion Indicator,direct_alias_match,material.deletion_mark,false,already_present
+PP,PLPO,AEDAT,Last Changed On,direct_alias_match,document.changed_date,false,already_present
+PP,PLPO,AENAM,Name of Person Who Changed Object,direct_alias_match,audit.changed_by,false,already_present
+PP,PLPO,VORNR,Operation/Activity Number,direct_alias_match,production_operation.number,false,already_present
+PP,PLPO,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+PP,PLPO,MEINH,Unit of measure for activity,direct_alias_match,uom.code,false,already_present
+PP,PLPO,LOART,Wage type,direct_alias_match,payroll.component,false,already_present
+PP,PLPO,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+PP,PLPO,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+PP,PLPO,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+PP,PLPO,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+PP,PLPO,ESOKZ,Purchasing info record category,direct_alias_match,info_record_category.code,true,added
+PP,PLPO,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+PP,PLPO,EKGRP,Purchasing Group for External Processing Activity,direct_alias_match,purchasing_group.id,false,already_present
+PP,PLPO,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+PP,PLPO,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+PP,PLPO,VERTN,"Distr.cap.reqmts (plant maint.,process order, network)",direct_alias_match,contract.id,false,already_present
+PP,PLPO,PSPNR,Standard WBS element,direct_alias_match,project.wbs_element_id,false,already_present
+PP,PLPO,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+PP,PLPO,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+PP,PLPO,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+PP,PLPO,VERSN,Routing Version,direct_alias_match,version.number,false,already_present
+PP,CRHD,BEGDA,Start Date,direct_alias_match,validity.start_date,true,added
+PP,CRHD,ENDDA,End Date,direct_alias_match,employee.termination_date,false,already_present
+PP,CRHD,AENAM_GRND,User Name,description_alias_match,account.name,true,added
+PP,CRHD,AENAM_VORA,User Name,description_alias_match,account.name,true,added
+PP,CRHD,AENAM_TERM,User Name,description_alias_match,account.name,true,added
+PP,CRHD,AENAM_TECH,User Name,description_alias_match,account.name,true,added
+PP,CRHD,ARBPL,Work Center,direct_alias_match,work_center.id,false,already_present
+PP,CRHD,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+PP,CRHD,LVORM,Deletion flag for work center,direct_alias_match,material.deletion_mark,false,already_present
+PP,CRHD,LOART,Wage type,direct_alias_match,payroll.component,false,already_present
+PP,CRHD,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+PP,CRHD,EBELN_EXT,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+PP,CRHD,EKGRP_EXT,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+PP,CRHD,EKORG_EXT,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+PP,CRHD,MATKL_EXT,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+PP,AFKO,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+PP,AFKO,GSTRI,Actual start date,direct_alias_match,production_order.actual_start_date,false,already_present
+PP,AFKO,GAMNG,Total Order Quantity,direct_alias_match,manufacturing_order.quantity,false,already_present
+PP,AFKO,GMEIN,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+PP,AFKO,PLNBEZ,Material Number,direct_alias_match,material.number,false,already_present
+PP,AFKO,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+PP,AFKO,PDATV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,AFKO,STLBEZ,Material Number,direct_alias_match,material.number,false,already_present
+PP,AFKO,STLNR,Bill of Material,direct_alias_match,bom.id,false,already_present
+PP,AFKO,SDATV,Valid-From Date,direct_alias_match,quote.valid_from_date,false,already_present
+PP,AFKO,SBMEH,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+PP,AFKO,PRUEFLOS,Inspection Lot Number,direct_alias_match,quality_inspection.id,false,already_present
+PP,AFKO,REVLV,Revision Level,direct_alias_match,material.drawing_revision,false,already_present
+PP,AFKO,BMEINS,Base Unit of Measure,direct_alias_match,base_uom.code,false,already_present
+PP,AFPO,AUFNR,Order Number,direct_alias_match,production_order.id,false,already_present
+PP,AFPO,POSNR,Order item number,direct_alias_match,sales_order.line_item_number,false,already_present
+PP,AFPO,PROJN,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+PP,AFPO,PLNUM,Planned Order,direct_alias_match,planned_order.id,false,already_present
+PP,AFPO,KDAUF,Sales Order,direct_alias_match,sales_order.id,false,already_present
+PP,AFPO,BESKZ,Procurement Type,direct_alias_match,make_or_buy.indicator,false,already_present
+PP,AFPO,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+PP,AFPO,MATNR,Material Number for Order,direct_alias_match,material.erp_material_number,false,already_present
+PP,AFPO,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+PP,AFPO,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+PP,AFPO,DWERK,Plant,direct_alias_match,plant.id,false,already_present
+PP,AFPO,CHARG,Batch Number,direct_alias_match,batch.id,false,already_present
+PP,AFPO,XLOEK,Deletion Flag,direct_alias_match,material.deletion_mark,false,already_present
+PP,AFPO,KUNNR2,Customer Number,direct_alias_match,customer.id,false,already_present
+PP,AFPO,FSH_SALLOC_QTY,Allocated Stock Quantity,direct_alias_match,inventory_reservation.quantity,false,already_present
+PM,AFVC,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+PM,AFVC,VORNR,Operation/Activity Number,direct_alias_match,production_operation.number,false,already_present
+PM,AFVC,WERKS,Plant,direct_alias_match,plant.id,false,already_present
+PM,AFVC,LOART,Wage type,direct_alias_match,payroll.component,false,already_present
+PM,AFVC,LIFNR,Account Number of Supplier,direct_alias_match,supplier.id,false,already_present
+PM,AFVC,PEINH,Price unit,direct_alias_match,price.unit,false,already_present
+PM,AFVC,WAERS,Currency Key,direct_alias_match,accounting.document_currency_code,false,already_present
+PM,AFVC,INFNR,Number of purchasing info record,direct_alias_match,purchasing_info_record.id,true,added
+PM,AFVC,ESOKZ,Purchasing info record category,direct_alias_match,info_record_category.code,true,added
+PM,AFVC,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+PM,AFVC,EKGRP,Purchasing Group for External Processing Activity,direct_alias_match,purchasing_group.id,false,already_present
+PM,AFVC,MATKL,Material Group,direct_alias_match,material.raw_material_group_id,false,already_present
+PM,AFVC,BUKRS,Company Code,direct_alias_match,company_code.id,true,added
+PM,AFVC,PROJN,Work Breakdown Structure Element (WBS Element),direct_alias_match,project.wbs_element_id,false,already_present
+PM,AFVC,BANFN,Purchase Requisition Number,direct_alias_match,requisition.id,false,already_present
+PM,AFVC,BNFPO,Item Number of Purchase Requisition in Order,direct_alias_match,requisition.line_item_number,false,already_present
+PM,AFVC,PSPNR,Standard WBS element,direct_alias_match,project.wbs_element_id,false,already_present
+PM,AFVC,PRCTR,Profit Center,direct_alias_match,profit_center.id,false,already_present
+PM,AFVC,EBELN,Purchasing Document Number,direct_alias_match,purchase_order.id,false,already_present
+PM,AFVC,EBELP,Item Number of Purchasing Document,direct_alias_match,purchase_order.line_item_number,false,already_present
+PM,AFVC,AFNAM,Name of requisitioner/requester,direct_alias_match,requisition.requester_id,false,already_present
+PM,AFVC,PERNR,Personnel number,direct_alias_match,contact.id,false,already_present
+PM,AFVC,LOEKZ,Deletion Flag,direct_alias_match,material.deletion_mark,false,already_present
+PM,AFVC,WKURS,Exchange Rate,direct_alias_match,exchange_rate.rate,false,already_present
+PM,AFVC,ADRNR,Addresses: Address Number,direct_alias_match,address.id,false,already_present
+PM,AFVC,ADRN2,Address Number,direct_alias_match,address.id,false,already_present
+PM,AFVC,PS_ADRNR,Addresses: Address Number,direct_alias_match,address.id,false,already_present
+PM,AFVC,PS_ADRN2,Address Number,direct_alias_match,address.id,false,already_present
+PM,AFVC,EQUNR,Equipment Number,direct_alias_match,equipment.id,false,already_present
+PP,PLAF,PLNUM,Planned Order,direct_alias_match,planned_order.id,false,already_present
+PP,PLAF,MATNR,Planning material,direct_alias_match,material.erp_material_number,false,already_present
+PP,PLAF,PLWRK,Planning Plant,direct_alias_match,plant.id,false,already_present
+PP,PLAF,BESKZ,Procurement Type,direct_alias_match,make_or_buy.indicator,false,already_present
+PP,PLAF,PSTTR,Planned Order Start Date,direct_alias_match,planned_order.start_date,false,already_present
+PP,PLAF,PEDTR,Planned Order End Date,direct_alias_match,planned_order.end_date,false,already_present
+PP,PLAF,KDAUF,Sales Order Number,direct_alias_match,sales_order.id,false,already_present
+PP,PLAF,PROJN,Old: Project number : No longer used --> PS_POSNR,direct_alias_match,project.wbs_element_id,false,already_present
+PP,PLAF,KONNR,Number of principal purchase agreement,direct_alias_match,contract.id,false,already_present
+PP,PLAF,EKORG,Purchasing Organization,direct_alias_match,purchasing_organization.id,false,already_present
+PP,PLAF,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+PP,PLAF,NUMVR,Version number,direct_alias_match,version.number,false,already_present
+PP,PLAF,PSPEL,WBS Element,direct_alias_match,project.wbs_element_id,false,already_present
+PP,PLAF,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+PP,PLAF,AUFNR,Run schedule header number,direct_alias_match,production_order.id,false,already_present
+PP,PLAF,PLNNR,Key for Task List Group,direct_alias_match,route.id,false,already_present
+PP,PLAF,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+PP,PLAF,REVLV,Revision Level,direct_alias_match,material.drawing_revision,false,already_present
+PP,PLAF,EMATN,Material number corresponding to manufacturer part number,direct_alias_match,material.number,false,already_present
+PP,PLAF,KUNNR,Customer Number,direct_alias_match,customer.id,false,already_present
+PP,MDKP,MATNR,Material Number,direct_alias_match,material.erp_material_number,false,already_present
+PP,MDKP,PLWRK,Plant,direct_alias_match,plant.id,false,already_present
+PP,MDKP,MTART,Material Type,direct_alias_match,material.type_code,false,already_present
+PP,MDKP,MEINS,Base Unit of Measure,direct_alias_match,material.base_uom_code,false,already_present
+PP,MDKP,BESKZ,Procurement Type,direct_alias_match,make_or_buy.indicator,false,already_present
+PP,MDKP,EKGRP,Purchasing Group,direct_alias_match,purchasing_group.id,false,already_present
+PP,MDKP,EISBE,Safety Stock,direct_alias_match,inventory_policy.safety_stock_quantity,false,already_present
+PP,MDKP,MINBE,Reorder Point,direct_alias_match,inventory_policy.reorder_point,false,already_present
+PP,MDTB,MNG03,Shortage Quantity,direct_alias_match,backorder.quantity,false,already_present
+PP,MDTB,PRPER,Forecast period,direct_alias_match,demand_forecast.forecast_period,false,already_present
+PP,MDTB,BESKZ,Procurement Type,direct_alias_match,make_or_buy.indicator,false,already_present
+PP,MDTB,LGORT,Storage Location,direct_alias_match,storage_location.id,false,already_present
+PP,MDTB,VERSB,Version Number for Independent Requirements,direct_alias_match,version.number,false,already_present
+PP,MDTB,SERNR,BOM explosion number,direct_alias_match,asset.serial_number,false,already_present
+PP,MDTB,REVLV,Revision Level,direct_alias_match,material.drawing_revision,false,already_present
+PP,MDTB,MPNMT,Material Number,direct_alias_match,material.number,false,already_present
