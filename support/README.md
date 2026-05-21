@@ -8,6 +8,8 @@ Structure:
 - `support/quickbooks/` - QuickBooks inventory classification, promotion waves, queue prioritization, context materialization, overlay generation, and canonical enrichment scripts
 - `support/vendor_ingest/` - vendor metadata parsers that convert upstream source files into importable overlay artifacts
 
+Ad hoc SAP diagnostics and one-off overlay KPI helpers also live under `support/sap/`, including `run_task.py`, `run_mapping_check.py`, and `_temp_overlay_kpi.py`.
+
 These scripts are intended to be run from the repo root, typically with `PYTHONPATH=backend` when they import backend services.
 
 ## QuickBooks Wave Status: ✅ COMPLETE
