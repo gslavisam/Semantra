@@ -17,6 +17,12 @@ from app.models.knowledge import (
     CanonicalConceptSummary,
     CanonicalConceptUsageRecord,
     CanonicalGlossaryImportResponse,
+    KnowledgeConceptPromotionRequest,
+    KnowledgeConceptPromotionResponse,
+    KnowledgeConceptDetailResponse,
+    KnowledgeConceptSummary,
+    KnowledgeConceptUpdateRequest,
+    KnowledgeRegistryImportResponse,
     KnowledgeAuditEntry,
     KnowledgeOverlayEntry,
     KnowledgeOverlayCreateResponse,
@@ -350,6 +356,113 @@ async def get_canonical_concept(concept_id: str) -> CanonicalConceptDetailRespon
         ],
         audit_entries=audit_entries,
     )
+
+
+@router.get("/concepts", response_model=list[KnowledgeConceptSummary], dependencies=[Depends(require_admin)])
+async def list_knowledge_concepts() -> list[KnowledgeConceptSummary]:
+    """List runtime knowledge concepts enriched with source and canonical-link metadata."""
+
+    return metadata_knowledge_service.list_knowledge_concepts()
+
+
+@router.get("/concepts/{concept_id}", response_model=KnowledgeConceptDetailResponse, dependencies=[Depends(require_admin)])
+async def get_knowledge_concept(concept_id: str) -> KnowledgeConceptDetailResponse:
+    """Return one runtime knowledge concept with aliases, contexts, and linked canonical concepts."""
+
+    concept = metadata_knowledge_service.get_knowledge_concept(concept_id)
+    if concept is None:
+        raise HTTPException(status_code=404, detail=f"Unknown knowledge concept: {concept_id}")
+    return concept
+
+
+@router.put("/concepts/{concept_id}/base-record", response_model=KnowledgeConceptDetailResponse, dependencies=[Depends(require_admin)])
+async def update_base_knowledge_concept(concept_id: str, request: KnowledgeConceptUpdateRequest) -> KnowledgeConceptDetailResponse:
+    """Update the editable base-registry fields for one knowledge concept and refresh runtime matching."""
+
+    try:
+        detail = metadata_knowledge_service.update_base_knowledge_concept(
+            concept_id,
+            domain=request.domain,
+            serbian_name=request.serbian_name,
+            abbreviations=request.abbreviations,
+            alternative_names=request.alternative_names,
+            data_type=request.data_type,
+            typical_length=request.typical_length,
+            example_value=request.example_value,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    append_audit_entry(
+        "stewardship",
+        " ".join(
+            part
+            for part in [
+                f"Updated base knowledge concept {concept_id}.",
+                f"Changed by={request.changed_by.strip()}." if request.changed_by and request.changed_by.strip() else "",
+            ]
+            if part
+        ),
+    )
+    return detail
+
+
+@router.post("/concepts/promote-to-glossary", response_model=KnowledgeConceptPromotionResponse, dependencies=[Depends(require_admin)])
+async def promote_knowledge_concepts_to_glossary(request: KnowledgeConceptPromotionRequest) -> KnowledgeConceptPromotionResponse:
+    """Promote one or more knowledge concepts into the stable canonical glossary using linked canonical concepts."""
+
+    if not request.concept_ids:
+        raise HTTPException(status_code=400, detail="At least one knowledge concept must be selected for promotion.")
+    try:
+        result = metadata_knowledge_service.promote_knowledge_concepts_to_canonical_glossary(
+            request.concept_ids,
+            target_concept_id=request.target_concept_id,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    append_audit_entry(
+        "stewardship",
+        " ".join(
+            part
+            for part in [
+                f"Promoted knowledge concepts to stable glossary: promoted={result.promoted_count}, skipped={result.skipped_count}.",
+                f"Target={request.target_concept_id.strip()}." if request.target_concept_id and request.target_concept_id.strip() else "",
+                f"Note={request.note.strip()}." if request.note and request.note.strip() else "",
+                f"Changed by={request.changed_by.strip()}." if request.changed_by and request.changed_by.strip() else "",
+            ]
+            if part
+        ),
+    )
+    return result
+
+
+@router.get("/base-registry/export", dependencies=[Depends(require_admin)])
+async def export_base_knowledge_registry() -> Response:
+    """Export the base metadata-driven knowledge registry as a CSV download."""
+
+    payload = metadata_knowledge_service.export_base_knowledge_csv()
+    return Response(
+        content=payload,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{metadata_knowledge_service.csv_path.name}"'},
+    )
+
+
+@router.post("/base-registry/import", response_model=KnowledgeRegistryImportResponse, dependencies=[Depends(require_admin)])
+async def import_base_knowledge_registry(file: UploadFile = File(...)) -> KnowledgeRegistryImportResponse:
+    """Import the base metadata-driven knowledge registry CSV and refresh runtime matching."""
+
+    payload = await file.read()
+    try:
+        result = metadata_knowledge_service.import_base_knowledge_csv(payload, filename=file.filename)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    append_audit_entry(
+        "create",
+        f"Imported base knowledge registry '{file.filename or metadata_knowledge_service.csv_path.name}' with {result.imported_row_count} rows.",
+    )
+    return result
 
 
 @router.get("/canonical-glossary/export", dependencies=[Depends(require_admin)])

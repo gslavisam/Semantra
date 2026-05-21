@@ -1,0 +1,101 @@
+entry_type,canonical_term,alias,domain,source_system,note
+auto_generated_from_description,sap_desc_26bdcd7c,Fixed Quantity,sap_master_data,SAP_AUTO_GEN,Auto-generated from 17 unmapped fields
+auto_generated_from_description,sap_desc_91e779ad,Quantities Incomplete,sap_master_data,SAP_AUTO_GEN,Auto-generated from 16 unmapped fields
+auto_generated_from_description,sap_desc_749b9417,Asset Subnumber,sap_master_data,SAP_AUTO_GEN,Auto-generated from 11 unmapped fields
+auto_generated_from_description,sap_desc_8e3aa641,Residue,sap_master_data,SAP_AUTO_GEN,Auto-generated from 10 unmapped fields
+auto_generated_from_description,sap_desc_4dcb2ebe,Trading partner's business area,sap_master_data,SAP_AUTO_GEN,Auto-generated from 9 unmapped fields
+auto_generated_from_description,sap_desc_9ef21c4d,Authorization Group,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_e0e9ee40,Tax Classification for Material,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_c0383039,Internal counter,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_407fb2ef,Sales District,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_d2b036cf,Field is referenced,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_c102cbb1,Selection indicator for exception groups,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_8c0054aa,Exception group in the MRP list,sap_master_data,SAP_AUTO_GEN,Auto-generated from 8 unmapped fields
+auto_generated_from_description,sap_desc_a51288c4,Shipping Conditions,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_be0f1eef,Logical system,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_914dbae9,Tax Reporting Country/Region,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_c6722c6d,Sales Document Item,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_e1b4b1ff,Unloading Point,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_8363c79a,Translation Date,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_55f51c25,Joint venture,sap_master_data,SAP_AUTO_GEN,Auto-generated from 7 unmapped fields
+auto_generated_from_description,sap_desc_40bf6d16,Alternative BOM,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_945a6f53,Incoterms Version,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_cf3ac228,Business Process,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_acd064be,Credit Control Area,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_e633d72e,Usage Indicator,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_86da4ef5,Number of Condition Record,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_fa757e73,Dunning Block,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_869764b0,Business Place,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_bcb2035d,Business Purpose Completed Flag,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_314f0b31,Special G/L Indicator,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_8e5fffae,Communication Number,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_7e009cf8,Financial Budget Item,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_74389775,Cost Element,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_4f04d988,Parameter unit,sap_master_data,SAP_AUTO_GEN,Auto-generated from 6 unmapped fields
+auto_generated_from_description,sap_desc_7d7ec9fe,Units of measure usage,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_4eab5a30,Group Counter,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_bda08ca7,Planning Group,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_d51d6d3b,Cash Discount Percentage 2,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_3e962214,Location for a physical handover of goods,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_33b47d73,Stock Type,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_57ca4786,"""Delivery Completed"" Indicator",sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_76cdac5a,Material Document Year,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_254e557e,Time of Entry,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_7633fd49,Transaction Code,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_8de69231,Date on which services are rendered,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_fdb3da85,Sales Office,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_17f56dc3,Tax Type,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_9a9f5be7,Dunning Area,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_559183af,Name 3,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_e4ec729e,Payment Reason,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_d75c45e1,Assembly,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_f622aa8f,CO Business Transaction,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_ba691770,Sealing Number,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_44222e75,Cumulations for average bases,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_da5f872c,Percentage for average bases,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_397cbd2d,Valuation Difference,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_b82eb8b8,Internal Real Estate Master Data Code,sap_master_data,SAP_AUTO_GEN,Auto-generated from 5 unmapped fields
+auto_generated_from_description,sap_desc_1ca30d00,Maintenance status,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_d6d9b757,Base quantity,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_53dec677,BOM Usage,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_64432bbd,Rounding Profile,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_c4b44f0d,Origin Group as Subdivision of Cost Element,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_f9cc5f53,VAS Relevant,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_f3f01aa5,Interest Indicator,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_cc7077cc,Shipping Instructions,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_5855ca4d,Inflation Index,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_40522320,Document Header Text,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_2dd2a64f,Item in Material Document,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_7e4777ee,Stock Category in the Warehouse Management System,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_a0c49b4c,Cost Object,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_c22a24fd,Agreement (various conditions grouped together),sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_da301e44,Annexing base date,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_23e89a4d,Condition Update,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_626a54d3,Promotion,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_a9108887,Sales Deal,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_81fee860,Bill-to Party,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_3671d683,Sales Employee,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_c1098dd4,Fund,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_56984c80,SEPA-Relevance,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_b97cd75f,Date on Which the Changes Were Confirmed,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_02b30da6,Time of Last Change Confirmation,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_a7bc2816,Period/Year,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_1547220c,Partner Functional Area,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_77f8c0e7,Financial Management Area,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_b2c677fa,Functional Location,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_ec5fbd80,Partner Fund,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_1441fd83,FM: Partner Budget Period,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_e0544448,Indicator: Document posted net ?,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_8444b79f,Reason for Late Payment,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_ce3859c7,Target Special G/L Indicator,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_d9cba818,Exempted from Interest Calculation,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_5aefadd7,Indicator: Down Payment in Net Procedure?,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_93b2ae46,Indicator: Capital Goods Affected?,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_229e38ef,Cash discount days 1,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_89e0e1fd,Cash discount days 2,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_f2478d37,Date of Last Dunning Notice,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_dc8e75ea,Payee/Payer,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_0419ba3b,Indicator: Items from Payment Program Blocked,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_4b6675af,Currency for Automatic Payment,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_694c1638,Section Code,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields
+auto_generated_from_description,sap_desc_1fd1cd2e,Item is in Execution,sap_master_data,SAP_AUTO_GEN,Auto-generated from 4 unmapped fields

@@ -10,7 +10,7 @@ Semantra currently has five top-level areas:
 - `Canonical Console`
 - `Catalog`
 - `Benchmarks`
-- `Admin / Debug`
+- `System`
 
 Recommended order for a new session:
 
@@ -18,7 +18,7 @@ Recommended order for a new session:
 2. move to `Canonical Console` only if you need canonical governance or overlay work
 3. use `Catalog` when you want reuse or discovery
 4. use `Benchmarks` when you want repeatable quality measurement
-5. use `Admin / Debug` for runtime and observability support tasks
+5. use `System` for runtime, observability, and support tasks
 
 ## Sidebar controls
 
@@ -207,9 +207,14 @@ Important:
 - this is for measuring quality and regression behavior, not for everyday mapping review itself
 - `Benchmark Explanation` does not change the score or runtime config; it only summarizes the currently loaded evidence and risks
 
-## Admin / Debug
+## System
 
-`Admin / Debug` is the operational support surface.
+`System` is the operational support surface.
+
+It has two internal sub-tabs:
+
+- `Admin`
+- `Debug`
 
 Use it for:
 

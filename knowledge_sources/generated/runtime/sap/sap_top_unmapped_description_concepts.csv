@@ -1,0 +1,214 @@
+action_type,rule_name,selection_rank,description_frequency,sap_module,sap_table,sap_field,sap_description,source_bucket,canonical_concept_id,alias_added,concept_created,context_added
+new_canonical_concept,top_unmapped_description,1,5,SD,KNA1,NAME3,Name 3,unmapped,sap_term.name_3,true,true,true
+new_canonical_concept,top_unmapped_description,1,5,SD,KNA1,PSON3,Name 3,unmapped,sap_term.name_3,true,true,true
+new_canonical_concept,top_unmapped_description,1,5,FI,LFA1,NAME3,Name 3,unmapped,sap_term.name_3,true,true,true
+new_canonical_concept,top_unmapped_description,1,5,FI,LFA1,PSON3,Name 3,unmapped,sap_term.name_3,true,true,true
+new_canonical_concept,top_unmapped_description,1,5,CO,CEPC,NAME3,Name 3,unmapped,sap_term.name_3,true,true,true
+new_canonical_concept,top_unmapped_description,2,5,SD,KNA1,PAYTRSN,Payment Reason,unmapped,sap_term.payment_reason,true,true,true
+new_canonical_concept,top_unmapped_description,2,5,SD,KNB1,PAYTRSN,Payment Reason,unmapped,sap_term.payment_reason,true,true,true
+new_canonical_concept,top_unmapped_description,2,5,FI,LFA1,PAYTRSN,Payment Reason,unmapped,sap_term.payment_reason,true,true,true
+new_canonical_concept,top_unmapped_description,2,5,FI,LFB1,PAYTRSN,Payment Reason,unmapped,sap_term.payment_reason,true,true,true
+new_canonical_concept,top_unmapped_description,2,5,FI,BSEG,PAYT_RSN,Payment Reason,unmapped,sap_term.payment_reason,true,true,true
+new_canonical_concept,top_unmapped_description,3,5,HR,T512W,D1PRO,Percentage for average bases,unmapped,sap_term.percentage_for_average_bases,true,true,true
+new_canonical_concept,top_unmapped_description,3,5,HR,T512W,D2PRO,Percentage for average bases,unmapped,sap_term.percentage_for_average_bases,true,true,true
+new_canonical_concept,top_unmapped_description,3,5,HR,T512W,D3PRO,Percentage for average bases,unmapped,sap_term.percentage_for_average_bases,true,true,true
+new_canonical_concept,top_unmapped_description,3,5,HR,T512W,D4PRO,Percentage for average bases,unmapped,sap_term.percentage_for_average_bases,true,true,true
+new_canonical_concept,top_unmapped_description,3,5,HR,T512W,D5PRO,Percentage for average bases,unmapped,sap_term.percentage_for_average_bases,true,true,true
+new_canonical_concept,top_unmapped_description,4,5,MM,MARC,SCM_RRP_SEL_GROUP,Planning Group,unmapped,sap_term.planning_group,true,true,true
+new_canonical_concept,top_unmapped_description,4,5,SD,KNB1,FDGRV,Planning Group,unmapped,sap_term.planning_group,true,true,true
+new_canonical_concept,top_unmapped_description,4,5,FI,LFB1,FDGRV,Planning Group,unmapped,sap_term.planning_group,true,true,true
+new_canonical_concept,top_unmapped_description,4,5,FI,BSEG,FDGRP,Planning Group,unmapped,sap_term.planning_group,true,true,true
+new_canonical_concept,top_unmapped_description,4,5,FI,SKB1,FDGRV,Planning Group,unmapped,sap_term.planning_group,true,true,true
+new_canonical_concept,top_unmapped_description,5,5,SD,VBAP,VKBUR_ANA,Sales Office,unmapped,sap_term.sales_office,true,true,true
+new_canonical_concept,top_unmapped_description,5,5,S/4HANA,ACDOCP,KMVKBU_PA,Sales Office,unmapped,sap_term.sales_office,true,true,true
+new_canonical_concept,top_unmapped_description,5,5,S/4HANA,ACDOCP,VKBUR_PA,Sales Office,unmapped,sap_term.sales_office,true,true,true
+new_canonical_concept,top_unmapped_description,5,5,S/4HANA,ACDOCA,KMVKBU_PA,Sales Office,unmapped,sap_term.sales_office,true,true,true
+new_canonical_concept,top_unmapped_description,5,5,S/4HANA,ACDOCA,VKBUR_PA,Sales Office,unmapped,sap_term.sales_office,true,true,true
+new_canonical_concept,top_unmapped_description,6,5,,VEKP,SEALN1,Sealing Number,unmapped,sap_term.sealing_number,true,true,true
+new_canonical_concept,top_unmapped_description,6,5,,VEKP,SEALN2,Sealing Number,unmapped,sap_term.sealing_number,true,true,true
+new_canonical_concept,top_unmapped_description,6,5,,VEKP,SEALN3,Sealing Number,unmapped,sap_term.sealing_number,true,true,true
+new_canonical_concept,top_unmapped_description,6,5,,VEKP,SEALN4,Sealing Number,unmapped,sap_term.sealing_number,true,true,true
+new_canonical_concept,top_unmapped_description,6,5,,VEKP,SEALN5,Sealing Number,unmapped,sap_term.sealing_number,true,true,true
+new_canonical_concept,top_unmapped_description,7,5,SD,KNA1,MCOD2,Search Term for Matchcode Search,unmapped,sap_term.search_term_for_matchcode_search,true,true,true
+new_canonical_concept,top_unmapped_description,7,5,SD,KNA1,MCOD3,Search term for matchcode search,unmapped,sap_term.search_term_for_matchcode_search,true,true,true
+new_canonical_concept,top_unmapped_description,7,5,FI,LFA1,MCOD2,Search term for matchcode search,unmapped,sap_term.search_term_for_matchcode_search,true,true,true
+new_canonical_concept,top_unmapped_description,7,5,FI,LFA1,MCOD3,Search term for matchcode search,unmapped,sap_term.search_term_for_matchcode_search,true,true,true
+new_canonical_concept,top_unmapped_description,7,5,FI,ANLA,MCOA1,Search Term for Matchcode Search,unmapped,sap_term.search_term_for_matchcode_search,true,true,true
+new_canonical_concept,top_unmapped_description,8,5,MM,EKPO,INSMK,Stock Type,unmapped,sap_term.stock_type,true,true,true
+new_canonical_concept,top_unmapped_description,8,5,MM,MSEG,INSMK,Stock Type,unmapped,sap_term.stock_type,true,true,true
+new_canonical_concept,top_unmapped_description,8,5,SD,LIPS,INSMK,Stock Type,unmapped,sap_term.stock_type,true,true,true
+new_canonical_concept,top_unmapped_description,8,5,S/4HANA,MATDOC,INSMK,Stock Type,unmapped,sap_term.stock_type,true,true,true
+new_canonical_concept,top_unmapped_description,8,5,PP,AFPO,INSMK,Stock Type,unmapped,sap_term.stock_type,true,true,true
+new_canonical_concept,top_unmapped_description,9,5,SD,VBKD,J_1AFITP,Tax Type,unmapped,sap_term.tax_type,true,true,true
+new_canonical_concept,top_unmapped_description,9,5,SD,VBRK,J_1AFITP,Tax Type,unmapped,sap_term.tax_type,true,true,true
+new_canonical_concept,top_unmapped_description,9,5,SD,KNA1,FITYP,Tax Type,unmapped,sap_term.tax_type,true,true,true
+new_canonical_concept,top_unmapped_description,9,5,FI,LFA1,FITYP,Tax Type,unmapped,sap_term.tax_type,true,true,true
+new_canonical_concept,top_unmapped_description,9,5,FI,BSEG,MWART,Tax Type,unmapped,sap_term.tax_type,true,true,true
+new_canonical_concept,top_unmapped_description,10,5,MM,MKPF,CPUTM,Time of Entry,unmapped,sap_term.time_of_entry,true,true,true
+new_canonical_concept,top_unmapped_description,10,5,MM,MSEG,CPUTM_MKPF,Time of Entry,unmapped,sap_term.time_of_entry,true,true,true
+new_canonical_concept,top_unmapped_description,10,5,S/4HANA,MATDOC,CPUTM,Time of Entry,unmapped,sap_term.time_of_entry,true,true,true
+new_canonical_concept,top_unmapped_description,10,5,FI,BKPF,CPUTM,Time of Entry,unmapped,sap_term.time_of_entry,true,true,true
+new_canonical_concept,top_unmapped_description,10,5,CO,COBK,CPUTM,Time of Entry,unmapped,sap_term.time_of_entry,true,true,true
+new_canonical_concept,top_unmapped_description,11,5,MM,MKPF,TCODE2,Transaction Code,unmapped,sap_term.transaction_code,true,true,true
+new_canonical_concept,top_unmapped_description,11,5,MM,MSEG,TCODE2_MKPF,Transaction Code,unmapped,sap_term.transaction_code,true,true,true
+new_canonical_concept,top_unmapped_description,11,5,SD,LIKP,TCODE,Transaction Code,unmapped,sap_term.transaction_code,true,true,true
+new_canonical_concept,top_unmapped_description,11,5,S/4HANA,MATDOC,TCODE2,Transaction Code,unmapped,sap_term.transaction_code,true,true,true
+new_canonical_concept,top_unmapped_description,11,5,FI,BKPF,TCODE,Transaction Code,unmapped,sap_term.transaction_code,true,true,true
+new_canonical_concept,top_unmapped_description,12,5,MM,MARA,KZWSM,Units of measure usage,unmapped,sap_term.units_of_measure_usage,true,true,true
+new_canonical_concept,top_unmapped_description,12,5,MM,MARM,KZWSO,Units of measure usage,unmapped,sap_term.units_of_measure_usage,true,true,true
+new_canonical_concept,top_unmapped_description,12,5,MM,EBAN,KZFME,Units of measure usage,unmapped,sap_term.units_of_measure_usage,true,true,true
+new_canonical_concept,top_unmapped_description,12,5,MM,EKPO,KZFME,Units of measure usage,unmapped,sap_term.units_of_measure_usage,true,true,true
+new_canonical_concept,top_unmapped_description,12,5,SD,LIPS,KZWSO,Units of measure usage,unmapped,sap_term.units_of_measure_usage,true,true,true
+new_canonical_concept,top_unmapped_description,13,5,FI,BSEG,BDIFF,Valuation Difference,unmapped,sap_term.valuation_difference,true,true,true
+new_canonical_concept,top_unmapped_description,13,5,FI,BSIS,BDIFF,Valuation Difference,unmapped,sap_term.valuation_difference,true,true,true
+new_canonical_concept,top_unmapped_description,13,5,FI,BSID,BDIFF,Valuation Difference,unmapped,sap_term.valuation_difference,true,true,true
+new_canonical_concept,top_unmapped_description,13,5,FI,BSIK,BDIFF,Valuation Difference,unmapped,sap_term.valuation_difference,true,true,true
+new_canonical_concept,top_unmapped_description,13,5,FI,BSAK,BDIFF,Valuation Difference,unmapped,sap_term.valuation_difference,true,true,true
+new_canonical_concept,top_unmapped_description,14,4,SD,VBAK,KNUMA,Agreement (various conditions grouped together),unmapped,sap_term.agreement_various_conditions_grouped_together,true,true,true
+new_canonical_concept,top_unmapped_description,14,4,SD,VBRK,KNUMA,Agreement (various conditions grouped together),unmapped,sap_term.agreement_various_conditions_grouped_together,true,true,true
+new_canonical_concept,top_unmapped_description,14,4,SD,VBRP,KNUMA_ANA,Agreement (various conditions grouped together),unmapped,sap_term.agreement_various_conditions_grouped_together,true,true,true
+new_canonical_concept,top_unmapped_description,14,4,,KONA,KNUMA,Agreement (various conditions grouped together),unmapped,sap_term.agreement_various_conditions_grouped_together,true,true,true
+new_canonical_concept,top_unmapped_description,15,4,SD,VBAK,ZABDATH,Annexing base date,unmapped,sap_term.annexing_base_date,true,true,true
+new_canonical_concept,top_unmapped_description,15,4,SD,VBAP,ZABDATI,Annexing base date,unmapped,sap_term.annexing_base_date,true,true,true
+new_canonical_concept,top_unmapped_description,15,4,SD,VBRK,ZABDATH,Annexing base date,unmapped,sap_term.annexing_base_date,true,true,true
+new_canonical_concept,top_unmapped_description,15,4,SD,VBRP,ZABDATI,Annexing base date,unmapped,sap_term.annexing_base_date,true,true,true
+new_canonical_concept,top_unmapped_description,16,4,SD,VBAP,KUNRE_ANA,Bill-to Party,unmapped,sap_term.bill_to_party,true,true,true
+new_canonical_concept,top_unmapped_description,16,4,SD,VBRP,KUNRE_ANA,Bill-to Party,unmapped,sap_term.bill_to_party,true,true,true
+new_canonical_concept,top_unmapped_description,16,4,S/4HANA,ACDOCP,KUNRE,Bill-to Party,unmapped,sap_term.bill_to_party,true,true,true
+new_canonical_concept,top_unmapped_description,16,4,S/4HANA,ACDOCA,KUNRE,Bill-to Party,unmapped,sap_term.bill_to_party,true,true,true
+new_canonical_concept,top_unmapped_description,17,4,MM,MARC,STLAN,BOM Usage,unmapped,sap_term.bom_usage,true,true,true
+new_canonical_concept,top_unmapped_description,17,4,PP,MAST,STLAN,BOM Usage,unmapped,sap_term.bom_usage,true,true,true
+new_canonical_concept,top_unmapped_description,17,4,PP,AFKO,STLAN,BOM Usage,unmapped,sap_term.bom_usage,true,true,true
+new_canonical_concept,top_unmapped_description,17,4,PP,PLAF,STLAN,BOM Usage,unmapped,sap_term.bom_usage,true,true,true
+new_canonical_concept,top_unmapped_description,18,4,FI,BSEG,ZBD1T,Cash discount days 1,unmapped,sap_term.cash_discount_days_1,true,true,true
+new_canonical_concept,top_unmapped_description,18,4,FI,BSID,ZBD1T,Cash discount days 1,unmapped,sap_term.cash_discount_days_1,true,true,true
+new_canonical_concept,top_unmapped_description,18,4,FI,BSIK,ZBD1T,Cash discount days 1,unmapped,sap_term.cash_discount_days_1,true,true,true
+new_canonical_concept,top_unmapped_description,18,4,FI,BSAK,ZBD1T,Cash discount days 1,unmapped,sap_term.cash_discount_days_1,true,true,true
+new_canonical_concept,top_unmapped_description,19,4,FI,BSEG,ZBD2T,Cash discount days 2,unmapped,sap_term.cash_discount_days_2,true,true,true
+new_canonical_concept,top_unmapped_description,19,4,FI,BSID,ZBD2T,Cash discount days 2,unmapped,sap_term.cash_discount_days_2,true,true,true
+new_canonical_concept,top_unmapped_description,19,4,FI,BSIK,ZBD2T,Cash discount days 2,unmapped,sap_term.cash_discount_days_2,true,true,true
+new_canonical_concept,top_unmapped_description,19,4,FI,BSAK,ZBD2T,Cash discount days 2,unmapped,sap_term.cash_discount_days_2,true,true,true
+new_canonical_concept,top_unmapped_description,20,4,PP,CRHD,AEDAT_GRND,Changed on,unmapped,sap_term.changed_on,true,true,true
+new_canonical_concept,top_unmapped_description,20,4,PP,CRHD,AEDAT_VORA,Changed on,unmapped,sap_term.changed_on,true,true,true
+new_canonical_concept,top_unmapped_description,20,4,PP,CRHD,AEDAT_TERM,Changed on,unmapped,sap_term.changed_on,true,true,true
+new_canonical_concept,top_unmapped_description,20,4,PP,CRHD,AEDAT_TECH,Changed on,unmapped,sap_term.changed_on,true,true,true
+new_canonical_concept,top_unmapped_description,21,4,SD,VBAP,KOUPD,Condition Update,unmapped,sap_term.condition_update,true,true,true
+new_canonical_concept,top_unmapped_description,21,4,SD,VBRP,KOUPD,Condition Update,unmapped,sap_term.condition_update,true,true,true
+new_canonical_concept,top_unmapped_description,21,4,S/4HANA,PRCD_ELEMENTS,KOUPD,Condition Update,unmapped,sap_term.condition_update,true,true,true
+new_canonical_concept,top_unmapped_description,21,4,SD,KONV,KOUPD,Condition Update,unmapped,sap_term.condition_update,true,true,true
+new_canonical_concept,top_unmapped_description,22,4,MM,MSEG,KSTRG,Cost Object,unmapped,sap_term.cost_object,true,true,true
+new_canonical_concept,top_unmapped_description,22,4,S/4HANA,MATDOC,KSTRG,Cost Object,unmapped,sap_term.cost_object,true,true,true
+new_canonical_concept,top_unmapped_description,22,4,S/4HANA,ACDOCA,KSTRG,Cost Object,unmapped,sap_term.cost_object,true,true,true
+new_canonical_concept,top_unmapped_description,22,4,FI,BSEG,KSTRG,Cost Object,unmapped,sap_term.cost_object,true,true,true
+new_canonical_concept,top_unmapped_description,23,4,FI,BSEG,PYCUR,Currency for Automatic Payment,unmapped,sap_term.currency_for_automatic_payment,true,true,true
+new_canonical_concept,top_unmapped_description,23,4,FI,BSID,PYCUR,Currency for Automatic Payment,unmapped,sap_term.currency_for_automatic_payment,true,true,true
+new_canonical_concept,top_unmapped_description,23,4,FI,BSIK,PYCUR,Currency for Automatic Payment,unmapped,sap_term.currency_for_automatic_payment,true,true,true
+new_canonical_concept,top_unmapped_description,23,4,FI,BSAK,PYCUR,Currency for Automatic Payment,unmapped,sap_term.currency_for_automatic_payment,true,true,true
+new_canonical_concept,top_unmapped_description,24,4,FI,BSEG,MADAT,Date of Last Dunning Notice,unmapped,sap_term.date_of_last_dunning_notice,true,true,true
+new_canonical_concept,top_unmapped_description,24,4,FI,BSID,MADAT,Date of Last Dunning Notice,unmapped,sap_term.date_of_last_dunning_notice,true,true,true
+new_canonical_concept,top_unmapped_description,24,4,FI,BSIK,MADAT,Date of Last Dunning Notice,unmapped,sap_term.date_of_last_dunning_notice,true,true,true
+new_canonical_concept,top_unmapped_description,24,4,FI,BSAK,MADAT,Date of Last Dunning Notice,unmapped,sap_term.date_of_last_dunning_notice,true,true,true
+new_canonical_concept,top_unmapped_description,25,4,SD,KNA1,UPDAT,Date on Which the Changes Were Confirmed,unmapped,sap_term.date_on_which_the_changes_were_confirmed,true,true,true
+new_canonical_concept,top_unmapped_description,25,4,SD,KNB1,UPDAT,Date on Which the Changes Were Confirmed,unmapped,sap_term.date_on_which_the_changes_were_confirmed,true,true,true
+new_canonical_concept,top_unmapped_description,25,4,FI,LFA1,UPDAT,Date on Which the Changes Were Confirmed,unmapped,sap_term.date_on_which_the_changes_were_confirmed,true,true,true
+new_canonical_concept,top_unmapped_description,25,4,FI,LFB1,UPDAT,Date on Which the Changes Were Confirmed,unmapped,sap_term.date_on_which_the_changes_were_confirmed,true,true,true
+new_canonical_concept,top_unmapped_description,26,4,PP,STKO,LKENZ,Deletion Indicator,unmapped,sap_term.deletion_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,26,4,PP,STPO,LKENZ,Deletion Indicator,unmapped,sap_term.deletion_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,26,4,PP,PLKO,LOEKZ_INHERITED,Deletion Indicator,unmapped,sap_term.deletion_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,26,4,PP,PLPO,LOEKZ_INHERITED,Deletion Indicator,unmapped,sap_term.deletion_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,27,4,MM,MKPF,BKTXT,Document Header Text,unmapped,sap_term.document_header_text,true,true,true
+new_canonical_concept,top_unmapped_description,27,4,S/4HANA,MATDOC,BKTXT,Document Header Text,unmapped,sap_term.document_header_text,true,true,true
+new_canonical_concept,top_unmapped_description,27,4,FI,BKPF,BKTXT,Document Header Text,unmapped,sap_term.document_header_text,true,true,true
+new_canonical_concept,top_unmapped_description,27,4,CO,COBK,BLTXT,Document Header Text,unmapped,sap_term.document_header_text,true,true,true
+new_canonical_concept,top_unmapped_description,28,4,FI,BSEG,ZINKZ,Exempted from Interest Calculation,unmapped,sap_term.exempted_from_interest_calculation,true,true,true
+new_canonical_concept,top_unmapped_description,28,4,FI,BSID,ZINKZ,Exempted from Interest Calculation,unmapped,sap_term.exempted_from_interest_calculation,true,true,true
+new_canonical_concept,top_unmapped_description,28,4,FI,BSIK,ZINKZ,Exempted from Interest Calculation,unmapped,sap_term.exempted_from_interest_calculation,true,true,true
+new_canonical_concept,top_unmapped_description,28,4,FI,BSAK,ZINKZ,Exempted from Interest Calculation,unmapped,sap_term.exempted_from_interest_calculation,true,true,true
+new_canonical_concept,top_unmapped_description,29,4,S/4HANA,ACDOCP,FIKRS,Financial Management Area,unmapped,sap_term.financial_management_area,true,true,true
+new_canonical_concept,top_unmapped_description,29,4,S/4HANA,ACDOCA,FIKRS,Financial Management Area,unmapped,sap_term.financial_management_area,true,true,true
+new_canonical_concept,top_unmapped_description,29,4,,T001,FIKRS,Financial Management Area,unmapped,sap_term.financial_management_area,true,true,true
+new_canonical_concept,top_unmapped_description,29,4,FI,BKPF,FIKRS,Financial Management Area,unmapped,sap_term.financial_management_area,true,true,true
+new_canonical_concept,top_unmapped_description,30,4,S/4HANA,ACDOCA,SBUDGET_PD,FM: Partner Budget Period,unmapped,sap_term.fm_partner_budget_period,true,true,true
+new_canonical_concept,top_unmapped_description,30,4,FI,BSEG,PBUDGET_PD,FM: Partner Budget Period,unmapped,sap_term.fm_partner_budget_period,true,true,true
+new_canonical_concept,top_unmapped_description,30,4,FI,BSIS,PBUDGET_PD,FM: Partner Budget Period,unmapped,sap_term.fm_partner_budget_period,true,true,true
+new_canonical_concept,top_unmapped_description,30,4,CO,COEP,PBUDGET_PD,FM: Partner Budget Period,unmapped,sap_term.fm_partner_budget_period,true,true,true
+new_canonical_concept,top_unmapped_description,31,4,S/4HANA,ACDOCP,TPLNR,Functional Location,unmapped,sap_term.functional_location,true,true,true
+new_canonical_concept,top_unmapped_description,31,4,S/4HANA,ACDOCA,TPLNR,Functional Location,unmapped,sap_term.functional_location,true,true,true
+new_canonical_concept,top_unmapped_description,31,4,PP,PLPO,TPLNR,Functional Location,unmapped,sap_term.functional_location,true,true,true
+new_canonical_concept,top_unmapped_description,31,4,PM,AFVC,TPLNR,Functional Location,unmapped,sap_term.functional_location,true,true,true
+new_canonical_concept,top_unmapped_description,32,4,SD,VBAP,FONDS,Fund,unmapped,sap_term.fund,true,true,true
+new_canonical_concept,top_unmapped_description,32,4,SD,VBRP,FONDS,Fund,unmapped,sap_term.fund,true,true,true
+new_canonical_concept,top_unmapped_description,32,4,S/4HANA,ACDOCP,RFUND,Fund,unmapped,sap_term.fund,true,true,true
+new_canonical_concept,top_unmapped_description,32,4,S/4HANA,ACDOCA,RFUND,Fund,unmapped,sap_term.fund,true,true,true
+new_canonical_concept,top_unmapped_description,33,4,FI,BSEG,XINVE,Indicator: Capital Goods Affected?,unmapped,sap_term.indicator_capital_goods_affected,true,true,true
+new_canonical_concept,top_unmapped_description,33,4,FI,BSID,XINVE,Indicator: Capital Goods Affected?,unmapped,sap_term.indicator_capital_goods_affected,true,true,true
+new_canonical_concept,top_unmapped_description,33,4,FI,BSIK,XINVE,Indicator: Capital Goods Affected?,unmapped,sap_term.indicator_capital_goods_affected,true,true,true
+new_canonical_concept,top_unmapped_description,33,4,FI,BSAK,XINVE,Indicator: Capital Goods Affected?,unmapped,sap_term.indicator_capital_goods_affected,true,true,true
+new_canonical_concept,top_unmapped_description,34,4,FI,BSIS,XARCH,Indicator: Document already archived ?,unmapped,sap_term.indicator_document_already_archived,true,true,true
+new_canonical_concept,top_unmapped_description,34,4,FI,BSID,XARCH,Indicator: Document already archived ?,unmapped,sap_term.indicator_document_already_archived,true,true,true
+new_canonical_concept,top_unmapped_description,34,4,FI,BSIK,XARCH,Indicator: Document already archived ?,unmapped,sap_term.indicator_document_already_archived,true,true,true
+new_canonical_concept,top_unmapped_description,34,4,FI,BSAK,XARCH,Indicator: Document already archived ?,unmapped,sap_term.indicator_document_already_archived,true,true,true
+new_canonical_concept,top_unmapped_description,35,4,FI,BKPF,XNETB,Indicator: Document posted net ?,unmapped,sap_term.indicator_document_posted_net,true,true,true
+new_canonical_concept,top_unmapped_description,35,4,FI,BSID,XNETB,Indicator: Document posted net ?,unmapped,sap_term.indicator_document_posted_net,true,true,true
+new_canonical_concept,top_unmapped_description,35,4,FI,BSIK,XNETB,Indicator: Document posted net ?,unmapped,sap_term.indicator_document_posted_net,true,true,true
+new_canonical_concept,top_unmapped_description,35,4,FI,BSAK,XNETB,Indicator: Document posted net ?,unmapped,sap_term.indicator_document_posted_net,true,true,true
+new_canonical_concept,top_unmapped_description,36,4,FI,BSEG,XANET,Indicator: Down Payment in Net Procedure?,unmapped,sap_term.indicator_down_payment_in_net_procedure,true,true,true
+new_canonical_concept,top_unmapped_description,36,4,FI,BSID,XANET,Indicator: Down Payment in Net Procedure?,unmapped,sap_term.indicator_down_payment_in_net_procedure,true,true,true
+new_canonical_concept,top_unmapped_description,36,4,FI,BSIK,XANET,Indicator: Down Payment in Net Procedure?,unmapped,sap_term.indicator_down_payment_in_net_procedure,true,true,true
+new_canonical_concept,top_unmapped_description,36,4,FI,BSAK,XANET,Indicator: Down Payment in Net Procedure?,unmapped,sap_term.indicator_down_payment_in_net_procedure,true,true,true
+new_canonical_concept,top_unmapped_description,37,4,FI,BSEG,XPYPR,Indicator: Items from Payment Program Blocked,unmapped,sap_term.indicator_items_from_payment_program_blocked,true,true,true
+new_canonical_concept,top_unmapped_description,37,4,FI,BSID,XPYPR,Indicator: Items from Payment Program Blocked,unmapped,sap_term.indicator_items_from_payment_program_blocked,true,true,true
+new_canonical_concept,top_unmapped_description,37,4,FI,BSIK,XPYPR,Indicator: Items from Payment Program Blocked,unmapped,sap_term.indicator_items_from_payment_program_blocked,true,true,true
+new_canonical_concept,top_unmapped_description,37,4,FI,BSAK,XPYPR,Indicator: Items from Payment Program Blocked,unmapped,sap_term.indicator_items_from_payment_program_blocked,true,true,true
+new_canonical_concept,top_unmapped_description,38,4,MM,EKPO,J_1AINDXP,Inflation Index,unmapped,sap_term.inflation_index,true,true,true
+new_canonical_concept,top_unmapped_description,38,4,SD,VBKD,J_1AINDXP,Inflation Index,unmapped,sap_term.inflation_index,true,true,true
+new_canonical_concept,top_unmapped_description,38,4,SD,VBRP,J_1AINDXP,Inflation Index,unmapped,sap_term.inflation_index,true,true,true
+new_canonical_concept,top_unmapped_description,38,4,FI,BSEG,IDXSP,Inflation Index,unmapped,sap_term.inflation_index,true,true,true
+new_canonical_concept,top_unmapped_description,39,4,MM,EKKO,VZSKZ,Interest Indicator,unmapped,sap_term.interest_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,39,4,SD,KNB1,VZSKZ,Interest Indicator,unmapped,sap_term.interest_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,39,4,FI,LFB1,VZSKZ,Interest Indicator,unmapped,sap_term.interest_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,39,4,FI,SKB1,VZSKZ,Interest Indicator,unmapped,sap_term.interest_indicator,true,true,true
+new_canonical_concept,top_unmapped_description,40,4,MM,MSEG,ZEILE,Item in Material Document,unmapped,sap_term.item_in_material_document,true,true,true
+new_canonical_concept,top_unmapped_description,40,4,MM,MSEG,SMBLP,Item in Material Document,unmapped,sap_term.item_in_material_document,true,true,true
+new_canonical_concept,top_unmapped_description,40,4,S/4HANA,MATDOC,ZEILE,Item in Material Document,unmapped,sap_term.item_in_material_document,true,true,true
+new_canonical_concept,top_unmapped_description,40,4,S/4HANA,MATDOC,SMBLP,Item in Material Document,unmapped,sap_term.item_in_material_document,true,true,true
+new_canonical_concept,top_unmapped_description,41,4,FI,BSEG,GMVKZ,Item is in Execution,unmapped,sap_term.item_is_in_execution,true,true,true
+new_canonical_concept,top_unmapped_description,41,4,FI,BSID,GMVKZ,Item is in Execution,unmapped,sap_term.item_is_in_execution,true,true,true
+new_canonical_concept,top_unmapped_description,41,4,FI,BSIK,GMVKZ,Item is in Execution,unmapped,sap_term.item_is_in_execution,true,true,true
+new_canonical_concept,top_unmapped_description,41,4,FI,BSAK,GMVKZ,Item is in Execution,unmapped,sap_term.item_is_in_execution,true,true,true
+new_canonical_concept,top_unmapped_description,42,4,MM,MARA,PSTAT,Maintenance status,unmapped,sap_term.maintenance_status,true,true,true
+new_canonical_concept,top_unmapped_description,42,4,MM,MARC,PSTAT,Maintenance status,unmapped,sap_term.maintenance_status,true,true,true
+new_canonical_concept,top_unmapped_description,42,4,MM,MARD,PSTAT,Maintenance status,unmapped,sap_term.maintenance_status,true,true,true
+new_canonical_concept,top_unmapped_description,42,4,MM,MBEW,PSTAT,Maintenance status,unmapped,sap_term.maintenance_status,true,true,true
+new_canonical_concept,top_unmapped_description,43,4,FI,BSIS,PROPMANO,"Mandate, Mandate-Opening Contract",unmapped,sap_term.mandate_mandate_opening_contract,true,true,true
+new_canonical_concept,top_unmapped_description,43,4,FI,BSID,PROPMANO,"Mandate, Mandate-Opening Contract",unmapped,sap_term.mandate_mandate_opening_contract,true,true,true
+new_canonical_concept,top_unmapped_description,43,4,FI,BSIK,PROPMANO,"Mandate, Mandate-Opening Contract",unmapped,sap_term.mandate_mandate_opening_contract,true,true,true
+new_canonical_concept,top_unmapped_description,43,4,FI,BSAK,PROPMANO,"Mandate, Mandate-Opening Contract",unmapped,sap_term.mandate_mandate_opening_contract,true,true,true
+new_canonical_concept,top_unmapped_description,44,4,SD,LIKP,TPQUA,not currently in use,unmapped,sap_term.not_currently_in_use,true,true,true
+new_canonical_concept,top_unmapped_description,44,4,SD,LIKP,TPGRP,not currently in use,unmapped,sap_term.not_currently_in_use,true,true,true
+new_canonical_concept,top_unmapped_description,44,4,SD,LIKP,STZKL,Not Currently in Use,unmapped,sap_term.not_currently_in_use,true,true,true
+new_canonical_concept,top_unmapped_description,44,4,SD,LIKP,STZZU,not currently in use,unmapped,sap_term.not_currently_in_use,true,true,true
+new_canonical_concept,top_unmapped_description,45,4,S/4HANA,ACDOCP,SFAREA,Partner Functional Area,unmapped,sap_term.partner_functional_area,true,true,true
+new_canonical_concept,top_unmapped_description,45,4,S/4HANA,ACDOCA,SFAREA,Partner Functional Area,unmapped,sap_term.partner_functional_area,true,true,true
+new_canonical_concept,top_unmapped_description,45,4,FI,BSEG,PFKBER,Partner Functional Area,unmapped,sap_term.partner_functional_area,true,true,true
+new_canonical_concept,top_unmapped_description,45,4,CO,COEP,PFKBER,Partner Functional Area,unmapped,sap_term.partner_functional_area,true,true,true
+new_canonical_concept,top_unmapped_description,46,4,S/4HANA,ACDOCA,SFUND,Partner Fund,unmapped,sap_term.partner_fund,true,true,true
+new_canonical_concept,top_unmapped_description,46,4,FI,BSEG,PGEBER,Partner Fund,unmapped,sap_term.partner_fund,true,true,true
+new_canonical_concept,top_unmapped_description,46,4,FI,BSIS,PGEBER,Partner Fund,unmapped,sap_term.partner_fund,true,true,true
+new_canonical_concept,top_unmapped_description,46,4,CO,COEP,PGEBER,Partner Fund,unmapped,sap_term.partner_fund,true,true,true
+new_canonical_concept,top_unmapped_description,47,4,FI,BSEG,EMPFB,Payee/Payer,unmapped,sap_term.payee_payer,true,true,true
+new_canonical_concept,top_unmapped_description,47,4,FI,BSID,EMPFB,Payee/Payer,unmapped,sap_term.payee_payer,true,true,true
+new_canonical_concept,top_unmapped_description,47,4,FI,BSIK,EMPFB,Payee/Payer,unmapped,sap_term.payee_payer,true,true,true
+new_canonical_concept,top_unmapped_description,47,4,FI,BSAK,EMPFB,Payee/Payer,unmapped,sap_term.payee_payer,true,true,true
+new_canonical_concept,top_unmapped_description,48,4,HR,PA2001,PAYTY,Payroll type,unmapped,sap_term.payroll_type,true,true,true
+new_canonical_concept,top_unmapped_description,48,4,FI,BSID,BTYPE,Payroll Type,unmapped,sap_term.payroll_type,true,true,true
+new_canonical_concept,top_unmapped_description,48,4,FI,BSIK,BTYPE,Payroll Type,unmapped,sap_term.payroll_type,true,true,true
+new_canonical_concept,top_unmapped_description,48,4,FI,BSAK,BTYPE,Payroll Type,unmapped,sap_term.payroll_type,true,true,true
+new_canonical_concept,top_unmapped_description,49,4,S/4HANA,MATDOC,GJPER,Period/Year,unmapped,sap_term.period_year,true,true,true
+new_canonical_concept,top_unmapped_description,49,4,S/4HANA,MATDOC,GJPER_CURR_PER,Period/Year,unmapped,sap_term.period_year,true,true,true
+new_canonical_concept,top_unmapped_description,49,4,S/4HANA,ACDOCP,FISCYEARPER,Period/Year,unmapped,sap_term.period_year,true,true,true
+new_canonical_concept,top_unmapped_description,49,4,S/4HANA,ACDOCA,FISCYEARPER,Period/Year,unmapped,sap_term.period_year,true,true,true
+new_canonical_concept,top_unmapped_description,50,4,SD,VBAP,KNUMA_PI,Promotion,unmapped,sap_term.promotion,true,true,true
+new_canonical_concept,top_unmapped_description,50,4,SD,VBRP,KNUMA_PI,Promotion,unmapped,sap_term.promotion,true,true,true
+new_canonical_concept,top_unmapped_description,50,4,,KONH,KNUMA_PI,Promotion,unmapped,sap_term.promotion,true,true,true
+new_canonical_concept,top_unmapped_description,50,4,,KONP,KNUMA_PI,Promotion,unmapped,sap_term.promotion,true,true,true

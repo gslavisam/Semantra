@@ -551,7 +551,7 @@ def _catalog_next_action_plan(
         if status != "approved" or unmatched_sources or artifact_type == "canonical-only":
             plan.update(
                 {
-                    "secondary_area": "Canonical Console",
+                    "secondary_area": "Governance",
                     "secondary_label": "Open canonical governance handoff",
                     "secondary_summary": (
                         "Inspect canonical coverage, stewardship, and approval context before treating this version as a stable reuse baseline."
@@ -563,7 +563,7 @@ def _catalog_next_action_plan(
     if status != "approved":
         return {
             "table_label": "Canonical governance handoff",
-            "primary_area": "Canonical Console",
+            "primary_area": "Governance",
             "primary_label": "Open canonical governance handoff",
             "primary_summary": (
                 f"This version is {status}. Inspect governance owner, review note, and canonical coverage before reusing it in Workspace."
@@ -585,7 +585,7 @@ def _catalog_next_action_plan(
     secondary_label = ""
     secondary_summary = ""
     if unmatched_sources or artifact_type == "canonical-only":
-        secondary_area = "Canonical Console"
+        secondary_area = "Governance"
         secondary_label = "Open canonical governance handoff"
         secondary_summary = (
             "Inspect canonical usage, gap queue, and overlay context for the concepts behind this reuse candidate."

@@ -2,15 +2,27 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 import csv
 import hashlib
+import re
 from pathlib import Path
 from typing import Iterable
 
 from openpyxl import load_workbook
 
-from app.models.knowledge import CanonicalGlossaryEntry, CanonicalGlossaryImportResponse
+from app.models.knowledge import (
+    CanonicalGlossaryEntry,
+    CanonicalGlossaryImportResponse,
+    KnowledgeConceptBaseRecord,
+    KnowledgeConceptDetailResponse,
+    KnowledgeConceptFieldContext,
+    KnowledgeConceptPromotionResponse,
+    KnowledgeConceptPromotionResult,
+    KnowledgeConceptSummary,
+    KnowledgeRegistryImportResponse,
+)
 from app.models.mapping import (
     CanonicalConceptMatchDetail,
     CanonicalCoverageColumnMatch,
@@ -39,7 +51,18 @@ DEFAULT_HRDH_OVERLAY_PATH   = PROJECT_ROOT / "metadata_dict" / "hrdh_knowledge_o
 DEFAULT_WD_DATAHUB_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "wd_datahub_knowledge_overlay.csv"
 DEFAULT_QB_OVERLAY_PATH = PROJECT_ROOT / "metadata_dict" / "qb_knowledge_overlay.csv"
 DEFAULT_CANONICAL_FIELD_CONTEXT_ENRICHMENT_PATH = PROJECT_ROOT / "metadata_dict" / "canonical_field_context_enrichment.csv"
+DEFAULT_SAP_KNOWLEDGE_AVAILABLE_TAGS_PATH = PROJECT_ROOT / "knowledge_sources" / "generated" / "runtime" / "sap" / "sap_remaining_knowledge_available_tags.csv"
 MULTI_VALUE_FIELDS = ("Skracenice", "Alternativni nazivi")
+BASE_KNOWLEDGE_REQUIRED_HEADERS = ("Kategorija/Domen", "Naziv (Engleski)")
+BASE_KNOWLEDGE_INLINE_EDIT_HEADERS = {
+    "domain": "Kategorija/Domen",
+    "serbian_name": "Naziv (Srpski)",
+    "abbreviations": "Skracenice",
+    "alternative_names": "Alternativni nazivi",
+    "data_type": "Tip podatka",
+    "typical_length": "Tipicna duzina",
+    "example_value": "Primer vrednosti",
+}
 CANONICAL_GLOSSARY_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
 DEFAULT_METADATA_EXACT_MATCH_STRENGTH = 0.75
 PRIORITY_METADATA_EXACT_MATCH_STRENGTH = 0.9
@@ -237,6 +260,242 @@ class MetadataKnowledgeService:
         payload = self.canonical_glossary_path.read_text(encoding="utf-8-sig")
         return payload if payload.endswith("\n") else payload + "\n"
 
+    def export_base_knowledge_csv(self) -> str:
+        if not self.csv_path.exists():
+            return ""
+
+        payload = self.csv_path.read_text(encoding="utf-8-sig")
+        return payload if payload.endswith("\n") else payload + "\n"
+
+    def list_knowledge_concepts(self) -> list[KnowledgeConceptSummary]:
+        base_concept_ids = self._base_knowledge_concept_ids()
+        concepts: list[KnowledgeConceptSummary] = []
+        for concept in sorted(self._concepts_by_id.values(), key=lambda item: item.concept_id):
+            source_systems = sorted({context.system.strip() for context in concept.contexts if context.system.strip()})
+            linked_canonical_concepts = sorted(self._kc_to_cc.get(concept.concept_id, set()))
+            editable = concept.concept_id in base_concept_ids
+            concepts.append(
+                KnowledgeConceptSummary(
+                    concept_id=concept.concept_id,
+                    domain=concept.domain,
+                    canonical_name=concept.canonical_name,
+                    source=self._classify_knowledge_concept_source(concept.concept_id, editable=editable),
+                    editable=editable,
+                    alias_count=len(concept.aliases),
+                    field_context_count=len(concept.contexts),
+                    linked_canonical_concept_count=len(linked_canonical_concepts),
+                    source_systems=source_systems,
+                    linked_canonical_concepts=linked_canonical_concepts,
+                    aliases=sorted(concept.aliases),
+                )
+            )
+        return concepts
+
+    def get_knowledge_concept(self, concept_id: str) -> KnowledgeConceptDetailResponse | None:
+        normalized_concept_id = str(concept_id or "").strip()
+        concept = self._concepts_by_id.get(normalized_concept_id)
+        if concept is None:
+            return None
+
+        base_concept_ids = self._base_knowledge_concept_ids()
+        editable = concept.concept_id in base_concept_ids
+        linked_canonical_concepts = sorted(self._kc_to_cc.get(concept.concept_id, set()))
+        summary = KnowledgeConceptSummary(
+            concept_id=concept.concept_id,
+            domain=concept.domain,
+            canonical_name=concept.canonical_name,
+            source=self._classify_knowledge_concept_source(concept.concept_id, editable=editable),
+            editable=editable,
+            alias_count=len(concept.aliases),
+            field_context_count=len(concept.contexts),
+            linked_canonical_concept_count=len(linked_canonical_concepts),
+            source_systems=sorted({context.system.strip() for context in concept.contexts if context.system.strip()}),
+            linked_canonical_concepts=linked_canonical_concepts,
+            aliases=sorted(concept.aliases),
+        )
+        return KnowledgeConceptDetailResponse(
+            concept=summary,
+            field_contexts=[
+                KnowledgeConceptFieldContext(
+                    system=context.system,
+                    object_name=context.object_name,
+                    field_name=context.field_name,
+                    category=context.category,
+                    object_description=context.object_description,
+                    field_description=context.field_description,
+                    note=context.note,
+                )
+                for context in concept.contexts
+            ],
+            base_record=self._build_base_knowledge_record(normalized_concept_id),
+        )
+
+    def update_base_knowledge_concept(
+        self,
+        concept_id: str,
+        *,
+        domain: str,
+        serbian_name: str,
+        abbreviations: str,
+        alternative_names: str,
+        data_type: str,
+        typical_length: str,
+        example_value: str,
+    ) -> KnowledgeConceptDetailResponse:
+        fieldnames, rows = self._read_base_knowledge_rows()
+        row = self._base_knowledge_row(rows, concept_id)
+        if row is None:
+            raise KeyError(f"Unknown editable base knowledge concept: {concept_id}")
+
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["domain"]] = str(domain or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["serbian_name"]] = str(serbian_name or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["abbreviations"]] = str(abbreviations or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["alternative_names"]] = str(alternative_names or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["data_type"]] = str(data_type or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["typical_length"]] = str(typical_length or "").strip()
+        row[BASE_KNOWLEDGE_INLINE_EDIT_HEADERS["example_value"]] = str(example_value or "").strip()
+
+        self._write_base_knowledge_rows(fieldnames, rows)
+        self.refresh()
+        detail = self.get_knowledge_concept(concept_id)
+        if detail is None:
+            raise KeyError(f"Knowledge concept disappeared after update: {concept_id}")
+        return detail
+
+    def promote_knowledge_concepts_to_canonical_glossary(
+        self,
+        concept_ids: Iterable[str],
+        *,
+        target_concept_id: str | None = None,
+    ) -> KnowledgeConceptPromotionResponse:
+        if not self.canonical_glossary_path.exists():
+            raise KeyError("Canonical glossary file is not available.")
+
+        with self.canonical_glossary_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames:
+                raise ValueError("Canonical glossary CSV must include a header row.")
+            rows = [{header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS} for row in reader]
+
+        rows_by_concept_id = {row["concept_id"]: row for row in rows if row.get("concept_id")}
+        results: list[KnowledgeConceptPromotionResult] = []
+        changed = False
+
+        for raw_concept_id in concept_ids:
+            normalized_concept_id = str(raw_concept_id or "").strip()
+            concept = self._concepts_by_id.get(normalized_concept_id)
+            if concept is None:
+                results.append(
+                    KnowledgeConceptPromotionResult(
+                        knowledge_concept_id=normalized_concept_id or "unknown",
+                        status="error",
+                        message="Knowledge concept was not found in the current runtime.",
+                    )
+                )
+                continue
+
+            linked_targets = sorted(self._kc_to_cc.get(normalized_concept_id, set()))
+            resolved_target_concept_id = str(target_concept_id or "").strip() or None
+            if resolved_target_concept_id is None:
+                if len(linked_targets) == 1:
+                    resolved_target_concept_id = linked_targets[0]
+                elif not linked_targets:
+                    results.append(
+                        KnowledgeConceptPromotionResult(
+                            knowledge_concept_id=normalized_concept_id,
+                            status="skipped",
+                            message="No linked canonical concept is available for automatic promotion.",
+                        )
+                    )
+                    continue
+                else:
+                    results.append(
+                        KnowledgeConceptPromotionResult(
+                            knowledge_concept_id=normalized_concept_id,
+                            status="skipped",
+                            message="Multiple linked canonical concepts are available; choose one explicitly for single-concept promotion.",
+                        )
+                    )
+                    continue
+
+            target_runtime_concept = self._canonical_concepts_by_id.get(resolved_target_concept_id)
+            target_row = rows_by_concept_id.get(resolved_target_concept_id)
+            concept_created = False
+            if target_row is None:
+                if target_runtime_concept is None:
+                    results.append(
+                        KnowledgeConceptPromotionResult(
+                            knowledge_concept_id=normalized_concept_id,
+                            target_concept_id=resolved_target_concept_id,
+                            status="error",
+                            message="Target canonical concept is not available in the stable glossary or runtime.",
+                        )
+                    )
+                    continue
+                target_row = {
+                    "concept_id": target_runtime_concept.concept_id,
+                    "entity": target_runtime_concept.entity,
+                    "attribute": target_runtime_concept.attribute,
+                    "display_name": target_runtime_concept.display_name,
+                    "description": target_runtime_concept.description,
+                    "data_type": target_runtime_concept.data_type,
+                    "aliases": "",
+                }
+                rows.append(target_row)
+                rows_by_concept_id[resolved_target_concept_id] = target_row
+                concept_created = True
+                changed = True
+
+            current_aliases = _split_values(target_row.get("aliases") or "")
+            existing_aliases = {
+                normalized
+                for normalized in (_normalize_canonical_alias(value) for value in current_aliases)
+                if normalized
+            }
+            candidate_aliases = filter_canonical_aliases([concept.canonical_name, *sorted(concept.aliases)])
+            aliases_to_add = [
+                alias
+                for alias in candidate_aliases
+                if _normalize_canonical_alias(alias) and _normalize_canonical_alias(alias) not in existing_aliases
+            ]
+
+            if aliases_to_add:
+                target_row["aliases"] = ", ".join(filter_canonical_aliases([*current_aliases, *aliases_to_add]))
+                changed = True
+                message = f"Promoted {len(aliases_to_add)} aliases into {resolved_target_concept_id}."
+                status = "promoted"
+            elif concept_created:
+                message = f"Created stable canonical concept {resolved_target_concept_id}; all promoted aliases were already present."
+                status = "promoted"
+            else:
+                message = f"All candidate aliases are already present in {resolved_target_concept_id}."
+                status = "skipped"
+
+            results.append(
+                KnowledgeConceptPromotionResult(
+                    knowledge_concept_id=normalized_concept_id,
+                    target_concept_id=resolved_target_concept_id,
+                    status=status,
+                    alias_count=len(candidate_aliases),
+                    aliases_added=len(aliases_to_add),
+                    concept_created=concept_created,
+                    message=message,
+                )
+            )
+
+        if changed:
+            with self.canonical_glossary_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=CANONICAL_GLOSSARY_HEADERS)
+                writer.writeheader()
+                writer.writerows(rows)
+            self._refresh_after_canonical_authoring_change()
+
+        return KnowledgeConceptPromotionResponse(
+            promoted_count=sum(1 for item in results if item.status == "promoted"),
+            skipped_count=sum(1 for item in results if item.status != "promoted"),
+            results=results,
+        )
+
     def list_canonical_glossary_entries(self) -> list[CanonicalGlossaryEntry]:
         return [
             CanonicalGlossaryEntry(
@@ -289,6 +548,43 @@ class MetadataKnowledgeService:
         return CanonicalGlossaryImportResponse(
             imported_row_count=len(parsed_rows),
             canonical_concept_count=self.canonical_concept_count,
+            source_filename=filename,
+        )
+
+    def import_base_knowledge_csv(
+        self,
+        payload: bytes,
+        filename: str | None = None,
+    ) -> KnowledgeRegistryImportResponse:
+        if filename and not filename.lower().endswith(".csv"):
+            raise ValueError("Knowledge registry import currently supports CSV files only.")
+
+        decoded = self._decode_csv_payload(payload)
+        reader = csv.DictReader(decoded.splitlines())
+        if not reader.fieldnames:
+            raise ValueError("Knowledge registry CSV must include a header row.")
+
+        fieldnames = [str(header or "").strip() for header in reader.fieldnames if str(header or "").strip()]
+        missing_headers = [header for header in BASE_KNOWLEDGE_REQUIRED_HEADERS if header not in fieldnames]
+        if missing_headers:
+            missing_label = ", ".join(missing_headers)
+            raise ValueError(f"Knowledge registry CSV is missing required columns: {missing_label}.")
+
+        parsed_rows: list[dict[str, str]] = []
+        for row_number, row in enumerate(reader, start=2):
+            concept_id = str(row.get("Naziv (Engleski)") or "").strip()
+            if not concept_id:
+                raise ValueError(f"Knowledge registry row {row_number} is missing Naziv (Engleski).")
+            parsed_rows.append({header: str(row.get(header) or "").strip() for header in fieldnames})
+
+        with self.csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(parsed_rows)
+        self.refresh()
+        return KnowledgeRegistryImportResponse(
+            imported_row_count=len(parsed_rows),
+            knowledge_concept_count=self.concept_count,
             source_filename=filename,
         )
 
@@ -1004,6 +1300,7 @@ class MetadataKnowledgeService:
         "DEFAULT_WD_DATAHUB_OVERLAY_PATH",
         "DEFAULT_QB_OVERLAY_PATH",
         "DEFAULT_CANONICAL_FIELD_CONTEXT_ENRICHMENT_PATH",
+        "DEFAULT_SAP_KNOWLEDGE_AVAILABLE_TAGS_PATH",
     )
 
     def _compute_source_hash(self) -> str:
@@ -1038,6 +1335,76 @@ class MetadataKnowledgeService:
         self._overlay_aliases_by_concept.clear()
         self._overlay_canonical_aliases_by_concept.clear()
         clear_normalization_overrides()
+
+    def _read_base_knowledge_rows(self) -> tuple[list[str], list[dict[str, str]]]:
+        if not self.csv_path.exists():
+            raise KeyError("Base knowledge registry file is not available.")
+
+        decoded = self._decode_csv_payload(self.csv_path.read_bytes())
+        reader = csv.DictReader(decoded.splitlines())
+        if not reader.fieldnames:
+            raise ValueError("Knowledge registry CSV must include a header row.")
+        fieldnames = [str(header or "").strip() for header in reader.fieldnames if str(header or "").strip()]
+        rows = [{header: str(row.get(header) or "").strip() for header in fieldnames} for row in reader]
+        return fieldnames, rows
+
+    def _write_base_knowledge_rows(self, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+        with self.csv_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def _base_knowledge_row(self, rows: Iterable[dict[str, str]], concept_id: str) -> dict[str, str] | None:
+        normalized_concept_id = _normalize_alias(str(concept_id or ""))
+        for row in rows:
+            row_concept_id = _normalize_alias(str(row.get("Naziv (Engleski)") or ""))
+            if row_concept_id == normalized_concept_id:
+                return row
+        return None
+
+    def _build_base_knowledge_record(self, concept_id: str) -> KnowledgeConceptBaseRecord | None:
+        try:
+            _fieldnames, rows = self._read_base_knowledge_rows()
+        except (KeyError, ValueError):
+            return None
+
+        row = self._base_knowledge_row(rows, concept_id)
+        if row is None:
+            return None
+        return KnowledgeConceptBaseRecord(
+            domain=str(row.get("Kategorija/Domen") or "").strip(),
+            english_name=str(row.get("Naziv (Engleski)") or "").strip(),
+            serbian_name=str(row.get("Naziv (Srpski)") or "").strip(),
+            abbreviations=str(row.get("Skracenice") or "").strip(),
+            alternative_names=str(row.get("Alternativni nazivi") or "").strip(),
+            data_type=str(row.get("Tip podatka") or "").strip(),
+            typical_length=str(row.get("Tipicna duzina") or "").strip(),
+            example_value=str(row.get("Primer vrednosti") or "").strip(),
+        )
+
+    def _base_knowledge_concept_ids(self) -> set[str]:
+        if not self.csv_path.exists():
+            return set()
+
+        for encoding in ("utf-8-sig", "utf-8", "cp1250", "cp1252", "latin-1"):
+            try:
+                with self.csv_path.open("r", encoding=encoding, newline="") as handle:
+                    reader = csv.DictReader(handle)
+                    return {
+                        _normalize_alias(str(row.get("Naziv (Engleski)") or ""))
+                        for row in reader
+                        if _normalize_alias(str(row.get("Naziv (Engleski)") or ""))
+                    }
+            except UnicodeDecodeError:
+                continue
+        return set()
+
+    def _classify_knowledge_concept_source(self, concept_id: str, *, editable: bool) -> str:
+        if editable:
+            return "base_registry"
+        if concept_id.startswith("sap_knowledge_available."):
+            return "generated_runtime"
+        return "derived_runtime"
 
     def _refresh_after_canonical_authoring_change(self) -> None:
         """Reload the canonical slice without reparsing the full metadata source stack."""
@@ -1224,6 +1591,7 @@ class MetadataKnowledgeService:
                     for row in reader:
                         self._register_csv_row(row)
                 self._load_workbook_contexts()
+                self._load_sap_knowledge_available_tags(DEFAULT_SAP_KNOWLEDGE_AVAILABLE_TAGS_PATH)
                 return
             except UnicodeDecodeError:
                 self._concepts_by_id.clear()
@@ -1348,6 +1716,71 @@ class MetadataKnowledgeService:
                     note=str(row.get("note") or "").strip(),
                 )
                 self._register_field_context(field_name, concept_id, context)
+
+    def _load_sap_knowledge_available_tags(self, csv_path: Path) -> None:
+        if not csv_path.exists():
+            return
+
+        grouped_rows: dict[str, list[dict[str, str]]] = {}
+        display_names: dict[str, str] = {}
+
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                description = str(row.get("sap_description") or "").strip()
+                field_name = str(row.get("sap_field") or "").strip()
+                if not description and not field_name:
+                    continue
+
+                group_label = description or field_name
+                group_key = _normalize_alias(group_label)
+                if not group_key:
+                    continue
+
+                grouped_rows.setdefault(group_key, []).append({
+                    "sap_module": str(row.get("sap_module") or "").strip(),
+                    "sap_table": str(row.get("sap_table") or "").strip(),
+                    "sap_field": field_name,
+                    "sap_description": description,
+                    "knowledge_tag_level": str(row.get("knowledge_tag_level") or "").strip(),
+                    "knowledge_tag_reason": str(row.get("knowledge_tag_reason") or "").strip(),
+                    "knowledge_tag_note": str(row.get("knowledge_tag_note") or "").strip(),
+                })
+                display_names.setdefault(group_key, group_label)
+
+        for group_key, rows in grouped_rows.items():
+            display_name = display_names.get(group_key) or group_key
+            concept_id = self._sap_knowledge_available_concept_id(group_key)
+            dominant_module = Counter(row.get("sap_module") or "UNKNOWN" for row in rows).most_common(1)[0][0]
+            contexts: list[KnowledgeFieldContext] = []
+            for row in rows:
+                field_name = row.get("sap_field") or ""
+                if not field_name:
+                    continue
+                contexts.append(
+                    KnowledgeFieldContext(
+                        system="SAP",
+                        object_name=row.get("sap_table") or "",
+                        field_name=field_name,
+                        category="sap_knowledge_available",
+                        object_description="",
+                        field_description=row.get("sap_description") or "",
+                        note=row.get("knowledge_tag_note") or f"module={dominant_module}",
+                    )
+                )
+            self._register_concept(
+                concept_id,
+                f"sap_knowledge_available:{dominant_module or 'UNKNOWN'}",
+                display_name,
+                aliases={display_name},
+                contexts=contexts,
+            )
+
+    def _sap_knowledge_available_concept_id(self, normalized_label: str) -> str:
+        slug = re.sub(r"[^a-z0-9]+", "_", normalized_label.lower()).strip("_")
+        if not slug:
+            slug = hashlib.md5(normalized_label.encode("utf-8"), usedforsecurity=False).hexdigest()[:12]
+        return f"sap_knowledge_available.{slug[:80]}"
 
     def _auto_register_sap_field_aliases(self, field_descriptions: dict[tuple[str, str], str]) -> None:
         """Auto-register SAP fields from Tbls_Clm as canonical concept aliases and field contexts."""

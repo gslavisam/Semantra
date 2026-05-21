@@ -1,0 +1,15 @@
+scope,label,row_count,ratio
+overall,remaining_unmapped,2915,1.0000
+knowledge_tag_level,high,2884,0.9894
+knowledge_tag_level,medium,31,0.0106
+knowledge_tag_reason,description_domain_data_element,2884,0.9894
+knowledge_tag_reason,description_table_context,31,0.0106
+sap_module,MM,658,0.2257
+sap_module,SD,627,0.2151
+sap_module,PP,473,0.1623
+sap_module,FI,419,0.1437
+sap_module,UNKNOWN,265,0.0909
+sap_module,S/4HANA,252,0.0864
+sap_module,HR,117,0.0401
+sap_module,PM,64,0.0220
+sap_module,CO,40,0.0137

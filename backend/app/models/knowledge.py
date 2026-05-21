@@ -16,6 +16,7 @@ KnowledgeRuntimeSource = Literal["sqlite_cache", "source_files", "canonical_auth
 KnowledgeSeedState = Literal["current", "drifted", "missing"]
 KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore", "triage", "stewardship"]
 CanonicalConceptSource = Literal["base", "overlay_only", "base_plus_active_overlay"]
+KnowledgeConceptSource = Literal["base_registry", "derived_runtime", "generated_runtime"]
 KnowledgeStewardshipItemType = Literal["canonical_gap", "overlay_promotion"]
 KnowledgeStewardshipStatus = Literal["new", "needs_review", "ready_for_approval", "approved", "rejected", "ignored", "promoted"]
 
@@ -139,6 +140,69 @@ class CanonicalGlossaryImportResponse(BaseModel):
     source_filename: str | None = None
 
 
+class KnowledgeRegistryImportResponse(BaseModel):
+    """Summary returned after importing the base knowledge registry CSV."""
+
+    imported_row_count: int = 0
+    knowledge_concept_count: int = 0
+    source_filename: str | None = None
+
+
+class KnowledgeConceptBaseRecord(BaseModel):
+    """Editable base-registry fields for one knowledge concept."""
+
+    domain: str = ""
+    english_name: str = ""
+    serbian_name: str = ""
+    abbreviations: str = ""
+    alternative_names: str = ""
+    data_type: str = ""
+    typical_length: str = ""
+    example_value: str = ""
+
+
+class KnowledgeConceptUpdateRequest(BaseModel):
+    """Request payload used to update the editable base-registry fields of one knowledge concept."""
+
+    domain: str = ""
+    serbian_name: str = ""
+    abbreviations: str = ""
+    alternative_names: str = ""
+    data_type: str = ""
+    typical_length: str = ""
+    example_value: str = ""
+    changed_by: str | None = None
+
+
+class KnowledgeConceptPromotionRequest(BaseModel):
+    """Request payload used to promote one or more knowledge concepts into the stable canonical glossary."""
+
+    concept_ids: list[str] = Field(default_factory=list)
+    target_concept_id: str | None = None
+    changed_by: str | None = None
+    note: str | None = None
+
+
+class KnowledgeConceptPromotionResult(BaseModel):
+    """Outcome for one knowledge concept promotion attempt."""
+
+    knowledge_concept_id: str
+    target_concept_id: str | None = None
+    status: str = "skipped"
+    alias_count: int = 0
+    aliases_added: int = 0
+    concept_created: bool = False
+    message: str = ""
+
+
+class KnowledgeConceptPromotionResponse(BaseModel):
+    """Batch response for knowledge-to-canonical promotion attempts."""
+
+    promoted_count: int = 0
+    skipped_count: int = 0
+    results: list[KnowledgeConceptPromotionResult] = Field(default_factory=list)
+
+
 class CanonicalGlossaryPromotionRequest(BaseModel):
     """Request metadata for promoting a stewardship item into the glossary."""
 
@@ -235,6 +299,42 @@ class CanonicalConceptDetailResponse(BaseModel):
     active_overlay_entries: list[CanonicalConceptOverlayEntry] = Field(default_factory=list)
     integrations: list[CanonicalConceptUsageRecord] = Field(default_factory=list)
     audit_entries: list[KnowledgeAuditEntry] = Field(default_factory=list)
+
+
+class KnowledgeConceptFieldContext(BaseModel):
+    """Field-level context attached to one runtime knowledge concept."""
+
+    system: str = ""
+    object_name: str = ""
+    field_name: str = ""
+    category: str = ""
+    object_description: str = ""
+    field_description: str = ""
+    note: str = ""
+
+
+class KnowledgeConceptSummary(BaseModel):
+    """Summary view of one runtime knowledge concept."""
+
+    concept_id: str
+    domain: str = ""
+    canonical_name: str
+    source: KnowledgeConceptSource = "base_registry"
+    editable: bool = False
+    alias_count: int = 0
+    field_context_count: int = 0
+    linked_canonical_concept_count: int = 0
+    source_systems: list[str] = Field(default_factory=list)
+    linked_canonical_concepts: list[str] = Field(default_factory=list)
+    aliases: list[str] = Field(default_factory=list)
+
+
+class KnowledgeConceptDetailResponse(BaseModel):
+    """Detail response for one runtime knowledge concept."""
+
+    concept: KnowledgeConceptSummary
+    field_contexts: list[KnowledgeConceptFieldContext] = Field(default_factory=list)
+    base_record: KnowledgeConceptBaseRecord | None = None
 
 
 class KnowledgeStewardshipItemRecord(BaseModel):

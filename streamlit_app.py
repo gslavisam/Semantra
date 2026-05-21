@@ -618,8 +618,8 @@ def render_canonical_console_tab() -> None:
     from streamlit_ui.admin_views import render_canonical_console_panel as _impl
 
     if admin_token_required() and not str(st.session_state.get("admin_token", "")).strip():
-        st.header("Canonical Console")
-        st.warning("Admin token is required for canonical console governance endpoints.")
+        st.header("Governance")
+        st.warning("Admin token is required for governance endpoints.")
         return
 
     return _impl(
@@ -679,7 +679,7 @@ def render_workspace_tab() -> None:
 
 # Application root
 
-TOP_LEVEL_AREAS = ["Workspace", "Canonical Console", "Catalog", "Benchmarks", "Admin / Debug"]
+TOP_LEVEL_AREAS = ["Workspace", "Catalog", "Benchmarks", "System", "Governance"]
 
 def main() -> None:
     st.title("Semantra - Data Mapping Review and Benchmarking")
@@ -714,11 +714,11 @@ def main() -> None:
 
     if selected_top_level_area == "Workspace":
         render_workspace_tab()
-    elif selected_top_level_area == "Canonical Console":
+    elif selected_top_level_area == "Governance":
         render_canonical_console_tab()
     elif selected_top_level_area == "Catalog":
         render_catalog_tab()
-    elif selected_top_level_area == "Admin / Debug":
+    elif selected_top_level_area == "System":
         render_admin_debug_tab()
     elif selected_top_level_area == "Benchmarks":
         render_benchmark_tab()

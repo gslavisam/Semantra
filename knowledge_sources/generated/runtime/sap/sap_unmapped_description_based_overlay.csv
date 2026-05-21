@@ -1,0 +1,2001 @@
+entry_type,canonical_term,alias,domain,source_system,note
+field_alias,Date of Last Change,MM_MARA_LAEDA,DATUM,SAP,Auto-linked via description
+field_alias,Maintenance status,MM_MARA_PSTAT,PSTAT,SAP,Auto-linked via description
+field_alias,Industry Sector,MM_MARA_MBRSH,MBRSH,SAP,Auto-linked via description
+field_alias,Page format of document (without Document Management system),MM_MARA_ZEIFO,DINFO,SAP,Auto-linked via description
+field_alias,Production/inspection memo,MM_MARA_FERTH,FERTH,SAP,Auto-linked via description
+field_alias,Page Format of Production Memo,MM_MARA_FORMT,DINFO,SAP,Auto-linked via description
+field_alias,Basic Material,MM_MARA_WRKST,WRKST,SAP,Auto-linked via description
+field_alias,Industry Standard Description (such as ANSI or ISO),MM_MARA_NORMT,NORMT,SAP,Auto-linked via description
+field_alias,Laboratory/design office,MM_MARA_LABOR,LABOR,SAP,Auto-linked via description
+field_alias,Container requirements,MM_MARA_BEHVO,BEHVO,SAP,Auto-linked via description
+field_alias,Temperature conditions indicator,MM_MARA_TEMPB,TEMPB,SAP,Auto-linked via description
+field_alias,Low-Level Code,MM_MARA_DISST,DISST,SAP,Auto-linked via description
+field_alias,Procurement rule,MM_MARA_BWVOR,BWVOR,SAP,Auto-linked via description
+field_alias,Source of Supply,MM_MARA_BWSCL,BQSCL,SAP,Auto-linked via description
+field_alias,Season Category,MM_MARA_SAISO,SAISO,SAP,Auto-linked via description
+field_alias,Label type,MM_MARA_ETIAR,ETIAR,SAP,Auto-linked via description
+field_alias,Label form,MM_MARA_ETIFO,ETIFO,SAP,Auto-linked via description
+field_alias,Deactivated,MM_MARA_ENTAR,CHAR1,SAP,Auto-linked via description
+field_alias,Unit of Dimension for Length/Width/Height,MM_MARA_MEABM,MEINS,SAP,Auto-linked via description
+field_alias,CAD Indicator,MM_MARA_CADKZ,XFELD,SAP,Auto-linked via description
+field_alias,Allowed packaging weight,MM_MARA_ERGEW,MENG13,SAP,Auto-linked via description
+field_alias,Allowed packaging volume,MM_MARA_ERVOL,MENG13,SAP,Auto-linked via description
+field_alias,Maximum level (by volume),MM_MARA_FUELG,DEC3,SAP,Auto-linked via description
+field_alias,Stacking factor,MM_MARA_STFAK,INT2,SAP,Auto-linked via description
+field_alias,Authorization Group,MM_MARA_BEGRU,BEGRU,SAP,Auto-linked via description
+field_alias,Deletion date,MM_MARA_LIQDT,DATUM,SAP,Auto-linked via description
+field_alias,Season Year,MM_MARA_SAISJ,CJAHR,SAP,Auto-linked via description
+field_alias,Empties Bill of Material,MM_MARA_MLGUT,FLAG,SAP,Auto-linked via description
+field_alias,Material Category,MM_MARA_ATTYP,ATTYP,SAP,Auto-linked via description
+field_alias,Co-Product,MM_MARA_KZKUP,FLAG,SAP,Auto-linked via description
+field_alias,Indicator: The material has a follow-up material,MM_MARA_KZNFM,XFELD,SAP,Auto-linked via description
+field_alias,Tax classification of the material,MM_MARA_TAKLV,TAXKM,SAP,Auto-linked via description
+field_alias,Catalog Profile,MM_MARA_RBNRM,RBNR,SAP,Auto-linked via description
+field_alias,Storage percentage,MM_MARA_MHDLP,DEC3,SAP,Auto-linked via description
+field_alias,Content unit,MM_MARA_INHME,MEINS,SAP,Auto-linked via description
+field_alias,Net contents,MM_MARA_INHAL,MENG13,SAP,Auto-linked via description
+field_alias,IS-R Labeling: material grouping (deactivated in 4.0),MM_MARA_ETIAG,ETIAG,SAP,Auto-linked via description
+field_alias,Gross contents,MM_MARA_INHBR,MENG13,SAP,Auto-linked via description
+field_alias,Quantity Conversion Method,MM_MARA_CMETH,OIB_CMETH,SAP,Auto-linked via description
+field_alias,Internal object number,MM_MARA_CUOBF,CUOBJ,SAP,Auto-linked via description
+field_alias,Product allocation determination procedure,MM_MARA_KOSCH,KOSCH,SAP,Auto-linked via description
+field_alias,Pricing profile for variants,MM_MARA_SPROF,SPROF,SAP,Auto-linked via description
+field_alias,Material qualifies for discount in kind,MM_MARA_NRFHG,NRFHG,SAP,Auto-linked via description
+field_alias,Units of measure usage,MM_MARA_KZWSM,KZWSO,SAP,Auto-linked via description
+field_alias,Rollout in a Season,MM_MARA_SAITY,SAITY,SAP,Auto-linked via description
+field_alias,Indicator: Highly Viscous,MM_MARA_IHIVI,X,SAP,Auto-linked via description
+field_alias,Indicator: In Bulk/Liquid,MM_MARA_ILOOS,X,SAP,Auto-linked via description
+field_alias,Packaging Material is Closed Packaging,MM_MARA_KZGVH,XFELD,SAP,Auto-linked via description
+field_alias,Approved Batch Record Required,MM_MARA_XGCHP,XFELD,SAP,Auto-linked via description
+field_alias,Assign effectivity parameter values/ override change numbers,MM_MARA_KZEFF,XFELD,SAP,Auto-linked via description
+field_alias,Material completion level,MM_MARA_COMPL,CSCP_COMP_LVL,SAP,Auto-linked via description
+field_alias,Rounding rule for calculation of SLED,MM_MARA_RDMHD,RDMHD,SAP,Auto-linked via description
+field_alias,Indicator: Product composition printed on packaging,MM_MARA_PRZUS,XFELD,SAP,Auto-linked via description
+field_alias,Generic Material with Logistical Variants,MM_MARA_BFLME,BFLME,SAP,Auto-linked via description
+field_alias,Relevant for Configuration Management,MM_MARA_CMREL,DO_CM_RELEVANCE_FLAG,SAP,Auto-linked via description
+field_alias,Assortment List Type,MM_MARA_BBTYP,BBTYP,SAP,Auto-linked via description
+field_alias,Indicator: Global Data Synchronization-Relevant,MM_MARA_GDS_RELEVANT,XFELD,SAP,Auto-linked via description
+field_alias,Acceptance At Origin,MM_MARA_WEORA,XFELD,SAP,Auto-linked via description
+field_alias,Standard HU Type,MM_MARA_HUTYP_DFLT,CHAR4,SAP,Auto-linked via description
+field_alias,Pilferable,MM_MARA_PILFERABLE,XFELD,SAP,Auto-linked via description
+field_alias,Warehouse Storage Condition,MM_MARA_WHSTC,CHAR2,SAP,Auto-linked via description
+field_alias,Handling Indicator,MM_MARA_HNDLCODE,CHAR4,SAP,Auto-linked via description
+field_alias,Variable Tare Weight,MM_MARA_TARE_VAR,XFELD,SAP,Auto-linked via description
+field_alias,Maximum Allowed Capacity of Packaging Material,MM_MARA_MAXC,DECV15_3,SAP,Auto-linked via description
+field_alias,Maximum Packing Length of Packaging Material,MM_MARA_MAXL,CIFQUAN15,SAP,Auto-linked via description
+field_alias,Maximum Packing Width of Packaging Material,MM_MARA_MAXB,CIFQUAN15,SAP,Auto-linked via description
+field_alias,Maximum Packing Height of Packaging Material,MM_MARA_MAXH,CIFQUAN15,SAP,Auto-linked via description
+field_alias,Quarantine Period,MM_MARA_QQTIME,data,SAP,Auto-linked via description
+field_alias,Time Unit for Quarantine Period,MM_MARA_QQTIMEUOM,MEINS,SAP,Auto-linked via description
+field_alias,Quality Inspection Group,MM_MARA_QGRP,CIFQGRP,SAP,Auto-linked via description
+field_alias,Form Name,MM_MARA_PS_SMARTFORM,TDSFNAME,SAP,Auto-linked via description
+field_alias,EWM CW: Catch Weight Profile for Entering CW Quantity,MM_MARA_CWQPROC,CIFCWQPROC,SAP,Auto-linked via description
+field_alias,Catch Weight Tolerance Group,MM_MARA_CWQTOLGR,CIFCWQTOLGR,SAP,Auto-linked via description
+field_alias,Adjustment Profile,MM_MARA_ADPROF,/SCWM/DO_MEDI_APROF,SAP,Auto-linked via description
+field_alias,Commodity,MM_MARA_COMMODITY,TBA_STOEFFCHEN,SAP,Auto-linked via description
+field_alias,Indicator: Contains Non-Textile Parts of Animal Origin,MM_MARA_ANIMAL_ORIGIN,WRF_ANIMAL_ORIGIN_FLAG,SAP,Auto-linked via description
+field_alias,Indicator: New Textile Composition Function,MM_MARA_TEXTILE_COMP_IND,WRF_TEXTL_COMP_IND,SAP,Auto-linked via description
+field_alias,Chemical Compliance Relevance Indicator,MM_MARA_CHML_CMPLNC_RLVNCE_IND,CHML_CMPLNC_RLVNCE_IND,SAP,Auto-linked via description
+field_alias,Category of a Logistical Material,MM_MARA_LOGISTICAL_MAT_CATEGORY,DO_LOGISTICAL_MAT_CATEGORY,SAP,Auto-linked via description
+field_alias,Identification Tag Type,MM_MARA_IDENTIFICATION_TAG_TYPE,IDENTIFICATIONTAGTYPE,SAP,Auto-linked via description
+field_alias,Data element for OID of product,MM_MARA_PRODUCTOID,PRODUCT_OID,SAP,Auto-linked via description
+field_alias,Segmentation Structure,MM_MARA_SGT_CSGR,SGT_CSGR,SAP,Auto-linked via description
+field_alias,Segmentation Strategy,MM_MARA_SGT_COVSA,SGT_COVS,SAP,Auto-linked via description
+field_alias,Segmentation Strategy Scope,MM_MARA_SGT_SCOPE,SGT_SCOPE,SAP,Auto-linked via description
+field_alias,Segmentation Relevant,MM_MARA_SGT_REL,CHAR1,SAP,Auto-linked via description
+field_alias,ANP Code,MM_MARA_ANP,J_1BANP,SAP,Auto-linked via description
+field_alias,Code of Protected Species Management,MM_MARA_PSM_CODE,WRF_PSM_CODE,SAP,Auto-linked via description
+field_alias,Fashion Information Field: 1,MM_MARA_FSH_MG_AT1,FSH_MG_ATTRIBUTE1,SAP,Auto-linked via description
+field_alias,Fashion Information Field: 2,MM_MARA_FSH_MG_AT2,FSH_MG_ATTRIBUTE2,SAP,Auto-linked via description
+field_alias,Fashion Information Field: 3,MM_MARA_FSH_MG_AT3,FSH_MG_ATTRIBUTE3,SAP,Auto-linked via description
+field_alias,Dummy Field,MM_MARA_DUMMY_PRD_INCL_EEW_PS,PRD_INCL_EEW,SAP,Auto-linked via description
+field_alias,Maturation Time,MM_MARA_SCM_MATURITY_DUR,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Preferred Alternative UoM for Warehouse Operations,MM_MARA_SCM_PUOM,MEINS,SAP,Auto-linked via description
+field_alias,Product Shape,MM_MARA_PROD_SHAPE,/SAPAPO/PROD_SHAPE,SAP,Auto-linked via description
+field_alias,Overhang Threshold [%],MM_MARA_OVERHANG_TRESH,DEC03_2,SAP,Auto-linked via description
+field_alias,Bridge Threshold [%],MM_MARA_BRIDGE_TRESH,DEC03_2,SAP,Auto-linked via description
+field_alias,Maximum Slope for Bridges [°],MM_MARA_BRIDGE_MAX_SLOPE,DEC03_2,SAP,Auto-linked via description
+field_alias,Absolute Height Threshold for Stacking on Non-Flat Surface,MM_MARA_HEIGHT_NONFLAT,MENG13,SAP,Auto-linked via description
+field_alias,UoM of Abs. Height Threshold (Stacking on Non-Flat Surface),MM_MARA_HEIGHT_NONFLAT_UOM,MEINS,SAP,Auto-linked via description
+field_alias,Product for Kit-to-Order,MM_MARA_SCM_KITCOMP,XFELD,SAP,Auto-linked via description
+field_alias,Product can be used for Procure-to-Order,MM_MARA_SCM_PROD_PAOOPT,XFELD,SAP,Auto-linked via description
+field_alias,Carry Out Push Deployment from Supplier,MM_MARA_SCM_BOD_DEPLVL,XFELD,SAP,Auto-linked via description
+field_alias,Inventory Balancing Not Allowed,MM_MARA_SCM_RESTRICT_INVBAL,XFELD,SAP,Auto-linked via description
+field_alias,Exclude from Express Shipment,MM_MARA_SCM_EXCL_EXPEDITE,XFELD,SAP,Auto-linked via description
+field_alias,New Product,MM_MARA_NEWPROD_INDI,XFELD,SAP,Auto-linked via description
+field_alias,eSPP: Inventory Planning via External Tool,MM_MARA_INV_PLN_MODE,ESPP_INV_PLN_MODE,SAP,Auto-linked via description
+field_alias,Configuration Relevance of Product,MM_MARA_FLAGCLASS,/SAPAPO/FLGCLASS,SAP,Auto-linked via description
+field_alias,Material Is Activated for CW,MM_MARA_/CWM/XCWMAT,XFELD,SAP,Auto-linked via description
+field_alias,Tolerance Group for CWM,MM_MARA_/CWM/TOLGR,/CWM/TOLGR,SAP,Auto-linked via description
+field_alias,Loading Units,MM_MARA_/BEV1/LULEINH,/BEV1/LULEINH,SAP,Auto-linked via description
+field_alias,Loading Unit Group: IS Beverage,MM_MARA_/BEV1/LULDEGRP,/BEV1/LULDEGRP,SAP,Auto-linked via description
+field_alias,Structure Category for Material Relationship,MM_MARA_/BEV1/NESTRUCCAT,/BEV1/NESTRUC_CAT,SAP,Auto-linked via description
+field_alias,Counting Group,MM_MARA_/DSD/SV_CNT_GRP,/DSD/SV_COUNT_GROUP,SAP,Auto-linked via description
+field_alias,DSD Grouping,MM_MARA_/DSD/VC_GROUP,/DSD/VC_GROUP,SAP,Auto-linked via description
+field_alias,Cable Diameter,MM_MARA_/SAPMP/KADU,/SAPMP/DURCHME,SAP,Auto-linked via description
+field_alias,Unit for Dimensions,MM_MARA_/SAPMP/ABMEIN,MEINS,SAP,Auto-linked via description
+field_alias,Cable Diameter Allowance in Percent,MM_MARA_/SAPMP/KADP,/SAPMP/PROZENT,SAP,Auto-linked via description
+field_alias,Bending Factor,MM_MARA_/SAPMP/BRAD,/SAPMP/BRAD,SAP,Auto-linked via description
+field_alias,Inner Width,MM_MARA_/SAPMP/SPBI,/SAPMP/DIMENS,SAP,Auto-linked via description
+field_alias,Outer Diameter,MM_MARA_/SAPMP/TRAD,/SAPMP/DURCHME,SAP,Auto-linked via description
+field_alias,Core Diameter,MM_MARA_/SAPMP/KEDU,/SAPMP/DURCHME,SAP,Auto-linked via description
+field_alias,Load Capacity,MM_MARA_/SAPMP/SPTR,/SAPMP/GEWICHT,SAP,Auto-linked via description
+field_alias,Run-Out Flange Thickness,MM_MARA_/SAPMP/FBDK,/SAPMP/DIMENS,SAP,Auto-linked via description
+field_alias,R-O Flange Height,MM_MARA_/SAPMP/FBHK,/SAPMP/DIMENS,SAP,Auto-linked via description
+field_alias,Coil Delivery,MM_MARA_/SAPMP/RILI,XFELD,SAP,Auto-linked via description
+field_alias,Run-Out Flange,MM_MARA_/SAPMP/FBAK,XFELD,SAP,Auto-linked via description
+field_alias,Maximum Number of Vertical Layers,MM_MARA_/SAPMP/AHO,NUMC3,SAP,Auto-linked via description
+field_alias,Smallest Permissible Reel Clearance for a Cable,MM_MARA_/SAPMP/MIFRR,/SAPMP/DIMENS,SAP,Auto-linked via description
+field_alias,Serialization Type,MM_MARA_/STTPEC/SERTYPE,/STTPEC/D_SERTYPE,SAP,Auto-linked via description
+field_alias,Synchronization Active,MM_MARA_/STTPEC/SYNCACT,XFELD,SAP,Auto-linked via description
+field_alias,Synchronization Time Stamp,MM_MARA_/STTPEC/SYNCTIME,/STTPEC/D_TIMESTAMP_CONV,SAP,Auto-linked via description
+field_alias,Indicator Changed Since Integration,MM_MARA_/STTPEC/SYNCCHG,XFELD,SAP,Auto-linked via description
+field_alias,Profile Relevant Country/Region,MM_MARA_/STTPEC/COUNTRY_REF,/STTPEC/D_COUNTRY,SAP,Auto-linked via description
+field_alias,Material may be Tilted (Vehicle Space Optimization),MM_MARA_/VSO/R_TILT_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Stacking not Allowed (VSO),MM_MARA_/VSO/R_STACK_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Bottom Layer (Vehicle Space Optimization),MM_MARA_/VSO/R_BOT_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Top Layer (VSO),MM_MARA_/VSO/R_TOP_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Load without Packaging Material (VSO),MM_MARA_/VSO/R_PAL_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Permissible Overhang (Depth) of Packaging Material (VSO),MM_MARA_/VSO/R_PAL_OVR_D,MENG13,SAP,Auto-linked via description
+field_alias,Permissible Overhang (Width) of Shipping Material (VSO),MM_MARA_/VSO/R_PAL_OVR_W,MENG13,SAP,Auto-linked via description
+field_alias,Maximum Stacking Height of the Packaging Material (VSO),MM_MARA_/VSO/R_PAL_B_HT,MENG13,SAP,Auto-linked via description
+field_alias,Minimum Stacking Height of the Packaging Material (VSO),MM_MARA_/VSO/R_PAL_MIN_H,MENG13,SAP,Auto-linked via description
+field_alias,Tolerance to Exceed the Max. Stacking Height (VSO),MM_MARA_/VSO/R_TOL_B_HT,MENG13,SAP,Auto-linked via description
+field_alias,Number of Materials for each Closed PKM (VSO),MM_MARA_/VSO/R_NO_P_GVH,/VSO/M_ANZ_PER_GVH,SAP,Auto-linked via description
+field_alias,Closed Packaging Material Required (VSO),MM_MARA_/VSO/R_KZGVH_IND,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Packaging Code,MM_MARA_PACKCODE,CBUND_PACOD,SAP,Auto-linked via description
+field_alias,Duration of Work,MM_MARA_SRV_DURA,MENG13,SAP,Auto-linked via description
+field_alias,Service Profile,MM_MARA_SRV_SERWI,CRM_SRV_SERWI,SAP,Auto-linked via description
+field_alias,Response Profile,MM_MARA_SRV_ESCAL,CRM_SRV_ESCAL,SAP,Auto-linked via description
+field_alias,Billing Cycle,MM_MARA_SOM_CYCLE,CYCLE_KK,SAP,Auto-linked via description
+field_alias,Assignment Schema,MM_MARA_SOM_TC_SCHEMA,CRM_TC_ASSIGN_SCHEMA,SAP,Auto-linked via description
+field_alias,Contract Auto Renewal Indicator,MM_MARA_SOM_CTR_AUTORENEWAL,CRMS4_SOM_CTR_AUTORENEWAL,SAP,Auto-linked via description
+field_alias,Material Condition Management,MM_MARA_MCOND,DFPS_MCOND,SAP,Auto-linked via description
+field_alias,Return Code,MM_MARA_RETDELC,DFPS_RETDELC,SAP,Auto-linked via description
+field_alias,Return to Logistics Level,MM_MARA_LOGLEV_RETO,DFPS_LOGLEV,SAP,Auto-linked via description
+field_alias,NATO Stock Number,MM_MARA_NSNID,DFPS_NSNID,SAP,Auto-linked via description
+field_alias,Interchangeability Code for Ammunition,MM_MARA_ICFA,DFS_ICFA,SAP,Auto-linked via description
+field_alias,Spare Part Class Code,MM_MARA_ADSPC_SPC,ADSPC_SPC,SAP,Auto-linked via description
+field_alias,GUID Variable Object Identification,MM_MARA_VARID,SYSUUID,SAP,Auto-linked via description
+field_alias,Tolerance Type,MM_MARA_TOLERANCE_TYPE,LMD_MDE_TOLERANCE_TYPE,SAP,Auto-linked via description
+field_alias,FFF class,MM_MARA_IMATN,MATNR,SAP,Auto-linked via description
+field_alias,Supersession chain number,MM_MARA_PICNUM,PIC_PICNUM,SAP,Auto-linked via description
+field_alias,Internal Charactieristic Number for Color Characteristics,MM_MARA_COLOR_ATINN,ATINN,SAP,Auto-linked via description
+field_alias,Internal Char. Number for Characteristics for Main Sizes,MM_MARA_SIZE1_ATINN,ATINN,SAP,Auto-linked via description
+field_alias,Internal Char. Number for Characteristics for Second Sizes,MM_MARA_SIZE2_ATINN,ATINN,SAP,Auto-linked via description
+field_alias,"Care Codes (such as Washing Code, Ironing Code, etc.)",MM_MARA_CARE_CODE,WRF_CARE_CODE,SAP,Auto-linked via description
+field_alias,Fiber Code for Textiles (Component 1),MM_MARA_FIBER_CODE1,WRF_FIBER_CODE,SAP,Auto-linked via description
+field_alias,Fiber Code for Textiles (Component 2),MM_MARA_FIBER_CODE2,WRF_FIBER_CODE,SAP,Auto-linked via description
+field_alias,Fiber Code for Textiles (Component 3),MM_MARA_FIBER_CODE3,WRF_FIBER_CODE,SAP,Auto-linked via description
+field_alias,Fiber Code for Textiles (Component 4),MM_MARA_FIBER_CODE4,WRF_FIBER_CODE,SAP,Auto-linked via description
+field_alias,Fiber Code for Textiles (Component 5),MM_MARA_FIBER_CODE5,WRF_FIBER_CODE,SAP,Auto-linked via description
+field_alias,Fashion Grade,MM_MARA_FASHGRD,FASHGRD,SAP,Auto-linked via description
+field_alias,Maintenance status,MM_MARC_PSTAT,PSTAT,SAP,Auto-linked via description
+field_alias,ABC Indicator,MM_MARC_MAABC,MAABC,SAP,Auto-linked via description
+field_alias,Indicator: Critical part,MM_MARC_KZKRI,XFELD,SAP,Auto-linked via description
+field_alias,Material: MRP profile,MM_MARC_DISPR,DISPR,SAP,Auto-linked via description
+field_alias,MRP Type,MM_MARC_DISMM,DISMM,SAP,Auto-linked via description
+field_alias,Indicator: MRP controller is buyer (deactivated),MM_MARC_KZDIE,XFELD,SAP,Auto-linked via description
+field_alias,Period Indicator,MM_MARC_PERKZ,PERKZ,SAP,Auto-linked via description
+field_alias,Assembly scrap in percent,MM_MARC_AUSSS,DEC3_2,SAP,Auto-linked via description
+field_alias,Fixed lot size,MM_MARC_BSTFE,MENG13,SAP,Auto-linked via description
+field_alias,Lot-Size-Independent Costs,MM_MARC_LOSFX,WERT11,SAP,Auto-linked via description
+field_alias,Indicator for Individual and Collective Requirements,MM_MARC_SBDKZ,SBDKZ,SAP,Auto-linked via description
+field_alias,Storage Costs Percentage Code,MM_MARC_LAGPR,LAGPR,SAP,Auto-linked via description
+field_alias,Method for Selecting Alternative Bills of Material,MM_MARC_ALTSL,ALTSL,SAP,Auto-linked via description
+field_alias,Discontinuation indicator,MM_MARC_KZAUS,KZAUS,SAP,Auto-linked via description
+field_alias,Follow-Up Material,MM_MARC_NFMAT,MATNR,SAP,Auto-linked via description
+field_alias,Indicator for Requirements Grouping,MM_MARC_KZBED,KZBED,SAP,Auto-linked via description
+field_alias,Mixed MRP indicator,MM_MARC_MISKZ,MISKZ,SAP,Auto-linked via description
+field_alias,Indicator: automatic fixing of planned orders,MM_MARC_PFREI,XFELD,SAP,Auto-linked via description
+field_alias,Release indicator for production orders,MM_MARC_FFREI,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Backflush,MM_MARC_RGEKZ,RGEKM,SAP,Auto-linked via description
+field_alias,Production Supervisor,MM_MARC_FEVOR,FEVOR,SAP,Auto-linked via description
+field_alias,Interoperation time,MM_MARC_TRANZ,DEC3_2,SAP,Auto-linked via description
+field_alias,Base quantity,MM_MARC_BASMG,MENG13,SAP,Auto-linked via description
+field_alias,In-house production time,MM_MARC_DZEIT,DEC3,SAP,Auto-linked via description
+field_alias,Maximum Storage Period,MM_MARC_MAXLZ,DEC5,SAP,Auto-linked via description
+field_alias,Unit for maximum storage period,MM_MARC_LZEIH,MEINS,SAP,Auto-linked via description
+field_alias,Indicator: withdrawal of stock from production bin,MM_MARC_KZPRO,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Material Included in Rough-Cut Planning,MM_MARC_GPMKZ,XFELD,SAP,Auto-linked via description
+field_alias,Overdelivery tolerance limit,MM_MARC_UEETO,DEC2_1,SAP,Auto-linked via description
+field_alias,Indicator: Unlimited Overdelivery Allowed,MM_MARC_UEETK,XFELD,SAP,Auto-linked via description
+field_alias,Underdelivery tolerance limit,MM_MARC_UNETO,DEC2_1,SAP,Auto-linked via description
+field_alias,Replacement part,MM_MARC_ATPKZ,ATPKZ,SAP,Auto-linked via description
+field_alias,Surcharge factor for cost in percent,MM_MARC_VZUSL,DEC3_2,SAP,Auto-linked via description
+field_alias,State of manufacture,MM_MARC_HERBL,HERBL,SAP,Auto-linked via description
+field_alias,Post to Inspection Stock,MM_MARC_INSMK,QKZ,SAP,Auto-linked via description
+field_alias,Sample for quality inspection (in %) (deactivated),MM_MARC_SPROZ,DEC2_1,SAP,Auto-linked via description
+field_alias,Quarantine period (deactivated),MM_MARC_QUAZT,DEC3,SAP,Auto-linked via description
+field_alias,Mean inspection duration (deactivated),MM_MARC_MPDAU,DEC5,SAP,Auto-linked via description
+field_alias,Indicator for inspection plan (deactivated),MM_MARC_KZPPV,KZPPV,SAP,Auto-linked via description
+field_alias,Documentation required indicator,MM_MARC_KZDKZ,XFELD,SAP,Auto-linked via description
+field_alias,Active substance content (deactivated),MM_MARC_WSTGH,DEC9,SAP,Auto-linked via description
+field_alias,Interval Until Next Recurring Inspection,MM_MARC_PRFRQ,DEC5,SAP,Auto-linked via description
+field_alias,Quota arrangement usage,MM_MARC_USEQU,USEQU,SAP,Auto-linked via description
+field_alias,Service level,MM_MARC_LGRAD,DEC2_1,SAP,Auto-linked via description
+field_alias,Splitting Indicator,MM_MARC_AUFTL,AUFTL,SAP,Auto-linked via description
+field_alias,Plan Version,MM_MARC_PLVAR,PLVAR,SAP,Auto-linked via description
+field_alias,Indicator: take correction factors into account,MM_MARC_KZKFK,XFELD,SAP,Auto-linked via description
+field_alias,Base quantity for capacity planning in shipping,MM_MARC_VBAMG,MENG13,SAP,Auto-linked via description
+field_alias,Deactivated,MM_MARC_LIZYK,CHAR4,SAP,Auto-linked via description
+field_alias,Source of Supply,MM_MARC_BWSCL,BQSCL,SAP,Auto-linked via description
+field_alias,"Indicator: ""automatic purchase order allowed""",MM_MARC_KAUTB,FLAG,SAP,Auto-linked via description
+field_alias,Indicator: Source list requirement,MM_MARC_KORDB,XFELD,SAP,Auto-linked via description
+field_alias,Planning Calendar,MM_MARC_MRPPP,MRPPP,SAP,Auto-linked via description
+field_alias,Indicator: Repetitive Manufacturing Allowed,MM_MARC_SAUFT,XFELD,SAP,Auto-linked via description
+field_alias,Planning time fence,MM_MARC_FXHOR,FXHOR,SAP,Auto-linked via description
+field_alias,Consumption mode,MM_MARC_VRMOD,VRMOD,SAP,Auto-linked via description
+field_alias,Consumption period: backward,MM_MARC_VINT1,VRINT,SAP,Auto-linked via description
+field_alias,Consumption period: forward,MM_MARC_VINT2,VRINT,SAP,Auto-linked via description
+field_alias,Version Indicator,MM_MARC_VERKZ,XFELD,SAP,Auto-linked via description
+field_alias,Alternative BOM,MM_MARC_STLAL,ALTNR,SAP,Auto-linked via description
+field_alias,BOM Usage,MM_MARC_STLAN,STLAN,SAP,Auto-linked via description
+field_alias,Group Counter,MM_MARC_APLAL,ALTNR,SAP,Auto-linked via description
+field_alias,Lot Size for Product Costing,MM_MARC_LOSGR,MENG13,SAP,Auto-linked via description
+field_alias,Production unit,MM_MARC_FRTME,MEINS,SAP,Auto-linked via description
+field_alias,MRP Group,MM_MARC_DISGR,DISGR,SAP,Auto-linked via description
+field_alias,Component Scrap in Percent,MM_MARC_KAUSF,DEC3_2,SAP,Auto-linked via description
+field_alias,Certificate Type,MM_MARC_QZGTP,QZGTYP,SAP,Auto-linked via description
+field_alias,Inspection Setup Exists for Material/Plant,MM_MARC_QMATV,XFELD,SAP,Auto-linked via description
+field_alias,Takt time,MM_MARC_TAKZT,DEC3,SAP,Auto-linked via description
+field_alias,Range-of-Coverage Profile,MM_MARC_RWPRO,RWPRO,SAP,Auto-linked via description
+field_alias,Local field name for CO/PA link to SOP,MM_MARC_COPAM,OLD_FDNAME,SAP,Auto-linked via description
+field_alias,Configurable Material,MM_MARC_STDPD,MATNR,SAP,Auto-linked via description
+field_alias,Repetitive Manufacturing Profile,MM_MARC_SFEPR,SFEPR,SAP,Auto-linked via description
+field_alias,Negative stocks allowed in plant,MM_MARC_XMCNG,XFELD,SAP,Auto-linked via description
+field_alias,Required QM System for Supplier,MM_MARC_QSSYS,QSSYS,SAP,Auto-linked via description
+field_alias,Planning Cycle,MM_MARC_LFRHY,MRPPP,SAP,Auto-linked via description
+field_alias,Rounding Profile,MM_MARC_RDPRF,RDPRF,SAP,Auto-linked via description
+field_alias,Reset Forecast Model Automatically,MM_MARC_AUTRU,XFELD,SAP,Auto-linked via description
+field_alias,Exemption certificate: Indicator for legal control,MM_MARC_PRENC,PRENC,SAP,Auto-linked via description
+field_alias,Indicator: Vendor declaration exists,MM_MARC_PRENE,PRENE,SAP,Auto-linked via description
+field_alias,Validity date of vendor declaration,MM_MARC_PRENG,PRENG,SAP,Auto-linked via description
+field_alias,Indicator: Military goods,MM_MARC_ITARK,XFELD,SAP,Auto-linked via description
+field_alias,IS-R service level,MM_MARC_SERVG,W_SERVGRD,SAP,Auto-linked via description
+field_alias,Co-Product,MM_MARC_KZKUP,FLAG,SAP,Auto-linked via description
+field_alias,Planning Strategy Group,MM_MARC_STRGR,STRGR,SAP,Auto-linked via description
+field_alias,Indicator: bulk material,MM_MARC_SCHGT,XFELD,SAP,Auto-linked via description
+field_alias,CC indicator is fixed,MM_MARC_CCFIX,XFELD,SAP,Auto-linked via description
+field_alias,Period of adjustment for planned independent requirements,MM_MARC_RESVP,RESVP,SAP,Auto-linked via description
+field_alias,"Unit of Mearsure Group (Oil, Natural Gas,...)",MM_MARC_UOMGR,OIB_UOMGR,SAP,Auto-linked via description
+field_alias,"Conversion Group (Oil, Natural Gas,..)",MM_MARC_UMRSL,OIB_UMRSL,SAP,Auto-linked via description
+field_alias,Air Bouyancy Factor,MM_MARC_ABFAC,OIL_ABFAC,SAP,Auto-linked via description
+field_alias,Production Scheduling Profile,MM_MARC_SFCPF,CO_PRODPRF,SAP,Auto-linked via description
+field_alias,Safety Time Indicator (with or without safety time),MM_MARC_SHFLG,SHFLG,SAP,Auto-linked via description
+field_alias,Safety Time (in Workdays),MM_MARC_SHZET,NUMC2,SAP,Auto-linked via description
+field_alias,Action Control: Planned Order Processing,MM_MARC_MDACH,MDACH,SAP,Auto-linked via description
+field_alias,Name of Backflush Profile,MM_MARC_PROFIL,PPC_PROFILE_NAME,SAP,Auto-linked via description
+field_alias,Indicator: smooth promotion consumption,MM_MARC_KZAGL,KZAGL,SAP,Auto-linked via description
+field_alias,Production Version To Be Costed,MM_MARC_FVIDK,VERID,SAP,Auto-linked via description
+field_alias,Logistics handling group for workload calculation,MM_MARC_LOGGR,LOGGR,SAP,Auto-linked via description
+field_alias,Distribution profile of material in plant,MM_MARC_FPRFM,MPPRF,SAP,Auto-linked via description
+field_alias,Tied Empties Stock,MM_MARC_GLGMG,MENG13V,SAP,Auto-linked via description
+field_alias,Material CFOP category,MM_MARC_INDUS,J_1BINDUS3,SAP,Auto-linked via description
+field_alias,CAP: Number of CAP products list,MM_MARC_MOWNR,MOWNR,SAP,Auto-linked via description
+field_alias,Common Agricultural Policy: CAP products group-Foreign Trade,MM_MARC_MOGRU,MOGRU,SAP,Auto-linked via description
+field_alias,CAS number for pharmaceutical products in foreign trade,MM_MARC_CASNR,CASNR,SAP,Auto-linked via description
+field_alias,Production statistics: PRODCOM number for foreign trade,MM_MARC_GPNUM,GPNUM,SAP,Auto-linked via description
+field_alias,Control code for consumption taxes in foreign trade,MM_MARC_STEUC,STEUC,SAP,Auto-linked via description
+field_alias,JIT Delivery Schedules,MM_MARC_FABKZ,FABKZ,SAP,Auto-linked via description
+field_alias,Group of Materials for Transition Matrix,MM_MARC_MATGR,CHAR20,SAP,Auto-linked via description
+field_alias,Proposed Supply Area in Material Master Record,MM_MARC_VSPVB,PRVBE,SAP,Auto-linked via description
+field_alias,Fair share rule,MM_MARC_DPLFS,DPLFS,SAP,Auto-linked via description
+field_alias,Indicator: push distribution,MM_MARC_DPLPU,DPLPU,SAP,Auto-linked via description
+field_alias,Deployment horizon in days,MM_MARC_DPLHO,DEC3,SAP,Auto-linked via description
+field_alias,Minimum lot size for Supply Demand Match,MM_MARC_MINLS,MENG13,SAP,Auto-linked via description
+field_alias,Maximum lot size for Supply Demand Match,MM_MARC_MAXLS,MENG13,SAP,Auto-linked via description
+field_alias,Fixed lot size for Supply Demand Match,MM_MARC_FIXLS,MENG13,SAP,Auto-linked via description
+field_alias,Lot size increment for Supply Demand Match,MM_MARC_LTINC,MENG13,SAP,Auto-linked via description
+field_alias,This field is no longer used,MM_MARC_COMPL,CSCP_COMP_LVL,SAP,Auto-linked via description
+field_alias,Conversion types for production figures,MM_MARC_CONVT,CSCP_CONV_TYPE,SAP,Auto-linked via description
+field_alias,Period Profile for Safety Time,MM_MARC_SHPRO,SHPRO,SAP,Auto-linked via description
+field_alias,MRP relevancy for dependent requirements,MM_MARC_AHDIS,AHDIS,SAP,Auto-linked via description
+field_alias,Indicator: MRP area exists,MM_MARC_DIBER,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for Cross-Project Material,MM_MARC_KZPSP,KZPSP,SAP,Auto-linked via description
+field_alias,Overall profile for order change management,MM_MARC_OCMPF,CHAR6,SAP,Auto-linked via description
+field_alias,Indicator: Is material relevant for APO,MM_MARC_APOKZ,APOKZ,SAP,Auto-linked via description
+field_alias,MARDH rec. already exists for per. before last of MARD per.,MM_MARC_MCRUE,XFELD,SAP,Auto-linked via description
+field_alias,Do Not Cost,MM_MARC_NCOST,CK_NO_COSTING,SAP,Auto-linked via description
+field_alias,Strategy for Putaway and Stock Removal,MM_MARC_ROTATION_DATE,ROTATION_DATE,SAP,Auto-linked via description
+field_alias,Excise Tax Relevance Indicator,MM_MARC_EXCISE_TAX_RLVNCE,XFELD,SAP,Auto-linked via description
+field_alias,Maximum Temperature,MM_MARC_TEMP_CTRL_MAX,/SCMTMS/TEMPERATURE,SAP,Auto-linked via description
+field_alias,Minimum Temperature,MM_MARC_TEMP_CTRL_MIN,/SCMTMS/TEMPERATURE,SAP,Auto-linked via description
+field_alias,JIT Production Confirmation Profile,MM_MARC_JITPRODNCONFPROFILE,NJIT_PRODN_CONF_PROFILE,SAP,Auto-linked via description
+field_alias,Segmentation Strategy,MM_MARC_SGT_COVS,SGT_COVS,SAP,Auto-linked via description
+field_alias,Segmentation Strategy Scope,MM_MARC_SGT_SCOPE,SGT_SCOPE,SAP,Auto-linked via description
+field_alias,Sort Stock Based on Segment,MM_MARC_SGT_MRPSI,SGT_SRT_STK,SAP,Auto-linked via description
+field_alias,Consumption Priority [Obsolete],MM_MARC_SGT_PRCM,SGT_PRCM,SAP,Auto-linked via description
+field_alias,Stock Protection Indicator [Obsolete],MM_MARC_SGT_STK_PRT,SGT_STK_PRT,SAP,Auto-linked via description
+field_alias,Supply Assignment (ARun),MM_MARC_FSH_MG_ARUN_REQ,FSH_MG_ARUN_REQ,SAP,Auto-linked via description
+field_alias,Variant Group,MM_MARC_FSH_VAR_GROUP,CHAR2,SAP,Auto-linked via description
+field_alias,Indicator: Batch Assignt. during TR to TO conv [OBSOLETE],MM_MARC_FSH_KZECH,FSH_KZECH,SAP,Auto-linked via description
+field_alias,Calendar Group,MM_MARC_FSH_CALENDAR_GROUP,FSH_CALENDAR_GROUP,SAP,Auto-linked via description
+field_alias,Assign Batches in Supply Assignment (ARun),MM_MARC_ARUN_FIX_BATCH,ARUN_FIX_BATCH,SAP,Auto-linked via description
+field_alias,Indicator for Advanced Planning,MM_MARC_PPSKZ,BOOLE,SAP,Auto-linked via description
+field_alias,Consignment Control,MM_MARC_CONS_PROCG,WRF_CONS_PROCG,SAP,Auto-linked via description
+field_alias,Minimum Target Range of Coverage,MM_MARC_MIN_TROC,WRF_FRE_TROC,SAP,Auto-linked via description
+field_alias,Maximum Target Range of Coverage,MM_MARC_MAX_TROC,WRF_FRE_TROC,SAP,Auto-linked via description
+field_alias,Target Stock,MM_MARC_TARGET_STOCK,MENG13,SAP,Auto-linked via description
+field_alias,Indicator: Material Contains NF Metals,MM_MARC_NF_FLAG,FLAG,SAP,Auto-linked via description
+field_alias,Product-Dependent Storage Costs,MM_MARC_SCM_SCOST,/SAPAPO/DEC13,SAP,Auto-linked via description
+field_alias,PP Planning Procedure,MM_MARC_SCM_RRP_TYPE,data,SAP,Auto-linked via description
+field_alias,Alert Relevance of Product,MM_MARC_SCM_GET_ALERTS,/SAPAPO/GET_ALERTS_FOR_PROD,SAP,Auto-linked via description
+field_alias,Resource Network,MM_MARC_SCM_RES_NET_NAME,CHAR40,SAP,Auto-linked via description
+field_alias,Location-Dependent Maturation Time,MM_MARC_SCM_MATURITY_DUR,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Reorder Days' Supply (in Workdays),MM_MARC_SCM_REORD_DUR,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Target Days' Supply in Workdays,MM_MARC_SCM_TARGET_DUR,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Planning Calendar for Periodic Lot Sizing Procedure,MM_MARC_SCM_TSTRID,/SAPAPO/TSTRID,SAP,Auto-linked via description
+field_alias,Requirement Strategy,MM_MARC_SCM_STRA1,/SAPAPO/STRA1,SAP,Auto-linked via description
+field_alias,Alert threshold for delayed receipts,MM_MARC_SCM_PEG_PAST_ALERT,TSTRDURAN,SAP,Auto-linked via description
+field_alias,Alert threshold for early receipts,MM_MARC_SCM_PEG_FUTURE_ALERT,TSTRDURAN,SAP,Auto-linked via description
+field_alias,Pegging strategy for dynamic pegging,MM_MARC_SCM_PEG_STRATEGY,/SAPAPO/PEG_STRATEGY,SAP,Auto-linked via description
+field_alias,Avoid Alerts in Pegging,MM_MARC_SCM_PEG_WO_ALERT_FST,/SAPAPO/PEG_WO_ALERT_FIRST,SAP,Auto-linked via description
+field_alias,Retain Fixed Pegging for Product on Document Change,MM_MARC_SCM_FIXPEG_PROD_SET,/SAPAPO/DM_FIXPEG_PROD_SETTING,SAP,Auto-linked via description
+field_alias,Plan Explosion,MM_MARC_SCM_WHATBOM,/SAPAPO/WHATBOM,SAP,Auto-linked via description
+field_alias,Planning Group,MM_MARC_SCM_RRP_SEL_GROUP,data,SAP,Auto-linked via description
+field_alias,Profile for Interactive Sourcing,MM_MARC_SCM_INTSRC_PROF,data,SAP,Auto-linked via description
+field_alias,Priority of Product,MM_MARC_SCM_PRIO,/SAPAPO/PRIO,SAP,Auto-linked via description
+field_alias,Usage in Extended Service Parts Planning,MM_MARC_ESPPFLG,BOOLE,SAP,Auto-linked via description
+field_alias,Throughput Time,MM_MARC_SCM_THRUPUT_TIME,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Third-Party Order Processing,MM_MARC_SCM_TPOP,/SAPAPO/TPOP,SAP,Auto-linked via description
+field_alias,Cost Factor for Stockholding Costs,MM_MARC_SCM_SCOST_PRCNT,/SAPAPO/PERCENT_SCOST,SAP,Auto-linked via description
+field_alias,Procurement Costs for Product,MM_MARC_SCM_PROC_COST,/SAPAPO/DEC13,SAP,Auto-linked via description
+field_alias,Goods Receiving Costs,MM_MARC_SCM_NDCOSTWE,data,SAP,Auto-linked via description
+field_alias,Consumption of Storage Capacity per Unit of Material,MM_MARC_SCM_CONINP,MENG13,SAP,Auto-linked via description
+field_alias,Unit of Measurement of Size,MM_MARC_SCM_IUNIT,MEINS,SAP,Auto-linked via description
+field_alias,MD product plant extensible field element,MM_MARC_DUMMY_PLNT_INCL_EEW_PS,PLNT_INCL_EEW,SAP,Auto-linked via description
+field_alias,Percentage Tolerance Plus,MM_MARC_/SAPMP/TOLPRPL,PRZ21,SAP,Auto-linked via description
+field_alias,Percentage Tolerance Minus,MM_MARC_/SAPMP/TOLPRMI,PRZ21,SAP,Auto-linked via description
+field_alias,Pick Packaging Materials only Lengthwise (VSO),MM_MARC_/VSO/R_FORK_DIR,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Structure Type of UII,MM_MARC_IUID_TYPE,IUID_TYPE,SAP,Auto-linked via description
+field_alias,External Allocation of UII,MM_MARC_UID_IEA,UID_IEA,SAP,Auto-linked via description
+field_alias,Maintenance status,MM_MARD_PSTAT,PSTAT,SAP,Auto-linked via description
+field_alias,Valuated unrestricted-use stock in previous period,MM_MARD_VMLAB,MENG13V,SAP,Auto-linked via description
+field_alias,Stock in Quality Inspection in Previous Period,MM_MARD_VMINS,MENG13V,SAP,Auto-linked via description
+field_alias,Restricted-Use Stock in Previous Period,MM_MARD_VMEIN,MENG13V,SAP,Auto-linked via description
+field_alias,Phys. inventory ind. f. stock in qual. insp. in current year,MM_MARD_KZILQ,INVKZ,SAP,Auto-linked via description
+field_alias,Phys. inventory ind. f. stock in qual. insp. in prev. period,MM_MARD_KZVLQ,INVKZ,SAP,Auto-linked via description
+field_alias,Preference indicator (deactivated),MM_MARD_EXPPG,EXPPG,SAP,Auto-linked via description
+field_alias,Export indicator (deactivated),MM_MARD_EXVER,EXVER,SAP,Auto-linked via description
+field_alias,Unrestricted-Use Consignment Stock,MM_MARD_KLABS,MENG13V,SAP,Auto-linked via description
+field_alias,Consignment Stock in Quality Inspection,MM_MARD_KINSM,MENG13V,SAP,Auto-linked via description
+field_alias,Restricted-Use Consignment Stock,MM_MARD_KEINM,MENG13V,SAP,Auto-linked via description
+field_alias,Date of Last Posted Count,MM_MARD_DLINL,DATS,SAP,Auto-linked via description
+field_alias,Picking area for lean WM,MM_MARD_LWMKB,KOBER,SAP,Auto-linked via description
+field_alias,Inventory Correction Factor,MM_MARD_BSKRF,FLTP,SAP,Auto-linked via description
+field_alias,MARDH rec. already exists for per. before last of MARD per.,MM_MARD_MDRUE,XFELD,SAP,Auto-linked via description
+field_alias,Valuated Unrestricted-Use Stock,MM_MARD_/CWM/LABST,MENG13V,SAP,Auto-linked via description
+field_alias,Stock in Quality Inspection,MM_MARD_/CWM/INSME,MENG13V,SAP,Auto-linked via description
+field_alias,Unrestricted-Use Consignment Stock,MM_MARD_/CWM/KLABS,MENG13V,SAP,Auto-linked via description
+field_alias,Consignment Stock in Quality Inspection,MM_MARD_/CWM/KINSM,MENG13V,SAP,Auto-linked via description
+field_alias,Restricted-Use Consignment Stock,MM_MARD_/CWM/KEINM,MENG13V,SAP,Auto-linked via description
+field_alias,Valuated unrestricted-use stock in previous period,MM_MARD_/CWM/VMLAB,MENG13V,SAP,Auto-linked via description
+field_alias,Stock in Quality Inspection in Previous Period,MM_MARD_/CWM/VMINS,MENG13V,SAP,Auto-linked via description
+field_alias,Restricted-Use Stock in Previous Period,MM_MARD_/CWM/VMEIN,MENG13V,SAP,Auto-linked via description
+field_alias,Valuation Area,MM_MBEW_BWKEY,BWKEY,SAP,Auto-linked via description
+field_alias,Valuation Class,MM_MBEW_BKLAS,BKLAS,SAP,Auto-linked via description
+field_alias,Valuation Class in Previous Period,MM_MBEW_VMBKL,BKLAS,SAP,Auto-linked via description
+field_alias,Valuation Class in Previous Year,MM_MBEW_VJBKL,BKLAS,SAP,Auto-linked via description
+field_alias,UTC Time Stamp in Short Form (YYYYMMDDhhmmss),MM_MBEW_TIMESTAMP,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,LIFO/FIFO-Relevant,MM_MBEW_XLIFO,LIFO_FIFO,SAP,Auto-linked via description
+field_alias,Pool number for LIFO valuation,MM_MBEW_MYPOL,LIFO_POOL,SAP,Auto-linked via description
+field_alias,Maintenance status,MM_MBEW_PSTAT,PSTAT,SAP,Auto-linked via description
+field_alias,Origin Group as Subdivision of Cost Element,MM_MBEW_HRKFT,HRKFT,SAP,Auto-linked via description
+field_alias,Costing Overhead Group,MM_MBEW_KOSGR,CK_KOSGR,SAP,Auto-linked via description
+field_alias,Material Is Costed with Quantity Structure,MM_MBEW_EKALR,XFELD,SAP,Auto-linked via description
+field_alias,Material Ledger Activated at Material Level,MM_MBEW_MLMAA,XFELD,SAP,Auto-linked via description
+field_alias,Date of Last Posted Count,MM_MBEW_WLINL,DATS,SAP,Auto-linked via description
+field_alias,Valuation margin,MM_MBEW_BWSPA,PRZ32V,SAP,Auto-linked via description
+field_alias,Valuation Class for Project Stock,MM_MBEW_QKLAS,BKLAS,SAP,Auto-linked via description
+field_alias,Usage of the material,MM_MBEW_MTUSE,J_1BMATUSE,SAP,Auto-linked via description
+field_alias,Produced in-house,MM_MBEW_OWNPR,XFELD,SAP,Auto-linked via description
+field_alias,MBEWH rec. already exists for per. before last of MBEW per.,MM_MBEW_MBRUE,XFELD,SAP,Auto-linked via description
+field_alias,Valuation Class for Special Stock at the Vendor,MM_MBEW_OKLAS,BKLAS,SAP,Auto-linked via description
+field_alias,MD Product valuation extension field element,MM_MBEW_DUMMY_VAL_INCL_EEW_PS,VAL_INCL_EEW,SAP,Auto-linked via description
+field_alias,Unit of Dimension for Length/Width/Height,MM_MARM_MEABM,MEINS,SAP,Auto-linked via description
+field_alias,Internal characteristic,MM_MARM_ATINN,ATINN,SAP,Auto-linked via description
+field_alias,Units of measure usage,MM_MARM_KZWSO,KZWSO,SAP,Auto-linked via description
+field_alias,Unit of Measurement of Characteristic,MM_MARM_MSEHI,MEINS,SAP,Auto-linked via description
+field_alias,Generic Material with Logistical Variants,MM_MARM_BFLME_MARM,BFLME,SAP,Auto-linked via description
+field_alias,Remaining Volume after Nesting (in Percentage),MM_MARM_NEST_FTR,DEC3,SAP,Auto-linked via description
+field_alias,Maximum Stacking Factor,MM_MARM_MAX_STACK,INT1,SAP,Auto-linked via description
+field_alias,Maximum Top Load on Full Package,MM_MARM_TOP_LOAD_FULL,MENG13,SAP,Auto-linked via description
+field_alias,Capacity Usage,MM_MARM_CAPAUSE,DEC15_3,SAP,Auto-linked via description
+field_alias,National Code,MM_MARM_/STTPEC/NCODE,CHAR40,SAP,Auto-linked via description
+field_alias,National Code Type,MM_MARM_/STTPEC/NCODE_TY,CHAR10,SAP,Auto-linked via description
+field_alias,Registration Code,MM_MARM_/STTPEC/RCODE,CHAR40,SAP,Auto-linked via description
+field_alias,Serialization Indicator,MM_MARM_/STTPEC/SERUSE,XFELD,SAP,Auto-linked via description
+field_alias,Indicator Changed Since Integration,MM_MARM_/STTPEC/SYNCCHG,XFELD,SAP,Auto-linked via description
+field_alias,Serialization Relevance Indicator,MM_MARM_/STTPEC/SER_GTIN,XFELD,SAP,Auto-linked via description
+field_alias,Number of quota arrangement,MM_EBAN_QUNUM,QUNUM,SAP,Auto-linked via description
+field_alias,Date of last resubmission,MM_EBAN_BVDAT,DATUM,SAP,Auto-linked via description
+field_alias,Number of resubmissions,MM_EBAN_BVDRK,ZAEHL,SAP,Auto-linked via description
+field_alias,Entry Sheet Number,MM_EBAN_LBLNI,LBLNI,SAP,Auto-linked via description
+field_alias,Advance procurement: project stock,MM_EBAN_VORAB,XFELD,SAP,Auto-linked via description
+field_alias,Committed date,MM_EBAN_DAT01,DATUM,SAP,Auto-linked via description
+field_alias,Material Category,MM_EBAN_ATTYP,ATTYP,SAP,Auto-linked via description
+field_alias,Overall release of purchase requisitions,MM_EBAN_GSFRG,XFELD,SAP,Auto-linked via description
+field_alias,Units of measure usage,MM_EBAN_KZFME,KZWSO,SAP,Auto-linked via description
+field_alias,Category of Incompleteness,MM_EBAN_MEMORYTYPE,MM_MEMORYTYPE,SAP,Auto-linked via description
+field_alias,External Processing Status,MM_EBAN_EXTAPPROVALSTATUS,MMPUR_REQ_EXTAPPRVLSTS,SAP,Auto-linked via description
+field_alias,Overall Limit,MM_EBAN_LIMIT_AMOUNT,WERT7,SAP,Auto-linked via description
+field_alias,Outline Type,MM_EBAN_OUTLINE_TYPE,MMPUR_REQ_OUTLINE_TYPE,SAP,Auto-linked via description
+field_alias,Hierarchy Number,MM_EBAN_EXLIN,EXLIN,SAP,Auto-linked via description
+field_alias,External Sort Number,MM_EBAN_EXSNR,EXSNR,SAP,Auto-linked via description
+field_alias,Advice Code,MM_EBAN_ADVCODE,/ISDFPS/ADVCODE,SAP,Auto-linked via description
+field_alias,Cross-System PReq Number,MM_EBAN_BANFN_CS,BANFN,SAP,Auto-linked via description
+field_alias,Type of subcontracting,MM_EBAN_SERRU,SERRU,SAP,Auto-linked via description
+field_alias,VAS Relevant,MM_EBAN_FSH_VAS_REL,FSH_VAS_REL,SAP,Auto-linked via description
+field_alias,Supply chain status,MM_EBAN_OIO_STATUS,OIO_SC_STATUS,SAP,Auto-linked via description
+field_alias,Cash (Prompt Payment) Discount Days,MM_EKKO_ZBD1T,ZBDXT,SAP,Auto-linked via description
+field_alias,Cash (Prompt Payment) Discount Days,MM_EKKO_ZBD2T,ZBDXT,SAP,Auto-linked via description
+field_alias,Cash (Prompt Payment) Discount Days,MM_EKKO_ZBD3T,ZBDXT,SAP,Auto-linked via description
+field_alias,Cash Discount Percentage 1,MM_EKKO_ZBD1P,PRZ23,SAP,Auto-linked via description
+field_alias,Cash Discount Percentage 2,MM_EKKO_ZBD2P,PRZ23,SAP,Auto-linked via description
+field_alias,Closing Date for Applications,MM_EKKO_BWBDT,DATUM,SAP,Auto-linked via description
+field_alias,Binding Period for Quotation,MM_EKKO_BNDDT,DATUM,SAP,Auto-linked via description
+field_alias,Warranty Date,MM_EKKO_GWLDT,DATUM,SAP,Auto-linked via description
+field_alias,Bid invitation number,MM_EKKO_AUSNR,EBELN,SAP,Auto-linked via description
+field_alias,Responsible Salesperson at Supplier's Office,MM_EKKO_VERKF,TEXT30,SAP,Auto-linked via description
+field_alias,Goods Supplier,MM_EKKO_LLIEF,LIFNR,SAP,Auto-linked via description
+field_alias,Active Purchasing Document,MM_EKKO_ACTIVE_ID,EBELN,SAP,Auto-linked via description
+field_alias,Field Not Used,MM_EKKO_ABGRU,CHAR2,SAP,Auto-linked via description
+field_alias,Field not used,MM_EKKO_LBLIF,LIFNR,SAP,Auto-linked via description
+field_alias,Collective Number,MM_EKKO_SUBMI,CHAR10,SAP,Auto-linked via description
+field_alias,Different Invoicing Party,MM_EKKO_LIFRE,LIFNR,SAP,Auto-linked via description
+field_alias,Logical System,MM_EKKO_LOGSY,LOGSYS,SAP,Auto-linked via description
+field_alias,Document with time-dependent conditions,MM_EKKO_STAKO,XFELD,SAP,Auto-linked via description
+field_alias,Release Strategy,MM_EKKO_FRGSX,FRGSX,SAP,Auto-linked via description
+field_alias,Release Indicator: Purchasing Document,MM_EKKO_FRGKE,FRGKE,SAP,Auto-linked via description
+field_alias,Country/Region for Tax Report,MM_EKKO_LANDS,LAND1,SAP,Auto-linked via description
+field_alias,Indicator for scheduling agreement release documentation,MM_EKKO_LPHIS,XFELD,SAP,Auto-linked via description
+field_alias,Reason for Cancellation,MM_EKKO_ABSGR,NUMC02,SAP,Auto-linked via description
+field_alias,Correction of miscellaneous provisions,MM_EKKO_KORNR,KORNR,SAP,Auto-linked via description
+field_alias,Purchasing Document Processing State,MM_EKKO_PROCSTAT,MEPROCSTATE,SAP,Auto-linked via description
+field_alias,Process Indicator for Purchase Order,MM_EKKO_PROCESS_INDICATOR,MMPUR_PROCESS_INDICATOR,SAP,Auto-linked via description
+field_alias,Change Request Status,MM_EKKO_CR_STAT,CR_STAT,SAP,Auto-linked via description
+field_alias,SCM Process That Created the Purchase Order,MM_EKKO_SCMPROC,CHAR1,SAP,Auto-linked via description
+field_alias,Category of Incompleteness,MM_EKKO_MEMORYTYPE,MM_MEMORYTYPE,SAP,Auto-linked via description
+field_alias,Retention Indicator,MM_EKKO_RETTP,RET_TYPE,SAP,Auto-linked via description
+field_alias,Retention in Percent,MM_EKKO_RETPC,PRZ32,SAP,Auto-linked via description
+field_alias,Down Payment Indicator,MM_EKKO_DPTYP,ME_DPTYPE_DOMAIN,SAP,Auto-linked via description
+field_alias,Down Payment Percentage,MM_EKKO_DPPCT,PRZ32,SAP,Auto-linked via description
+field_alias,Part of a Contract Hierarchy,MM_EKKO_HIERARCHY_EXISTS,XFELD,SAP,Auto-linked via description
+field_alias,Location for a physical handover of goods,MM_EKKO_HANDOVERLOC,HANDOVER_LOC,SAP,Auto-linked via description
+field_alias,Shipping Conditions,MM_EKKO_SHIPCOND,VSBED,SAP,Auto-linked via description
+field_alias,Incoterms Version,MM_EKKO_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,Currency of statistical values for foreign trade,MM_EKKO_GRWCU,WAERS,SAP,Auto-linked via description
+field_alias,Relevant for Intrastat Reporting,MM_EKKO_INTRA_REL,XFELD,SAP,Auto-linked via description
+field_alias,Exclude from Intrastat Reporting,MM_EKKO_INTRA_EXCL,XFELD,SAP,Auto-linked via description
+field_alias,Data Element for Extensibility of Purchasing Document Header,MM_EKKO_DUMMY_EKKO_INCL_EEW_PS,EKKO_INCL_EEW,SAP,Auto-linked via description
+field_alias,1 Byte Unsigned Integer,MM_EKKO_ESG_WERT_FELD,INT1,SAP,Auto-linked via description
+field_alias,Document is aged,MM_EKKO_ISAGED,XFELD,SAP,Auto-linked via description
+field_alias,Internal (Version) Counter,MM_EKKO_FORCE_CNT,NUMC6,SAP,Auto-linked via description
+field_alias,Logical system,MM_EKKO_SOURCE_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Order Scheduling Strategy Fields Changed Manually,MM_EKKO_FSH_OS_STG_CHANGE,FLAG,SAP,Auto-linked via description
+field_alias,Base Date,MM_EKKO_ZBAS_DATE,DATUM,SAP,Auto-linked via description
+field_alias,Annexing Date Type,MM_EKKO_ZADATTYP,/ILE/TDATETYP,SAP,Auto-linked via description
+field_alias,deviation percentage,MM_EKKO_Z_DEV,/ILE/TDEC3_3,SAP,Auto-linked via description
+field_alias,Annexing limit date (purchasing),MM_EKKO_ZLIMIT_DAT,DATUM,SAP,Auto-linked via description
+field_alias,IL Annexing Numerator,MM_EKKO_NUMERATOR,CHAR20,SAP,Auto-linked via description
+field_alias,"""The general acountant method"" New base date.",MM_EKKO_HASHCAL_BDAT,DATS,SAP,Auto-linked via description
+field_alias,Accountant general method,MM_EKKO_HASHCAL,/ILE/MTG_CHASHCAL,SAP,Auto-linked via description
+field_alias,Do not allow negative annexing,MM_EKKO_NEGATIVE,/ILE/NEGATIVE_ANNEXING,SAP,Auto-linked via description
+field_alias,Known Index indicator in /ILE/T_ANNEXING_CALCULATION Func,MM_EKKO_KNOWN_INDEX,XFELD,SAP,Auto-linked via description
+field_alias,Flag for the S1POSTAT message,MM_EKKO_POSTAT,ADSPC_FLAG,SAP,Auto-linked via description
+field_alias,Interest Indicator,MM_EKKO_VZSKZ,VZSKZ,SAP,Auto-linked via description
+field_alias,Snapshot Status,MM_EKKO_FSH_SNST_STATUS,FSH_SNST_STATUS,SAP,Auto-linked via description
+field_alias,Procedure number,MM_EKKO_PROCE,PFM_01NUMPROCEDIMENTO,SAP,Auto-linked via description
+field_alias,Adjustment/contest,MM_EKKO_CONC,PFM_01CONCURSO,SAP,Auto-linked via description
+field_alias,Miscellaneous,MM_EKKO_OUTR,PFM_01OUTROS,SAP,Auto-linked via description
+field_alias,Despatch,MM_EKKO_DESP,TEXT100,SAP,Auto-linked via description
+field_alias,Assessment,MM_EKKO_PARE,TEXT100,SAP,Auto-linked via description
+field_alias,PTFM: Contract in Purchasing process,MM_EKKO_PFM_CONTRACT,PS_POSNR,SAP,Auto-linked via description
+field_alias,Plant Header: All Items Have Same Receiving Plant,MM_EKKO_EQ_WERKS,WERKS,SAP,Auto-linked via description
+field_alias,Firm Deal Indicator,MM_EKKO_FIXPO,WRF_POHF_FIXPO_X,SAP,Auto-linked via description
+field_alias,Take Account of Plants,MM_EKKO_WERKS_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Take Account of Contracts,MM_EKKO_CONTRACT_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Take Account of Item Categories,MM_EKKO_PSTYP_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Take Account of Fixed-Date Purchases Indicator,MM_EKKO_FIXPO_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Take Account of Alloc. Table Relevance,MM_EKKO_AUREL_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Take Account of Dlvy Period,MM_EKKO_DELPER_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,Include Vendor Subrange,MM_EKKO_LTSNR_ALLOW,WRF_POHF_CHAR_1_2,SAP,Auto-linked via description
+field_alias,OTB Check Level,MM_EKKO_OTB_LEVEL,WRF_POTB_CHECK_LEVEL,SAP,Auto-linked via description
+field_alias,OTB Condition Type,MM_EKKO_OTB_COND_TYPE,KSCHL,SAP,Auto-linked via description
+field_alias,OTB Currency,MM_EKKO_OTB_CURR,WAERS,SAP,Auto-linked via description
+field_alias,Reason Profile for OTB Special Release,MM_EKKO_SPR_RSN_PROFILE,WRF_POTB_SPR_RSN_PROFILE,SAP,Auto-linked via description
+field_alias,Budget Type,MM_EKKO_BUDG_TYPE,WRF_BUDG_TYPE,SAP,Auto-linked via description
+field_alias,OTB Check Status,MM_EKKO_OTB_STATUS,WRF_POTB_STATUS,SAP,Auto-linked via description
+field_alias,Reason Indicator for OTB Check Status,MM_EKKO_OTB_REASON,WRF_POTB_STATUS_REASON,SAP,Auto-linked via description
+field_alias,Type of OTB Check,MM_EKKO_CHECK_TYPE,WRF_BUDG_OTB_CHECK,SAP,Auto-linked via description
+field_alias,OTB-Relevant Contract,MM_EKKO_CON_OTB_REQ,CHAR1_X,SAP,Auto-linked via description
+field_alias,OTB Indicator Level for Contracts,MM_EKKO_CON_PREBOOK_LEV,WRF_POTB_PREBOOK_LEVEL,SAP,Auto-linked via description
+field_alias,Origin of a Purchasing Document Item,MM_EKPO_STATU,ASTAT,SAP,Auto-linked via description
+field_alias,Target Quantity,MM_EKPO_KTMNG,MENGE,SAP,Auto-linked via description
+field_alias,Date for Determining Tax Rates,MM_EKPO_TXDAT,DATUM,SAP,Auto-linked via description
+field_alias,Tax Reporting Country/Region,MM_EKPO_TAX_COUNTRY,LAND1,SAP,Auto-linked via description
+field_alias,Stock Type,MM_EKPO_INSMK,INSMK,SAP,Auto-linked via description
+field_alias,Indicator: Update Info Record,MM_EKPO_SPINF,SPINF,SAP,Auto-linked via description
+field_alias,Number of Reminders/Expediters,MM_EKPO_MAHNZ,PACK2,SAP,Auto-linked via description
+field_alias,Rejection Indicator,MM_EKPO_ABSKZ,XFELD,SAP,Auto-linked via description
+field_alias,Internal Comment on Quotation,MM_EKPO_AGMEM,AGMEM,SAP,Auto-linked via description
+field_alias,"""Delivery Completed"" Indicator",MM_EKPO_ELIKZ,XFELD,SAP,Auto-linked via description
+field_alias,Final Invoice Indicator,MM_EKPO_EREKZ,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: GR-Based Invoice Verification,MM_EKPO_WEBRE,XFELD,SAP,Auto-linked via description
+field_alias,Order Acknowledgment Requirement,MM_EKPO_KZABS,XFELD,SAP,Auto-linked via description
+field_alias,Order Acknowledgment Number,MM_EKPO_LABNR,TEXT20,SAP,Auto-linked via description
+field_alias,Agreed Cumulative Quantity,MM_EKPO_ABFTZ,MENG13,SAP,Auto-linked via description
+field_alias,Firm Zone (Go-Ahead for Production),MM_EKPO_ETFZ1,PACK2,SAP,Auto-linked via description
+field_alias,Trade-Off Zone (Go-Ahead for Materials Procurement),MM_EKPO_ETFZ2,PACK2,SAP,Auto-linked via description
+field_alias,Firm/Trade-Off Zones Binding with Regard to Mat. Planning,MM_EKPO_KZSTU,KZFIX,SAP,Auto-linked via description
+field_alias,Shipping Instructions,MM_EKPO_EVERS,EVERS,SAP,Auto-linked via description
+field_alias,Non-deductible input tax,MM_EKPO_NAVNW,WERT7,SAP,Auto-linked via description
+field_alias,Item Does Not Qualify for Cash Discount,MM_EKPO_SKTOF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Print-relevant schedule lines exist,MM_EKPO_ETDRK,ETDRK,SAP,Auto-linked via description
+field_alias,Quality inspection indicator cannot be changed,MM_EKPO_INSNC,XFELD,SAP,Auto-linked via description
+field_alias,Certificate Type,MM_EKPO_ZGTYP,QZGTYP,SAP,Auto-linked via description
+field_alias,Business area reported to the partner,MM_EKPO_KO_GSBER,GSBER,SAP,Auto-linked via description
+field_alias,assumed business area of the business partner,MM_EKPO_KO_PARGB,GSBER,SAP,Auto-linked via description
+field_alias,Advance procurement: project stock,MM_EKPO_VORAB,XFELD,SAP,Auto-linked via description
+field_alias,Prior Supplier,MM_EKPO_KOLIF,LIFNR,SAP,Auto-linked via description
+field_alias,Supplier Subrange,MM_EKPO_LTSNR,LTSNR,SAP,Auto-linked via description
+field_alias,Currently not used,MM_EKPO_GNETWR,WERT7,SAP,Auto-linked via description
+field_alias,Item is statistical,MM_EKPO_STAPO,XFELD,SAP,Auto-linked via description
+field_alias,Higher-Level Item in Purchasing Documents,MM_EKPO_UEBPO,EBELP,SAP,Auto-linked via description
+field_alias,Material Category,MM_EKPO_ATTYP,ATTYP,SAP,Auto-linked via description
+field_alias,Location for a physical handover of goods,MM_EKPO_HANDOVERLOC,HANDOVER_LOC,SAP,Auto-linked via description
+field_alias,Evaluated Receipt Settlement (ERS),MM_EKPO_XERSY,XFELD,SAP,Auto-linked via description
+field_alias,Last Transmission,MM_EKPO_DRDAT,DATUM,SAP,Auto-linked via description
+field_alias,Time,MM_EKPO_DRUHR,UZEIT,SAP,Auto-linked via description
+field_alias,Sequential Number,MM_EKPO_DRUNR,NUMC4,SAP,Auto-linked via description
+field_alias,Number of Points,MM_EKPO_ANZPU,MENG13,SAP,Auto-linked via description
+field_alias,Points Unit,MM_EKPO_PUNEI,MEINS,SAP,Auto-linked via description
+field_alias,Season Category,MM_EKPO_SAISO,SAISO,SAP,Auto-linked via description
+field_alias,Season Year,MM_EKPO_SAISJ,CJAHR,SAP,Auto-linked via description
+field_alias,Material Ledger Activated at Material Level,MM_EKPO_MLMAA,XFELD,SAP,Auto-linked via description
+field_alias,Quota arrangement usage,MM_EKPO_USEQU,USEQU,SAP,Auto-linked via description
+field_alias,Subitems Exist,MM_EKPO_UPVOR,CHAR1,SAP,Auto-linked via description
+field_alias,Maximum Cumulative Material Go-Ahead Quantity,MM_EKPO_MFZHI,MENG15,SAP,Auto-linked via description
+field_alias,Maximum Cumulative Production Go-Ahead Quantity,MM_EKPO_FFZHI,MENG15,SAP,Auto-linked via description
+field_alias,Returns Item,MM_EKPO_RETPO,XFELD,SAP,Auto-linked via description
+field_alias,Reason for Ordering,MM_EKPO_BSGRU,BSGRU,SAP,Auto-linked via description
+field_alias,Material qualifies for discount in kind,MM_EKPO_NRFHG,NRFHG,SAP,Auto-linked via description
+field_alias,Brazilian NCM Code,MM_EKPO_J_1BNBM,STEUC,SAP,Auto-linked via description
+field_alias,Usage of the material,MM_EKPO_J_1BMATUSE,J_1BMATUSE,SAP,Auto-linked via description
+field_alias,Produced in-house,MM_EKPO_J_1BOWNPRO,XFELD,SAP,Auto-linked via description
+field_alias,Material CFOP category,MM_EKPO_J_1BINDUST,J_1BINDUS3,SAP,Auto-linked via description
+field_alias,Release Creation Profile,MM_EKPO_ABUEB,ABUEB,SAP,Auto-linked via description
+field_alias,Next Forecast Delivery Schedule Transmission,MM_EKPO_NLABD,DATUM,SAP,Auto-linked via description
+field_alias,Next JIT Delivery Schedule Transmission,MM_EKPO_NFABD,DATUM,SAP,Auto-linked via description
+field_alias,Rebate Basis 1,MM_EKPO_BONBA,WERTV7,SAP,Auto-linked via description
+field_alias,JIT Delivery Schedules,MM_EKPO_FABKZ,FABKZ,SAP,Auto-linked via description
+field_alias,Inflation Index,MM_EKPO_J_1AINDXP,J_1AINDXP,SAP,Auto-linked via description
+field_alias,Inflation Index Date,MM_EKPO_J_1AIDATEP,J_1AUDATEP,SAP,Auto-linked via description
+field_alias,"""Outward Delivery Completed"" Indicator",MM_EKPO_EGLKZ,XFELD,SAP,Auto-linked via description
+field_alias,Units of measure usage,MM_EKPO_KZFME,KZWSO,SAP,Auto-linked via description
+field_alias,Rounding Profile,MM_EKPO_RDPRF,RDPRF,SAP,Auto-linked via description
+field_alias,Configuration changed,MM_EKPO_CHG_SRV,XFELD,SAP,Auto-linked via description
+field_alias,Item blocked for SD delivery,MM_EKPO_NOVET,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for Service-Based Invoice Verification,MM_EKPO_LEBRE,XFELD,SAP,Auto-linked via description
+field_alias,APO as Planning System,MM_EKPO_APOMS,APOMS,SAP,Auto-linked via description
+field_alias,Posting Logic in the Case of Stock Transfers,MM_EKPO_CCOMP,MMPUR_CCOMP,SAP,Auto-linked via description
+field_alias,Acceptance At Origin,MM_EKPO_WEORA,XFELD,SAP,Auto-linked via description
+field_alias,Service-Based Commitment,MM_EKPO_SRV_BAS_COM,XFELD,SAP,Auto-linked via description
+field_alias,Differential Invoicing,MM_EKPO_DIFF_INVOICE,DIFF_INVOICE,SAP,Auto-linked via description
+field_alias,Risk Relevancy in Purchasing,MM_EKPO_TRMRISK_RELEVANT,LOGTRM_RISK_RELEVANCY,SAP,Auto-linked via description
+field_alias,Reason for rejection of quotations and sales orders,MM_EKPO_SPE_ABGRU,ABGRU,SAP,Auto-linked via description
+field_alias,Billing Relevance CRM,MM_EKPO_SPE_CRM_FKREL,FKREL,SAP,Auto-linked via description
+field_alias,CQ Control Type,MM_EKPO_SPE_CQ_CTRLTYPE,/SPE/CQ_CONTROL_TYPE,SAP,Auto-linked via description
+field_alias,No Transmission of Cumulative Quantities in SA Release,MM_EKPO_SPE_CQ_NOCQ,XFELD,SAP,Auto-linked via description
+field_alias,Cumulative Goods Receipts from Redirected Purchase Orders,MM_EKPO_CQU_SAR,MENG15,SAP,Auto-linked via description
+field_alias,EWM Delivery Based Tolerance Check,MM_EKPO_SPE_EWM_DTC,XFELD,SAP,Auto-linked via description
+field_alias,Hierarchy Number,MM_EKPO_EXLIN,EXLIN,SAP,Auto-linked via description
+field_alias,External Sort Number,MM_EKPO_EXSNR,EXSNR,SAP,Auto-linked via description
+field_alias,External Hierarchy Category,MM_EKPO_EHTYP,EHTYP,SAP,Auto-linked via description
+field_alias,Retention in Percent,MM_EKPO_RETPC,PRZ32,SAP,Auto-linked via description
+field_alias,Down Payment Indicator,MM_EKPO_DPTYP,ME_DPTYPE_DOMAIN,SAP,Auto-linked via description
+field_alias,Down Payment Percentage,MM_EKPO_DPPCT,PRZ32,SAP,Auto-linked via description
+field_alias,Store Return with Inbound and Outbound Delivery,MM_EKPO_FLS_RSTO,XFELD,SAP,Auto-linked via description
+field_alias,Logical System,MM_EKPO_EXT_RFX_SYSTEM,LOGSYS,SAP,Auto-linked via description
+field_alias,Goods count correction,MM_EKPO_GOODS_COUNT_CORRECTION,XFELD,SAP,Auto-linked via description
+field_alias,Real-Time Consumption Posting of Subcontracting Components,MM_EKPO_ITCONS,XFELD,SAP,Auto-linked via description
+field_alias,Complete Delivery Requested for Purchase Order Item,MM_EKPO_CMPL_DLV_ITM,XFELD,SAP,Auto-linked via description
+field_alias,Are GRs posted by using Service Entry Sheet,MM_EKPO_GR_BY_SES,XFELD,SAP,Auto-linked via description
+field_alias,Renegotiation Status,MM_EKPO_RENEGOTIATION_STATUS,MEPROC_RENOGSTATE,SAP,Auto-linked via description
+field_alias,Jurisdiction Code of the Point of Origin,MM_EKPO_SF_TXJCD,J_1BTXJCD,SAP,Auto-linked via description
+field_alias,Data Element for Extensibility of Purchasing Document Item,MM_EKPO_DUMMY_EKPO_INCL_EEW_PS,EKPO_INCL_EEW,SAP,Auto-linked via description
+field_alias,Overall Limit,MM_EKPO_LIMIT_AMOUNT,WERT7,SAP,Auto-linked via description
+field_alias,WKA: Percentage of wages,MM_EKPO_ENH_PERCENT,PRZ32,SAP,Auto-linked via description
+field_alias,CIG Italy : Competition Identification Number,MM_EKPO_CIGIT,GLO_IT_CIG,SAP,Auto-linked via description
+field_alias,MGO Italy Monitoraggio Grandi Opere - Big Project Monitoring,MM_EKPO_MGOIT,GLO_IT_MGO,SAP,Auto-linked via description
+field_alias,Tax Service Business Transaction,MM_EKPO_TXS_BUSINESS_TRANSACTION,TXS_BUSINESS_TRANSACTION,SAP,Auto-linked via description
+field_alias,Tax Service Material Usage,MM_EKPO_TXS_MATERIAL_USAGE,data,SAP,Auto-linked via description
+field_alias,Tax Service Usage Purpose,MM_EKPO_TXS_USAGE_PURPOSE,TXS_USAGE_PURPOSE,SAP,Auto-linked via description
+field_alias,Indicator: Item Is Generated,MM_EKPO_/BEV1/NEGEN_ITEM,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Dependent Items Are Free of Charge,MM_EKPO_/BEV1/NEDEPFREE,XFELD,SAP,Auto-linked via description
+field_alias,Structure Category for Material Relationship,MM_EKPO_/BEV1/NESTRUCCAT,/BEV1/NESTRUC_CAT,SAP,Auto-linked via description
+field_alias,Advice Code,MM_EKPO_ADVCODE,/ISDFPS/ADVCODE,SAP,Auto-linked via description
+field_alias,Acceptance Period,MM_EKPO_EXCPE,NUM02,SAP,Auto-linked via description
+field_alias,Location GUID (004) with Conversion Exit,MM_EKPO_TMS_SRC_LOC_KEY,/SCMTMS/LOCUUID,SAP,Auto-linked via description
+field_alias,Location GUID (004) with Conversion Exit,MM_EKPO_TMS_DES_LOC_KEY,/SCMTMS/LOCUUID,SAP,Auto-linked via description
+field_alias,Option of MM Item,MM_EKPO_/DMBE/OPTIONOF,EBELP,SAP,Auto-linked via description
+field_alias,Financial Accounting Standards Code,MM_EKPO_/DMBE/FAS_CODE,/DMBE/DM_FAS_CODE,SAP,Auto-linked via description
+field_alias,Scheduling Desk,MM_EKPO_/DMBE/SCHEDULING_DESK,/DMBE/DM_SCHEDULERS_DESK,SAP,Auto-linked via description
+field_alias,Product,MM_EKPO_/DMBE/MIXEDPRODUCT,MATNR,SAP,Auto-linked via description
+field_alias,Posted Date of a Deal,MM_EKPO_/DMBE/POSTEDDATE,DATS,SAP,Auto-linked via description
+field_alias,Deal is Posted,MM_EKPO_/DMBE/DEAL_POSTED,FLAG,SAP,Auto-linked via description
+field_alias,Base Date,MM_EKPO_ZBAS_DATE,DATUM,SAP,Auto-linked via description
+field_alias,Annexing Date Type,MM_EKPO_ZADATTYP,/ILE/TDATETYP,SAP,Auto-linked via description
+field_alias,deviation percentage,MM_EKPO_Z_DEV,/ILE/TDEC3_3,SAP,Auto-linked via description
+field_alias,Annexing limit date (purchasing),MM_EKPO_ZLIMIT_DAT,DATUM,SAP,Auto-linked via description
+field_alias,IL Annexing Numerator,MM_EKPO_NUMERATOR,CHAR20,SAP,Auto-linked via description
+field_alias,"""The general acountant method"" New base date.",MM_EKPO_HASHCAL_BDAT,DATS,SAP,Auto-linked via description
+field_alias,Accountant general method,MM_EKPO_HASHCAL,/ILE/MTG_CHASHCAL,SAP,Auto-linked via description
+field_alias,Do not allow negative annexing,MM_EKPO_NEGATIVE,/ILE/NEGATIVE_ANNEXING,SAP,Auto-linked via description
+field_alias,Known Index indicator in /ILE/T_ANNEXING_CALCULATION Func,MM_EKPO_KNOWN_INDEX,XFELD,SAP,Auto-linked via description
+field_alias,Sales Document Item,MM_EKPO_AFPNR,POSNR,SAP,Auto-linked via description
+field_alias,Flag for the S1PNSTAT message,MM_EKPO_PNSTAT,ADSPC_FLAG,SAP,Auto-linked via description
+field_alias,ARun Demand Priority,MM_EKPO_ASSIGNMENT_PRIORITY,VBELN,SAP,Auto-linked via description
+field_alias,ARun Demand Group Priority,MM_EKPO_ARUN_GROUP_PRIO,VBELN,SAP,Auto-linked via description
+field_alias,ARun Order Priority,MM_EKPO_ARUN_ORDER_PRIO,data,SAP,Auto-linked via description
+field_alias,Type of subcontracting,MM_EKPO_SERRU,SERRU,SAP,Auto-linked via description
+field_alias,VAS Relevant,MM_EKPO_FSH_VAS_REL,FSH_VAS_REL,SAP,Auto-linked via description
+field_alias,Grid Condition Record Number,MM_EKPO_FSH_GRID_COND_REC,CHAR32,SAP,Auto-linked via description
+field_alias,Committed Quantity,MM_EKPO_CNFM_QTY,MENGV13,SAP,Auto-linked via description
+field_alias,Status of Diversion process,MM_EKPO_RFM_DIVERSION,RFM_DIVERSION_STATUS,SAP,Auto-linked via description
+field_alias,Season Completeness Indicator,MM_EKPO_RFM_SCC_INDICATOR,RFM_SCC_INDICATOR,SAP,Auto-linked via description
+field_alias,Activate Static Stopping of Releases,MM_EKPO_STPAC,STPAC,SAP,Auto-linked via description
+field_alias,(Automotive) Unloading Point,MM_EKPO_LGBZO_B,LGBZO,SAP,Auto-linked via description
+field_alias,Sequence Number,MM_EKPO_CONSNUM,NUMC3,SAP,Auto-linked via description
+field_alias,Indicator: Action at Registration,MM_EKPO_BORGR_MISS,CHAR1,SAP,Auto-linked via description
+field_alias,Earmarked Funds: Document Item,MM_EKPO_KBLPOS_CAB,KBLPOS,SAP,Auto-linked via description
+field_alias,Commitment document,MM_EKPO_KBLNR_COMP,KBLNR,SAP,Auto-linked via description
+field_alias,Commitment item,MM_EKPO_KBLPOS_COMP,KBLPOS,SAP,Auto-linked via description
+field_alias,PSST Grouping Rule,MM_EKPO_RFM_PSST_RULE,RFM_PSST_RULE,SAP,Auto-linked via description
+field_alias,Indicator for Putting Back from Grouped PO Document,MM_EKPO_PUT_BACK,XFELD,SAP,Auto-linked via description
+field_alias,Purchase Order for Consignment,MM_EKPO_CONS_ORDER,WRF_CONS_ORDER,SAP,Auto-linked via description
+field_alias,Material Document Year,MM_MKPF_MJAHR,GJAHR,SAP,Auto-linked via description
+field_alias,Time of Entry,MM_MKPF_CPUTM,UZEIT,SAP,Auto-linked via description
+field_alias,Undefined range (can be used for patch levels),MM_MKPF_TCODE,CHAR4,SAP,Auto-linked via description
+field_alias,Document Header Text,MM_MKPF_BKTXT,TEXT25,SAP,Auto-linked via description
+field_alias,Unplanned delivery costs,MM_MKPF_FRATH,WERT7,SAP,Auto-linked via description
+field_alias,Version for Printing GR/GI Slip,MM_MKPF_WEVER,WEVER,SAP,Auto-linked via description
+field_alias,Transaction Code,MM_MKPF_TCODE2,TCODE,SAP,Auto-linked via description
+field_alias,Control posting for external WMS,MM_MKPF_BFWMS,BFWMS,SAP,Auto-linked via description
+field_alias,Logical System of EWM Material Document,MM_MKPF_SPE_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Store Return with Inbound and Outbound Delivery,MM_MKPF_FLS_RSTO,XFELD,SAP,Auto-linked via description
+field_alias,Advanced Returns Management Active,MM_MKPF_MSR_ACTIVE,MSR_ACTIVE,SAP,Auto-linked via description
+field_alias,Material document can only be canceled in full,MM_MKPF_XCOMPL,CHAR1,SAP,Auto-linked via description
+field_alias,Material Document Year,MM_MSEG_MJAHR,GJAHR,SAP,Auto-linked via description
+field_alias,Item in Material Document,MM_MSEG_ZEILE,MBLPO,SAP,Auto-linked via description
+field_alias,Original Line for Account Assignment Item in Material Doc.,MM_MSEG_MAA_URZEI,MBLPO,SAP,Auto-linked via description
+field_alias,Item automatically created,MM_MSEG_XAUTO,MB_XAUTO,SAP,Auto-linked via description
+field_alias,Stock Type,MM_MSEG_INSMK,MB_INSMK,SAP,Auto-linked via description
+field_alias,Batch in Restricted-Use Stock,MM_MSEG_ZUSTD,XFELD,SAP,Auto-linked via description
+field_alias,Distribution of Differences,MM_MSEG_PLPLA,PLPLA,SAP,Auto-linked via description
+field_alias,Delivery costs in local currency,MM_MSEG_BNBTR,WERT13N,SAP,Auto-linked via description
+field_alias,Material Document Year,MM_MSEG_SJAHR,GJAHR,SAP,Auto-linked via description
+field_alias,Item in Material Document,MM_MSEG_SMBLP,MBLPO,SAP,Auto-linked via description
+field_alias,"""Delivery Completed"" Indicator",MM_MSEG_ELIKZ,XFELD,SAP,Auto-linked via description
+field_alias,Unloading Point,MM_MSEG_ABLAD,TEXT25,SAP,Auto-linked via description
+field_alias,Trading partner's business area,MM_MSEG_PARGB,GSBER,SAP,Auto-linked via description
+field_alias,Asset Subnumber,MM_MSEG_ANLN2,ANLN2,SAP,Auto-linked via description
+field_alias,Indicator: Posting to Order Is Statistical,MM_MSEG_XSAUF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Posting to Profitability Analysis Is Statistical,MM_MSEG_XSERG,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: post to previous year,MM_MSEG_XRUEJ,XFELD,SAP,Auto-linked via description
+field_alias,Final Issue for Reservation,MM_MSEG_KZEAR,XFELD,SAP,Auto-linked via description
+field_alias,Transaction/event is relevant to statistics,MM_MSEG_KZSTR,KZSTR,SAP,Auto-linked via description
+field_alias,Valuation Type of Transfer Batch,MM_MSEG_UMBAR,BWTAR,SAP,Auto-linked via description
+field_alias,Movement Indicator,MM_MSEG_KZBEW,KZBEW,SAP,Auto-linked via description
+field_alias,Receipt Indicator,MM_MSEG_KZZUG,KZZUG,SAP,Auto-linked via description
+field_alias,Stock Category in the Warehouse Management System,MM_MSEG_BESTQ,BESTQ,SAP,Auto-linked via description
+field_alias,Transfer Requirement Item,MM_MSEG_TBPOS,TBPOS,SAP,Auto-linked via description
+field_alias,Indicator: posting in warehouse management system,MM_MSEG_XBLVS,XFELD,SAP,Auto-linked via description
+field_alias,Transfer Priority,MM_MSEG_TBPRI,TBPRI,SAP,Auto-linked via description
+field_alias,Shipping Instructions,MM_MSEG_EVERS,EVERS,SAP,Auto-linked via description
+field_alias,Compliance with Shipping Instructions,MM_MSEG_EVERE,EVERE,SAP,Auto-linked via description
+field_alias,Cost Object,MM_MSEG_KSTRG,KSTRG,SAP,Auto-linked via description
+field_alias,Reversal of GR allowed for GR-based IV despite invoice,MM_MSEG_XWSBR,XFELD,SAP,Auto-linked via description
+field_alias,Material in Respect of Which Stock is Managed,MM_MSEG_MATBF,MATNR,SAP,Auto-linked via description
+field_alias,Receiving/Issuing Material,MM_MSEG_UMMAB,MATNR,SAP,Auto-linked via description
+field_alias,Posting string for quantities,MM_MSEG_BUSTM,BUSTM,SAP,Auto-linked via description
+field_alias,Posting String for Values,MM_MSEG_BUSTW,BUSTW,SAP,Auto-linked via description
+field_alias,Original line in material document,MM_MSEG_URZEI,MBLPO,SAP,Auto-linked via description
+field_alias,Calculation of val. open,MM_MSEG_XWOFF,XFELD,SAP,Auto-linked via description
+field_alias,Business Process,MM_MSEG_PRZNR,CO_PRZNR,SAP,Auto-linked via description
+field_alias,Goods Supplier,MM_MSEG_LLIEF,LIFNR,SAP,Auto-linked via description
+field_alias,Vendor Stock Valuation Indicator,MM_MSEG_XOBEW,XFELD,SAP,Auto-linked via description
+field_alias,Stock Type Modification (Read from Table T156M),MM_MSEG_ZUSTD_T156M,BAMOK_MSEG,SAP,Auto-linked via description
+field_alias,GTS Stock Type,MM_MSEG_SPE_GTS_STOCK_TY,/SPE/GTS_STOCK_TYPE,SAP,Auto-linked via description
+field_alias,Multiple Account Assignment,MM_MSEG_XMACC,CHAR1,SAP,Auto-linked via description
+field_alias,Day On Which Accounting Document Was Entered,MM_MSEG_CPUDT_MKPF,DATUM,SAP,Auto-linked via description
+field_alias,Time of Entry,MM_MSEG_CPUTM_MKPF,UZEIT,SAP,Auto-linked via description
+field_alias,Transaction Code,MM_MSEG_TCODE2_MKPF,TCODE,SAP,Auto-linked via description
+field_alias,Receiving/Issuing Stock Segment,MM_MSEG_SGT_UMSCAT,SGT_SRCA,SAP,Auto-linked via description
+field_alias,Date on which services are rendered,MM_MSEG_FBUDA,DATUM,SAP,Auto-linked via description
+field_alias,Print via Output Control,MM_MSEG_XPRINT,XRADI,SAP,Auto-linked via description
+field_alias,Completed indicator,MM_MSEG_COMPL_MARK,XFELD,SAP,Auto-linked via description
+field_alias,Display Dialog Box,MM_MSEG_POPUP_MARK,KENZX,SAP,Auto-linked via description
+field_alias,Non-deductible input tax,MM_MSEG_OINAVNW,WERT7,SAP,Auto-linked via description
+field_alias,Transaction Group,SD_VBAK_TRVOG,TRVOG,SAP,Auto-linked via description
+field_alias,Order Reason (Reason for the Business Transaction),SD_VBAK_AUGRU,AUGRU,SAP,Auto-linked via description
+field_alias,Warranty Date,SD_VBAK_GWLDT,DATUM,SAP,Auto-linked via description
+field_alias,Collective Number (SD),SD_VBAK_SUBMI,CHAR10,SAP,Auto-linked via description
+field_alias,Delivery Block (Document Header),SD_VBAK_LIFSK,LIFSP,SAP,Auto-linked via description
+field_alias,Billing Block in SD Document,SD_VBAK_FAKSK,FAKSP,SAP,Auto-linked via description
+field_alias,Proposed date type,SD_VBAK_VPRGR,PRGRS,SAP,Auto-linked via description
+field_alias,Original system with release and transaction control,SD_VBAK_VBKLA,CHAR9,SAP,Auto-linked via description
+field_alias,SD document indicator,SD_VBAK_VBKLT,VBKLT,SAP,Auto-linked via description
+field_alias,Shipping Conditions,SD_VBAK_VSBED,VSBED,SAP,Auto-linked via description
+field_alias,Statistics Currency,SD_VBAK_STWAE,WAERS,SAP,Auto-linked via description
+field_alias,Agreement (various conditions grouped together),SD_VBAK_KNUMA,KNUMA,SAP,Auto-linked via description
+field_alias,Credit Control Area,SD_VBAK_KKBER,KKBER,SAP,Auto-linked via description
+field_alias,Credit Representative Group for Credit Management,SD_VBAK_SBGRP,SBGRP_CM,SAP,Auto-linked via description
+field_alias,Credit Management: Risk Category,SD_VBAK_CTLPC,CTLPC_CM,SAP,Auto-linked via description
+field_alias,Next date,SD_VBAK_CMNGV,DATUM,SAP,Auto-linked via description
+field_alias,Timestamp of the last Credit Management check run,SD_VBAK_CM_LAST_CHECK,TZNTSTMPL,SAP,Auto-linked via description
+field_alias,Hierarchy type for pricing,SD_VBAK_HITYP_PR,HITYP,SAP,Auto-linked via description
+field_alias,Customer Hierarchy Relevance,SD_VBAK_CUSTH_UNIV_SALES_RELVNCE,SD_CUSTH_CHRELV,SAP,Auto-linked via description
+field_alias,Customer Hierarchy Branch UUID,SD_VBAK_CUSTH_BRANCH_UUID,SYSUUID_C32,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_VBAK_ABRVW,ABRVW,SAP,Auto-linked via description
+field_alias,MRP for delivery schedule types,SD_VBAK_ABDIS,ABRAB,SAP,Auto-linked via description
+field_alias,Alternative Tax Classification,SD_VBAK_TAXK1,TAXKD,SAP,Auto-linked via description
+field_alias,Search Procedure for Batch Determination,SD_VBAK_KALSM_CH,KALSM,SAP,Auto-linked via description
+field_alias,Referencing requirement: Procedure,SD_VBAK_SCHEME_GRP,SCHEME_GRP,SAP,Auto-linked via description
+field_alias,Check partner authorizations,SD_VBAK_ABRUF_PART,ABRUF_PART,SAP,Auto-linked via description
+field_alias,Pick-Up Date,SD_VBAK_ABHOD,DATUM,SAP,Auto-linked via description
+field_alias,Pick-Up Time,SD_VBAK_ABHOV,UZEIT,SAP,Auto-linked via description
+field_alias,Pick-Up Time,SD_VBAK_ABHOB,UZEIT,SAP,Auto-linked via description
+field_alias,Number of payment card plan type,SD_VBAK_RPLNR,FPLNR,SAP,Auto-linked via description
+field_alias,Tax Destination Country/Region,SD_VBAK_STCEG_L,LAND1,SAP,Auto-linked via description
+field_alias,Tax Departure Country/Region,SD_VBAK_LANDTX,LAND1,SAP,Auto-linked via description
+field_alias,Indicator: Triangular Deal Within the EU,SD_VBAK_XEGDR,XFELD,SAP,Auto-linked via description
+field_alias,Block master contr. until all lower level contracts updated,SD_VBAK_ENQUEUE_GRP,ENQUEUE_GRP,SAP,Auto-linked via description
+field_alias,"Character field, length 70",SD_VBAK_CRM_GUID,CHAR70,SAP,Auto-linked via description
+field_alias,UTC Time Stamp in Long Form (YYYYMMDDhhmmssmmmuuun),SD_VBAK_UPD_TMSTMP,TZNTSTMPL,SAP,Auto-linked via description
+field_alias,Location for a physical handover of goods,SD_VBAK_HANDOVERLOC,HANDOVER_LOC,SAP,Auto-linked via description
+field_alias,Type of communication system,SD_VBAK_EXT_COMM_SYST_TYPE,DOM_COMM_SYST_TYPE,SAP,Auto-linked via description
+field_alias,Create Purchasing Document Retroactively,SD_VBAK_RETRO_PURCHDOC_CREATION,EDI_RETRO_PURCHDOC_CREATION,SAP,Auto-linked via description
+field_alias,Cross-Item Pricing Date,SD_VBAK_CROSSITEM_PRC_DATE,CROSSITEM_PRC_DATE,SAP,Auto-linked via description
+field_alias,Rejection Status (All Items),SD_VBAK_ABSTK,STATV,SAP,Auto-linked via description
+field_alias,Overall Status of Credit Checks,SD_VBAK_CMGST,CMGST,SAP,Auto-linked via description
+field_alias,Delay Status (All Items),SD_VBAK_DCSTK,STATV,SAP,Auto-linked via description
+field_alias,Status Funds Management,SD_VBAK_FMSTK,STATV,SAP,Auto-linked via description
+field_alias,Billing Block Status (All Items),SD_VBAK_FSSTK,STATV,SAP,Auto-linked via description
+field_alias,Manual Completion of Contract,SD_VBAK_MANEK,MANEK,SAP,Auto-linked via description
+field_alias,Overall Block Status (Header),SD_VBAK_SPSTG,STATV,SAP,Auto-linked via description
+field_alias,Pricing Incompletion Status (All Items),SD_VBAK_UVPRS,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 1: Sum of all items,SD_VBAK_UVS01,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 2: Sum of all items,SD_VBAK_UVS02,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 3: Sum of all items,SD_VBAK_UVS03,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 4: Sum of all items,SD_VBAK_UVS04,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 5: Sum of all items,SD_VBAK_UVS05,STATV,SAP,Auto-linked via description
+field_alias,Omnichannel Sales Promotion Status (Header),SD_VBAK_BOB_STATUS,DOM_BOB_STATUS,SAP,Auto-linked via description
+field_alias,B2B Message Processing Status,SD_VBAK_B2B_MSG_PROCESSING_STATUS,DOM_B2B_MSG_PROCESSING_STATUS,SAP,Auto-linked via description
+field_alias,Business Process Indicator for Poland,SD_VBAK_GLO_LOG_REF1_HD,GLO_LOG_REF1_HD,SAP,Auto-linked via description
+field_alias,Annexing base date,SD_VBAK_ZABDATH,DATUM,SAP,Auto-linked via description
+field_alias,Rule for Billing,SD_VBAK_AD01FAREG,AD01FAREG,SAP,Auto-linked via description
+field_alias,Initial document,SD_VBAK_AD01BASDOC,VBELN,SAP,Auto-linked via description
+field_alias,Release Rule,SD_VBAK_FSH_REREG,ARUN_REREG,SAP,Auto-linked via description
+field_alias,Requirement Relevance for Contract,SD_VBAK_FSH_CQ_CHECK,XFELD,SAP,Auto-linked via description
+field_alias,Snapshot Status,SD_VBAK_FSH_VRSN_STATUS,FSH_SNST_STATUS,SAP,Auto-linked via description
+field_alias,Cancellation Date,SD_VBAK_FSH_CANDATE,DATUM,SAP,Auto-linked via description
+field_alias,Order Scheduling Strategy Fields Changed Manually,SD_VBAK_FSH_OS_STG_CHANGE,FLAG,SAP,Auto-linked via description
+field_alias,ETM-Relevant Indicator,SD_VBAK_J_3GKBAUL,J_3GKBAUL,SAP,Auto-linked via description
+field_alias,Treasury Account Symbol,SD_VBAK_TAS,CHAR30,SAP,Auto-linked via description
+field_alias,Modification Allowed,SD_VBAK_MOD_ALLOW,CHAR1,SAP,Auto-linked via description
+field_alias,Cancellation Allowed,SD_VBAK_CANCEL_ALLOW,CHAR1,SAP,Auto-linked via description
+field_alias,Reporting Frequency,SD_VBAK_REP_FREQ,CHAR3,SAP,Auto-linked via description
+field_alias,Logical system with which document was created,SD_VBAK_LOGSYSB,LOGSYS,SAP,Auto-linked via description
+field_alias,Procedure for Campaign Determination,SD_VBAK_KALCD,KALSM,SAP,Auto-linked via description
+field_alias,Multiple Campaigns/Trade Promotions Active Indicator,SD_VBAK_MULTI,CMPGN_MULT_CAMPAIGN,SAP,Auto-linked via description
+field_alias,Claim header,SD_VBAK_WTYSC_CLM_HDR,WTYSC_CLM_HDR,SAP,Auto-linked via description
+field_alias,Item Is Relevant for Delivery,SD_VBAP_LFREL,XFELD,SAP,Auto-linked via description
+field_alias,Higher-Level Item in Bill of Material Structures,SD_VBAP_UEPOS,POSNR,SAP,Auto-linked via description
+field_alias,Item for Which this Item is an Alternative,SD_VBAP_GRPOS,GRPOS,SAP,Auto-linked via description
+field_alias,Reason for Rejection of Sales Documents,SD_VBAP_ABGRU,ABGRU_VA,SAP,Auto-linked via description
+field_alias,Discontinuation Date,SD_VBAP_DISCONTINUED_DATE,DATS,SAP,Auto-linked via description
+field_alias,Discontinuation Time,SD_VBAP_DISCONTINUED_TIME,TIMES,SAP,Auto-linked via description
+field_alias,Follow-Up Item In Discontinuation,SD_VBAP_FOLLOW_UP_ITEM,POSNR,SAP,Auto-linked via description
+field_alias,Apply Picking Criteria for Handling Units,SD_VBAP_PICK_HU_IND,DOM_PICK_HU_IND,SAP,Auto-linked via description
+field_alias,Target Quantity UoM,SD_VBAP_ZIEME,MEINS,SAP,Auto-linked via description
+field_alias,Quantity Conversion: Numerator,SD_VBAP_SUBSTN_NUMERATOR,data,SAP,Auto-linked via description
+field_alias,Quantity Conversion: Denominator,SD_VBAP_SUBSTN_DENOMINATOR,data,SAP,Auto-linked via description
+field_alias,Rounding quantity for delivery,SD_VBAP_ABLFZ,ABLFZ,SAP,Auto-linked via description
+field_alias,Allowed deviation in quantity (absolute),SD_VBAP_ABSFZ,MENG13,SAP,Auto-linked via description
+field_alias,Allowed deviation in quantity (in percent),SD_VBAP_KBVER,PACK2,SAP,Auto-linked via description
+field_alias,Days by which the quantity can be shifted,SD_VBAP_KEVER,PACK2,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_VBAP_VKAUS,ABRVW,SAP,Auto-linked via description
+field_alias,Replacement part,SD_VBAP_ATPKZ,ATPKZ,SAP,Auto-linked via description
+field_alias,Method of billing for CO/PPC orders,SD_VBAP_RKFKF,RKFKF,SAP,Auto-linked via description
+field_alias,Originating Item,SD_VBAP_POSNV,POSNR,SAP,Auto-linked via description
+field_alias,Completion Rule for Quotation / Contract,SD_VBAP_ERLRE,ERLRE,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM2,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM3,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM4,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM5,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM6,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM7,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM8,TAXKD,SAP,Auto-linked via description
+field_alias,Tax Classification for Material,SD_VBAP_TAXM9,TAXKD,SAP,Auto-linked via description
+field_alias,Cash Discount Indicator,SD_VBAP_SKTOF,XFELD,SAP,Auto-linked via description
+field_alias,Commission Group,SD_VBAP_PROVG,PROVG,SAP,Auto-linked via description
+field_alias,Pricing is OK,SD_VBAP_PRSOK,XFELD,SAP,Auto-linked via description
+field_alias,Reason for material substitution,SD_VBAP_SUGRD,SUGRD,SAP,Auto-linked via description
+field_alias,Profitability Segment Is Dependent on Preceding Document,SD_VBAP_FREEZE_PAOBJNR,XFELD,SAP,Auto-linked via description
+field_alias,Requirements type,SD_VBAP_BEDAE,BEDAE,SAP,Auto-linked via description
+field_alias,Condition Update,SD_VBAP_KOUPD,XFELD,SAP,Auto-linked via description
+field_alias,Costing Variant,SD_VBAP_KLVAR,KLVAR,SAP,Auto-linked via description
+field_alias,Statistics date,SD_VBAP_STADAT,DATUM,SAP,Auto-linked via description
+field_alias,Internal Class Number,SD_VBAP_CLINT,CLINT,SAP,Auto-linked via description
+field_alias,Internal counter,SD_VBAP_STPOZ,CIM_COUNT,SAP,Auto-linked via description
+field_alias,Inconsistent configuration,SD_VBAP_STMAN,XFELD,SAP,Auto-linked via description
+field_alias,Costing Sheet,SD_VBAP_KALSM_K,KALSM,SAP,Auto-linked via description
+field_alias,Costing Variant,SD_VBAP_KALVAR,KLVAR,SAP,Auto-linked via description
+field_alias,Product allocation determination procedure,SD_VBAP_KOSCH,KOSCH,SAP,Auto-linked via description
+field_alias,Instruction for Planning Delivery Schedule,SD_VBAP_PLAVO,PLAVO,SAP,Auto-linked via description
+field_alias,KANBAN/Sequence Number,SD_VBAP_KANNR,CHAR35,SAP,Auto-linked via description
+field_alias,Assortment module,SD_VBAP_SKOPF,WSORTK,SAP,Auto-linked via description
+field_alias,Promotion,SD_VBAP_KNUMA_PI,KNUMA,SAP,Auto-linked via description
+field_alias,Sales Deal,SD_VBAP_KNUMA_AG,KNUMA,SAP,Auto-linked via description
+field_alias,Free goods delivery control,SD_VBAP_LSTANR,STATVNR,SAP,Auto-linked via description
+field_alias,Logical system,SD_VBAP_LOGSYS_EXT,LOGSYS,SAP,Auto-linked via description
+field_alias,First Inventory-Managing Location,SD_VBAP_STOCKLOC,LOCNR,SAP,Auto-linked via description
+field_alias,Return Reason,SD_VBAP_MSR_RET_REASON,MSR_RETURNS_REASON,SAP,Auto-linked via description
+field_alias,Approval Block,SD_VBAP_MSR_APPROV_BLOCK,MSR_APPROVAL_BLOCK,SAP,Auto-linked via description
+field_alias,Number of Condition Record,SD_VBAP_NRAB_KNUMH,KNUMH,SAP,Auto-linked via description
+field_alias,Risk Relevancy in Sales,SD_VBAP_TRMRISK_RELEVANT,LOGTRM_RISK_RELEVANCY,SAP,Auto-linked via description
+field_alias,Sales Document Item,SD_VBAP_VBKD_POSNR,POSNR,SAP,Auto-linked via description
+field_alias,Sales Document Item,SD_VBAP_VEDA_POSNR,POSNR,SAP,Auto-linked via description
+field_alias,Location for a physical handover of goods,SD_VBAP_HANDOVERLOC,HANDOVER_LOC,SAP,Auto-linked via description
+field_alias,Handover Date at the Handover Location,SD_VBAP_HANDOVERDATE,HANDOVER_DATE,SAP,Auto-linked via description
+field_alias,Handover time at the handover location,SD_VBAP_HANDOVERTIME,HANDOVER_TIME,SAP,Auto-linked via description
+field_alias,Nota Fiscal Special Case for CFOP Determination,SD_VBAP_SPCSTO,J_1BSPCSTO_SD,SAP,Auto-linked via description
+field_alias,Status of Credit Check Against Export Credit Insurance,SD_VBAP_CMPPJ,CMPSZ,SAP,Auto-linked via description
+field_alias,Manual Completion of Contract,SD_VBAP_MANEK,MANEK,SAP,Auto-linked via description
+field_alias,Legal Control License Indicator,SD_VBAP_LGLC_LIC_IND,DOM_LGLC_LIC_IND,SAP,Auto-linked via description
+field_alias,State of Project-Based Service,SD_VBAP_PBS_STATE,SD_PBS_STATE,SAP,Auto-linked via description
+field_alias,Item is relevant for IFRS 15,SD_VBAP_IFRS15_RELEVANCE,XFELD,SAP,Auto-linked via description
+field_alias,Rule for transferring the results of the availability check,SD_VBAP_REVFP,REVFP,SAP,Auto-linked via description
+field_alias,Overtime Category,SD_VBAP_CATS_OVERTIME_CATEGORY,CATS_OVERTIME_CATEGORY,SAP,Auto-linked via description
+field_alias,Time of the Session During Which the Record Was Created,SD_VBAP_SESSION_CREATION_TIME,UZEIT,SAP,Auto-linked via description
+field_alias,Original Plant in Plant Substitution,SD_VBAP_ORIGINAL_PLANT,WERKS,SAP,Auto-linked via description
+field_alias,Substitution Status for Alternative-Based Confirmation (ABC),SD_VBAP_ATP_ABC_SUBSTITUTION_STATUS,ATP_ABC_SUBSTITUTION_STATUS,SAP,Auto-linked via description
+field_alias,Transit Plant,SD_VBAP_TRANSIT_PLANT,WERKS,SAP,Auto-linked via description
+field_alias,Global Item,SD_VBAP_MILL_SE_GPOSN,POSNR,SAP,Auto-linked via description
+field_alias,Control of Batch Selection,SD_VBAP_MILL_BATCH_SEL_F,MILL_BATCH_SEL_FLG,SAP,Auto-linked via description
+field_alias,Sales Office,SD_VBAP_VKBUR_ANA,VKBUR,SAP,Auto-linked via description
+field_alias,Order Reason (Reason for the Business Transaction),SD_VBAP_AUGRU_ANA,AUGRU,SAP,Auto-linked via description
+field_alias,Shipping Conditions,SD_VBAP_VSBED_ANA,VSBED,SAP,Auto-linked via description
+field_alias,Sales District,SD_VBAP_BZIRK_ANA,BZIRK,SAP,Auto-linked via description
+field_alias,Shipping Type,SD_VBAP_VSART_ANA,VERSART,SAP,Auto-linked via description
+field_alias,Billing Date,SD_VBAP_FKDAT_ANA,DATUM,SAP,Auto-linked via description
+field_alias,Billing Plan Number / Invoicing Plan Number,SD_VBAP_FPLNR_ANA,FPLNR,SAP,Auto-linked via description
+field_alias,Bill-to Party,SD_VBAP_KUNRE_ANA,KUNNR,SAP,Auto-linked via description
+field_alias,Sales Employee,SD_VBAP_PERVE_ANA,PERNR,SAP,Auto-linked via description
+field_alias,Employee Responsible,SD_VBAP_PERZM_ANA,PERNR,SAP,Auto-linked via description
+field_alias,Payer,SD_VBAP_KUNRG_ANA,KUNNR,SAP,Auto-linked via description
+field_alias,Tax Service Business Transaction,SD_VBAP_TXS_BUSINESS_TRANSACTION,TXS_BUSINESS_TRANSACTION,SAP,Auto-linked via description
+field_alias,Tax Service Material Usage,SD_VBAP_TXS_MATERIAL_USAGE,data,SAP,Auto-linked via description
+field_alias,Tax Service Usage Purpose,SD_VBAP_TXS_USAGE_PURPOSE,TXS_USAGE_PURPOSE,SAP,Auto-linked via description
+field_alias,Time Stamp,SD_VBAP_CPD_UPDAT,/CPD/PFP_SC_TSTMP,SAP,Auto-linked via description
+field_alias,Option of SD Item,SD_VBAP_/DMBE/OPTIONOF,POSNR,SAP,Auto-linked via description
+field_alias,Financial Accounting Standards Code,SD_VBAP_/DMBE/FAS_CODE,/DMBE/DM_FAS_CODE,SAP,Auto-linked via description
+field_alias,Scheduling Desk,SD_VBAP_/DMBE/SCHEDULING_DESK,/DMBE/DM_SCHEDULERS_DESK,SAP,Auto-linked via description
+field_alias,Product,SD_VBAP_/DMBE/MIXEDPRODUCT,MATNR,SAP,Auto-linked via description
+field_alias,Posted Date of a Deal,SD_VBAP_/DMBE/POSTEDDATE,DATS,SAP,Auto-linked via description
+field_alias,Deal is Posted,SD_VBAP_/DMBE/DEAL_POSTED,FLAG,SAP,Auto-linked via description
+field_alias,Annexing base date,SD_VBAP_ZABDATI,DATUM,SAP,Auto-linked via description
+field_alias,Internal counter,SD_VBAP_APLZL_OLC,CIM_COUNT,SAP,Auto-linked via description
+field_alias,Dynamic Item Processor Profile,SD_VBAP_AD01PROFNR,AD01PROFNR,SAP,Auto-linked via description
+field_alias,Interchangeability Code,SD_VBAP_ADICC,ADICC,SAP,Auto-linked via description
+field_alias,ARun Demand Priority,SD_VBAP_ASSIGNMENT_PRIORITY,VBELN,SAP,Auto-linked via description
+field_alias,ARun Demand Group Priority,SD_VBAP_ARUN_GROUP_PRIO,VBELN,SAP,Auto-linked via description
+field_alias,Indicator for Inbound Forecast and JIT Delivery Schedules,SD_VBAP_LABSG,EDISG,SAP,Auto-linked via description
+field_alias,Indicator for Inbound Forecast Delivery Schedule Headers,SD_VBAP_FABSG,EDISG,SAP,Auto-linked via description
+field_alias,Profile for Comparison of Frcst.DelSched with Frcst.DelSched,SD_VBAP_PR_L_L,DI_ESD_PROFIL,SAP,Auto-linked via description
+field_alias,Profile for Comparison of JIT Del.Sched. with JIT Del.Sched.,SD_VBAP_PR_F_F,DI_ESD_PROFIL,SAP,Auto-linked via description
+field_alias,Profile for Comp. of JIT Del.Sched. with Forecast Del.Sched.,SD_VBAP_PR_F_L,DI_ESD_PROFIL,SAP,Auto-linked via description
+field_alias,Regulatory indicator,SD_VBAP_FERC_IND,FE_IND,SAP,Auto-linked via description
+field_alias,Condition Record Number for Seasons,SD_VBAP_FSH_CRSD,FSH_CRSD,SAP,Auto-linked via description
+field_alias,Cancellation Date,SD_VBAP_FSH_CANDATE,DATUM,SAP,Auto-linked via description
+field_alias,VAS Relevant,SD_VBAP_FSH_VAS_REL,FSH_VAS_REL,SAP,Auto-linked via description
+field_alias,Grid Condition Record Number,SD_VBAP_FSH_GRID_COND_REC,CHAR32,SAP,Auto-linked via description
+field_alias,Season Completeness Indicator,SD_VBAP_RFM_SCC_INDICATOR,RFM_SCC_INDICATOR,SAP,Auto-linked via description
+field_alias,Fund,SD_VBAP_FONDS,BP_GEBER,SAP,Auto-linked via description
+field_alias,Type of Technical Object,SD_VBAP_EQART,EQART,SAP,Auto-linked via description
+field_alias,Document Item,SD_VBAP_J_3GPOSNRI,J_3GPOSNR,SAP,Auto-linked via description
+field_alias,Engagement mgmt: Object number,SD_VBAP_PRS_OBJNR,CHAR22,SAP,Auto-linked via description
+field_alias,Work Period (Internal Representation),SD_VBAP_PRS_WORK_PERIOD,PRS_WORK_PERIOD,SAP,Auto-linked via description
+field_alias,Treasury Account Symbol,SD_VBAP_TAS,CHAR30,SAP,Auto-linked via description
+field_alias,Modification Allowed,SD_VBAP_MOD_ALLOW,CHAR1,SAP,Auto-linked via description
+field_alias,Cancellation Allowed,SD_VBAP_CANCEL_ALLOW,CHAR1,SAP,Auto-linked via description
+field_alias,Reporting Frequency,SD_VBAP_REP_FREQ,CHAR3,SAP,Auto-linked via description
+field_alias,PSST Grouping Rule,SD_VBAP_RFM_PSST_RULE,RFM_PSST_RULE,SAP,Auto-linked via description
+field_alias,Trading partner's business area,SD_VBAP_PARGB,GSBER,SAP,Auto-linked via description
+field_alias,Internal counter,SD_VBAP_APLZL_OAA,CIM_COUNT,SAP,Auto-linked via description
+field_alias,End Customer (Central Business Partner),SD_VBAP_VLCENDCU,BU_PARTNER,SAP,Auto-linked via description
+field_alias,Partner Function,SD_VBPA_PARVW,PARVW,SAP,Auto-linked via description
+field_alias,Unloading Point,SD_VBPA_ABLAD,TEXT25,SAP,Auto-linked via description
+field_alias,Address indicator,SD_VBPA_ADRDA,ADRDA,SAP,Auto-linked via description
+field_alias,Indicator: Is the account a one-time account?,SD_VBPA_XCPDK,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Customer Is Rebate-Relevant,SD_VBPA_BOKRE,XFELD,SAP,Auto-linked via description
+field_alias,Level number within hierarchy,SD_VBPA_HISTUNR,NUM2,SAP,Auto-linked via description
+field_alias,Transportation zone to or from which the goods are delivered,SD_VBPA_LZONE,ZONE,SAP,Auto-linked via description
+field_alias,Assignment to Hierarchy,SD_VBPA_HZUOR,HZUOR,SAP,Auto-linked via description
+field_alias,Indicator 'further partners in this function' (VBPA2),SD_VBPA_PARVW_FF,XFELD,SAP,Auto-linked via description
+field_alias,Person Number,SD_VBPA_ADRNP,AD_PERSNUM,SAP,Auto-linked via description
+field_alias,Maintain appointments in calendar,SD_VBPA_KALE,KALE,SAP,Auto-linked via description
+field_alias,Address Determination in Document,SD_VBPA_ADDR_OPERATION,BU_OPERATION,SAP,Auto-linked via description
+field_alias,Sales District,SD_VBKD_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Manual Invoice Maintenance,SD_VBKD_MRNKZ,XFELD,SAP,Auto-linked via description
+field_alias,Date on which services are rendered,SD_VBKD_FBUDA,DATUM,SAP,Auto-linked via description
+field_alias,Dunning Block,SD_VBKD_MANSP,MANSP,SAP,Auto-linked via description
+field_alias,Retail Promotion,SD_VBKD_WAKTION,WAKTION,SAP,Auto-linked via description
+field_alias,Payment Guarantee Procedure,SD_VBKD_ABSSC,ABSSCHE_CM,SAP,Auto-linked via description
+field_alias,Tax Type,SD_VBKD_J_1AFITP,J_1AFITP,SAP,Auto-linked via description
+field_alias,Reason for Zero VAT,SD_VBKD_J_1ARFZ,J_1ARFZVAT,SAP,Auto-linked via description
+field_alias,Tax relevant classification,SD_VBKD_J_1ATXREL,J_1ATXREL,SAP,Auto-linked via description
+field_alias,Department number,SD_VBKD_ABTNR,ABTNR,SAP,Auto-linked via description
+field_alias,Translation Date,SD_VBKD_KURSK_DAT,DATUM,SAP,Auto-linked via description
+field_alias,Translation Date,SD_VBKD_KURRF_DAT,DATUM,SAP,Auto-linked via description
+field_alias,Depreciation percentage for financial document processing,SD_VBKD_AKPRZ,PRZ32,SAP,Auto-linked via description
+field_alias,Inflation Index,SD_VBKD_J_1AINDXP,J_1AINDXP,SAP,Auto-linked via description
+field_alias,Indexing base date,SD_VBKD_J_1AIDATEP,J_1AUDATEP,SAP,Auto-linked via description
+field_alias,Agreed Delivery Time,SD_VBKD_DELCO,DELCO,SAP,Auto-linked via description
+field_alias,Dynamic Item Processor Profile,SD_VBKD_FFPRF,AD01PROFNR,SAP,Auto-linked via description
+field_alias,Billing form,SD_VBKD_FAKTF,FAKTF,SAP,Auto-linked via description
+field_alias,Revenue recognition category,SD_VBKD_RRREL,RR_RELTYP,SAP,Auto-linked via description
+field_alias,Means of Transport,SD_VBKD_TRMTYP,MATNR,SAP,Auto-linked via description
+field_alias,Special Processing Indicator,SD_VBKD_SDABW,SDABW,SAP,Auto-linked via description
+field_alias,Relevant for POD processing,SD_VBKD_PODKZ,XFELD,SAP,Auto-linked via description
+field_alias,Billing Plan Number / Invoicing Plan Number,SD_VBKD_DPBP_REF_FPLNR,FPLNR,SAP,Auto-linked via description
+field_alias,Item for billing plan/invoice plan/payment cards,SD_VBKD_DPBP_REF_FPLTR,FPLTR,SAP,Auto-linked via description
+field_alias,Revenue Distribution Type,SD_VBKD_REVSP,RR_REVSP,SAP,Auto-linked via description
+field_alias,Revenue Accounting Type,SD_VBKD_FARR_RELTYPE,FARR_RELTYPE,SAP,Auto-linked via description
+field_alias,Incoterms Version,SD_VBKD_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,LST CST applicability code,SD_VBKD_STCODE,J_1ISTCODE,SAP,Auto-linked via description
+field_alias,Form Type,SD_VBKD_FORMC1,J_1IFORTYP,SAP,Auto-linked via description
+field_alias,Form Type,SD_VBKD_FORMC2,J_1IFORTYP,SAP,Auto-linked via description
+field_alias,Control code for consumption taxes in foreign trade,SD_VBKD_STEUC,STEUC,SAP,Auto-linked via description
+field_alias,Abbreviation for Complaints Reason,SD_VBKD_COMPREAS,CMP_COMPREAS_COPY,SAP,Auto-linked via description
+field_alias,SEPA-Relevance,SD_VBKD_SEPON,SD_SEPA_FLAG,SAP,Auto-linked via description
+field_alias,SEPA-Relevance,SD_VBKD_MNDVG,SD_SEPA_FLAG,SAP,Auto-linked via description
+field_alias,Sales District,SD_LIKP_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Transportation Planning Date,SD_LIKP_TDDAT,DATUM,SAP,Auto-linked via description
+field_alias,Unloading Point,SD_LIKP_ABLAD,TEXT25,SAP,Auto-linked via description
+field_alias,Export indicator,SD_LIKP_EXPKZ,EXPKZ,SAP,Auto-linked via description
+field_alias,Billing Block in SD Document,SD_LIKP_FAKSK,FAKSP,SAP,Auto-linked via description
+field_alias,Delivery Block (Document Header),SD_LIKP_LIFSK,LIFSP,SAP,Auto-linked via description
+field_alias,Customer Factory Calendar,SD_LIKP_KNFAK,WFCID,SAP,Auto-linked via description
+field_alias,not currently in use,SD_LIKP_TPQUA,TPQUA,SAP,Auto-linked via description
+field_alias,not currently in use,SD_LIKP_TPGRP,TPGRP,SAP,Auto-linked via description
+field_alias,Shipping Conditions,SD_LIKP_VSBED,VSBED,SAP,Auto-linked via description
+field_alias,Not Currently in Use,SD_LIKP_STZKL,STZKL,SAP,Auto-linked via description
+field_alias,not currently in use,SD_LIKP_STZZU,STZZU,SAP,Auto-linked via description
+field_alias,Picked Items Location,SD_LIKP_BEROT,BEROT,SAP,Auto-linked via description
+field_alias,Time of delivery,SD_LIKP_LFUHR,LFUHR,SAP,Auto-linked via description
+field_alias,Weight Group for Delivery,SD_LIKP_GRULG,GRULG,SAP,Auto-linked via description
+field_alias,Combination criteria for delivery,SD_LIKP_ZUKRL,CHAR40,SAP,Auto-linked via description
+field_alias,Distribution delivery,SD_LIKP_VERUR,CHAR35,SAP,Auto-linked via description
+field_alias,Statistics Currency,SD_LIKP_STWAE,WAERS,SAP,Auto-linked via description
+field_alias,Delivery Within one Warehouse,SD_LIKP_LISPL,LNSPL_LIKP,SAP,Auto-linked via description
+field_alias,Date for intercompany billing,SD_LIKP_PIOIV,WFCID,SAP,Auto-linked via description
+field_alias,Billing Date for Intercompany Billing,SD_LIKP_FKDIV,DATUM,SAP,Auto-linked via description
+field_alias,Credit Control Area,SD_LIKP_KKBER,KKBER,SAP,Auto-linked via description
+field_alias,Credit Representative Group for Credit Management,SD_LIKP_SBGRP,SBGRP_CM,SAP,Auto-linked via description
+field_alias,Credit Management: Risk Category,SD_LIKP_CTLPC,CTLPC_CM,SAP,Auto-linked via description
+field_alias,Next date,SD_LIKP_CMNGV,DATUM,SAP,Auto-linked via description
+field_alias,Order Number,SD_LIKP_TERNR,AUFNR,SAP,Auto-linked via description
+field_alias,Search Procedure for Batch Determination,SD_LIKP_KALSM_CH,KALSM,SAP,Auto-linked via description
+field_alias,Correction delivery,SD_LIKP_KLIEF,XFELD,SAP,Auto-linked via description
+field_alias,Shipping: Pricing procedure,SD_LIKP_KALSP,KALSM,SAP,Auto-linked via description
+field_alias,Route Schedule,SD_LIKP_AULWE,AULWE,SAP,Auto-linked via description
+field_alias,Payment Guarantee Procedure,SD_LIKP_ABSSC,ABSSCHE_CM,SAP,Auto-linked via description
+field_alias,Depreciation percentage for financial document processing,SD_LIKP_AKPRZ,PRZ32,SAP,Auto-linked via description
+field_alias,Time segment exists,SD_LIKP_TSEGFL,FLAG,SAP,Auto-linked via description
+field_alias,Event group time segment delivery header,SD_LIKP_TSEGTP,TSEGTEMPLA,SAP,Auto-linked via description
+field_alias,Distribution delivery: Original system,SD_LIKP_VERURSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Indicator for controlling goods movement,SD_LIKP_KZWAB,KZWAB,SAP,Auto-linked via description
+field_alias,Transaction Code,SD_LIKP_TCODE,TCODE,SAP,Auto-linked via description
+field_alias,Means of Transport,SD_LIKP_TRMTYP,MATNR,SAP,Auto-linked via description
+field_alias,Special Processing Indicator,SD_LIKP_SDABW,SDABW,SAP,Auto-linked via description
+field_alias,Calculation of val. open,SD_LIKP_XWOFF,XFELD,SAP,Auto-linked via description
+field_alias,Automatic TO Creation Immediately After TR Generation,SD_LIKP_DIRTA,XFELD,SAP,Auto-linked via description
+field_alias,Production Supply Area,SD_LIKP_PRVBE,PRVBE,SAP,Auto-linked via description
+field_alias,Confirmation Time,SD_LIKP_POTIM,TIME_PLANT,SAP,Auto-linked via description
+field_alias,Document deletion indicator,SD_LIKP_SPE_LOEKZ,XFELD,SAP,Auto-linked via description
+field_alias,Sequence of Intermediate Locations in Returns Process,SD_LIKP_SPE_LOC_SEQ,CHAR3,SAP,Auto-linked via description
+field_alias,Returns: Flag showing that an ASN is cancelled,SD_LIKP_SPE_RET_CANC,XFELD,SAP,Auto-linked via description
+field_alias,Scenario Logistic Execution,SD_LIKP_SPE_LE_SCENARIO,/SPE/LE_SCENARIO,SAP,Auto-linked via description
+field_alias,Change Indicator for the Route,SD_LIKP_SPE_GEOROUTEIND,/SPE/DE_ROUTE_IND,SAP,Auto-linked via description
+field_alias,Change Indicator for the Carrier,SD_LIKP_SPE_CARRIER_IND,CHAR1,SAP,Auto-linked via description
+field_alias,Release Time Stamp,SD_LIKP_SPE_REL_TMSTMP,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,SPE indicator if redirecting has occured,SD_LIKP_SPE_RED_IND,/SPE/RED_IND,SAP,Auto-linked via description
+field_alias,Type of External Identification,SD_LIKP_SPE_LIFEX_TYPE,/SPE/DO_LIFEX_TYPE,SAP,Auto-linked via description
+field_alias,Means of Transport,SD_LIKP_SPE_TTYPE,/SPE/TTYPE,SAP,Auto-linked via description
+field_alias,Partner Identification : Progressive Identification Number,SD_LIKP_SPE_PRO_NUMBER,/SPE/PRO_NUMBER,SAP,Auto-linked via description
+field_alias,Akkreditiv (GUID),SD_LIKP_LOC_GUID,SYSUUID,SAP,Auto-linked via description
+field_alias,EWM Billing Indicator,SD_LIKP_SPE_BILLING_IND,/SPE/DE_BILLING_IND,SAP,Auto-linked via description
+field_alias,Advanced Returns Management Active,SD_LIKP_MSR_ACTIVE,MSR_ACTIVE,SAP,Auto-linked via description
+field_alias,Temporary Change of Storage Locations in Delivery,SD_LIKP_STGE_LOC_CHANGE,SHP_STGE_LOC_CHANGE,SAP,Auto-linked via description
+field_alias,Delivery Split Initiator,SD_LIKP_DLV_SPLIT_INITIA,DLV_SPLIT_INITIATOR,SAP,Auto-linked via description
+field_alias,Delivery Version,SD_LIKP_DLV_VERSION,DLV_VERSION,SAP,Auto-linked via description
+field_alias,Mode of Transport at the Border (Intrastat),SD_LIKP_GTS_EXPVZ,EXPVZ,SAP,Auto-linked via description
+field_alias,Port/Airport,SD_LIKP_GTS_PORTI,/ECRS/PORTI,SAP,Auto-linked via description
+field_alias,Mode of Transport at the Border,SD_LIKP_ITM_EXPVZ,VKTRA,SAP,Auto-linked via description
+field_alias,Origin of Means of Transport when Crossing the Border,SD_LIKP_ITM_STGBE,LAND1,SAP,Auto-linked via description
+field_alias,Inland Mode of Transport,SD_LIKP_ITM_IEVER,VKTRA,SAP,Auto-linked via description
+field_alias,Location for a physical handover of goods,SD_LIKP_HANDOVERLOC,HANDOVER_LOC,SAP,Auto-linked via description
+field_alias,Handover Date at the Handover Location,SD_LIKP_HANDOVERDATE,HANDOVER_DATE,SAP,Auto-linked via description
+field_alias,Handover time at the handover location,SD_LIKP_HANDOVERTIME,HANDOVER_TIME,SAP,Auto-linked via description
+field_alias,Overall Status of Credit Checks,SD_LIKP_CMGST,CMGST,SAP,Auto-linked via description
+field_alias,Temporary inbound delivery,SD_LIKP_SPE_TMPID,/SPE/TMPID,SAP,Auto-linked via description
+field_alias,Overall Block Status (Header),SD_LIKP_SPSTG,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 1: Sum of all items,SD_LIKP_UVS01,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 2: Sum of all items,SD_LIKP_UVS02,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 3: Sum of all items,SD_LIKP_UVS03,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 4: Sum of all items,SD_LIKP_UVS04,STATV,SAP,Auto-linked via description
+field_alias,Customer reserves 5: Sum of all items,SD_LIKP_UVS05,STATV,SAP,Auto-linked via description
+field_alias,Incoterms Version,SD_LIKP_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,Advanced Shipping and Receiving Relevance,SD_LIKP_TM_ADV_SHIP_RECV,/SCMTMS/ADV_SHP_RECV_RLV,SAP,Auto-linked via description
+field_alias,Warehouse Execution Block,SD_LIKP_TM_WHSE_BLOCK,LE_TM_WHSE_BLOCK,SAP,Auto-linked via description
+field_alias,Legal Control License Indicator,SD_LIKP_LGLC_LIC_IND,DOM_LGLC_LIC_IND,SAP,Auto-linked via description
+field_alias,Loading Units,SD_LIKP_/BEV1/LULEINH,/BEV1/LULEINH,SAP,Auto-linked via description
+field_alias,Last Notified Point of the Route from Tracking,SD_LIKP_IDT_CUR_EVTLOC,KNOTN,SAP,Auto-linked via description
+field_alias,Indicates Arrival or Departure at the Current Point,SD_LIKP_IDT_CUR_EVTQUA,IDT_EVTQUA,SAP,Auto-linked via description
+field_alias,Event Time Stamp for the Tracking Message at Current Point,SD_LIKP_IDT_CUR_EVTTST,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,Base Point for Time Estimation from Tracking,SD_LIKP_IDT_CUR_ESTLOC,KNOTN,SAP,Auto-linked via description
+field_alias,Arrival/Departure for Time Estimation,SD_LIKP_IDT_CUR_ESTQUA,IDT_ESTQUA,SAP,Auto-linked via description
+field_alias,Various Qualifiers of the Tracking Entry,SD_LIKP_IDT_CUR_WRKQUA,CHAR10,SAP,Auto-linked via description
+field_alias,Prior Route Point From Tracking,SD_LIKP_IDT_PRE_EVTLOC,KNOTN,SAP,Auto-linked via description
+field_alias,Indicates the Arrival and Departure at Prior Point,SD_LIKP_IDT_PRE_EVTQUA,IDT_EVTQUA,SAP,Auto-linked via description
+field_alias,Event Time Stamp for the Tracking Message at Prior Point,SD_LIKP_IDT_PRE_EVTTST,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,Prior Base Point for Time Estimation from Tracking,SD_LIKP_IDT_PRE_ESTLOC,KNOTN,SAP,Auto-linked via description
+field_alias,Arrival/Departure for Time Estimation,SD_LIKP_IDT_PRE_ESTQUA,IDT_ESTQUA,SAP,Auto-linked via description
+field_alias,Various Qualifiers of the Prior Tracking Entry,SD_LIKP_IDT_PRE_WRKQUA,CHAR10,SAP,Auto-linked via description
+field_alias,JIT-Relevant,SD_LIKP_JIT_RLVNT,XFELD,SAP,Auto-linked via description
+field_alias,Originating Item,SD_LIPS_POSNV,POSNR,SAP,Auto-linked via description
+field_alias,Higher-Level Item in Bill of Material Structures,SD_LIPS_UEPOS,POSNR,SAP,Auto-linked via description
+field_alias,Split to warehouse number required,SD_LIPS_LISPL,LNSPL_LIPS,SAP,Auto-linked via description
+field_alias,Schedule Line Category,SD_LIPS_ETTYP,ETTYP,SAP,Auto-linked via description
+field_alias,Requirement type,SD_LIPS_BDART,BDART,SAP,Auto-linked via description
+field_alias,Higher-Level Item of Batch Split Item,SD_LIPS_UECHA,POSNR,SAP,Auto-linked via description
+field_alias,Release type,SD_LIPS_ABART,ABART,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_LIPS_ABRVW,ABRVW,SAP,Auto-linked via description
+field_alias,Object Number at Header Level,SD_LIPS_OBJKO,J_OBJNR,SAP,Auto-linked via description
+field_alias,Department number,SD_LIPS_ABTNR,ABTNR,SAP,Auto-linked via description
+field_alias,Statistics date,SD_LIPS_STADAT,DATUM,SAP,Auto-linked via description
+field_alias,Internal Class Number,SD_LIPS_CLINT,CLINT,SAP,Auto-linked via description
+field_alias,Movement Indicator,SD_LIPS_KZBEW,KZBEW,SAP,Auto-linked via description
+field_alias,KANBAN/Sequence Number,SD_LIPS_KANNR,CHAR35,SAP,Auto-linked via description
+field_alias,Stock Determination Rule,SD_LIPS_RULES,BF_RULES,SAP,Auto-linked via description
+field_alias,Indicator Inventory Management active,SD_LIPS_KZBEF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: deactivate availability check,SD_LIPS_NOATP,NO_ATP_CHECK,SAP,Auto-linked via description
+field_alias,Stock Category in the Warehouse Management System,SD_LIPS_BESTQ,BESTQ,SAP,Auto-linked via description
+field_alias,Stock Category in the Warehouse Management System,SD_LIPS_UMBSQ,BESTQ,SAP,Auto-linked via description
+field_alias,Valuation Type of Transfer Batch,SD_LIPS_UMBAR,BWTAR,SAP,Auto-linked via description
+field_alias,Special Stock Number,SD_LIPS_SONUM,LVS_SONUM,SAP,Auto-linked via description
+field_alias,Special Stock Number,SD_LIPS_USONU,LVS_SONUM,SAP,Auto-linked via description
+field_alias,Stock Type,SD_LIPS_INSMK,MB_INSMK,SAP,Auto-linked via description
+field_alias,Final Issue for Reservation,SD_LIPS_KZEAR,XFELD,SAP,Auto-linked via description
+field_alias,Delivery Category,SD_LIPS_DLVTP,DLVTP,SAP,Auto-linked via description
+field_alias,Units of measure usage,SD_LIPS_KZWSO,KZWSO,SAP,Auto-linked via description
+field_alias,Goods Movement Control,SD_LIPS_GMCONTROL,GMCONTROL,SAP,Auto-linked via description
+field_alias,Goods Movement Control: HU,SD_LIPS_POSTING_CHANGE,POSTING_CHANGE,SAP,Auto-linked via description
+field_alias,Scrap Indicator for EWM Processing,SD_LIPS_SPE_SCRAP_IND,/SPE/DELIVERY_SCRAP_IND,SAP,Auto-linked via description
+field_alias,ATP Time Stamp,SD_LIPS_SPE_ATP_TMSTMP,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,Revenue Accounting Type,SD_LIPS_FARR_RELTYPE,FARR_RELTYPE,SAP,Auto-linked via description
+field_alias,Status of Credit Check Against Export Credit Insurance,SD_LIPS_CMPPJ,CMPSZ,SAP,Auto-linked via description
+field_alias,Legal Control Check Status,SD_LIPS_LCCST,/SAPSLL/CDCST,SAP,Auto-linked via description
+field_alias,Safety Data Sheet Check Status,SD_LIPS_SDSSTA,DOM_SDSSTA_LE,SAP,Auto-linked via description
+field_alias,DTUC Status,SD_LIPS_/SAPMP/LBASP,STATV,SAP,Auto-linked via description
+field_alias,Excise Tax ARC Status,SD_LIPS_ARC_STATUS,ET_ARC_STATUS,SAP,Auto-linked via description
+field_alias,Intercompany Billing Type,SD_LIPS_ICO_FKAIV,FKART,SAP,Auto-linked via description
+field_alias,Factory Calendar Identification for Intercompany Billing,SD_LIPS_ICO_PIOIV,WFCID,SAP,Auto-linked via description
+field_alias,Billing Date for Intercompany Billing,SD_LIPS_ICO_FKDIV,DATUM,SAP,Auto-linked via description
+field_alias,VAS Relevant,SD_LIPS_FSH_VAS_REL,FSH_VAS_REL,SAP,Auto-linked via description
+field_alias,Purchase Order for Consignment,SD_LIPS_CONS_ORDER,WRF_CONS_ORDER,SAP,Auto-linked via description
+field_alias,Billing Category,SD_VBRK_FKTYP,FKTYP,SAP,Auto-linked via description
+field_alias,Shipping Conditions,SD_VBRK_VSBED,VSBED,SAP,Auto-linked via description
+field_alias,Sales District,SD_VBRK_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Status for Transfer to Accounting,SD_VBRK_RFBSK,RFBSK,SAP,Auto-linked via description
+field_alias,Manual Invoice Maintenance,SD_VBRK_MRNKZ,XFELD,SAP,Auto-linked via description
+field_alias,County Code,SD_VBRK_COUNC,COUNC,SAP,Auto-linked via description
+field_alias,City Code,SD_VBRK_CITYC,CITYC,SAP,Auto-linked via description
+field_alias,Combination criteria in the billing document,SD_VBRK_ZUKRI,CHAR40,SAP,Auto-linked via description
+field_alias,Payer,SD_VBRK_KUNRG,KUNNR,SAP,Auto-linked via description
+field_alias,Dunning Area,SD_VBRK_MABER,MABER,SAP,Auto-linked via description
+field_alias,Statistics Currency,SD_VBRK_STWAE,WAERS,SAP,Auto-linked via description
+field_alias,Agreement (various conditions grouped together),SD_VBRK_KNUMA,KNUMA,SAP,Auto-linked via description
+field_alias,Invoice List Type,SD_VBRK_FKART_RL,FKART,SAP,Auto-linked via description
+field_alias,Dunning Block,SD_VBRK_MANSP,MANSP,SAP,Auto-linked via description
+field_alias,Credit Control Area,SD_VBRK_KKBER,KKBER,SAP,Auto-linked via description
+field_alias,Hierarchy type for pricing,SD_VBRK_HITYP_PR,HITYP,SAP,Auto-linked via description
+field_alias,Customer Hierarchy Relevance,SD_VBRK_CUSTH_UNIV_SALES_RELVNCE,SD_CUSTH_CHRELV,SAP,Auto-linked via description
+field_alias,Customer Hierarchy Branch UUID,SD_VBRK_CUSTH_BRANCH_UUID,SYSUUID_C32,SAP,Auto-linked via description
+field_alias,Accrual Billing Type,SD_VBRK_FKART_AB,FKART,SAP,Auto-linked via description
+field_alias,Tax Departure Country/Region,SD_VBRK_LANDTX,LAND1,SAP,Auto-linked via description
+field_alias,Logical system,SD_VBRK_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Billing document is canceled,SD_VBRK_FKSTO,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Triangular Deal Within the EU,SD_VBRK_XEGDR,XFELD,SAP,Auto-linked via description
+field_alias,Number of payment card plan type,SD_VBRK_RPLNR,FPLNR,SAP,Auto-linked via description
+field_alias,Tax Type,SD_VBRK_J_1AFITP,J_1AFITP,SAP,Auto-linked via description
+field_alias,Translation Date,SD_VBRK_KURRF_DAT,DATUM,SAP,Auto-linked via description
+field_alias,Business Place,SD_VBRK_BUPLA,J_1BBRANCH,SAP,Auto-linked via description
+field_alias,Additional Status Transfer to Fin. Accounting (Res. RFBSK),SD_VBRK_FKK_DOCSTAT,DOCSTAT_KK,SAP,Auto-linked via description
+field_alias,Character Field of Length 12,SD_VBRK_NRZAS,CHAR12,SAP,Auto-linked via description
+field_alias,EWM Billing Indicator,SD_VBRK_SPE_BILLING_IND,/SPE/DE_BILLING_IND,SAP,Auto-linked via description
+field_alias,Billing Category in SAP S/4HANA Service,SD_VBRK_FKTYP_CRM,FKTYP,SAP,Auto-linked via description
+field_alias,Reason for Reversal or Inverse Posting,SD_VBRK_STGRD,STGRD,SAP,Auto-linked via description
+field_alias,UTC Time Stamp in Long Form (YYYYMMDDhhmmssmmmuuun),SD_VBRK_CHANGED_ON,TZNTSTMPL,SAP,Auto-linked via description
+field_alias,Export indicator,SD_VBRK_EXPKZ,EXPKZ,SAP,Auto-linked via description
+field_alias,Pricing Incompletion Status (All Items),SD_VBRK_UVPRS,STATV,SAP,Auto-linked via description
+field_alias,SD Billing Status,SD_VBRK_VF_STATUS,VF_STATUS,SAP,Auto-linked via description
+field_alias,Billing Issue Type,SD_VBRK_VF_TODO,VF_TODO,SAP,Auto-linked via description
+field_alias,Rejection Status (All Items),SD_VBRK_ABSTK,STATV,SAP,Auto-linked via description
+field_alias,IsDraft Indicator,SD_VBRK_DRAFT,XFELD,SAP,Auto-linked via description
+field_alias,Currency of statistical values for foreign trade,SD_VBRK_GRWCU,WAERS,SAP,Auto-linked via description
+field_alias,Relevant for Intrastat Reporting,SD_VBRK_INTRA_REL,XFELD,SAP,Auto-linked via description
+field_alias,Exclude from Intrastat Reporting,SD_VBRK_INTRA_EXCL,XFELD,SAP,Auto-linked via description
+field_alias,Is relevant for accrual,SD_VBRK_ACCRREL,VF_BOOLEAN,SAP,Auto-linked via description
+field_alias,Payment Split Predecessor Sales Document,SD_VBRK_PSPSD,VBELN,SAP,Auto-linked via description
+field_alias,Incoterms Version,SD_VBRK_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,Business Process Indicator for Poland,SD_VBRK_GLO_LOG_REF1_HD,GLO_LOG_REF1_HD,SAP,Auto-linked via description
+field_alias,Annexing base date,SD_VBRK_ZABDATH,DATUM,SAP,Auto-linked via description
+field_alias,Flag: DPC relevant,SD_VBRK_DPC_REL,CHAR01,SAP,Auto-linked via description
+field_alias,Initial document,SD_VBRK_AD01BASDOC,VBELN,SAP,Auto-linked via description
+field_alias,Rule for Billing,SD_VBRK_AD01FAREG,AD01FAREG,SAP,Auto-linked via description
+field_alias,ETM-Relevant Indicator,SD_VBRK_J_3GKBAUL,J_3GKBAUL,SAP,Auto-linked via description
+field_alias,Indicator for I(nternal) or E(xternal) Posting,SD_VBRK_J_3GKENIE,J_3GKENIE,SAP,Auto-linked via description
+field_alias,SEPA-Relevance,SD_VBRK_SEPON,SD_SEPA_FLAG,SAP,Auto-linked via description
+field_alias,SEPA-Relevance,SD_VBRK_MNDVG,SD_SEPA_FLAG,SAP,Auto-linked via description
+field_alias,Higher-Level Item in Bill of Material Structures,SD_VBRP_UEPOS,POSNR,SAP,Auto-linked via description
+field_alias,Date on which services are rendered,SD_VBRP_FBUDA,DATUM,SAP,Auto-linked via description
+field_alias,Originating Item,SD_VBRP_POSNV,POSNR,SAP,Auto-linked via description
+field_alias,Sales Document Item,SD_VBRP_AUPOS,POSNR,SAP,Auto-linked via description
+field_alias,Replacement part,SD_VBRP_ATPKZ,ATPKZ,SAP,Auto-linked via description
+field_alias,Departure Country/Region (from which the goods are sent),SD_VBRP_ALAND,LAND1,SAP,Auto-linked via description
+field_alias,Region in which plant is located,SD_VBRP_WKREG,REGIO,SAP,Auto-linked via description
+field_alias,County in which plant is located,SD_VBRP_WKCOU,CHAR3,SAP,Auto-linked via description
+field_alias,City in which plant is located,SD_VBRP_WKCTY,CHAR4,SAP,Auto-linked via description
+field_alias,Tax Classification 2 for Material,SD_VBRP_TAXM2,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 3 for Material,SD_VBRP_TAXM3,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 4 for Material,SD_VBRP_TAXM4,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 5 for Material,SD_VBRP_TAXM5,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 6 for Material,SD_VBRP_TAXM6,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 7 for Material,SD_VBRP_TAXM7,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 8 for Material,SD_VBRP_TAXM8,TAXKM,SAP,Auto-linked via description
+field_alias,Tax Classification 9 for Material,SD_VBRP_TAXM9,TAXKM,SAP,Auto-linked via description
+field_alias,Pricing Relevance,SD_VBRP_PRSFD,PRSFD,SAP,Auto-linked via description
+field_alias,Cash Discount Indicator,SD_VBRP_SKTOF,XFELD,SAP,Auto-linked via description
+field_alias,Commission Group,SD_VBRP_PROVG,PROVG,SAP,Auto-linked via description
+field_alias,Division for order header,SD_VBRP_SPARA,SPART,SAP,Auto-linked via description
+field_alias,Incomplete with respect to pricing,SD_VBRP_UVPRS,XFELD,SAP,Auto-linked via description
+field_alias,Rebate Basis 1,SD_VBRP_BONBA,WERTV7,SAP,Auto-linked via description
+field_alias,Condition Update,SD_VBRP_KOUPD,XFELD,SAP,Auto-linked via description
+field_alias,Higher-Level Item of Batch Split Item,SD_VBRP_UECHA,POSNR,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_VBRP_ABRVW,ABRVW,SAP,Auto-linked via description
+field_alias,Statistics date,SD_VBRP_STADAT,DATUM,SAP,Auto-linked via description
+field_alias,Item for billing plan/invoice plan/payment cards,SD_VBRP_FPLTR,FPLTR,SAP,Auto-linked via description
+field_alias,Promotion,SD_VBRP_KNUMA_PI,KNUMA,SAP,Auto-linked via description
+field_alias,Sales Deal,SD_VBRP_KNUMA_AG,KNUMA,SAP,Auto-linked via description
+field_alias,Rule in billing plan/invoice plan,SD_VBRP_FAREG,FAREG,SAP,Auto-linked via description
+field_alias,Reason for Zero VAT,SD_VBRP_J_1ARFZ,J_1ARFZVAT,SAP,Auto-linked via description
+field_alias,Tax relevant classification,SD_VBRP_J_1ATXREL,J_1ATXREL,SAP,Auto-linked via description
+field_alias,Translation Date,SD_VBRP_KURSK_DAT,DATUM,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_VBRP_VKAUS,ABRVW,SAP,Auto-linked via description
+field_alias,Inflation Index,SD_VBRP_J_1AINDXP,J_1AINDXP,SAP,Auto-linked via description
+field_alias,Indexing base date,SD_VBRP_J_1AIDATEP,J_1AUDATEP,SAP,Auto-linked via description
+field_alias,Agreed Delivery Time,SD_VBRP_DELCO,DELCO,SAP,Auto-linked via description
+field_alias,Revenue recognition category,SD_VBRP_RRREL,RR_RELTYP,SAP,Auto-linked via description
+field_alias,Logical system,SD_VBRP_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Category of an external transaction or element,SD_VBRP_VGTYP_EX,VORG_TYP,SAP,Auto-linked via description
+field_alias,Return Reason,SD_VBRP_MSR_RET_REASON,MSR_RETURNS_REASON,SAP,Auto-linked via description
+field_alias,Number of Condition Record,SD_VBRP_NRAB_KNUMH,KNUMH,SAP,Auto-linked via description
+field_alias,Dispute Case,SD_VBRP_DISPUTE_CASE,SDBIL_RAW16,SAP,Auto-linked via description
+field_alias,Fund Usage Item,SD_VBRP_FUND_USAGE_ITEM,SDBIL_RAW16,SAP,Auto-linked via description
+field_alias,Revenue Accounting Type,SD_VBRP_FARR_RELTYPE,FARR_RELTYPE,SAP,Auto-linked via description
+field_alias,Claims Taxation,SD_VBRP_CLAIMS_TAXATION,CLAIMS_TAXATION,SAP,Auto-linked via description
+field_alias,Translation Date,SD_VBRP_KURRF_DAT_ORIG,DATUM,SAP,Auto-linked via description
+field_alias,"Boolean Variable (X = True, - = False, Space = Unknown)",SD_VBRP_DRAFT,BOOLEAN,SAP,Auto-linked via description
+field_alias,Rejection Reason for Billing Document Request Item,SD_VBRP_ABGRU,ABGRU_BDR,SAP,Auto-linked via description
+field_alias,Overtime Category,SD_VBRP_CATS_OVERTIME_CATEGORY,CATS_OVERTIME_CATEGORY,SAP,Auto-linked via description
+field_alias,Settlement of Down Payment from Sales Contract,SD_VBRP_CONTR_DP_SETTL,CONTR_DP_SETTL_VF,SAP,Auto-linked via description
+field_alias,Transit Plant,SD_VBRP_TRANSIT_PLANT,WERKS,SAP,Auto-linked via description
+field_alias,Billing Type,SD_VBRP_FKART_ANA,FKART,SAP,Auto-linked via description
+field_alias,Destination Country/Region,SD_VBRP_LAND1_ANA,LAND1,SAP,Auto-linked via description
+field_alias,Sales District,SD_VBRP_BZIRK_ANA,BZIRK,SAP,Auto-linked via description
+field_alias,Overall Processing Status (Header/All Items),SD_VBRP_GBSTK_ANA,STATV,SAP,Auto-linked via description
+field_alias,Payer,SD_VBRP_KUNRG_ANA,KUNNR,SAP,Auto-linked via description
+field_alias,Billing Date,SD_VBRP_FKDAT_ANA,DATUM,SAP,Auto-linked via description
+field_alias,Agreement (various conditions grouped together),SD_VBRP_KNUMA_ANA,KNUMA,SAP,Auto-linked via description
+field_alias,Billing Category,SD_VBRP_FKTYP_ANA,FKTYP,SAP,Auto-linked via description
+field_alias,Bill-to Party,SD_VBRP_KUNRE_ANA,KUNNR,SAP,Auto-linked via description
+field_alias,Sales Employee,SD_VBRP_PERVE_ANA,PERNR,SAP,Auto-linked via description
+field_alias,Employee Responsible,SD_VBRP_PERZM_ANA,PERNR,SAP,Auto-linked via description
+field_alias,Tax Service Business Transaction,SD_VBRP_TXS_BUSINESS_TRANSACTION,TXS_BUSINESS_TRANSACTION,SAP,Auto-linked via description
+field_alias,Tax Service Material Usage,SD_VBRP_TXS_MATERIAL_USAGE,data,SAP,Auto-linked via description
+field_alias,Tax Service Usage Purpose,SD_VBRP_TXS_USAGE_PURPOSE,TXS_USAGE_PURPOSE,SAP,Auto-linked via description
+field_alias,Annexing base date,SD_VBRP_ZABDATI,DATUM,SAP,Auto-linked via description
+field_alias,Down Payment Chain Number,SD_VBRP_DPCNR,/SAPPCE/DPCNR,SAP,Auto-linked via description
+field_alias,Transaction Number,SD_VBRP_DCPNR,NUM03,SAP,Auto-linked via description
+field_alias,Billing/Invoicing rule (w/o invoicing plan,SD_VBRP_BOSFAR,BOSFAR,SAP,Auto-linked via description
+field_alias,Fund,SD_VBRP_FONDS,BP_GEBER,SAP,Auto-linked via description
+field_alias,PM Order Number (Owner),SD_VBRP_J_3GPMAUFE,AUFNR,SAP,Auto-linked via description
+field_alias,PM Order Number (Administrator),SD_VBRP_J_3GPMAUFV,AUFNR,SAP,Auto-linked via description
+field_alias,Sending Recipient Type,SD_VBRP_J_3GETYPA,J_3GETYP,SAP,Auto-linked via description
+field_alias,Receiving Recipient Type,SD_VBRP_J_3GETYPE,J_3GETYP,SAP,Auto-linked via description
+field_alias,Indicator: Across All Organizational Structures,SD_VBRP_J_3GORGUEB,CHAR1,SAP,Auto-linked via description
+field_alias,Work Period (Internal Representation),SD_VBRP_PRS_WORK_PERIOD,PRS_WORK_PERIOD,SAP,Auto-linked via description
+field_alias,Trading partner's business area,SD_VBRP_PARGB,GSBER,SAP,Auto-linked via description
+field_alias,Internal counter,SD_VBRP_APLZL_OAA,CIM_COUNT,SAP,Auto-linked via description
+field_alias,Abbreviation for Complaints Reason,SD_VBRP_COMPREAS,CMP_COMPREAS_COPY,SAP,Auto-linked via description
+field_alias,Sort field,SD_KNA1_SORTL,CHAR10,SAP,Auto-linked via description
+field_alias,Indicator: Is the account a one-time account?,SD_KNA1_XCPDK,XFELD,SAP,Auto-linked via description
+field_alias,Search Term for Matchcode Search,SD_KNA1_MCOD2,CHAR25,SAP,Auto-linked via description
+field_alias,Search term for matchcode search,SD_KNA1_MCOD3,CHAR25,SAP,Auto-linked via description
+field_alias,Express train station,SD_KNA1_BAHNE,BAHNH,SAP,Auto-linked via description
+field_alias,Train station,SD_KNA1_BAHNS,BAHNH,SAP,Auto-linked via description
+field_alias,Authorization Group,SD_KNA1_BEGRU,BRGRU,SAP,Auto-linked via description
+field_alias,Check digit for the international location number,SD_KNA1_BUBKZ,NUM01,SAP,Auto-linked via description
+field_alias,Indicator: Unloading points exist,SD_KNA1_EXABL,XFELD,SAP,Auto-linked via description
+field_alias,Central billing block for customer,SD_KNA1_FAKSD,FAKSP,SAP,Auto-linked via description
+field_alias,Working Time Calendar,SD_KNA1_KNAZK,WFCID,SAP,Auto-linked via description
+field_alias,Central delivery block for the customer,SD_KNA1_LIFSD,LIFSP,SAP,Auto-linked via description
+field_alias,City Coordinates,SD_KNA1_LOCCO,LOCCO,SAP,Auto-linked via description
+field_alias,Name 3,SD_KNA1_NAME3,NAME,SAP,Auto-linked via description
+field_alias,Name 4,SD_KNA1_NAME4,NAME,SAP,Auto-linked via description
+field_alias,County Code,SD_KNA1_COUNC,COUNC,SAP,Auto-linked via description
+field_alias,City Code,SD_KNA1_CITYC,CITYC,SAP,Auto-linked via description
+field_alias,Regional market,SD_KNA1_RPMKR,RPMKR,SAP,Auto-linked via description
+field_alias,Indicator: Business Partner Subject to Equalization Tax?,SD_KNA1_STKZA,STKZA,SAP,Auto-linked via description
+field_alias,Liable for VAT,SD_KNA1_STKZU,XFELD,SAP,Auto-linked via description
+field_alias,Transportation zone to or from which the goods are delivered,SD_KNA1_LZONE,ZONE,SAP,Auto-linked via description
+field_alias,Indicator: Is an alternative payer allowed in document?,SD_KNA1_XZEMP,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Competitor,SD_KNA1_DEAR1,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Sales partner,SD_KNA1_DEAR2,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Sales prospect,SD_KNA1_DEAR3,DEAR3,SAP,Auto-linked via description
+field_alias,Legal status,SD_KNA1_GFORM,GFORM,SAP,Auto-linked via description
+field_alias,Annual sales,SD_KNA1_UMSAT,UMSAT,SAP,Auto-linked via description
+field_alias,Year For Which Sales are Given,SD_KNA1_UMJAH,JAHR,SAP,Auto-linked via description
+field_alias,Currency of sales figure,SD_KNA1_UWAER,WAERS,SAP,Auto-linked via description
+field_alias,Attribute 1,SD_KNA1_KATR1,ATTR1,SAP,Auto-linked via description
+field_alias,Attribute 2,SD_KNA1_KATR2,ATTR2,SAP,Auto-linked via description
+field_alias,Attribute 3,SD_KNA1_KATR3,ATTR3,SAP,Auto-linked via description
+field_alias,Attribute 4,SD_KNA1_KATR4,ATTR4,SAP,Auto-linked via description
+field_alias,Attribute 5,SD_KNA1_KATR5,ATTR5,SAP,Auto-linked via description
+field_alias,Attribute 6,SD_KNA1_KATR6,ATTR6,SAP,Auto-linked via description
+field_alias,Attribute 7,SD_KNA1_KATR7,ATTR7,SAP,Auto-linked via description
+field_alias,Attribute 8,SD_KNA1_KATR8,ATTR8,SAP,Auto-linked via description
+field_alias,Attribute 9,SD_KNA1_KATR9,ATTR9,SAP,Auto-linked via description
+field_alias,Attribute 10,SD_KNA1_KATR10,ATTR10,SAP,Auto-linked via description
+field_alias,Natural Person,SD_KNA1_STKZN,STKZN,SAP,Auto-linked via description
+field_alias,Annual sales,SD_KNA1_UMSA1,UMSA1,SAP,Auto-linked via description
+field_alias,Usage Indicator,SD_KNA1_ABRVW,ABRVW,SAP,Auto-linked via description
+field_alias,Recipient Code for Data Medium Exchange,SD_KNA1_DTAMS,DTAMS,SAP,Auto-linked via description
+field_alias,Assignment to Hierarchy,SD_KNA1_HZUOR,HZUOR,SAP,Auto-linked via description
+field_alias,Payment Block,SD_KNA1_SPERZ,XFELD,SAP,Auto-linked via description
+field_alias,Tax Type,SD_KNA1_FITYP,J_1AFITP,SAP,Auto-linked via description
+field_alias,Customer is ICMS-exempt,SD_KNA1_XICMS,XFELD,SAP,Auto-linked via description
+field_alias,Customer is IPI-exempt,SD_KNA1_XXIPI,XFELD,SAP,Auto-linked via description
+field_alias,Customer's CFOP category,SD_KNA1_CFOPC,J_1BINDUS1,SAP,Auto-linked via description
+field_alias,Indicator for biochemical warfare for legal control,SD_KNA1_CCC01,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for nuclear nonproliferation for legal control,SD_KNA1_CCC02,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for national security for legal control,SD_KNA1_CCC03,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for missile technology for legal control,SD_KNA1_CCC04,XFELD,SAP,Auto-linked via description
+field_alias,Taiwan: Bonded Area Confirm in Business Partner Extension,SD_KNA1_BONDED_AREA_CONFIRM,TWVAT_BONDED_AREA_CONF,SAP,Auto-linked via description
+field_alias,Taiwan: Donate Mark in Business Partner Extension,SD_KNA1_DONATE_MARK,TWVAT_DONATE_MARK,SAP,Auto-linked via description
+field_alias,Consolidated Invoicing for Taiwan,SD_KNA1_CONSOLIDATE_INVOICE,TWGUI_CONSOLIDATE_INVOICE,SAP,Auto-linked via description
+field_alias,Taiwan: Mode in Business Partner Extension,SD_KNA1_EINVOICE_MODE,TWVAT_EINVOICE_MODE,SAP,Auto-linked via description
+field_alias,Taiwan: B2C Invoicing in Business Partner Extension,SD_KNA1_B2C_INDICATOR,XFELD,SAP,Auto-linked via description
+field_alias,Central sales block for customer,SD_KNA1_CASSD,CASSP,SAP,Auto-linked via description
+field_alias,Uniform resource locator,SD_KNA1_KNURL,TEXT132,SAP,Auto-linked via description
+field_alias,Name of Representative,SD_KNA1_J_1KFREPRE,REPRES,SAP,Auto-linked via description
+field_alias,Type of Industry,SD_KNA1_J_1KFTIND,INDTYP,SAP,Auto-linked via description
+field_alias,Status of Change Authorization (Central),SD_KNA1_CONFS,CHAR1,SAP,Auto-linked via description
+field_alias,Date on Which the Changes Were Confirmed,SD_KNA1_UPDAT,DATUM,SAP,Auto-linked via description
+field_alias,Time of Last Change Confirmation,SD_KNA1_UPTIM,AS4TIME,SAP,Auto-linked via description
+field_alias,Central deletion block for master record,SD_KNA1_NODEL,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Consumer,SD_KNA1_DEAR6,XFELD,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,SD_KNA1_CVP_XBLCK,CVP_XBLCK,SAP,Auto-linked via description
+field_alias,Suframa Code,SD_KNA1_SUFRAMA,J_1BSUFRAMA,SAP,Auto-linked via description
+field_alias,RG Number,SD_KNA1_RG,J_1BRG,SAP,Auto-linked via description
+field_alias,Issued by,SD_KNA1_EXP,J_1BEXP,SAP,Auto-linked via description
+field_alias,RG Issuing Date,SD_KNA1_RGDATE,DATUM,SAP,Auto-linked via description
+field_alias,RIC Number,SD_KNA1_RIC,J_1BRIC,SAP,Auto-linked via description
+field_alias,Foreign National Registration,SD_KNA1_RNE,J_1BRNE,SAP,Auto-linked via description
+field_alias,RNE Issuing Date,SD_KNA1_RNEDATE,DATUM,SAP,Auto-linked via description
+field_alias,CNAE,SD_KNA1_CNAE,J_1BCNAE,SAP,Auto-linked via description
+field_alias,Legal Nature,SD_KNA1_LEGALNAT,J_1BLEGALNAT,SAP,Auto-linked via description
+field_alias,ICMS Taxpayer,SD_KNA1_ICMSTAXPAY,J_1BICMSTAXPAY,SAP,Auto-linked via description
+field_alias,Industry Main Type,SD_KNA1_INDTYP,J_1BINDTYP,SAP,Auto-linked via description
+field_alias,Tax Declaration Type,SD_KNA1_TDT,J_1BTDT,SAP,Auto-linked via description
+field_alias,Company Size,SD_KNA1_COMSIZE,J_1BCOMSIZE,SAP,Auto-linked via description
+field_alias,Declaration Regimen for PIS/COFINS,SD_KNA1_DECREGPC,J_1BDECREGPC,SAP,Auto-linked via description
+field_alias,Payment Reason,SD_KNA1_PAYTRSN,FARP_PAYT_RSN,SAP,Auto-linked via description
+field_alias,data element for customer,SD_KNA1_KNA1_EEW_CUST,KNA1_EEW_CUST,SAP,Auto-linked via description
+field_alias,Maximum Stacking Height of the Packaging Material (VSO),SD_KNA1_/VSO/R_PALHGT,MENG13,SAP,Auto-linked via description
+field_alias,Customer-Related Packing for Each Packaging Material (VSO),SD_KNA1_/VSO/R_PK_MAT,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Packaging Material of the Customer in VSO,SD_KNA1_/VSO/R_MATPAL,MATNR,SAP,Auto-linked via description
+field_alias,Number Layers Under an Inter-Pallet (VSO),SD_KNA1_/VSO/R_I_NO_LYR,/VSO/M_IPAL_NO_LYR,SAP,Auto-linked via description
+field_alias,Packing Material-Specific for Each Packaging Material,SD_KNA1_/VSO/R_ONE_MAT,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Pack Only One Package Type for Each PKM (VSO),SD_KNA1_/VSO/R_ONE_SORT,/VSO/M_XFIELD,SAP,Auto-linked via description
+field_alias,Side Preference of Loading/Unloading (VSO),SD_KNA1_/VSO/R_ULD_SIDE,/VSO/M_SIDE_PREF,SAP,Auto-linked via description
+field_alias,Front/Back Preference of Loading/Unloading (VSO),SD_KNA1_/VSO/R_LOAD_PREF,/VSO/M_LOAD_PREF,SAP,Auto-linked via description
+field_alias,Collective Unloading Point for VSO,SD_KNA1_/VSO/R_DPOINT,/VSO/R_DELIVERYPOINT,SAP,Auto-linked via description
+field_alias,Payment Office,SD_KNA1_PMT_OFFICE,FMFG_PMT_OFF,SAP,Auto-linked via description
+field_alias,Fee schedule,SD_KNA1_FEE_SCHEDULE,FM_FEE_SCHED,SAP,Auto-linked via description
+field_alias,DUNS+4,SD_KNA1_DUNS4,data,SAP,Auto-linked via description
+field_alias,System for Award Management Electronic Funds Transfer Ind,SD_KNA1_SAM_EFT_IND,data,SAP,Auto-linked via description
+field_alias,Processor group,SD_KNA1_PSOFG,PSOFG,SAP,Auto-linked via description
+field_alias,Subledger acct preprocessing procedure,SD_KNA1_PSOIS,CHAR20,SAP,Auto-linked via description
+field_alias,Name 1,SD_KNA1_PSON1,NAME,SAP,Auto-linked via description
+field_alias,Name 2,SD_KNA1_PSON2,NAME,SAP,Auto-linked via description
+field_alias,Name 3,SD_KNA1_PSON3,NAME,SAP,Auto-linked via description
+field_alias,ECC Number,SD_KNA1_J_1IEXCD,CHAR40,SAP,Auto-linked via description
+field_alias,Excise Range,SD_KNA1_J_1IEXRG,CHAR60,SAP,Auto-linked via description
+field_alias,Excise Division,SD_KNA1_J_1IEXDI,CHAR60,SAP,Auto-linked via description
+field_alias,Excise Commissionerate,SD_KNA1_J_1IEXCO,CHAR60,SAP,Auto-linked via description
+field_alias,Excise tax indicator for customer,SD_KNA1_J_1IEXCICU,J_1IINDTAX,SAP,Auto-linked via description
+field_alias,GST TDS Registration,SD_KNA1_GST_TDS,J_1IGSTCD3,SAP,Auto-linked via description
+field_alias,Recipient Type,SD_KNA1_J_3GETYP,J_3GETYP,SAP,Auto-linked via description
+field_alias,Order Number,SD_KNA1_COAUFNR,AUFNR,SAP,Auto-linked via description
+field_alias,Customer Internal Settlement,SD_KNA1_J_3GAGINT,KUNNR,SAP,Auto-linked via description
+field_alias,Dummy Recipient,SD_KNA1_J_3GAGDUMI,KUNNR,SAP,Auto-linked via description
+field_alias,Standard Recipient,SD_KNA1_J_3GAGSTDI,KUNNR,SAP,Auto-linked via description
+field_alias,Settlement Type,SD_KNA1_J_3GABRART,J_3GABRART,SAP,Auto-linked via description
+field_alias,Hours per Month,SD_KNA1_J_3GSTDMON,DEC03_2,SAP,Auto-linked via description
+field_alias,Hours per Day,SD_KNA1_J_3GSTDTAG,DEC03_2,SAP,Auto-linked via description
+field_alias,Function for Settlement on Acquisition Date/PBE,SD_KNA1_J_3GZUGTAG,X,SAP,Auto-linked via description
+field_alias,"""Fill PBE Documents"" Indicator",SD_KNA1_J_3GMASCHB,J_3GMASCHB,SAP,Auto-linked via description
+field_alias,Indicator: Take Multiple Usage Periods into Account,SD_KNA1_J_3GMEINSA,X,SAP,Auto-linked via description
+field_alias,Indicator - Relevant to Short Operation Periods,SD_KNA1_J_3GKEINSA,X,SAP,Auto-linked via description
+field_alias,Blocking Indicator for Document Entry,SD_KNA1_J_3GBLSPER,X,SAP,Auto-linked via description
+field_alias,Indicator: Calculate PBE as TBE,SD_KNA1_J_3GKLEIVO,X,SAP,Auto-linked via description
+field_alias,Indicator for Complete Month,SD_KNA1_J_3GVMONAT,J_3GVMONAT,SAP,Auto-linked via description
+field_alias,Settlement Indicator,SD_KNA1_J_3GABRKEN,J_3GABRKEN,SAP,Auto-linked via description
+field_alias,Date of Last Settlement,SD_KNA1_J_3GLABRECH,DATUM,SAP,Auto-linked via description
+field_alias,Date of Current Settlement,SD_KNA1_J_3GAABRECH,DATUM,SAP,Auto-linked via description
+field_alias,Ind.: Acquisition Date Counts (as Daily Settlement for PBE),SD_KNA1_J_3GZUTVHLG,X,SAP,Auto-linked via description
+field_alias,Negative Quantities Allowed Even for Chronolog. Inv. Mgmt,SD_KNA1_J_3GNEGMEN,X,SAP,Auto-linked via description
+field_alias,Indicator: Deadline Logic,SD_KNA1_J_3GFRISTLO,X,SAP,Auto-linked via description
+field_alias,Minimum Usage Period for Restricted Usage (Days),SD_KNA1_J_3GEMINBE,NUMC,SAP,Auto-linked via description
+field_alias,Release Notification Allowance for Unrestricted Usage (Days),SD_KNA1_J_3GFMGUE,NUMC,SAP,Auto-linked via description
+field_alias,Surcharge for Unrestricted Usage (Days),SD_KNA1_J_3GZUSCHUE,NUMC,SAP,Auto-linked via description
+field_alias,Status of Construction Site Inventory,SD_KNA1_J_3GINVSTA,J_3GINVSTA,SAP,Auto-linked via description
+field_alias,Planning Area,SD_KNA1_/SAPCEM/DBER,/SAPCEM/DBER,SAP,Auto-linked via description
+field_alias,Indicator: Settlement Qty Relevant to Equipment,SD_KNA1_/SAPCEM/KVMEQ,/SAPCEM/KVMEQ,SAP,Auto-linked via description
+field_alias,Accounting Clerk Abbreviation,SD_KNB1_BUSAB,BUSAB,SAP,Auto-linked via description
+field_alias,Authorization Group,SD_KNB1_BEGRU,BRGRU,SAP,Auto-linked via description
+field_alias,Indicator: Payment Notice to Customer (with Cleared Items)?,SD_KNB1_ZAMIM,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Payment Notice to Sales Department?,SD_KNB1_ZAMIV,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Payment Notice to Legal Department?,SD_KNB1_ZAMIR,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Payment Notice to the Accounting Department?,SD_KNB1_ZAMIB,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Payment Notice to Customer (W/o Cleared Items)?,SD_KNB1_ZAMIO,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Clearing between customer and vendor ?,SD_KNB1_XVERR,XFELD,SAP,Auto-linked via description
+field_alias,Interest Indicator,SD_KNB1_VZSKZ,VZSKZ,SAP,Auto-linked via description
+field_alias,Interest Calculation Frequency in Months,SD_KNB1_ZINRT,ZINRT,SAP,Auto-linked via description
+field_alias,User at customer,SD_KNB1_ZSABE,TEXT15,SAP,Auto-linked via description
+field_alias,Memo,SD_KNB1_KVERM,TEXT30,SAP,Auto-linked via description
+field_alias,Planning Group,SD_KNB1_FDGRV,FDGRP,SAP,Auto-linked via description
+field_alias,Insurance Lead Months,SD_KNB1_VRSZL,PACK2,SAP,Auto-linked via description
+field_alias,Deductible Percentage Rate,SD_KNB1_VRSPR,PACK2,SAP,Auto-linked via description
+field_alias,Insurance Validity Date,SD_KNB1_VERDT,DATUM,SAP,Auto-linked via description
+field_alias,Collective Invoice Variant,SD_KNB1_PERKZ,PERKZ_KNB1,SAP,Auto-linked via description
+field_alias,Indicator: Local Processing?,SD_KNB1_XDEZV,XFELD,SAP,Auto-linked via description
+field_alias,Indicator for Periodic Account Statements,SD_KNB1_XAUSZ,AUSZG,SAP,Auto-linked via description
+field_alias,Bill of Exchange Limit (in Local Currency),SD_KNB1_WEBTR,WERT7,SAP,Auto-linked via description
+field_alias,Next payee,SD_KNB1_REMIT,KUNNR,SAP,Auto-linked via description
+field_alias,Date of Last Interest Calculation Run,SD_KNB1_DATLZ,DATUM,SAP,Auto-linked via description
+field_alias,Indicator: Record Payment History ?,SD_KNB1_XZVER,XFELD,SAP,Auto-linked via description
+field_alias,Probable Time Until Check Is Paid,SD_KNB1_KULTG,PACK2,SAP,Auto-linked via description
+field_alias,Indicator: Pay All Items Separately?,SD_KNB1_XPORE,XFELD,SAP,Auto-linked via description
+field_alias,(Obsolete) Subsidy Ind. for Determining the Reduction Rate,SD_KNB1_BLNKZ,BLNKZ,SAP,Auto-linked via description
+field_alias,Previous Master Record Number,SD_KNB1_ALTKN,CHAR10,SAP,Auto-linked via description
+field_alias,Selection Rule for Payment Advices,SD_KNB1_SREGL,SREGL,SAP,Auto-linked via description
+field_alias,Indicator: Send Payment Advices by EDI,SD_KNB1_XEDIP,XFELD,SAP,Auto-linked via description
+field_alias,Release Approval Group,SD_KNB1_FRGRP,FRGRP,SAP,Auto-linked via description
+field_alias,Internet address of partner company clerk,SD_KNB1_INTAD,TXT130,SAP,Auto-linked via description
+field_alias,Date on Which the Changes Were Confirmed,SD_KNB1_UPDAT,DATUM,SAP,Auto-linked via description
+field_alias,Time of Last Change Confirmation,SD_KNB1_UPTIM,AS4TIME,SAP,Auto-linked via description
+field_alias,Indicator: Send Payment Advice by XML,SD_KNB1_AVSND,AVSND,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,SD_KNB1_CVP_XBLCK_B,CVP_XBLCK,SAP,Auto-linked via description
+field_alias,Main economic activity,SD_KNB1_CIIUCODE,CIIUCODE,SAP,Auto-linked via description
+field_alias,Payment Reason,SD_KNB1_PAYTRSN,FARP_PAYT_RSN,SAP,Auto-linked via description
+field_alias,Customer is in execution,SD_KNB1_GMVKZD,XFELD,SAP,Auto-linked via description
+field_alias,Authorization Group,SD_KNVV_BEGRU,BEGRU,SAP,Auto-linked via description
+field_alias,Sales District,SD_KNVV_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Customer delivery block (sales area),SD_KNVV_LIFSD,LIFSP,SAP,Auto-linked via description
+field_alias,Shipping Conditions,SD_KNVV_VSBED,VSBED,SAP,Auto-linked via description
+field_alias,Billing block for customer (sales and distribution),SD_KNVV_FAKSD,FAKSP,SAP,Auto-linked via description
+field_alias,Manual Invoice Maintenance,SD_KNVV_MRNKZ,XFELD,SAP,Auto-linked via description
+field_alias,Cost estimate indicator (inactive),SD_KNVV_KVAKZ,XFELD,SAP,Auto-linked via description
+field_alias,Delivering Plant (Own or External),SD_KNVV_VWERK,WERKS,SAP,Auto-linked via description
+field_alias,Item proposal,SD_KNVV_VSORT,VBELN,SAP,Auto-linked via description
+field_alias,Indicator: Customer Is Rebate-Relevant,SD_KNVV_BOKRE,XFELD,SAP,Auto-linked via description
+field_alias,Start of validity per.for the rebate index for the customer,SD_KNVV_BOIDT,DATUM,SAP,Auto-linked via description
+field_alias,Customer payment guarantee procedure,SD_KNVV_KABSS,KABSSCH_CM,SAP,Auto-linked via description
+field_alias,Credit Control Area,SD_KNVV_KKBER,KKBER,SAP,Auto-linked via description
+field_alias,Sales Block for Customer (Sales Area),SD_KNVV_CASSD,CASSP,SAP,Auto-linked via description
+field_alias,Switch off rounding?,SD_KNVV_RDOFF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Relevant for Settlement Management,SD_KNVV_AGREL,XFELD,SAP,Auto-linked via description
+field_alias,Customer procedure for product proposal,SD_KNVV_PVKSM,PVKSM,SAP,Auto-linked via description
+field_alias,Relevant for POD processing,SD_KNVV_PODKZ,XFELD,SAP,Auto-linked via description
+field_alias,Timeframe for Confirmation of POD,SD_KNVV_PODTG,TSTRDURAG,SAP,Auto-linked via description
+field_alias,Index Structure Active for Subsequent Settlement,SD_KNVV_BLIND,XFELD,SAP,Auto-linked via description
+field_alias,Carrier is to be notified,SD_KNVV_CARRIER_NOTIF,XFELD,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,SD_KNVV_CVP_XBLCK_V,CVP_XBLCK,SAP,Auto-linked via description
+field_alias,Incoterms Version,SD_KNVV_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,Billing Plan Procedure,SD_KNVV_BILLPLAN_PROC,CRM_BILLPLAN_PROC,SAP,Auto-linked via description
+field_alias,Deposit on Empties,SD_KNVV_/BEV1/EMLGPFAND,/BEV1/EMGPFAND,SAP,Auto-linked via description
+field_alias,Indicator for Empties Update,SD_KNVV_/BEV1/EMLGFORTS,/BEV1/EMGFORTS,SAP,Auto-linked via description
+field_alias,Grouping Rule,SD_KNVV_FSH_GRREG,FSH_GRREG,SAP,Auto-linked via description
+field_alias,Release Strategy,SD_KNVV_FSH_RESGY,FSH_RESGY,SAP,Auto-linked via description
+field_alias,VAS Determination Mode,SD_KNVV_FSH_VAS_DETC,FSH_VAS_DETC,SAP,Auto-linked via description
+field_alias,ARUN Grouping Strategy,SD_KNVV_FSH_GRSGY,FSH_GRSGY,SAP,Auto-linked via description
+field_alias,Fill Rate %,SD_KNVV_FSH_FRATE,PROZENT,SAP,Auto-linked via description
+field_alias,Fill Rate Aggregation Level,SD_KNVV_FSH_FRATE_AGG_LEVEL,FSH_FRATE_AGG_LEVEL,SAP,Auto-linked via description
+field_alias,Distribution Center of Customer,SD_KNVV_FSH_MSOCDC,KUNNR,SAP,Auto-linked via description
+field_alias,PSST Grouping Rule,SD_KNVV_RFM_PSST_RULE,RFM_PSST_RULE,SAP,Auto-linked via description
+field_alias,Exclude from PSST Grouping Rule Determination,SD_KNVV_RFM_PSST_EXCLUDE,XFELD,SAP,Auto-linked via description
+field_alias,Step Number,S/4HANA_PRCD_ELEMENTS_STUNR,STUNR,SAP,Auto-linked via description
+field_alias,Condition Counter,S/4HANA_PRCD_ELEMENTS_ZAEHK,ZAEHK,SAP,Auto-linked via description
+field_alias,Timestamp for Pricing,S/4HANA_PRCD_ELEMENTS_KDATU,TIMESTAMP,SAP,Auto-linked via description
+field_alias,Condition is used for statistics,S/4HANA_PRCD_ELEMENTS_KSTAT,XFELD,SAP,Auto-linked via description
+field_alias,Condition is Relevant for Accrual (e.g. Freight),S/4HANA_PRCD_ELEMENTS_KRUEK,XFELD,SAP,Auto-linked via description
+field_alias,Origin of the Condition,S/4HANA_PRCD_ELEMENTS_KHERK,KHERK,SAP,Auto-linked via description
+field_alias,Group Condition,S/4HANA_PRCD_ELEMENTS_KGRPE,KGRPE,SAP,Auto-linked via description
+field_alias,Access sequence - Access number,S/4HANA_PRCD_ELEMENTS_KOLNR,KOLNR_LONG,SAP,Auto-linked via description
+field_alias,Number of Condition Record,S/4HANA_PRCD_ELEMENTS_KNUMH,KNUMH,SAP,Auto-linked via description
+field_alias,Sequential Number of the Condition,S/4HANA_PRCD_ELEMENTS_KOPOS,NUM03,SAP,Auto-linked via description
+field_alias,Rounding-Off Difference of the Condition,S/4HANA_PRCD_ELEMENTS_KDIFF,VFPRC_CURR_VALUE5,SAP,Auto-linked via description
+field_alias,Condition Control,S/4HANA_PRCD_ELEMENTS_KSTEU,KSTEU,SAP,Auto-linked via description
+field_alias,Condition is Inactive,S/4HANA_PRCD_ELEMENTS_KINAK,KINAK,SAP,Auto-linked via description
+field_alias,Condition Class,S/4HANA_PRCD_ELEMENTS_KOAID,KOAID,SAP,Auto-linked via description
+field_alias,Condition Counter (Header),S/4HANA_PRCD_ELEMENTS_ZAEKO,ZAEHK,SAP,Auto-linked via description
+field_alias,Structure Condition,S/4HANA_PRCD_ELEMENTS_KDUPL,KDUPL,SAP,Auto-linked via description
+field_alias,Factor for Condition Basis (Period),S/4HANA_PRCD_ELEMENTS_KFAKTOR1,FLTP,SAP,Auto-linked via description
+field_alias,Scale Currency,S/4HANA_PRCD_ELEMENTS_KONWS,WAERS,SAP,Auto-linked via description
+field_alias,Condition Currency (for Cumulation Fields),S/4HANA_PRCD_ELEMENTS_KWAEH,WAERS,SAP,Auto-linked via description
+field_alias,Condition for Intercompany Billing,S/4HANA_PRCD_ELEMENTS_KFKIV,XFELD,SAP,Auto-linked via description
+field_alias,Condition Changed Manually,S/4HANA_PRCD_ELEMENTS_KMPRS,XFELD,SAP,Auto-linked via description
+field_alias,Bit encrypted flags in Pricing,S/4HANA_PRCD_ELEMENTS_KBFLAG,KBFLAG,SAP,Auto-linked via description
+field_alias,Condition Update,S/4HANA_PRCD_ELEMENTS_KOUPD,XFELD,SAP,Auto-linked via description
+field_alias,Condition Used for Variant Configuration,S/4HANA_PRCD_ELEMENTS_KVARC,XFELD,SAP,Auto-linked via description
+field_alias,Relevance for Account Assignment,S/4HANA_PRCD_ELEMENTS_KTREL,KTREL,SAP,Auto-linked via description
+field_alias,Indicator: Matrix Maintenance,S/4HANA_PRCD_ELEMENTS_MDFLG,MDFLG,SAP,Auto-linked via description
+field_alias,Adjusted Quantity,S/4HANA_PRCD_ELEMENTS_KAQTY,QUAN31,SAP,Auto-linked via description
+field_alias,Statistical and Relevant for Account Determination,S/4HANA_PRCD_ELEMENTS_IS_ACCT_DETN_RELEVANT,XFELD,SAP,Auto-linked via description
+field_alias,Tax Reporting Country/Region,S/4HANA_PRCD_ELEMENTS_TAX_COUNTRY,LAND1,SAP,Auto-linked via description
+field_alias,Common Supplementary Data Indicator,S/4HANA_PRCD_ELEMENTS_COMMON_SUPPL_DATA,XFELD,SAP,Auto-linked via description
+field_alias,Subprocedure,S/4HANA_PRCD_ELEMENTS_PRICINGSUBPROCEDURE,KALSM,SAP,Auto-linked via description
+field_alias,Business Partner Grouping,S/4HANA_BUT000_BU_GROUP,BU_GROUP,SAP,Auto-linked via description
+field_alias,Search Term 1 for Business Partner,S/4HANA_BUT000_BU_SORT1,BU_SORT1,SAP,Auto-linked via description
+field_alias,Search Term 2 for Business Partner,S/4HANA_BUT000_BU_SORT2,BU_SORT1,SAP,Auto-linked via description
+field_alias,Central Archiving Flag,S/4HANA_BUT000_XDELE,XFELD,SAP,Auto-linked via description
+field_alias,Central Block for Business Partner,S/4HANA_BUT000_XBLCK,XFELD,SAP,Auto-linked via description
+field_alias,Authorization Group,S/4HANA_BUT000_AUGRP,BU_AUGRP,SAP,Auto-linked via description
+field_alias,Logical system,S/4HANA_BUT000_BU_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Indicator: Not Released,S/4HANA_BUT000_NOT_RELEASED,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Not Legally Competent,S/4HANA_BUT000_NOT_LG_COMPETENT,BOOLE,SAP,Auto-linked via description
+field_alias,Business Partner Print Format,S/4HANA_BUT000_PRINT_MODE,BU_PRINT_MODE,SAP,Auto-linked via description
+field_alias,BP: Legal form of organization,S/4HANA_BUT000_LEGAL_ENTY,BU_LEGENTY,SAP,Auto-linked via description
+field_alias,Industry sector,S/4HANA_BUT000_IND_SECTOR,BU_INDSECT,SAP,Auto-linked via description
+field_alias,Legal Entity of Organization,S/4HANA_BUT000_LEGAL_ORG,BU_LEGAL_ORG,SAP,Auto-linked via description
+field_alias,Liquidation date of organization,S/4HANA_BUT000_LIQUID_DAT,data,SAP,Auto-linked via description
+field_alias,Selection: Business partner is male,S/4HANA_BUT000_XSEXM,XFELD,SAP,Auto-linked via description
+field_alias,Selection: Business partner is female,S/4HANA_BUT000_XSEXF,XFELD,SAP,Auto-linked via description
+field_alias,Birthplace of business partner,S/4HANA_BUT000_BIRTHPL,TEXT40,SAP,Auto-linked via description
+field_alias,Occupation/group,S/4HANA_BUT000_JOBGR,BU_JOBGR,SAP,Auto-linked via description
+field_alias,Obsolete Field,S/4HANA_BUT000_CNTAX,LAND1,SAP,Auto-linked via description
+field_alias,Person Number,S/4HANA_BUT000_PERSNUMBER,AD_PERSNUM,SAP,Auto-linked via description
+field_alias,Selection: Sex of business partner is not known,S/4HANA_BUT000_XSEXU,XFELD,SAP,Auto-linked via description
+field_alias,Obsolete Field,S/4HANA_BUT000_XUBNAME,XUBNAME,SAP,Auto-linked via description
+field_alias,Business partner: Language,S/4HANA_BUT000_BU_LANGU,SPRAS,SAP,Auto-linked via description
+field_alias,Date of death of business partner,S/4HANA_BUT000_DEATHDT,DATUM,SAP,Auto-linked via description
+field_alias,Obsolete Field,S/4HANA_BUT000_MEM_HOUSE,DEC2,SAP,Auto-linked via description
+field_alias,Last user to change object,S/4HANA_BUT000_CHUSR,USNAM,SAP,Auto-linked via description
+field_alias,Business Partner GUID,S/4HANA_BUT000_PARTNER_GUID,SYSUUID,SAP,Auto-linked via description
+field_alias,Planned Change Documents for Partner Were Converted,S/4HANA_BUT000_TD_SWITCH,CHAR1,SAP,Auto-linked via description
+field_alias,Indicator: Business Partner Is Also an Organizational Center,S/4HANA_BUT000_IS_ORG_CENTRE,BU_IS_ORG_CENTRE,SAP,Auto-linked via description
+field_alias,UUID in X form (binary),S/4HANA_BUT000_DB_KEY,SYSUUID,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,S/4HANA_BUT000_XPCPT,BU_XPCPT,SAP,Auto-linked via description
+field_alias,Nuclear Sector (Indicator),S/4HANA_BUT000_NUC_SEC,XCHAR,SAP,Auto-linked via description
+field_alias,Business Partner Released,S/4HANA_BUT000_PAR_REL,BP_PAR_REL,SAP,Auto-linked via description
+field_alias,Bank Keys,S/4HANA_BUT000_KBANKL,BANKK,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 1",S/4HANA_MATDOC_KEY1,data,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 2",S/4HANA_MATDOC_KEY2,data,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 3",S/4HANA_MATDOC_KEY3,data,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 4",S/4HANA_MATDOC_KEY4,data,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 5",S/4HANA_MATDOC_KEY5,data,SAP,Auto-linked via description
+field_alias,"Split GUID, Part 6",S/4HANA_MATDOC_KEY6,data,SAP,Auto-linked via description
+field_alias,Record Type,S/4HANA_MATDOC_RECORD_TYPE,NSDM_RECORD_TYPE,SAP,Auto-linked via description
+field_alias,Material Document Counter,S/4HANA_MATDOC_HEADER_COUNTER,NSDM_HEADER_COUNTER,SAP,Auto-linked via description
+field_alias,Material in Respect of Which Stock is Managed,S/4HANA_MATDOC_MATBF,MATNR,SAP,Auto-linked via description
+field_alias,Supplier for Special Stock,S/4HANA_MATDOC_LIFNR_SID,LIFNR,SAP,Auto-linked via description
+field_alias,Customer for Special Stock,S/4HANA_MATDOC_KUNNR_SID,KUNNR,SAP,Auto-linked via description
+field_alias,SD Document Object,S/4HANA_MATDOC_VBOBJ_SG,VBOBJ,SAP,Auto-linked via description
+field_alias,Stock Characteristics,S/4HANA_MATDOC_BSTAUS_SG,BSTAUS,SAP,Auto-linked via description
+field_alias,Stock Category,S/4HANA_MATDOC_BSTTYP_SG,BSTTYP,SAP,Auto-linked via description
+field_alias,Delivery costs in local currency,S/4HANA_MATDOC_BNBTR,WERT13N,SAP,Auto-linked via description
+field_alias,Analytical Currency of Warehouse Stock - not used,S/4HANA_MATDOC_CURRENCY_A1,WAERS,SAP,Auto-linked via description
+field_alias,Receiving/Issuing Material,S/4HANA_MATDOC_UMMAB_CID,MATNR,SAP,Auto-linked via description
+field_alias,Supplier for Special Stock,S/4HANA_MATDOC_LIFNR_CID,LIFNR,SAP,Auto-linked via description
+field_alias,Customer for Special Stock,S/4HANA_MATDOC_KUNNR_CID,KUNNR,SAP,Auto-linked via description
+field_alias,Special Stock Indicator,S/4HANA_MATDOC_UMSOK_CID,SOBKZ,SAP,Auto-linked via description
+field_alias,SD Document Object,S/4HANA_MATDOC_VBOBJ_CG,VBOBJ,SAP,Auto-linked via description
+field_alias,Valuation of Special Stock,S/4HANA_MATDOC_UMKZBWS_CG,KZBWS,SAP,Auto-linked via description
+field_alias,Stock Characteristics,S/4HANA_MATDOC_BSTAUS_CG,BSTAUS,SAP,Auto-linked via description
+field_alias,Stock Category,S/4HANA_MATDOC_BSTTYP_CG,BSTTYP,SAP,Auto-linked via description
+field_alias,Time of Entry,S/4HANA_MATDOC_CPUTM,UZEIT,SAP,Auto-linked via description
+field_alias,Year-Day-Combination,S/4HANA_MATDOC_YEARDAY_BUDAT,NSDM_YEARDAY,SAP,Auto-linked via description
+field_alias,Year-Week-Combination,S/4HANA_MATDOC_YEARWEEK_BUDAT,NUM6,SAP,Auto-linked via description
+field_alias,Year-Month-Combination,S/4HANA_MATDOC_YEARMONTH_BUDAT,NUM6,SAP,Auto-linked via description
+field_alias,Year-Quarter-Combination,S/4HANA_MATDOC_YEARQUARTER_BUDAT,NUM5,SAP,Auto-linked via description
+field_alias,Quarter (1 - 4),S/4HANA_MATDOC_QUARTER_BUDAT,data,SAP,Auto-linked via description
+field_alias,Month (1 - 12),S/4HANA_MATDOC_MONTH_BUDAT,data,SAP,Auto-linked via description
+field_alias,Calendar Week (1 - 53),S/4HANA_MATDOC_WEEK_BUDAT,data,SAP,Auto-linked via description
+field_alias,Day of Year (1 - 366),S/4HANA_MATDOC_DAY_BUDAT,data,SAP,Auto-linked via description
+field_alias,Week Day,S/4HANA_MATDOC_WEEKDAY_BUDAT,SC_WEEKDAY,SAP,Auto-linked via description
+field_alias,Period/Year,S/4HANA_MATDOC_GJPER,JAHRPER,SAP,Auto-linked via description
+field_alias,Period/Year,S/4HANA_MATDOC_GJPER_CURR_PER,JAHRPER,SAP,Auto-linked via description
+field_alias,Material Document Year,S/4HANA_MATDOC_MJAHR,GJAHR,SAP,Auto-linked via description
+field_alias,Item in Material Document,S/4HANA_MATDOC_ZEILE,MBLPO,SAP,Auto-linked via description
+field_alias,Original Line for Account Assignment Item in Material Doc.,S/4HANA_MATDOC_MAA_URZEI,MBLPO,SAP,Auto-linked via description
+field_alias,Material Document Year,S/4HANA_MATDOC_SJAHR,GJAHR,SAP,Auto-linked via description
+field_alias,Item in Material Document,S/4HANA_MATDOC_SMBLP,MBLPO,SAP,Auto-linked via description
+field_alias,Asset Subnumber,S/4HANA_MATDOC_ANLN2,ANLN2,SAP,Auto-linked via description
+field_alias,Transfer Requirement Item,S/4HANA_MATDOC_TBPOS,TBPOS,SAP,Auto-linked via description
+field_alias,Original line in material document,S/4HANA_MATDOC_URZEI,MBLPO,SAP,Auto-linked via description
+field_alias,Logical System of EWM Material Document,S/4HANA_MATDOC_SPE_LOGSYS,LOGSYS,SAP,Auto-linked via description
+field_alias,Item has been Cancelled,S/4HANA_MATDOC_CANCELLED,XFELD,SAP,Auto-linked via description
+field_alias,Relevance for Analytics,S/4HANA_MATDOC_CANCELLATION_TYPE,NSDM_CANCELLATION_TYPE,SAP,Auto-linked via description
+field_alias,"Reversal, return delivery, or transfer posting",S/4HANA_MATDOC_XSTOR,KZSTO,SAP,Auto-linked via description
+field_alias,Item automatically created,S/4HANA_MATDOC_XAUTO,MB_XAUTO,SAP,Auto-linked via description
+field_alias,Stock Type,S/4HANA_MATDOC_INSMK,MB_INSMK,SAP,Auto-linked via description
+field_alias,Batch in Restricted-Use Stock,S/4HANA_MATDOC_ZUSTD,XFELD,SAP,Auto-linked via description
+field_alias,Distribution of Differences,S/4HANA_MATDOC_PLPLA,PLPLA,SAP,Auto-linked via description
+field_alias,"""Delivery Completed"" Indicator",S/4HANA_MATDOC_ELIKZ,XFELD,SAP,Auto-linked via description
+field_alias,Unloading Point,S/4HANA_MATDOC_ABLAD,TEXT25,SAP,Auto-linked via description
+field_alias,Trading partner's business area,S/4HANA_MATDOC_PARGB,GSBER,SAP,Auto-linked via description
+field_alias,Indicator: Posting to Order Is Statistical,S/4HANA_MATDOC_XSAUF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Posting to Profitability Analysis Is Statistical,S/4HANA_MATDOC_XSERG,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: post to previous year,S/4HANA_MATDOC_XRUEJ,XFELD,SAP,Auto-linked via description
+field_alias,Final Issue for Reservation,S/4HANA_MATDOC_KZEAR,XFELD,SAP,Auto-linked via description
+field_alias,Transaction/event is relevant to statistics,S/4HANA_MATDOC_KZSTR,KZSTR,SAP,Auto-linked via description
+field_alias,Movement Indicator,S/4HANA_MATDOC_KZBEW,KZBEW,SAP,Auto-linked via description
+field_alias,Receipt Indicator,S/4HANA_MATDOC_KZZUG,KZZUG,SAP,Auto-linked via description
+field_alias,Stock Category in the Warehouse Management System,S/4HANA_MATDOC_BESTQ,BESTQ,SAP,Auto-linked via description
+field_alias,Indicator: posting in warehouse management system,S/4HANA_MATDOC_XBLVS,XFELD,SAP,Auto-linked via description
+field_alias,Transfer Priority,S/4HANA_MATDOC_TBPRI,TBPRI,SAP,Auto-linked via description
+field_alias,Shipping Instructions,S/4HANA_MATDOC_EVERS,EVERS,SAP,Auto-linked via description
+field_alias,Compliance with Shipping Instructions,S/4HANA_MATDOC_EVERE,EVERE,SAP,Auto-linked via description
+field_alias,Cost Object,S/4HANA_MATDOC_KSTRG,KSTRG,SAP,Auto-linked via description
+field_alias,Reversal of GR allowed for GR-based IV despite invoice,S/4HANA_MATDOC_XWSBR,XFELD,SAP,Auto-linked via description
+field_alias,Posting string for quantities,S/4HANA_MATDOC_BUSTM,BUSTM,SAP,Auto-linked via description
+field_alias,Posting String for Values,S/4HANA_MATDOC_BUSTW,BUSTW,SAP,Auto-linked via description
+field_alias,Calculation of val. open,S/4HANA_MATDOC_XWOFF,XFELD,SAP,Auto-linked via description
+field_alias,Business Process,S/4HANA_MATDOC_PRZNR,CO_PRZNR,SAP,Auto-linked via description
+field_alias,Goods Supplier,S/4HANA_MATDOC_LLIEF,LIFNR,SAP,Auto-linked via description
+field_alias,Vendor Stock Valuation Indicator,S/4HANA_MATDOC_XOBEW,XFELD,SAP,Auto-linked via description
+field_alias,Stock Type Modification (Read from Table T156M),S/4HANA_MATDOC_ZUSTD_T156M,BAMOK_MSEG,SAP,Auto-linked via description
+field_alias,GTS Stock Type,S/4HANA_MATDOC_SPE_GTS_STOCK_TY,/SPE/GTS_STOCK_TYPE,SAP,Auto-linked via description
+field_alias,Multiple Account Assignment,S/4HANA_MATDOC_XMACC,CHAR1,SAP,Auto-linked via description
+field_alias,Receiving/Issuing Material,S/4HANA_MATDOC_UMMAB,MATNR,SAP,Auto-linked via description
+field_alias,Valuation Type of Transfer Batch,S/4HANA_MATDOC_UMBAR,BWTAR,SAP,Auto-linked via description
+field_alias,Receiving/Issuing Stock Segment,S/4HANA_MATDOC_SGT_UMSCAT,SGT_SRCA,SAP,Auto-linked via description
+field_alias,Completed indicator,S/4HANA_MATDOC_COMPL_MARK,XFELD,SAP,Auto-linked via description
+field_alias,Display Dialog Box,S/4HANA_MATDOC_POPUP_MARK,KENZX,SAP,Auto-linked via description
+field_alias,Date on which services are rendered,S/4HANA_MATDOC_FBUDA,DATUM,SAP,Auto-linked via description
+field_alias,Non-deductible input tax,S/4HANA_MATDOC_OINAVNW,WERT7,SAP,Auto-linked via description
+field_alias,Undefined range (can be used for patch levels),S/4HANA_MATDOC_TCODE,CHAR4,SAP,Auto-linked via description
+field_alias,Document Header Text,S/4HANA_MATDOC_BKTXT,TEXT25,SAP,Auto-linked via description
+field_alias,Unplanned delivery costs,S/4HANA_MATDOC_FRATH,WERT7,SAP,Auto-linked via description
+field_alias,Version for Printing GR/GI Slip,S/4HANA_MATDOC_WEVER,WEVER,SAP,Auto-linked via description
+field_alias,Control posting for external WMS,S/4HANA_MATDOC_BFWMS,BFWMS,SAP,Auto-linked via description
+field_alias,Transaction Code,S/4HANA_MATDOC_TCODE2,TCODE,SAP,Auto-linked via description
+field_alias,Store Return with Inbound and Outbound Delivery,S/4HANA_MATDOC_FLS_RSTO,XFELD,SAP,Auto-linked via description
+field_alias,Advanced Returns Management Active,S/4HANA_MATDOC_MSR_ACTIVE,MSR_ACTIVE,SAP,Auto-linked via description
+field_alias,Single-Character Flag,S/4HANA_MATDOC_XCOMPL,CHAR1,SAP,Auto-linked via description
+field_alias,Print via Output Control,S/4HANA_MATDOC_XPRINT,XRADI,SAP,Auto-linked via description
+field_alias,Under/Overdelivery,S/4HANA_MATDOC_LMBMV,XFELD,SAP,Auto-linked via description
+field_alias,Material is a missing part,S/4HANA_MATDOC_XFMAT,XFELD,SAP,Auto-linked via description
+field_alias,Print kanban card,S/4HANA_MATDOC_KNBDR,KNBDR,SAP,Auto-linked via description
+field_alias,Business Transaction Category,S/4HANA_ACDOCP_BTTYPE,FINS_BTTYPE,SAP,Auto-linked via description
+field_alias,Functional Area,S/4HANA_ACDOCP_RFAREA,FKBER,SAP,Auto-linked via description
+field_alias,Business Area,S/4HANA_ACDOCP_RBUSA,GSBER,SAP,Auto-linked via description
+field_alias,Partner Functional Area,S/4HANA_ACDOCP_SFAREA,FKBER,SAP,Auto-linked via description
+field_alias,Trading partner's business area,S/4HANA_ACDOCP_SBUSA,GSBER,SAP,Auto-linked via description
+field_alias,Valuation quantity,S/4HANA_ACDOCP_VMSL,MENGV12,SAP,Auto-linked via description
+field_alias,Fixed valuation quantity,S/4HANA_ACDOCP_VMFSL,MENGV12,SAP,Auto-linked via description
+field_alias,Period/Year,S/4HANA_ACDOCP_FISCYEARPER,JAHRPER,SAP,Auto-linked via description
+field_alias,Network activity,S/4HANA_ACDOCP_NPLNR_VORGN,VORNR,SAP,Auto-linked via description
+field_alias,Origin activity,S/4HANA_ACDOCP_ULSTAR,LSTAR,SAP,Auto-linked via description
+field_alias,Partner activity,S/4HANA_ACDOCP_PLSTAR,LSTAR,SAP,Auto-linked via description
+field_alias,Is Lot Size Independent,S/4HANA_ACDOCP_PSKNZ,XFELD,SAP,Auto-linked via description
+field_alias,Product Sold,S/4HANA_ACDOCP_MATNR_COPA,MATNR,SAP,Auto-linked via description
+field_alias,Sales District,S/4HANA_ACDOCP_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Bill-to Party,S/4HANA_ACDOCP_KUNRE,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 1,S/4HANA_ACDOCP_KMHI01_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 2,S/4HANA_ACDOCP_KMHI02_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 3,S/4HANA_ACDOCP_KMHI03_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Sales Office,S/4HANA_ACDOCP_KMVKBU_PA,VKBUR,SAP,Auto-linked via description
+field_alias,Sales Employee,S/4HANA_ACDOCP_KMVTNR_PA,PERNR,SAP,Auto-linked via description
+field_alias,CO-PA Partner,S/4HANA_ACDOCP_PARTNER_PA,RKEPARTNER,SAP,Auto-linked via description
+field_alias,Generic Article,S/4HANA_ACDOCP_ARTNRG_PA,MATNR,SAP,Auto-linked via description
+field_alias,CRM Marketing Element,S/4HANA_ACDOCP_CRMELEM_PA,PS_POSNR,SAP,Auto-linked via description
+field_alias,Form of manufacture,S/4HANA_ACDOCP_EFORM_PA,RKEG_EFORM,SAP,Auto-linked via description
+field_alias,Route Segment,S/4HANA_ACDOCP_KMLEGS_PA,RKESKMLEGS,SAP,Auto-linked via description
+field_alias,Departure Location,S/4HANA_ACDOCP_KMORIG_PA,RKESKMORIG,SAP,Auto-linked via description
+field_alias,Sales Office,S/4HANA_ACDOCP_VKBUR_PA,VKBUR,SAP,Auto-linked via description
+field_alias,Servicevorgangsart,S/4HANA_ACDOCP_WWVOR_PA,RKEG_WWVOR,SAP,Auto-linked via description
+field_alias,Financial Management Area,S/4HANA_ACDOCP_FIKRS,FIKRS,SAP,Auto-linked via description
+field_alias,Fund,S/4HANA_ACDOCP_RFUND,BP_GEBER,SAP,Auto-linked via description
+field_alias,Budget Period,S/4HANA_ACDOCP_RBUDGET_PD,FM_BUDGET_PERIOD,SAP,Auto-linked via description
+field_alias,Sponsored Program,S/4HANA_ACDOCP_RSPONSORED_PROG,GM_SPONSORED_PROG,SAP,Auto-linked via description
+field_alias,Sponsored Class,S/4HANA_ACDOCP_RSPONSORED_CLASS,GM_SPONSORED_CLASS,SAP,Auto-linked via description
+field_alias,Suboperation,S/4HANA_ACDOCP_UVORN,VORNR,SAP,Auto-linked via description
+field_alias,Functional Location,S/4HANA_ACDOCP_TPLNR,TPLNR,SAP,Auto-linked via description
+field_alias,Assembly,S/4HANA_ACDOCP_ISTRU,MATNR,SAP,Auto-linked via description
+field_alias,Depreciation Area Real or Derived,S/4HANA_ACDOCP_AFABE,AFABE,SAP,Auto-linked via description
+field_alias,Asset Subnumber,S/4HANA_ACDOCP_ANLN2,ANLN2,SAP,Auto-linked via description
+field_alias,Joint venture,S/4HANA_ACDOCP_VNAME,JV_NAME,SAP,Auto-linked via description
+field_alias,Settlement Unit,S/4HANA_ACDOCP_SEMPSL,RESCSUID,SAP,Auto-linked via description
+field_alias,Assembly/Operation Scrap Included,S/4HANA_ACDOCP_ASSL_SCRAP_INCLD,CK_AUSID,SAP,Auto-linked via description
+field_alias,Assembly scrap in percent,S/4HANA_ACDOCP_ASSL_SCRAP_PCT,DEC3_2,SAP,Auto-linked via description
+field_alias,Scrap Factor,S/4HANA_ACDOCP_SCRAP_FACTOR,DEC3_3,SAP,Auto-linked via description
+field_alias,Origin Group as Subdivision of Cost Element,S/4HANA_ACDOCP_HKGRP,HRKFT,SAP,Auto-linked via description
+field_alias,Lot Size for Product Costing,S/4HANA_ACDOCP_LOSGR,MENG13,SAP,Auto-linked via description
+field_alias,CO Business Transaction,S/4HANA_ACDOCA_VRGNG,J_VORGANG,SAP,Auto-linked via description
+field_alias,Business Transaction Category,S/4HANA_ACDOCA_BTTYPE,FINS_BTTYPE,SAP,Auto-linked via description
+field_alias,Closing step,S/4HANA_ACDOCA_CLOSINGSTEP,FINS_CLOSINGSTEP,SAP,Auto-linked via description
+field_alias,Partial Document to be balanced to zero,S/4HANA_ACDOCA_SUBTA,NUMC6,SAP,Auto-linked via description
+field_alias,Indicator: True reversal (i.e. cancellation),S/4HANA_ACDOCA_XTRUEREV,XFELD,SAP,Auto-linked via description
+field_alias,Reversal: Partial Document to be balanced to zero,S/4HANA_ACDOCA_SUBTA_REV,NUMC6,SAP,Auto-linked via description
+field_alias,Preceding Partial Document to be balanced to zero,S/4HANA_ACDOCA_PREC_SUBTA,NUMC6,SAP,Auto-linked via description
+field_alias,Secondary journal entry,S/4HANA_ACDOCA_XSECONDARY,BOOLE,SAP,Auto-linked via description
+field_alias,Orgl Change,S/4HANA_ACDOCA_ORGL_CHANGE,FINOC_ORGL_CHANGE,SAP,Auto-linked via description
+field_alias,Subitem in Source Document,S/4HANA_ACDOCA_SRC_AWSUBIT,NUMC6,SAP,Auto-linked via description
+field_alias,Indicator: Commitment,S/4HANA_ACDOCA_XCOMMITMENT,XFELD,SAP,Auto-linked via description
+field_alias,Functional Area,S/4HANA_ACDOCA_RFAREA,FKBER,SAP,Auto-linked via description
+field_alias,Business Area,S/4HANA_ACDOCA_RBUSA,GSBER,SAP,Auto-linked via description
+field_alias,Partner Functional Area,S/4HANA_ACDOCA_SFAREA,FKBER,SAP,Auto-linked via description
+field_alias,Trading partner's business area,S/4HANA_ACDOCA_SBUSA,GSBER,SAP,Auto-linked via description
+field_alias,Fixed quantity,S/4HANA_ACDOCA_MFSL,MENGV12,SAP,Auto-linked via description
+field_alias,Valuation quantity,S/4HANA_ACDOCA_VMSL,MENGV12,SAP,Auto-linked via description
+field_alias,Fixed valuation quantity,S/4HANA_ACDOCA_VMFSL,MENGV12,SAP,Auto-linked via description
+field_alias,Additional Quantity 1,S/4HANA_ACDOCA_QUANT1,MENGV12,SAP,Auto-linked via description
+field_alias,Additional Quantity 2,S/4HANA_ACDOCA_QUANT2,MENGV12,SAP,Auto-linked via description
+field_alias,Additional Quantity 3,S/4HANA_ACDOCA_QUANT3,MENGV12,SAP,Auto-linked via description
+field_alias,CO Valuation Quantity,S/4HANA_ACDOCA_CO_MEGBTR,MENGV12,SAP,Auto-linked via description
+field_alias,CO Valuation Quantity Fix,S/4HANA_ACDOCA_CO_MEFBTR,MENGV12,SAP,Auto-linked via description
+field_alias,Period/Year,S/4HANA_ACDOCA_FISCYEARPER,JAHRPER,SAP,Auto-linked via description
+field_alias,UTC Time Stamp in Short Form (YYYYMMDDhhmmss),S/4HANA_ACDOCA_TIMESTAMP,TZNTSTMPS,SAP,Auto-linked via description
+field_alias,Consolidation Unit,S/4HANA_ACDOCA_RBUNIT,FINCS_MD_BUNIT,SAP,Auto-linked via description
+field_alias,Partner Consolidation Unit,S/4HANA_ACDOCA_RBUPTR,FINCS_MD_BUNIT,SAP,Auto-linked via description
+field_alias,Subitem Category,S/4HANA_ACDOCA_SITYP,FC_SITYP,SAP,Auto-linked via description
+field_alias,Subitem,S/4HANA_ACDOCA_SUBIT,FC_SITEM,SAP,Auto-linked via description
+field_alias,Date on which services are rendered,S/4HANA_ACDOCA_FBUDA,DATUM,SAP,Auto-linked via description
+field_alias,Translation Date,S/4HANA_ACDOCA_WWERT,DATUM,SAP,Auto-linked via description
+field_alias,Special G/L Indicator,S/4HANA_ACDOCA_UMSKZ,UMSKZ,SAP,Auto-linked via description
+field_alias,Tax Reporting Country/Region,S/4HANA_ACDOCA_TAX_COUNTRY,LAND1,SAP,Auto-linked via description
+field_alias,Aging Increment,S/4HANA_ACDOCA_AGING_INCRMNT,FINS_INCRMNT,SAP,Auto-linked via description
+field_alias,Depreciation Area Real or Derived,S/4HANA_ACDOCA_AFABE,AFABE,SAP,Auto-linked via description
+field_alias,Asset Subnumber,S/4HANA_ACDOCA_ANLN2,ANLN2,SAP,Auto-linked via description
+field_alias,Group Asset,S/4HANA_ACDOCA_ANLGR,ANLN1,SAP,Auto-linked via description
+field_alias,Subnumber of Group Asset,S/4HANA_ACDOCA_ANLGR2,ANLN2,SAP,Auto-linked via description
+field_alias,Distribution Rule Group,S/4HANA_ACDOCA_SETTLEMENT_RULE,NUMC3,SAP,Auto-linked via description
+field_alias,Account Determination,S/4HANA_ACDOCA_KTOGR,KTOGR,SAP,Auto-linked via description
+field_alias,Partner Asset Subnumber (Transfer),S/4HANA_ACDOCA_PANL2,ANLN2,SAP,Auto-linked via description
+field_alias,Prima Nota Information for ASSET_SUBNO,S/4HANA_ACDOCA_ANLN2_PN,ANLN2,SAP,Auto-linked via description
+field_alias,Prima Nota Information for BZDAT,S/4HANA_ACDOCA_BZDAT_PN,DATUM,SAP,Auto-linked via description
+field_alias,Indicator: Post Complete Retirement,S/4HANA_ACDOCA_XVABG_PN,XFELD,SAP,Auto-linked via description
+field_alias,Asset Retirement: Percentage Rate,S/4HANA_ACDOCA_PROZS_PN,PRZ32,SAP,Auto-linked via description
+field_alias,Indicator Proportional Values Entered Manually,S/4HANA_ACDOCA_XMANPROPVAL_PN,XFELD,SAP,Auto-linked via description
+field_alias,Vendor Stock Valuation Indicator,S/4HANA_ACDOCA_XOBEW,XFELD,SAP,Auto-linked via description
+field_alias,Valuation Time Stamp,S/4HANA_ACDOCA_VTSTAMP,TZNTSTMPL,SAP,Auto-linked via description
+field_alias,Supplier of Valuated Special Inventory,S/4HANA_ACDOCA_MAT_LIFNR,LIFNR,SAP,Auto-linked via description
+field_alias,Valuation Area,S/4HANA_ACDOCA_BWKEY,BWKEY,SAP,Auto-linked via description
+field_alias,Original Process Category,S/4HANA_ACDOCA_MLPTYP,CKML_PROZESS_TYP,SAP,Auto-linked via description
+field_alias,Category in Material Update Structure,S/4HANA_ACDOCA_MLCATEG,CKML_KATEGORIE,SAP,Auto-linked via description
+field_alias,Procurement Alternative/Process,S/4HANA_ACDOCA_QSBVALT,CK_KALNR,SAP,Auto-linked via description
+field_alias,Production Process,S/4HANA_ACDOCA_QSPROCESS,CK_KALNR,SAP,Auto-linked via description
+field_alias,Balance Sheet Valuation: Inventory Movement Category,S/4HANA_ACDOCA_INV_MOV_CATEG,FBV_INV_MOV_CATEG,SAP,Auto-linked via description
+field_alias,Origin Group as Subdivision of Cost Element,S/4HANA_ACDOCA_HKGRP,HRKFT,SAP,Auto-linked via description
+field_alias,Partner object (always filled),S/4HANA_ACDOCA_PAROB1,J_OBJNR,SAP,Auto-linked via description
+field_alias,Indicator: Quantity Is Incomplete,S/4HANA_ACDOCA_MUVFLG,FCO_MUV_CODE,SAP,Auto-linked via description
+field_alias,Indicator: Profitability segm. relevant for CO compatibility,S/4HANA_ACDOCA_XPAOBJNR_CO_REL,XFELD,SAP,Auto-linked via description
+field_alias,Object Class,S/4HANA_ACDOCA_SCOPE,SCOPE_CV,SAP,Auto-linked via description
+field_alias,Partner object class,S/4HANA_ACDOCA_PSCOPE,SCOPE_CV,SAP,Auto-linked via description
+field_alias,Origin activity,S/4HANA_ACDOCA_ULSTAR,LSTAR,SAP,Auto-linked via description
+field_alias,Source: Business Process,S/4HANA_ACDOCA_UPRZNR,CO_PRZNR,SAP,Auto-linked via description
+field_alias,Origin G/L Account of a Variance,S/4HANA_ACDOCA_VARC_UACCT,SAKNR,SAP,Auto-linked via description
+field_alias,Variance Origin Group,S/4HANA_ACDOCA_VARC_HKGRP,HRKFT,SAP,Auto-linked via description
+field_alias,Account Assignment,S/4HANA_ACDOCA_ACCAS,ACCAS,SAP,Auto-linked via description
+field_alias,Order category,S/4HANA_ACDOCA_AUTYP,AUFTYP,SAP,Auto-linked via description
+field_alias,Network activity,S/4HANA_ACDOCA_NPLNR_VORGN,VORNR,SAP,Auto-linked via description
+field_alias,Business Process,S/4HANA_ACDOCA_PRZNR,CO_PRZNR,SAP,Auto-linked via description
+field_alias,Cost Object,S/4HANA_ACDOCA_KSTRG,KSTRG,SAP,Auto-linked via description
+field_alias,Operating concern,S/4HANA_ACDOCA_ERKRS,ERKRS,SAP,Auto-linked via description
+field_alias,Partner Account Assignment,S/4HANA_ACDOCA_PACCAS,ACCAS,SAP,Auto-linked via description
+field_alias,Partner activity,S/4HANA_ACDOCA_PLSTAR,LSTAR,SAP,Auto-linked via description
+field_alias,Partner Order Category,S/4HANA_ACDOCA_PAUTYP,AUFTYP,SAP,Auto-linked via description
+field_alias,Partner Business Process,S/4HANA_ACDOCA_PPRZNR,CO_PRZNR,SAP,Auto-linked via description
+field_alias,Partner Cost Object,S/4HANA_ACDOCA_PKSTRG,KSTRG,SAP,Auto-linked via description
+field_alias,Posting Row,S/4HANA_ACDOCA_CO_BUZEI,BUZEI,SAP,Auto-linked via description
+field_alias,Overtime Category,S/4HANA_ACDOCA_OVERTIMECAT,CATS_OVERTIME_CATEGORY,SAP,Auto-linked via description
+field_alias,Suboperation,S/4HANA_ACDOCA_UVORN,VORNR,SAP,Auto-linked via description
+field_alias,Functional Location,S/4HANA_ACDOCA_TPLNR,TPLNR,SAP,Auto-linked via description
+field_alias,Assembly,S/4HANA_ACDOCA_ISTRU,MATNR,SAP,Auto-linked via description
+field_alias,Planned Parts/Work,S/4HANA_ACDOCA_PLANNED_PARTS_WORK,BOOLE,SAP,Auto-linked via description
+field_alias,Product Sold,S/4HANA_ACDOCA_MATNR_COPA,MATNR,SAP,Auto-linked via description
+field_alias,Sales District,S/4HANA_ACDOCA_BZIRK,BZIRK,SAP,Auto-linked via description
+field_alias,Bill-to Party,S/4HANA_ACDOCA_KUNRE,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 1,S/4HANA_ACDOCA_KMHI01_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 2,S/4HANA_ACDOCA_KMHI02_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Customer hierarchy Level 3,S/4HANA_ACDOCA_KMHI03_PA,KUNNR,SAP,Auto-linked via description
+field_alias,Sales Office,S/4HANA_ACDOCA_KMVKBU_PA,VKBUR,SAP,Auto-linked via description
+field_alias,Sales Employee,S/4HANA_ACDOCA_KMVTNR_PA,PERNR,SAP,Auto-linked via description
+field_alias,CO-PA Partner,S/4HANA_ACDOCA_PARTNER_PA,RKEPARTNER,SAP,Auto-linked via description
+field_alias,Generic Article,S/4HANA_ACDOCA_ARTNRG_PA,MATNR,SAP,Auto-linked via description
+field_alias,CRM Marketing Element,S/4HANA_ACDOCA_CRMELEM_PA,PS_POSNR,SAP,Auto-linked via description
+field_alias,Form of manufacture,S/4HANA_ACDOCA_EFORM_PA,RKEG_EFORM,SAP,Auto-linked via description
+field_alias,Route Segment,S/4HANA_ACDOCA_KMLEGS_PA,RKESKMLEGS,SAP,Auto-linked via description
+field_alias,Departure Location,S/4HANA_ACDOCA_KMORIG_PA,RKESKMORIG,SAP,Auto-linked via description
+field_alias,Sales Office,S/4HANA_ACDOCA_VKBUR_PA,VKBUR,SAP,Auto-linked via description
+field_alias,Servicevorgangsart,S/4HANA_ACDOCA_WWVOR_PA,RKEG_WWVOR,SAP,Auto-linked via description
+field_alias,Cash Origin Account,S/4HANA_ACDOCA_RE_ACCOUNT,SAKNR,SAP,Auto-linked via description
+field_alias,Financial Management Area,S/4HANA_ACDOCA_FIKRS,FIKRS,SAP,Auto-linked via description
+field_alias,Funded Program,S/4HANA_ACDOCA_MEASURE,FM_MEASURE,SAP,Auto-linked via description
+field_alias,Fund,S/4HANA_ACDOCA_RFUND,BP_GEBER,SAP,Auto-linked via description
+field_alias,Budget Period,S/4HANA_ACDOCA_RBUDGET_PD,FM_BUDGET_PERIOD,SAP,Auto-linked via description
+field_alias,Partner Fund,S/4HANA_ACDOCA_SFUND,BP_GEBER,SAP,Auto-linked via description
+field_alias,FM: Partner Budget Period,S/4HANA_ACDOCA_SBUDGET_PD,FM_BUDGET_PERIOD,SAP,Auto-linked via description
+field_alias,Budget Account,S/4HANA_ACDOCA_BDGT_ACCOUNT,SAKNR,SAP,Auto-linked via description
+field_alias,Budget Consumption Date,S/4HANA_ACDOCA_BDGT_CNSMPN_DATE,DATUM,SAP,Auto-linked via description
+field_alias,Budget-Relevant Indicator,S/4HANA_ACDOCA_BDGT_RELEVANT,XFELD,SAP,Auto-linked via description
+field_alias,Sponsored Program,S/4HANA_ACDOCA_RSPONSORED_PROG,GM_SPONSORED_PROG,SAP,Auto-linked via description
+field_alias,Sponsored Class,S/4HANA_ACDOCA_RSPONSORED_CLASS,GM_SPONSORED_CLASS,SAP,Auto-linked via description
+field_alias,Joint venture,S/4HANA_ACDOCA_VNAME,JV_NAME,SAP,Auto-linked via description
+field_alias,Billing Indicator,S/4HANA_ACDOCA_BTYPE,JV_BILIND,SAP,Auto-linked via description
+field_alias,Billing Month,S/4HANA_ACDOCA_BILLM,DATUM,SAP,Auto-linked via description
+field_alias,Processing operational month,S/4HANA_ACDOCA_POM,DATUM,SAP,Auto-linked via description
+field_alias,JVA Activity (Joint Venture Accounting),S/4HANA_ACDOCA_JVACTIVITY,data,SAP,Auto-linked via description
+field_alias,Partner Equity Group (Joint Venture Accounting),S/4HANA_ACDOCA_PEGRUP,JV_EGROUP,SAP,Auto-linked via description
+field_alias,Allocation: Sender Credit Recovery Indicator,S/4HANA_ACDOCA_S_RECIND,JV_RECIND,SAP,Auto-linked via description
+field_alias,Cutback Account (Joint Venture Accounting),S/4HANA_ACDOCA_CBRACCT,SAKNR,SAP,Auto-linked via description
+field_alias,Cutback Cost Object (Joint Venture Accounting),S/4HANA_ACDOCA_CBOBJNR,J_OBJNR,SAP,Auto-linked via description
+field_alias,Settlement Unit,S/4HANA_ACDOCA_SEMPSL,RESCSUID,SAP,Auto-linked via description
+field_alias,Partner Settlement Unit,S/4HANA_ACDOCA_PSEMPSL,RESCSUID,SAP,Auto-linked via description
+field_alias,Risk Class,S/4HANA_ACDOCA_RISK_CLASS,UKM_RISK_CLASS,SAP,Auto-linked via description
+field_alias,Name 3,FI_LFA1_NAME3,NAME,SAP,Auto-linked via description
+field_alias,Name 4,FI_LFA1_NAME4,NAME,SAP,Auto-linked via description
+field_alias,Sort field,FI_LFA1_SORTL,CHAR10,SAP,Auto-linked via description
+field_alias,Search term for matchcode search,FI_LFA1_MCOD2,CHAR25,SAP,Auto-linked via description
+field_alias,Search term for matchcode search,FI_LFA1_MCOD3,CHAR25,SAP,Auto-linked via description
+field_alias,Train station,FI_LFA1_BAHNS,BAHNH,SAP,Auto-linked via description
+field_alias,Authorization Group,FI_LFA1_BEGRU,BRGRU,SAP,Auto-linked via description
+field_alias,Check digit for the international location number,FI_LFA1_BUBKZ,NUM01,SAP,Auto-linked via description
+field_alias,Recipient Code for Data Medium Exchange,FI_LFA1_DTAMS,DTAMS,SAP,Auto-linked via description
+field_alias,ISR Subscriber Number,FI_LFA1_ESRNR,ESRNR,SAP,Auto-linked via description
+field_alias,Centrally imposed purchasing block,FI_LFA1_SPERM,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Business Partner Subject to Equalization Tax?,FI_LFA1_STKZA,STKZA,SAP,Auto-linked via description
+field_alias,Liable for VAT,FI_LFA1_STKZU,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Is the account a one-time account?,FI_LFA1_XCPDK,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Alternative Payee in Document Allowed?,FI_LFA1_XZEMP,XFELD,SAP,Auto-linked via description
+field_alias,Natural Person,FI_LFA1_STKZN,STKZN,SAP,Auto-linked via description
+field_alias,Function That Will Be Blocked,FI_LFA1_SPERQ,QSPERRFKT,SAP,Auto-linked via description
+field_alias,Last External Review,FI_LFA1_REVDB,DATUM,SAP,Auto-linked via description
+field_alias,Supplier's QM System,FI_LFA1_QSSYS,QSSYSFAM,SAP,Auto-linked via description
+field_alias,Indicator: vendor sub-range relevant,FI_LFA1_LTSNA,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: plant level relevant,FI_LFA1_WERKR,XFELD,SAP,Auto-linked via description
+field_alias,Payment Block,FI_LFA1_SPERZ,XFELD,SAP,Auto-linked via description
+field_alias,Forwarding agent freight group,FI_LFA1_SFRGR,SFRGR,SAP,Auto-linked via description
+field_alias,Transportation zone to or from which the goods are delivered,FI_LFA1_LZONE,ZONE,SAP,Auto-linked via description
+field_alias,Service agent procedure group,FI_LFA1_DLGRP,DLGRP,SAP,Auto-linked via description
+field_alias,Tax Type,FI_LFA1_FITYP,J_1AFITP,SAP,Auto-linked via description
+field_alias,Registered for Social Insurance,FI_LFA1_REGSS,XFELD,SAP,Auto-linked via description
+field_alias,Activity Code for Social Insurance,FI_LFA1_ACTSS,J_1AACTSS,SAP,Auto-linked via description
+field_alias,Tax Split,FI_LFA1_IPISP,XFELD,SAP,Auto-linked via description
+field_alias,Profession,FI_LFA1_PROFS,TEXT30,SAP,Auto-linked via description
+field_alias,"Shipment: statistics group, transportation service agent",FI_LFA1_STGDL,STGDL,SAP,Auto-linked via description
+field_alias,Uniform resource locator,FI_LFA1_LFURL,TEXT132,SAP,Auto-linked via description
+field_alias,Name of Representative,FI_LFA1_J_1KFREPRE,REPRES,SAP,Auto-linked via description
+field_alias,Type of Industry,FI_LFA1_J_1KFTIND,INDTYP,SAP,Auto-linked via description
+field_alias,Status of Change Authorization (Central),FI_LFA1_CONFS,CHAR1,SAP,Auto-linked via description
+field_alias,Date on Which the Changes Were Confirmed,FI_LFA1_UPDAT,DATUM,SAP,Auto-linked via description
+field_alias,Time of Last Change Confirmation,FI_LFA1_UPTIM,AS4TIME,SAP,Auto-linked via description
+field_alias,Central deletion block for master record,FI_LFA1_NODEL,XFELD,SAP,Auto-linked via description
+field_alias,Validity Date of Certification,FI_LFA1_QSSYSDAT,QQSSYSDAT,SAP,Auto-linked via description
+field_alias,Supplier indicator relevant for proof of delivery,FI_LFA1_PODKZB,PODKZB,SAP,Auto-linked via description
+field_alias,Carrier confirmation is expected,FI_LFA1_CARRIER_CONF,/SPE/CARRIER_CONF,SAP,Auto-linked via description
+field_alias,Micro company indicator,FI_LFA1_MIN_COMP,XFELD,SAP,Auto-linked via description
+field_alias,Terms of Liability,FI_LFA1_TERM_LI,XFELD,SAP,Auto-linked via description
+field_alias,CRC number,FI_LFA1_CRC_NUM,CHAR25,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,FI_LFA1_CVP_XBLCK,CVP_XBLCK,SAP,Auto-linked via description
+field_alias,Acceptance At Origin,FI_LFA1_WEORA,XFELD,SAP,Auto-linked via description
+field_alias,RG Number,FI_LFA1_RG,J_1BRG,SAP,Auto-linked via description
+field_alias,Issued by,FI_LFA1_EXP,J_1BEXP,SAP,Auto-linked via description
+field_alias,RG Issuing Date,FI_LFA1_RGDATE,DATUM,SAP,Auto-linked via description
+field_alias,RIC Number,FI_LFA1_RIC,J_1BRIC,SAP,Auto-linked via description
+field_alias,Foreign National Registration,FI_LFA1_RNE,J_1BRNE,SAP,Auto-linked via description
+field_alias,RNE Issuing Date,FI_LFA1_RNEDATE,DATUM,SAP,Auto-linked via description
+field_alias,CNAE,FI_LFA1_CNAE,J_1BCNAE,SAP,Auto-linked via description
+field_alias,Legal Nature,FI_LFA1_LEGALNAT,J_1BLEGALNAT,SAP,Auto-linked via description
+field_alias,ICMS Taxpayer,FI_LFA1_ICMSTAXPAY,J_1BICMSTAXPAY,SAP,Auto-linked via description
+field_alias,Industry Main Type,FI_LFA1_INDTYP,J_1BINDTYP,SAP,Auto-linked via description
+field_alias,Tax Declaration Type,FI_LFA1_TDT,J_1BTDT,SAP,Auto-linked via description
+field_alias,Company Size,FI_LFA1_COMSIZE,J_1BCOMSIZE,SAP,Auto-linked via description
+field_alias,Declaration Regimen for PIS/COFINS,FI_LFA1_DECREGPC,J_1BDECREGPC,SAP,Auto-linked via description
+field_alias,Payment Reason,FI_LFA1_PAYTRSN,FARP_PAYT_RSN,SAP,Auto-linked via description
+field_alias,Dataelement Exstensibility for Supplier,FI_LFA1_LFA1_EEW_SUPP,LFA1_EEW_SUPP,SAP,Auto-linked via description
+field_alias,Payment Office,FI_LFA1_PMT_OFFICE,FMFG_PMT_OFF,SAP,Auto-linked via description
+field_alias,Vendor is PPA relevant,FI_LFA1_PPA_RELEVANT,XFELD,SAP,Auto-linked via description
+field_alias,System for Award Management Electronic Funds Transfer Ind,FI_LFA1_SAM_EFT_IND,data,SAP,Auto-linked via description
+field_alias,Processor group,FI_LFA1_PSOFG,PSOFG,SAP,Auto-linked via description
+field_alias,Subledger acct preprocessing procedure,FI_LFA1_PSOIS,CHAR20,SAP,Auto-linked via description
+field_alias,Name 1,FI_LFA1_PSON1,NAME,SAP,Auto-linked via description
+field_alias,Name 2,FI_LFA1_PSON2,NAME,SAP,Auto-linked via description
+field_alias,Name 3,FI_LFA1_PSON3,NAME,SAP,Auto-linked via description
+field_alias,Annual Repetition of Date Limit,FI_LFA1_BORGR_YEAUN,XFELD,SAP,Auto-linked via description
+field_alias,Is payer making payment in course of carrying on enterprise,FI_LFA1_AU_CARRYING_ENT,BOOLEAN,SAP,Auto-linked via description
+field_alias,Is an individual under 18 and payment does not exceed $350,FI_LFA1_AU_IND_UNDER_18,BOOLEAN,SAP,Auto-linked via description
+field_alias,"The payment does not exceed $75, excl. GST",FI_LFA1_AU_PAYMENT_NOT_EXCEED_75,BOOLEAN,SAP,Auto-linked via description
+field_alias,The supply that the payment relates to is wholly input taxed,FI_LFA1_AU_WHOLLY_INP_TAXED,BOOLEAN,SAP,Auto-linked via description
+field_alias,The supply is made by an individual without gain,FI_LFA1_AU_PARTNER_WITHOUT_GAIN,BOOLEAN,SAP,Auto-linked via description
+field_alias,The supplier is not entitled to an ABN,FI_LFA1_AU_NOT_ENTITLED_ABN,BOOLEAN,SAP,Auto-linked via description
+field_alias,The whole of the payment is exempt income.,FI_LFA1_AU_PAYMENT_EXEMPT,BOOLEAN,SAP,Auto-linked via description
+field_alias,An activity done as a private recreational pursuit,FI_LFA1_AU_PRIVATE_HOBBY,BOOLEAN,SAP,Auto-linked via description
+field_alias,wholly of a private or domestic nature,FI_LFA1_AU_DOMESTIC_NATURE,BOOLEAN,SAP,Auto-linked via description
+field_alias,House Number,FI_LFA1_ADDR2_HOUSE_NUM,TEXT10,SAP,Auto-linked via description
+field_alias,Verification Number,FI_LFA1_VFNUM,CHAR20,SAP,Auto-linked via description
+field_alias,Organisation Occupation,FI_LFA1_FR_OCCUPATION,data,SAP,Auto-linked via description
+field_alias,ECC Number,FI_LFA1_J_1IEXCD,CHAR40,SAP,Auto-linked via description
+field_alias,Excise Range,FI_LFA1_J_1IEXRG,CHAR60,SAP,Auto-linked via description
+field_alias,Excise Division,FI_LFA1_J_1IEXDI,CHAR60,SAP,Auto-linked via description
+field_alias,Excise Commissionerate,FI_LFA1_J_1IEXCO,CHAR60,SAP,Auto-linked via description
+field_alias,Excise tax indicator for vendor,FI_LFA1_J_1IEXCIVE,J_1IINDTAX,SAP,Auto-linked via description
+field_alias,SSI Status,FI_LFA1_J_1ISSIST,J_1ISSIST,SAP,Auto-linked via description
+field_alias,CENVAT Scheme Participant,FI_LFA1_J_1IVENCRE,XFELD,SAP,Auto-linked via description
+field_alias,Customs Vendor,FI_LFA1_J_1I_CUSTOMS,FLAG,SAP,Auto-linked via description
+field_alias,Vendor is public entity?,FI_LFA1_ENTPUB,XFELD,SAP,Auto-linked via description
+field_alias,Deed of public use,FI_LFA1_ESCRIT,CHAR80K,SAP,Auto-linked via description
+field_alias,Social Security certificate validity date,FI_LFA1_DVALSS,DATS,SAP,Auto-linked via description
+field_alias,Social Security certificate submission form,FI_LFA1_FRMCSS,BU_TEXT50,SAP,Auto-linked via description
+field_alias,CAE code,FI_LFA1_CODCAE,PFM_12CODCAE,SAP,Auto-linked via description
+field_alias,Absence of debt,FI_LFA1_AUSDIV,XFELD,SAP,Auto-linked via description
+field_alias,Staging Time in Days,FI_LFA1_STAGING_TIME,WRF_PSCD_MST,SAP,Auto-linked via description
+field_alias,Scheduling Procedure,FI_LFA1_SCHEDULING_TYPE,WRF_PSCD_SCHED_TYPE,SAP,Auto-linked via description
+field_alias,Cross Docking: Relevant for Collective Numbering,FI_LFA1_SUBMI_RELEVANT,XFELD,SAP,Auto-linked via description
+field_alias,Authorization Group,FI_LFB1_BEGRU,BRGRU,SAP,Auto-linked via description
+field_alias,Interest Indicator,FI_LFB1_VZSKZ,VZSKZ,SAP,Auto-linked via description
+field_alias,Indicator: Clearing between customer and vendor?,FI_LFB1_XVERR,XFELD,SAP,Auto-linked via description
+field_alias,Clerk at vendor,FI_LFB1_ZSABE,TEXT15,SAP,Auto-linked via description
+field_alias,Memo,FI_LFB1_KVERM,TEXT30,SAP,Auto-linked via description
+field_alias,Planning Group,FI_LFB1_FDGRV,FDGRP,SAP,Auto-linked via description
+field_alias,Accounting Clerk Abbreviation,FI_LFB1_BUSAB,BUSAB,SAP,Auto-linked via description
+field_alias,Interest Calculation Frequency in Months,FI_LFB1_ZINRT,ZINRT,SAP,Auto-linked via description
+field_alias,Date of Last Interest Calculation Run,FI_LFB1_DATLZ,DATUM,SAP,Auto-linked via description
+field_alias,Indicator: Local Processing?,FI_LFB1_XDEZV,XFELD,SAP,Auto-linked via description
+field_alias,Bill of Exchange Limit (in Local Currency),FI_LFB1_WEBTR,WERT7,SAP,Auto-linked via description
+field_alias,Probable Time Until Check Is Paid,FI_LFB1_KULTG,PACK2,SAP,Auto-linked via description
+field_alias,Check Flag for Double Invoices or Credit Memos,FI_LFB1_REPRF,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Pay All Items Separately?,FI_LFB1_XPORE,XFELD,SAP,Auto-linked via description
+field_alias,(Obsolete) Subsidy Ind. for Determining the Reduction Rate,FI_LFB1_BLNKZ,BLNKZ,SAP,Auto-linked via description
+field_alias,Minority Indicator,FI_LFB1_MINDK,MINDK,SAP,Auto-linked via description
+field_alias,Previous Master Record Number,FI_LFB1_ALTKN,CHAR10,SAP,Auto-linked via description
+field_alias,Indicator: Send Payment Advices by EDI,FI_LFB1_XEDIP,XFELD,SAP,Auto-linked via description
+field_alias,Release Approval Group,FI_LFB1_FRGRP,FRGRP,SAP,Auto-linked via description
+field_alias,Tolerance Group in Invoice Verification,FI_LFB1_TOGRR,TOGRR,SAP,Auto-linked via description
+field_alias,Internet address of partner company clerk,FI_LFB1_INTAD,TXT130,SAP,Auto-linked via description
+field_alias,Indicator for Periodic Account Statements,FI_LFB1_XAUSZ,AUSZG,SAP,Auto-linked via description
+field_alias,Certification Date,FI_LFB1_CERDT,DATUM,SAP,Auto-linked via description
+field_alias,Date on Which the Changes Were Confirmed,FI_LFB1_UPDAT,DATUM,SAP,Auto-linked via description
+field_alias,Time of Last Change Confirmation,FI_LFB1_UPTIM,AS4TIME,SAP,Auto-linked via description
+field_alias,Indicator: Send Payment Advice by XML,FI_LFB1_AVSND,AVSND,SAP,Auto-linked via description
+field_alias,Business Purpose Completed Flag,FI_LFB1_CVP_XBLCK_B,CVP_XBLCK,SAP,Auto-linked via description
+field_alias,Main economic activity,FI_LFB1_CIIUCODE,CIIUCODE,SAP,Auto-linked via description
+field_alias,Payment Reason,FI_LFB1_PAYTRSN,FARP_PAYT_RSN,SAP,Auto-linked via description
+field_alias,Certification date for minimum wage,FI_LFB1_ZMINDAT,DATS,SAP,Auto-linked via description
+field_alias,Subcontractor Type,FI_LFB1_J_SC_SUBCONTYPE,/SAPNEA/J_SC_SUBCONTYPE,SAP,Auto-linked via description
+field_alias,Offset Method,FI_LFB1_J_SC_OFFSM,/SAPNEA/J_SC_OFFSM,SAP,Auto-linked via description
+field_alias,Offset Percentage,FI_LFB1_J_SC_OFFSR,/SAPNEA/J_SC_OFFSR,SAP,Auto-linked via description
+field_alias,Average daily basis points for purchase cards,FI_LFB1_BASIS_PNT,FMBASIS_POINTS,SAP,Auto-linked via description
+field_alias,Vendor is in execution,FI_LFB1_GMVKZK,XFELD,SAP,Auto-linked via description
+field_alias,Foreign Shareholder,FI_LFB1_FORGN,SAP_BOOL,SAP,Auto-linked via description
+field_alias,Share in Dividend Paying Company,FI_LFB1_SHARE_IN_FOREIGN,data,SAP,Auto-linked via description
+field_alias,US Recipient GIIN,FI_LFB1_US_GIIN,data,SAP,Auto-linked via description
+field_alias,LOB Treaty Code,FI_LFB1_US_LOB_CODE,data,SAP,Auto-linked via description
+field_alias,US W8 Form Received Date,FI_LFB1_US_W8_RECVDATE,DATUM,SAP,Auto-linked via description
+field_alias,US W8 Form Received Date,FI_LFB1_US_W9_RECVDATE,DATUM,SAP,Auto-linked via description
+field_alias,Second TIN Notice from IRS,FI_LFB1_US_TIN_NOTICE,BOOLEAN,SAP,Auto-linked via description
+field_alias,Partnership Interest Indicator,FI_LFB1_US_PARTNERSHIP_IND,BOOLEAN,SAP,Auto-linked via description
+field_alias,US FATCA Indicator,FI_LFB1_US_FATCA_IND,BOOLEAN,SAP,Auto-linked via description
+field_alias,Prepayment Relevance (Supplier Master),FI_LFB1_PREPAY_RELEVANT,WRF_PREPAY_RELEVANT,SAP,Auto-linked via description
+field_alias,Assignment Test Group,FI_LFB1_ASSIGN_TEST,WRF_MRM_ASSIGN_GROUP,SAP,Auto-linked via description
+field_alias,Indicator: Is there collection authorization ?,nan_LFBK_XEZER,XFELD,SAP,Auto-linked via description
+field_alias,BP: Bank Account Alias GUID,nan_LFBK_BANK_GUID,SYSUUID,SAP,Auto-linked via description
+field_alias,Status of Bank Details in Biller Direct,nan_LFBK_EBPP_BVSTATUS,EBPP_BVSTATUS,SAP,Auto-linked via description
+field_alias,Sort Term for Non-Stock Info Records,nan_EINA_SORTL,CHAR10,SAP,Auto-linked via description
+field_alias,Salesperson Responsible in the Event of Queries,nan_EINA_VERKF,TEXT30,SAP,Auto-linked via description
+field_alias,Certificate of Origin Valid Until,nan_EINA_URZDT,DATUM,SAP,Auto-linked via description
+field_alias,Certificate Category,nan_EINA_URZTP,URZTP,SAP,Auto-linked via description
+field_alias,Supplier Subrange,nan_EINA_LTSNR,LTSNR,SAP,Auto-linked via description
+field_alias,Sort Sequence Number,nan_EINA_LTSSF,NUMC5,SAP,Auto-linked via description
+field_alias,Available (Deliverable) From,nan_EINA_LIFAB,DATUM,SAP,Auto-linked via description
+field_alias,Available (Deliverable) Until,nan_EINA_LIFBI,DATUM,SAP,Auto-linked via description
+field_alias,Prior Supplier,nan_EINA_KOLIF,LIFNR,SAP,Auto-linked via description
+field_alias,Number of Points,nan_EINA_ANZPU,MENG13,SAP,Auto-linked via description
+field_alias,Points Unit,nan_EINA_PUNEI,MEINS,SAP,Auto-linked via description
+field_alias,Regular Supplier,nan_EINA_RELIF,XFELD,SAP,Auto-linked via description
+field_alias,Data element for Inforecords extensibility,nan_EINA_DUMMY_EINA_INCL_EEW_PS,EINA_INCL_EEW,SAP,Auto-linked via description
+field_alias,Indicator: Quantity-Based Volume Rebate,nan_EINE_MGBON,XFELD,SAP,Auto-linked via description
+field_alias,Rejection Indicator,nan_EINE_ABSKZ,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Amortization reset,nan_EINE_AMORS,XFELD,SAP,Auto-linked via description
+field_alias,Material Master Record PO Text Not Relevant,nan_EINE_MTXNO,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: GR-Based Invoice Verification,nan_EINE_WEBRE,XFELD,SAP,Auto-linked via description
+field_alias,Item Does Not Qualify for Cash Discount,nan_EINE_SKTOF,XFELD,SAP,Auto-linked via description
+field_alias,Order Acknowledgment Requirement,nan_EINE_KZABS,XFELD,SAP,Auto-linked via description
+field_alias,Tax Reporting Country/Region,nan_EINE_TAX_COUNTRY,LAND1,SAP,Auto-linked via description
+field_alias,Shipping Instructions,nan_EINE_EVERS,EVERS,SAP,Auto-linked via description
+field_alias,Procedure,nan_EINE_EXPRF,EXPRF,SAP,Auto-linked via description
+field_alias,Rounding Profile,nan_EINE_RDPRF,RDPRF,SAP,Auto-linked via description
+field_alias,Brazilian NCM Code,nan_EINE_J_1BNBM,STEUC,SAP,Auto-linked via description
+field_alias,Real-Time Consumption Posting of Subcontracting Components,nan_EINE_CO_ORDER,XFELD,SAP,Auto-linked via description
+field_alias,Differential Invoicing,nan_EINE_DIFF_INVOICE,DIFF_INVOICE,SAP,Auto-linked via description
+field_alias,Incoterms Version,nan_EINE_INCOV,INCOV,SAP,Auto-linked via description
+field_alias,Relevant for Automatic Sourcing,nan_EINE_AUT_SOURCE,AUT_SOURCE,SAP,Auto-linked via description
+field_alias,EINE_INCL_EEW,nan_EINE_DUMMY_EINE_INCL_EEW_PS,EINE_INCL_EEW,SAP,Auto-linked via description
+field_alias,Delivery Completion Indicator Correlation,nan_EINE_FSH_DCI_CORR,XFELD,SAP,Auto-linked via description
+field_alias,Stock Segment Relevant Indicator,nan_EINE_SGT_SSREL,SGT_YNSI,SAP,Auto-linked via description
+field_alias,Staging Time in Days,nan_EINE_STAGING_TIME,WRF_PSCD_MST,SAP,Auto-linked via description
+field_alias,Allocation Indicator,nan_T001_KOKFI,KOKFI,SAP,Auto-linked via description
+field_alias,Financial Management Area,nan_T001_FIKRS,FIKRS,SAP,Auto-linked via description
+field_alias,Indicator: Cash Budget Management Active,nan_T001_XFMCB,XFELD,SAP,Auto-linked via description
+field_alias,Activate Update in Funds Management,nan_T001_XFMCA,XFELD,SAP,Auto-linked via description
+field_alias,Transit Plant,nan_T001_TRANSIT_PLANT,WERKS,SAP,Auto-linked via description
+field_alias,Indicator: Cash Management Activated?,nan_T001_XFDIS,XFELD,SAP,Auto-linked via description
+field_alias,Credit Control Area,nan_T001_KKBER,KKBER,SAP,Auto-linked via description
+field_alias,Rules for Copying from the Sample Account for G/L Accounts,nan_T001_MREGL,MREGL,SAP,Auto-linked via description
+field_alias,Indicator: Business Area Financial Statements Required?,nan_T001_XGSBE,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: JVA Active,nan_T001_XJVAA,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Financial Assets Management Active,nan_T001_XVVWA,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Updating MM in Cash Mgmt/Forecast Activated?,nan_T001_XFDMM,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Updating SD in Cash Mgmt/Forecast Activated?,nan_T001_XFDSD,XFELD,SAP,Auto-linked via description
+field_alias,Field Status Variant,nan_T001_FSTVA,FSTVA,SAP,Auto-linked via description
+field_alias,Indicator: hedge request active,nan_T001_XCOVR,XFELD,SAP,Auto-linked via description
+field_alias,Foreign Currency Translation for Tax Items,nan_T001_TXKRS,TXKRS,SAP,Auto-linked via description
+field_alias,Workflow Variant,nan_T001_WFVAR,WFVAR,SAP,Auto-linked via description
+field_alias,G/L account authorization check in inventory management,nan_T001_XBBBF,XFELD,SAP,Auto-linked via description
+field_alias,G/L account authorization check in PO/scheduling agreement,nan_T001_XBBBE,XFELD,SAP,Auto-linked via description
+field_alias,G/L account authorization check in purchase requisitions,nan_T001_XBBBA,XFELD,SAP,Auto-linked via description
+field_alias,G/L account authorization check in contracts,nan_T001_XBBKO,XFELD,SAP,Auto-linked via description
+field_alias,Foreign Trade: Import Data Control in MM Purchase Orders,nan_T001_IMPDA,IMPDATEN,SAP,Auto-linked via description
+field_alias,Indicator: Negative Postings Permitted,nan_T001_XNEGP,XFELD,SAP,Auto-linked via description
+field_alias,Indicator: Can Credit Control Area Be Overwritten?,nan_T001_XKKBI,XFELD,SAP,Auto-linked via description
+field_alias,Inflation Method,nan_T001_INFMT,J_1AINFMET,SAP,Auto-linked via description
+field_alias,Foreign trade: Import data copying control for GR,nan_T001_KOPIM,KOPIM,SAP,Auto-linked via description
+field_alias,Foreign Trade: Screen ctrl of imp.data f. MM-goods rececipt,nan_T001_DKWEG,DKWEG,SAP,Auto-linked via description
+field_alias,Method for Offsetting Account Determination,nan_T001_OFFSACCT,GPACCT,SAP,Auto-linked via description
+field_alias,Additional settings variant for bus.area financial statemnts,nan_T001_BAPOVAR,BAPOVAR,SAP,Auto-linked via description
+field_alias,Cost of Sales Accounting Status,nan_T001_XCOS,XCOS,SAP,Auto-linked via description
+field_alias,Accounts Receivable Pledging Active,nan_T001_XCESSION,XFELD,SAP,Auto-linked via description
+field_alias,Surcharge Calculation Method,nan_T001_SURCCM,J_1ISURC,SAP,Auto-linked via description
+field_alias,Deferred Tax Rule,nan_T001_DTAXR,DTAXR,SAP,Auto-linked via description
+field_alias,Tax Reporting Date Active in Documents,nan_T001_XVATDATE,XFELD,SAP,Auto-linked via description
+field_alias,G/L account authorization check in shopping cart,nan_T001_XBBSC,XFELD,SAP,Auto-linked via description
+field_alias,Activate Account Assignment Derivation in Funds Management,nan_T001_FM_DERIVE_ACC,XFELD,SAP,Auto-linked via description
+field_alias,Time of Entry,FI_BKPF_CPUTM,UZEIT,SAP,Auto-linked via description
+field_alias,Translation Date,FI_BKPF_WWERT,DATUM,SAP,Auto-linked via description
+field_alias,Transaction Code,FI_BKPF_TCODE,TCODE,SAP,Auto-linked via description
+field_alias,Document Header Text,FI_BKPF_BKTXT,TEXT25,SAP,Auto-linked via description
+field_alias,Indicator: Document posted net ?,FI_BKPF_XNETB,XFELD,SAP,Auto-linked via description
+field_alias,Unplanned delivery costs,FI_BKPF_FRATH,WERT7,SAP,Auto-linked via description
+field_alias,Business Transaction,FI_BKPF_GLVOR,CHAR4,SAP,Auto-linked via description
+field_alias,Batch Input Session Name,FI_BKPF_GRPID,CHAR12,SAP,Auto-linked via description
+field_alias,Document Name in the Archive System,FI_BKPF_DOKID,CHAR40,SAP,Auto-linked via description
+field_alias,Financial Management Area,FI_BKPF_FIKRS,FIKRS,SAP,Auto-linked via description
+field_alias,Local Currency,FI_BKPF_HWAER,WAERS,SAP,Auto-linked via description
