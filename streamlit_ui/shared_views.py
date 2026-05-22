@@ -13,6 +13,36 @@ STATUS_STYLES = {
     "pending": ("Pending", "#475569", "#e2e8f0"),
 }
 
+DECISION_STATUS_BADGES = {
+    "accepted": ("Accepted", "#065f46", "#d1fae5"),
+    "needs_review": ("Needs Review", "#92400e", "#fef3c7"),
+    "rejected": ("Rejected", "#991b1b", "#fee2e2"),
+    "llm_proposal": ("LLM Proposal", "#1e3a8a", "#dbeafe"),
+}
+
+ONBOARDING_HINTS = {
+    "Workspace": (
+        "Workspace flow",
+        "Run Setup -> Review -> Decisions -> Output in sequence. Preview stays advisory, while code generation remains governance-gated.",
+    ),
+    "Governance": (
+        "Governance flow",
+        "Canonical and Knowledge registries are steward surfaces. Overlay actions are reversible, but glossary promotion is durable and audited.",
+    ),
+    "Catalog": (
+        "Catalog flow",
+        "Use Catalog after decisions are reviewed to search reusable mapping sets and inspect reuse-fit explanations.",
+    ),
+    "Benchmarks": (
+        "Benchmark flow",
+        "Benchmarks measure mapping quality and drift. Treat them as quality telemetry, not as the decision authoring surface.",
+    ),
+    "System": (
+        "System flow",
+        "System tab is for runtime observability and debug traces. Keep analyst decision work in Workspace and Governance.",
+    ),
+}
+
 
 def status_banner(level: str, message: str) -> None:
     """Render a Streamlit status banner using the requested severity level."""
@@ -65,6 +95,85 @@ def render_step_status() -> None:
                 """,
                 unsafe_allow_html=True,
             )
+
+
+def render_status_badge_legend(*, title: str = "Decision Status Legend", compact: bool = False) -> None:
+    """Render one consistent status-badge legend for review/governance surfaces."""
+
+    padding = "3px 8px" if compact else "4px 10px"
+    font_size = "11px" if compact else "12px"
+    badges: list[str] = []
+    for _status, (label, text_color, background) in DECISION_STATUS_BADGES.items():
+        badges.append(
+            (
+                f"<span style='display:inline-block;padding:{padding};border-radius:999px;"
+                f"background:{background};color:{text_color};font-size:{font_size};font-weight:700;margin-right:6px;margin-bottom:6px;'>"
+                f"{label}</span>"
+            )
+        )
+    st.caption(title)
+    st.markdown("".join(badges), unsafe_allow_html=True)
+
+
+def render_operation_strip(*, compact: bool = False) -> None:
+    """Render a compact operational KPI strip for the current session."""
+
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    active_decisions = 0
+    open_reviews = 0
+    for entry in editor_state.values():
+        target = str(entry.get("target") or "").strip()
+        status = str(entry.get("status") or "needs_review").strip().lower() or "needs_review"
+        if target and status != "rejected":
+            active_decisions += 1
+        if status != "accepted" or not target:
+            open_reviews += 1
+
+    pending_llm_proposals = len(st.session_state.get("llm_decision_proposals") or [])
+    canonical_concepts = len(st.session_state.get("debug_canonical_concepts") or [])
+    knowledge_concepts = len(st.session_state.get("debug_knowledge_concepts") or [])
+
+    if compact:
+        st.caption("Operations")
+        grid_row_1 = st.columns(2)
+        grid_row_2 = st.columns(2)
+        grid_row_3 = st.columns(2)
+        grid_row_1[0].metric("Active decisions", active_decisions)
+        grid_row_1[1].metric("Open review items", open_reviews)
+        grid_row_2[0].metric("Pending LLM proposals", pending_llm_proposals)
+        grid_row_2[1].metric("Canonical concepts", canonical_concepts)
+        grid_row_3[0].metric("Knowledge concepts", knowledge_concepts)
+        grid_row_3[1].metric("Session", "Live")
+        return
+
+    operation_columns = st.columns(5)
+    operation_columns[0].metric("Active decisions", active_decisions)
+    operation_columns[1].metric("Open review items", open_reviews)
+    operation_columns[2].metric("Pending LLM proposals", pending_llm_proposals)
+    operation_columns[3].metric("Canonical concepts", canonical_concepts)
+    operation_columns[4].metric("Knowledge concepts", knowledge_concepts)
+
+
+def render_onboarding_hint(area: str) -> None:
+    """Render a dismissible onboarding hint for one top-level area."""
+
+    hint = ONBOARDING_HINTS.get(area)
+    if hint is None:
+        return
+
+    dismissed = st.session_state.setdefault("dismissed_onboarding_hints", {})
+    if dismissed.get(area):
+        return
+
+    hint_title, hint_body = hint
+    hint_columns = st.columns([10, 2])
+    with hint_columns[0]:
+        st.info(f"{hint_title}: {hint_body}")
+    with hint_columns[1]:
+        if st.button("Dismiss", key=f"dismiss_onboarding_{area}", width="stretch"):
+            dismissed[area] = True
+            st.session_state["dismissed_onboarding_hints"] = dismissed
+            st.rerun()
 
 
 def render_llm_runtime_status() -> None:

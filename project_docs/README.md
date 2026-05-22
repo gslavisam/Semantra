@@ -2,7 +2,7 @@
 
 Ovaj folder drži mali skup projektnih dokumenata sa jasnim ulogama. Cilj je da stanje proizvoda, istorija isporuke, sledeći prioriteti i izvršne checkliste budu pregledni bez međusobnog preklapanja.
 
-Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-18.
+Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-22.
 
 ## Preporučeni red čitanja
 
@@ -21,6 +21,7 @@ Ovaj set je usklađen sa trenutnim stanjem proizvoda zaključno sa 2026-05-18.
 
 - `current_state.md`
 	- primarni kontrolni dokument za današnje stanje proizvoda
+	- uključuje i trenutnu granicu session continuity ponašanja i otvoreni resume-by-design fokus
 - `completed_slices.md`
 	- istorijski ledger; ovde ide ono što je završeno
 - `plan.md`

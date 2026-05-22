@@ -180,6 +180,118 @@ def test_review_plan_cluster_rows_flattens_cluster_examples() -> None:
     ]
 
 
+def test_build_llm_decision_proposal_creates_safe_accept_current_proposal() -> None:
+    proposal = workspace_review_views._build_llm_decision_proposal(
+        {
+            "source": "annual_spend_usd",
+            "target": "annual_revenue_usd",
+            "status": "needs_review",
+            "signals": {"knowledge": 0.4, "canonical": 0.0},
+            "explanation": ["Context prior: finance glossary supports this mapping."],
+            "llm_recommendation": {"confidence": 0.91, "reasoning": ["Business semantics align."]},
+            "llm_decision_proposition": {
+                "proposition_type": "confirm",
+                "summary": "LLM supports the current target.",
+            },
+        },
+        {"target": "annual_revenue_usd", "status": "needs_review"},
+    )
+
+    assert proposal == {
+        "source": "annual_spend_usd",
+        "current_target": "annual_revenue_usd",
+        "current_status": "needs_review",
+        "proposal_type": "accept_current",
+        "proposed_target": "annual_revenue_usd",
+        "proposed_status": "accepted",
+        "summary": "LLM supports the current target.",
+        "confidence": 0.91,
+        "reasoning": ["Business semantics align."],
+        "origin": "mapping_validation",
+        "knowledge_supported": True,
+        "canonical_supported": False,
+        "safe_to_apply": True,
+        "safe_reason": "Eligible for safe apply.",
+    }
+
+
+def test_build_llm_decision_proposal_marks_unsupported_switch_as_not_safe() -> None:
+    proposal = workspace_review_views._build_llm_decision_proposal(
+        {
+            "source": "op_type",
+            "target": "operation_label",
+            "status": "needs_review",
+            "signals": {"knowledge": 0.0, "canonical": 0.0},
+            "explanation": [],
+            "llm_recommendation": {"confidence": 0.9, "reasoning": ["Another candidate is semantically closer."]},
+            "llm_decision_proposition": {
+                "proposition_type": "challenge",
+                "proposed_target": "operation_type_code",
+                "summary": "LLM prefers operation_type_code.",
+            },
+        },
+        {"target": "operation_label", "status": "needs_review"},
+    )
+
+    assert proposal is not None
+    assert proposal["proposal_type"] == "switch_target"
+    assert proposal["proposed_target"] == "operation_type_code"
+    assert proposal["safe_to_apply"] is False
+    assert proposal["safe_reason"] == "Switch proposals need knowledge or canonical support for batch-safe apply."
+
+
+def test_llm_decision_proposals_for_filtered_rows_can_use_live_fill() -> None:
+    calls: list[tuple[str, list[str]]] = []
+
+    def _fake_refine(source: str, *, candidate_targets: list[str], **_: object) -> dict:
+        calls.append((source, list(candidate_targets)))
+        return {
+            "selected": {
+                "target": "operation_type_code",
+                "llm_recommendation": {
+                    "confidence": 0.92,
+                    "reasoning": ["Target naming and semantics are closer."],
+                },
+                "llm_decision_proposition": {
+                    "summary": "Refine favors operation_type_code.",
+                },
+            }
+        }
+
+    proposals = workspace_review_views._llm_decision_proposals_for_filtered_rows(
+        [{"source": "op_type", "status": "needs_review"}],
+        {
+            "ranked_mappings": [
+                {
+                    "source": "op_type",
+                    "candidates": [
+                        {
+                            "target": "operation_label",
+                            "signals": {"knowledge": 0.4, "canonical": 0.0},
+                            "explanation": ["Context prior: operation taxonomy context."],
+                        },
+                        {
+                            "target": "operation_type_code",
+                            "signals": {"knowledge": 0.5, "canonical": 0.0},
+                            "explanation": ["Context prior: operation taxonomy context."],
+                        },
+                    ],
+                }
+            ],
+            "mappings": [{"source": "op_type", "target": "operation_label"}],
+        },
+        {"op_type": {"target": "operation_label", "status": "needs_review"}},
+        include_live_llm_fill=True,
+        request_llm_mapping_refinement=_fake_refine,
+        llm_runtime_available=True,
+    )
+
+    assert calls == [("op_type", ["operation_label", "operation_type_code"])]
+    assert len(proposals) == 1
+    assert proposals[0]["proposal_type"] == "switch_target"
+    assert proposals[0]["proposed_target"] == "operation_type_code"
+
+
 def test_canonical_gap_triage_payload_preserves_candidates_and_states() -> None:
     payload = workspace_review_views._canonical_gap_triage_payload(
         [{"source": "ALT_KUNNR"}],

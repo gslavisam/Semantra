@@ -7,20 +7,25 @@ This document is a practical guide to the current Semantra Streamlit product sur
 Semantra currently has five top-level areas:
 
 - `Workspace`
-- `Canonical Console`
 - `Catalog`
 - `Benchmarks`
 - `System`
+- `Governance`
 
 Recommended order for a new session:
 
 1. start in `Workspace`
-2. move to `Canonical Console` only if you need canonical governance or overlay work
+2. move to `Governance` (`Canonical Console`) only if you need canonical governance or overlay work
 3. use `Catalog` when you want reuse or discovery
 4. use `Benchmarks` when you want repeatable quality measurement
 5. use `System` for runtime, observability, and support tasks
 
 ## Sidebar controls
+
+The sidebar now also includes a compact operational panel:
+
+- an `Operations` KPI grid (`Active decisions`, `Open review items`, `Pending LLM proposals`, `Canonical concepts`, `Knowledge concepts`)
+- a `Unified Status Legend` (accepted, needs_review, rejected, llm_proposal)
 
 ### `API Base URL`
 
@@ -80,6 +85,10 @@ Use `Review` to inspect:
 - per-row `LLM refine` inputs with meaning, negative guidance, sample values, and a refinement instruction
 - batch low-confidence LLM refinement for the current review set
 - accept/revert handling for LLM-refined row proposals
+- an `LLM Decision Proposals` panel for `needs_review` rows
+	- it can materialize proposals from existing LLM traces
+	- optionally, it can run live bounded LLM fill for rows without cached propositions
+	- it does not change active decisions until apply actions are executed in `Decisions`
 - canonical path information
 - `Mapping Analysis Overview` for a technical summary of the current mapping state
 - optional narration and audio generation for the mapping analysis
@@ -104,6 +113,7 @@ Use `Decisions` for:
 - manual target adjustments
 - manual mapping in canonical mode through the virtual canonical target options
 - exporting or importing mapping decisions as JSON or Excel
+- apply/dismiss workflows for `LLM Decision Proposals` (`Apply selected` and `Apply safe`)
 - saving mapping-set versions
 - loading and applying previously saved mapping sets
 - correction history and reusable-learning flows
@@ -112,6 +122,8 @@ Important current rules:
 
 - mapping-set reuse back into Workspace works only for `approved` mapping sets
 - corrections become durable only after the review outcome is closed
+- `Active Decisions` now surfaces decision-origin metadata (`manual_mapping`, `llm_proposal`) when available
+- decision-origin audit metadata is now included in decision JSON export/import
 
 ### `Output`
 
@@ -142,13 +154,16 @@ If you are using transformations:
 - manually write your own code
 - only explicitly activated transformations are used by preview and code generation
 
-## Canonical Console
+## Governance
 
-`Canonical Console` is the main canonical governance area.
+`Governance` is the top-level area for canonical and knowledge governance.
+
+Its main panel is `Canonical Console`, which is the central canonical governance surface.
 
 Use it to:
 
 - browse the canonical concept registry
+- see canonical concept count metrics (`Filtered`, `Total`, `With active overlay`, `With context`) aligned with the Knowledge registry style
 - filter concepts by name, alias, source system, business domain, and focus
 - open concept detail with aliases, contexts, active overlay entries, usage, and audit references
 - inspect active overlay summary and overlay lifecycle state
@@ -245,11 +260,11 @@ Use it for:
 4. In `Review`, inspect the source -> canonical path and use per-row `LLM refine` when needed.
 5. In `Decisions`, you can manually map to canonical options.
 6. In `Output`, generate code without preview.
-7. If you find semantic gaps, continue the governance loop in `Canonical Console`.
+7. If you find semantic gaps, continue the governance loop in `Governance` (`Canonical Console`).
 
 ### Canonical governance workflow
 
-1. Open `Canonical Console`.
+1. Open `Governance`, then open `Canonical Console`.
 2. Refresh the registry, overlay state, and stewardship queue if needed.
 3. Open the concept detail or stewardship item you care about.
 4. Review status, audit context, and impact preview.
@@ -263,6 +278,8 @@ Use it for:
 - Durable artifact and execution-like surfaces are governed more strictly than preview.
 - The newer bounded AI panels across Review, Benchmarks, and Catalog are guidance layers only; they do not auto-apply durable changes.
 - If the UI state feels inconsistent after multiple experiments, `Reset flow` is often the fastest recovery path.
+- The onboarding `Dismiss` action only hides the hint for the current session and does not modify product data.
+- Closing the browser does not automatically restore the full Workspace state the next day; continue through a saved mapping set or imported decision checkpoint.
 
 For the detailed reference on signals, score formula, confidence thresholds, and bounded LLM cases, see `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 

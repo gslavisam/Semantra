@@ -123,6 +123,8 @@ Implemented today:
 - source-to-concept and concept-to-target review views
 - per-row LLM mapping refinement with transient meaning/negative/sample/refinement hints
 - batch low-confidence LLM refinement plus accept/revert handling for refined row proposals
+- opportunistic LLM decision proposal generation for `needs_review` rows
+- optional live bounded LLM fill for rows without cached LLM proposition traces
 - Mapping Analysis Overview with technical summary, recommended actions, and optional narration/audio
 - Review Queue Plan for the currently filtered review set
 - grouped review-attention summary for repeated unmatched or low-confidence patterns
@@ -142,6 +144,8 @@ Main anchors:
 Implemented today:
 
 - manual target adjustment in both standard and canonical workflows
+- explicit apply/dismiss flows for `LLM Decision Proposals`
+- safe batch apply mode for proposal subsets that pass conservative guardrails
 - decision export/import as JSON and Excel
 - reusable transformation templates and manual transformation editing
 - advisory preview over active mapping decisions
@@ -158,6 +162,8 @@ Important product contract:
 - standard-mode code generation and transformation test-set persistence/execution are governance-gated
 - canonical mode still supports Pandas/PySpark code generation and artifact refinement from current source-to-canonical decisions
 - refinement is guidance only until the user explicitly accepts the refined artifact
+- active decisions now surface decision-origin metadata (`manual_mapping`, `llm_proposal`) when available
+- decision JSON export/import now includes decision-origin audit metadata
 
 Detailed preview/codegen warning behavior and classification is documented in `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
 
@@ -239,6 +245,7 @@ Implemented today:
 
 - top-level console for canonical concept registry and governance
 - concept detail with aliases, contexts, active overlay entries, catalog usage, and audit references
+- canonical registry metrics (`Filtered`, `Total`, `With active overlay`, `With context`) aligned with the Knowledge registry style
 - active overlay summary and lifecycle actions
 - mirrored canonical-gap queue from Workspace review
 - stewardship item detail for `canonical_gap` and `overlay_promotion`
@@ -253,6 +260,30 @@ Main anchors:
 
 - `streamlit_ui/admin_views.py`
 - `backend/app/api/routes/knowledge.py`
+
+### 11. UI shell orientation and guided onboarding
+
+Implemented today:
+
+- compact sidebar operations strip with live workflow KPIs
+- unified status legend shared across Workspace and Governance surfaces
+- dismissible onboarding hints per top-level area for first-run discoverability
+
+Main anchors:
+
+- `streamlit_ui/shared_views.py`
+- `streamlit_app.py`
+
+### 12. Session continuity boundary today
+
+Current behavior:
+
+- browser session state is local UI state and is not automatically resumed across days
+- durable continuation is supported through explicit artifacts (saved mapping sets, exported/imported decision checkpoints)
+
+Open productization task:
+
+- design a deliberate draft/resume model (scope, conflict handling, and audit semantics) before introducing auto-resume behavior
 
 ### 9. Enterprise Integration Catalog
 

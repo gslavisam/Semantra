@@ -36,7 +36,19 @@ Fokus:
 - izbeći semantičko preklapanje između postojećeg trust layer-a i novih queue/explanation panela
 - zadržati pravilo da nijedna od ovih površina ne radi auto-apply ili auto-approval
 
-### 2. SAP-first knowledge expansion i canonical coverage wave
+### 2. Session continuity and resume-by-design (ne uvoditi na brzinu)
+
+Sledeći UX/produkt fokus koji treba osmisliti pažljivo pre implementacije je nastavak rada nakon zatvaranja browser-a ili narednog dana.
+
+Fokus:
+
+- definisati šta je tačno `draft session` jedinica (scope po workspace-u, korisniku i setu učitanih artefakata)
+- odvojiti automatski restore UI stanja od governance artefakata koji već postoje (`mapping set`, decision checkpoint export/import)
+- definisati konflikt pravila kada postoji više paralelnih checkpoint-a ili promene backend podataka
+- uključiti decision/audit semantiku u resume tok da poreklo odluka ostane jasno
+- ažurirati `README`, `help`, `PROJECT_OVERVIEW` i `project_docs` zajedno sa implementacijom da behavior bude transparentan
+
+### 3. SAP-first knowledge expansion i canonical coverage wave
 
 Posle poslednjih SAP mapping poboljšanja postalo je jasno da sledeći veliki kvalitetni dobitak više nije samo engine tuning, nego sistematsko širenje knowledge pokrivenosti i disciplinovano izvlačenje canonical gap-ova iz postojećih vendor specifikacija.
 
@@ -50,7 +62,7 @@ Fokus:
 
 Detaljniji radni okvir za ovaj talas je u `docs/vision/KNOWLEDGE_EXPANSION_WAVE.md`.
 
-### 3. Epic 13D: Concept and reuse discovery expansion
+### 4. Epic 13D: Concept and reuse discovery expansion
 
 Početni 13D discovery talas je zatvoren kroz concept-centric reuse pregled, viši discovery overview, reuse hint-ove i surfacing ponavljanih review gap-ova. Sada sledi širenje tog sloja.
 
@@ -61,7 +73,7 @@ Fokus:
 - povezivanje Catalog reuse discovery signala sa Workspace review i canonical gap radom
 - jači reuse narativ pre samog `Reuse in Workspace` koraka
 
-### 4. Operational hardening nad postojećim pilot površinama
+### 5. Operational hardening nad postojećim pilot površinama
 
 Ovo ostaje stalni paralelni fokus pre većeg feature širenja.
 
@@ -72,7 +84,7 @@ Fokus:
 - dalji governance enforcement tamo gde još postoje advisory ili implicitni prolazi
 - UX poliranje zasnovano na realnim pilot prolazima
 
-### 5. Persistence i runtime separation hardening
+### 6. Persistence i runtime separation hardening
 
 Prvi lokalni/pilot slice ovog fokusa je zatvoren. Sledeći rad ovde više nije osnovno razdvajanje, nego tek naredna faza kada se pojavi stvarna operativna potreba.
 
@@ -83,7 +95,7 @@ Fokus:
 - širiti DB-normalized read/write modele samo na nove governance/discovery surface-e koji pokažu realan query pressure, ne kao globalni persistence redesign
 - nastaviti postepeno odvajanje canonical authoring od runtime matching sloja tek kada bude potreban širi DB-only authoring model
 
-### 6. Epic 14A i 14B: performance i signal precomputation
+### 7. Epic 14A i 14B: performance i signal precomputation
 
 Kada reuse discovery i bounded guidance produktizacija budu stabilni, sledeći racionalan korak je ubrzanje i rasterećenje ranking toka.
 
@@ -93,7 +105,7 @@ Fokus:
 - stabilni precomputed signali
 - jasna granica između runtime scoring-a i keširanih slojeva
 
-### 7. Epic 12B: system-specific virtual targets
+### 8. Epic 12B: system-specific virtual targets
 
 Ovaj pravac ima smisla tek kada canonical coverage i governance disciplina budu dovoljno stabilni.
 
@@ -102,11 +114,11 @@ Pravilo:
 - canonical-only ostaje baza
 - system-specific virtual target ne sme da zamagli current canonical-first model
 
-### 8. Epic 9: data quality intelligence
+### 9. Epic 9: data quality intelligence
 
 Ovo ostaje važna, ali sledeća liga prioriteta. Treba ga uvoditi tek kada reuse i operational hardening budu dovoljno zatvoreni.
 
-### 9. Epic 15: derived graph layer
+### 10. Epic 15: derived graph layer
 
 Graph projekcija ostaje kasniji derived sloj. Ne uvoditi je pre nego što canonical, catalog i usage modeli sazru dovoljno da graf ima stabilan izvor.
 

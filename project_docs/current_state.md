@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-18, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-22, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -81,6 +81,8 @@ Implemented:
 - source-to-concept and concept-to-target review views
 - per-row LLM mapping refinement with transient meaning, negative guidance, sample values, and a refinement instruction
 - batch low-confidence LLM refinement plus accept/revert handling for refined row proposals
+- opportunistic LLM decision proposals for filtered `needs_review` rows
+- optional live LLM fill for missing proposal traces under bounded, closed-set constraints
 - Mapping Analysis Overview with structured technical summary, risk readout, and recommended next actions
 - optional narration/audio generation for Mapping Analysis Overview
 - Review Queue Plan for queue-level prioritization over the currently filtered review set
@@ -93,6 +95,7 @@ Important current behavior:
 - these guidance surfaces do not auto-approve or auto-apply durable changes
 - they are designed to stay close to a concrete local workflow step
 - they use deterministic fallback behavior when LLM output is unavailable or invalid
+- proposal generation in Review remains advisory until explicit apply actions are executed in Decisions
 
 Main code surfaces:
 
@@ -108,6 +111,7 @@ Implemented:
 - manual adjustment of suggested target mappings in the Decisions flow
 - manual mapping to virtual canonical target options in canonical mode
 - export/import of current mapping decisions as JSON and Excel
+- apply/dismiss workflows for LLM decision proposals, including conservative `Apply safe` execution
 - transformation suggestion, template-assisted authoring, and manual transformation code editing
 - advisory row preview from active mapping decisions
 - Pandas and PySpark starter code generation from reviewed mapping decisions
@@ -116,6 +120,7 @@ Implemented:
 - transformation templates
 - output artifact refinement with side-by-side original/refined compare and explicit accept/discard actions
 - transformation test set persistence, detail, listing, and execution
+- decision-origin audit metadata (`manual_mapping`, `llm_proposal`) surfaced in Active Decisions
 
 Important current behavior:
 
@@ -124,6 +129,7 @@ Important current behavior:
 - canonical mode intentionally skips preview because no concrete target dataset exists, but still supports Pandas/PySpark code generation and artifact refinement from active source-to-canonical decisions
 - transformation test-set save and run are governance-gated and require accepted active decisions
 - refinement does not replace the active generated artifact until the user explicitly accepts it
+- decision-origin audit metadata is persisted through decision JSON export/import for analyst handoff continuity
 
 Main code surfaces:
 
@@ -215,6 +221,7 @@ Implemented:
 
 - top-level Canonical Console area in the Streamlit product navigation
 - concept registry with search and filtering by scope/focus
+- canonical concept count summary (`Filtered`, `Total`, `With active overlay`, `With context`) aligned with knowledge-registry metrics style
 - concept detail showing aliases, field contexts, active overlay entries, catalog usage, and audit references
 - active overlay summary metrics and lifecycle controls
 - mirror of canonical-gap queue from Workspace review
@@ -300,6 +307,30 @@ Main code surfaces:
 - `backend/app/api/routes/observability.py`
 - `streamlit_ui/admin_views.py`
 - `streamlit_ui/api.py`
+
+### 12. UI shell guidance surfaces
+
+Implemented:
+
+- compact sidebar operations strip in a 2x3 KPI layout for fast workflow orientation
+- unified status badge legend shared across Workspace and Governance views
+- dismissible onboarding hints by top-level app area
+
+Main code surfaces:
+
+- `streamlit_ui/shared_views.py`
+- `streamlit_app.py`
+
+### 13. Session continuity boundary
+
+Current behavior:
+
+- browser session state is not automatically resumed across days
+- continuation is supported through explicit persisted artifacts (mapping sets or exported/imported decision checkpoints)
+
+Open design track:
+
+- design a deliberate draft/resume model (scope, conflict handling, audit) before enabling auto-resume behavior
 
 ## Enforced Governance Rules Today
 

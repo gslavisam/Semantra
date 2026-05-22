@@ -11,6 +11,8 @@ from typing import Any
 import httpx
 import streamlit as st
 
+from streamlit_ui.shared_views import render_status_badge_legend
+
 
 def _normalized_text(value: object) -> str:
     return str(value or "").strip()
@@ -1197,6 +1199,7 @@ def render_canonical_console_panel(
     st.caption(
         "Governance console for canonical, knowledge, overlay runtime, and stewardship workflows without changing the underlying authoring logic."
     )
+    render_status_badge_legend(title="Governance Status Legend")
 
     try:
         _bootstrap_canonical_console_state(api_request=api_request)
@@ -1718,6 +1721,7 @@ def render_canonical_console_panel(
                         st.caption("Activate this overlay before creating a new promotion candidate. Existing candidates can still be reviewed.")
 
     with governance_tabs[1]:
+        st.caption("Knowledge registry stewardship with concept counts, linked canonical paths, and promotion readiness.")
         knowledge_header_actions = st.columns(2)
         if knowledge_header_actions[0].button(
             _canonical_console_action_label(st.session_state.get("debug_knowledge_concepts") is not None, "knowledge concept registry"),
@@ -2165,6 +2169,7 @@ def render_canonical_console_panel(
                 st.info("No field contexts are attached to this knowledge concept.")
 
     with governance_tabs[0]:
+        st.caption("Canonical glossary stewardship with filtered/total concept counts and context coverage.")
         canonical_header_actions = st.columns(1)
         if canonical_header_actions[0].button(
             _canonical_console_action_label(st.session_state.get("debug_canonical_concepts") is not None, "canonical concept registry"),
@@ -2301,6 +2306,17 @@ def render_canonical_console_panel(
                 ),
                 concept_source_system,
                 concept_business_domain,
+            )
+            summary_columns = st.columns(4)
+            summary_columns[0].metric("Filtered", len(filtered_concepts))
+            summary_columns[1].metric("Total", len(canonical_concepts))
+            summary_columns[2].metric(
+                "With active overlay",
+                sum(1 for item in filtered_concepts if int(item.get("active_overlay_entry_count", 0) or 0) > 0),
+            )
+            summary_columns[3].metric(
+                "With context",
+                sum(1 for item in filtered_concepts if int(item.get("field_context_count", 0) or 0) > 0),
             )
             st.dataframe(_canonical_concept_registry_rows(filtered_concepts), width="stretch", hide_index=True)
 

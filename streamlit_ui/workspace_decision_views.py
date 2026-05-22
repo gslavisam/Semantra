@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import streamlit as st
 
 from streamlit_ui.governance import api_error_message, mapping_set_workspace_block_reason
+from streamlit_ui.shared_views import render_status_badge_legend
 
 
 def _saved_mapping_set_apply_block_reason(saved_mapping_set: dict) -> str:
@@ -20,6 +22,203 @@ def _saved_mapping_set_apply_block_reason(saved_mapping_set: dict) -> str:
 def _section_label(title: str, detail: str | None = None) -> str:
     detail_text = str(detail or "").strip()
     return f"{title} · {detail_text}" if detail_text else title
+
+
+def _decision_audit_map() -> dict[str, dict]:
+    current = st.session_state.get("mapping_decision_audit") or {}
+    if isinstance(current, dict):
+        return current
+    return {}
+
+
+def _record_decision_audit(source: str, *, origin: str, details: dict | None = None) -> None:
+    source_name = str(source or "").strip()
+    if not source_name:
+        return
+    audit_map = _decision_audit_map()
+    audit_map[source_name] = {
+        "origin": str(origin or "manual").strip() or "manual",
+        "applied_at": datetime.now(UTC).isoformat(),
+        "details": dict(details or {}),
+    }
+    st.session_state["mapping_decision_audit"] = audit_map
+
+
+def _active_decision_rows_with_audit(decisions: list[dict]) -> list[dict]:
+    audit_map = _decision_audit_map()
+    rows: list[dict] = []
+    for decision in decisions:
+        source = str(decision.get("source") or "").strip()
+        audit = audit_map.get(source) or {}
+        row = dict(decision)
+        row["decision_origin"] = str(audit.get("origin") or "manual_or_imported")
+        row["decision_origin_at"] = str(audit.get("applied_at") or "")
+        rows.append(row)
+    return rows
+
+
+def _apply_llm_decision_proposal(editor_state: dict, proposal: dict) -> bool:
+    source = str(proposal.get("source") or "").strip()
+    if not source:
+        return False
+
+    current_entry = editor_state.setdefault(source, {})
+    expected_target = str(proposal.get("current_target") or "").strip()
+    expected_status = str(proposal.get("current_status") or "needs_review").strip().lower() or "needs_review"
+    actual_target = str(current_entry.get("target") or "").strip()
+    actual_status = str(current_entry.get("status") or "needs_review").strip().lower() or "needs_review"
+    if actual_target and expected_target and actual_target != expected_target:
+        return False
+    if actual_status != expected_status:
+        return False
+
+    proposal_type = str(proposal.get("proposal_type") or "").strip()
+    if proposal_type == "switch_target":
+        current_entry["target"] = str(proposal.get("proposed_target") or "").strip()
+        current_entry["status"] = "accepted"
+        _record_decision_audit(
+            source,
+            origin="llm_proposal",
+            details={
+                "mode": "switch_target",
+                "proposal_origin": str(proposal.get("origin") or ""),
+                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+            },
+        )
+        return bool(current_entry.get("target"))
+    if proposal_type == "accept_current":
+        if not actual_target and expected_target:
+            current_entry["target"] = expected_target
+        current_entry["status"] = "accepted"
+        _record_decision_audit(
+            source,
+            origin="llm_proposal",
+            details={
+                "mode": "accept_current",
+                "proposal_origin": str(proposal.get("origin") or ""),
+                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+            },
+        )
+        return bool(current_entry.get("target"))
+    if proposal_type == "reject":
+        if not actual_target and expected_target:
+            current_entry["target"] = expected_target
+        current_entry["status"] = "rejected"
+        _record_decision_audit(
+            source,
+            origin="llm_proposal",
+            details={
+                "mode": "reject",
+                "proposal_origin": str(proposal.get("origin") or ""),
+                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+            },
+        )
+        return True
+    return False
+
+
+def _render_llm_decision_proposals_panel() -> None:
+    proposals = st.session_state.get("llm_decision_proposals") or []
+    with st.expander(
+        _section_label("LLM Decision Proposals", f"{len(proposals)} pending" if proposals else None),
+        expanded=bool(proposals),
+    ):
+        st.caption(
+            "These proposals are advisory outputs derived from the current bounded LLM validation/refine evidence for `needs_review` rows. "
+            "Applying a proposal updates the active review state and removes the cached proposal."
+        )
+        if not proposals:
+            st.info("No pending decision proposals. Generate them from the Review tab for the current needs-review slice.")
+            return
+
+        st.dataframe(
+            [
+                {
+                    "source": proposal.get("source"),
+                    "current_target": proposal.get("current_target") or "unmapped",
+                    "action": proposal.get("proposal_type"),
+                    "proposed_target": proposal.get("proposed_target") or "unmapped",
+                    "confidence": round(float(proposal.get("confidence", 0.0) or 0.0) * 100),
+                    "origin": proposal.get("origin"),
+                    "safe_to_apply": "yes" if proposal.get("safe_to_apply") else "no",
+                }
+                for proposal in proposals
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        safe_proposals = [proposal for proposal in proposals if proposal.get("safe_to_apply")]
+        if st.button(
+            "Apply safe proposals",
+            key="apply_safe_llm_decision_proposals",
+            width="stretch",
+            disabled=not safe_proposals,
+        ):
+            editor_state = st.session_state.setdefault("mapping_editor_state", {})
+            applied_sources: list[str] = []
+            remaining_proposals: list[dict] = []
+            for proposal in proposals:
+                if proposal.get("safe_to_apply") and _apply_llm_decision_proposal(editor_state, proposal):
+                    applied_sources.append(str(proposal.get("source") or ""))
+                    continue
+                remaining_proposals.append(proposal)
+            st.session_state["mapping_editor_state"] = editor_state
+            st.session_state["llm_decision_proposals"] = remaining_proposals
+            if applied_sources:
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Applied {len(applied_sources)} safe LLM proposal(s): {', '.join(applied_sources)}.",
+                }
+            else:
+                st.session_state["last_action"] = {
+                    "level": "warning",
+                    "message": "No safe LLM proposals were applied. The workspace state may have changed; regenerate proposals from Review.",
+                }
+            st.rerun()
+
+        proposal_sources = [str(proposal.get("source") or "") for proposal in proposals]
+        selected_source = st.selectbox("Proposal source", proposal_sources, key="llm_decision_proposal_source")
+        selected_proposal = next((proposal for proposal in proposals if proposal.get("source") == selected_source), None) or {}
+        if selected_proposal:
+            st.write(f"**Summary:** {selected_proposal.get('summary') or 'LLM proposed a follow-up decision for this review item.'}")
+            st.caption(
+                f"Action: {selected_proposal.get('proposal_type')} | "
+                f"Current target: {selected_proposal.get('current_target') or 'unmapped'} | "
+                f"Proposed target: {selected_proposal.get('proposed_target') or 'unmapped'} | "
+                f"Confidence: {round(float(selected_proposal.get('confidence', 0.0) or 0.0) * 100)}%"
+            )
+            st.caption(selected_proposal.get("safe_reason") or "")
+            for line in selected_proposal.get("reasoning") or []:
+                st.write(f"- {line}")
+
+            action_columns = st.columns(2)
+            if action_columns[0].button("Apply selected proposal", key="apply_selected_llm_decision_proposal", width="stretch"):
+                editor_state = st.session_state.setdefault("mapping_editor_state", {})
+                if _apply_llm_decision_proposal(editor_state, selected_proposal):
+                    st.session_state["mapping_editor_state"] = editor_state
+                    st.session_state["llm_decision_proposals"] = [
+                        proposal for proposal in proposals if proposal.get("source") != selected_source
+                    ]
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Applied the LLM decision proposal for {selected_source}.",
+                    }
+                else:
+                    st.session_state["last_action"] = {
+                        "level": "warning",
+                        "message": f"Could not apply the LLM proposal for {selected_source}. Regenerate proposals from Review because the row changed.",
+                    }
+                st.rerun()
+            if action_columns[1].button("Dismiss selected proposal", key="dismiss_selected_llm_decision_proposal", width="stretch"):
+                st.session_state["llm_decision_proposals"] = [
+                    proposal for proposal in proposals if proposal.get("source") != selected_source
+                ]
+                st.session_state["last_action"] = {
+                    "level": "info",
+                    "message": f"Dismissed the cached LLM decision proposal for {selected_source}.",
+                }
+                st.rerun()
 
 
 def render_manual_mapping_panel(
@@ -80,6 +279,11 @@ def render_manual_mapping_panel(
         )
         if form_columns[3].button("Add mapping", width="stretch", key="manual_mapping_add"):
             upsert_manual_mapping(selected_source, selected_target, selected_status)
+            _record_decision_audit(
+                selected_source,
+                origin="manual_mapping",
+                details={"mode": "add_mapping", "status": selected_status, "target": selected_target},
+            )
             st.session_state["last_action"] = {
                 "level": "success",
                 "message": f"Added manual mapping {selected_source} -> {selected_target}.",
@@ -110,12 +314,14 @@ def render_manual_mapping_panel(
 def render_mapping_decision_summary(*, build_mapping_decisions) -> None:
     """Render the currently active mapping decisions selected in the editor."""
 
+    render_status_badge_legend(title="Decision Status Legend")
+    _render_llm_decision_proposals_panel()
     decisions = build_mapping_decisions()
     if not decisions:
         st.warning("No active mapping decisions. Accept or mark at least one candidate as needs review.")
         return
     st.subheader(_section_label("Active Decisions", f"{len(decisions)} active"))
-    st.dataframe(decisions, width="stretch", hide_index=True)
+    st.dataframe(_active_decision_rows_with_audit(decisions), width="stretch", hide_index=True)
 
 
 def render_mapping_io_panel(

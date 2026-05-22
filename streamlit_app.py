@@ -25,6 +25,9 @@ from streamlit_ui.shared_views import (
     render_dataset_summary,
     render_last_action_status,
     render_llm_runtime_status,
+    render_onboarding_hint,
+    render_operation_strip,
+    render_status_badge_legend,
     render_step_status,
 )
 
@@ -363,6 +366,8 @@ def render_mapping_review(mapping_response: dict) -> None:
         validator_badge=validator_badge,
         canonical_path_label=canonical_path_label,
         request_review_plan_summary=request_review_plan_summary,
+        llm_runtime_enabled=llm_runtime_enabled,
+        request_llm_mapping_refinement=request_llm_mapping_refinement,
     )
 
 
@@ -699,6 +704,9 @@ def main() -> None:
             "This UI talks to the Semantra FastAPI backend. LLM and TTS provider endpoints are configured behind that backend and shown below in Runtime."
         )
         render_llm_runtime_status()
+        st.divider()
+        render_operation_strip(compact=True)
+        render_status_badge_legend(title="Unified Status Legend", compact=True)
         if st.button("Reset flow"):
             reset_flow_state()
             st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
@@ -711,6 +719,7 @@ def main() -> None:
         horizontal=True,
         label_visibility="collapsed",
     )
+    render_onboarding_hint(selected_top_level_area)
 
     if selected_top_level_area == "Workspace":
         render_workspace_tab()

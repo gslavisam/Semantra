@@ -314,6 +314,46 @@ Ishod:
 
 - persistence separation wave je zatvoren za trenutni pilot scope: canonical authoring, governance i discovery sada imaju jasnije SQLite read/write granice, dok lease/dequeue i širi DB-only authoring ostaju sledeća faza kada zaista zatrebaju
 
+## 2026-05-22
+
+### Review -> Decisions LLM proposal productization and audit persistence
+
+Isporučeno:
+
+- `LLM Decision Proposals` surface za `needs_review` redove u `Workspace > Review`
+- opcioni live bounded LLM fill za redove bez cached proposition-a
+- `Decisions` apply/dismiss workflow za predloge, uključujući konzervativni `Apply safe` batch mode
+- decision-origin audit surfacing u `Active Decisions` (`manual_mapping`, `llm_proposal`)
+- decision-origin audit persistence kroz JSON export/import decision checkpoint-a
+
+Ishod:
+
+- LLM predlog sada ima kompletan put od advisory review signala do kontrolisanog apply toka sa vidljivim poreklom odluke i handoff-friendly persistence slojem
+
+### Sidebar guidance shell and canonical metrics parity
+
+Isporučeno:
+
+- `Operations` KPI strip i `Unified Status Legend` premešteni u sidebar kao stalni navigacioni/orijentacioni sloj
+- compact operations strip formatiran kao 2x3 grid za bolju preglednost
+- onboarding hints po glavnim površinama (`Workspace`, `Governance`, `Catalog`, `Benchmarks`, `System`)
+- Canonical tab summary dopunjen metrikama broja koncepata u stilu Knowledge registra (`Filtered`, `Total`, `With active overlay`, `With context`)
+
+Ishod:
+
+- UX je konzistentniji i ozbiljniji kroz sve glavne tokove, uz bolju discoverability i parity između canonical i knowledge pregleda
+
+### Documentation sync wave
+
+Isporučeno:
+
+- usklađeni `README.md`, `help.md`, `help.en.md`, `PROJECT_OVERVIEW.md`
+- osveženi `project_docs/current_state.md`, `project_docs/completed_slices.md` i planning smernice u `project_docs/plan.md`
+
+Ishod:
+
+- dokumentacija sada odražava aktuelno implementirano ponašanje (proposals, audit, sidebar guidance, continuity boundary) i sledeći design fokus
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

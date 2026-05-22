@@ -78,6 +78,7 @@ def test_bootstrap_canonical_console_state_loads_core_console_data() -> None:
                 "entries": [],
             },
             ("GET", "/knowledge/canonical-concepts"): [{"concept_id": "customer.id"}],
+            ("GET", "/knowledge/concepts"): [{"concept_id": "customer.id", "canonical_name": "Customer ID"}],
         }
         return responses[(method, path)]
 
@@ -96,6 +97,7 @@ def test_bootstrap_canonical_console_state_loads_core_console_data() -> None:
         "entries": [],
     }
     assert session_state["debug_canonical_concepts"] == [{"concept_id": "customer.id"}]
+    assert session_state["debug_knowledge_concepts"] == [{"concept_id": "customer.id", "canonical_name": "Customer ID"}]
     assert session_state["debug_canonical_console_bootstrapped"] is True
     assert calls == [
         ("POST", "/knowledge/reload"),
@@ -104,6 +106,7 @@ def test_bootstrap_canonical_console_state_loads_core_console_data() -> None:
         ("GET", "/knowledge/stewardship-items"),
         ("GET", "/knowledge/overlays/1"),
         ("GET", "/knowledge/canonical-concepts"),
+        ("GET", "/knowledge/concepts"),
     ]
 
 

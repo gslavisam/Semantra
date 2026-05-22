@@ -41,6 +41,10 @@ Core implemented capabilities:
 - configurable canonical candidate pool shortlisting before full canonical scoring
 - Mapping Analysis Overview with optional narration/audio generation
 - Review Queue Plan and Gap Queue Summary for queue-level review guidance
+- opportunistic LLM decision proposals for `needs_review` rows with optional live LLM fill
+- proposal apply workflows (`Apply selected` and `Apply safe`) with stale-state protection
+- local decision-origin audit trail (`manual_mapping`, `llm_proposal`) surfaced in Active Decisions
+- mapping decision audit persistence through decision JSON export/import
 - per-row and batch LLM mapping refinement with transient field context and accept/revert controls
 - transformation generation, templates, advisory preview, and Pandas/PySpark starter generation
 - canonical-mode manual mapping and canonical-mode code generation against virtual canonical targets
@@ -50,6 +54,8 @@ Core implemented capabilities:
 - canonical glossary import/export, knowledge overlays, stewardship items, and Canonical Console workflows
 - integration catalog search/detail/reuse flows with workspace reuse-fit assessment
 - benchmark datasets, evaluation runs, scoring-profile comparison, correction impact, and benchmark explanation
+- compact sidebar operations strip and unified status legend for cross-surface orientation
+- dismissible onboarding hints per top-level area (`Workspace`, `Governance`, `Catalog`, `Benchmarks`, `System`)
 
 For the full grounded feature inventory, see `project_docs/current_state.md`.
 
@@ -156,6 +162,14 @@ Semantra today is not yet:
 - a multi-step enterprise workflow engine
 - a DB-only canonical authoring platform without file-backed reseed inputs
 - a durable multi-user job runtime with persistent queue semantics
+
+## Session Continuity Today
+
+Semantra currently treats browser session state as local UI state.
+
+- if the browser is closed, transient Workspace state is not automatically restored on the next day
+- continuing work is supported through explicit artifacts: saved mapping-set versions or exported mapping JSON/Excel
+- the next hardening step is to design a durable draft/resume model intentionally (scope, conflicts, audit), not as a quick auto-save patch
 
 ## Documentation Map
 

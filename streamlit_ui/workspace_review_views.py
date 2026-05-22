@@ -5,6 +5,8 @@ from __future__ import annotations
 import httpx
 import streamlit as st
 
+from streamlit_ui.shared_views import render_status_badge_legend
+
 
 def _normalized_text(value: str | None) -> str:
     return str(value or "").strip().lower()
@@ -534,6 +536,231 @@ def _manual_review_open_item_count(mapping_response: dict, editor_state: dict, *
         if status != "accepted" or not target:
             open_count += 1
     return open_count
+
+
+def _llm_support_flags(mapping: dict | None) -> tuple[bool, bool]:
+    current_mapping = mapping or {}
+    signals = current_mapping.get("signals") or {}
+    explanation = current_mapping.get("explanation") or []
+
+    def _has_signal(name: str) -> bool:
+        try:
+            return float(signals.get(name, 0.0) or 0.0) > 0.0
+        except (TypeError, ValueError):
+            return False
+
+    knowledge_supported = _has_signal("knowledge")
+    canonical_supported = _has_signal("canonical")
+    for line in explanation if isinstance(explanation, list) else [explanation]:
+        text = str(line or "").lower()
+        if not knowledge_supported and (
+            "knowledge" in text or "metadata" in text or "context prior" in text
+        ):
+            knowledge_supported = True
+        if not canonical_supported and "canonical glossary aligns both fields" in text:
+            canonical_supported = True
+    return knowledge_supported, canonical_supported
+
+
+def _llm_decision_safe_to_apply(proposal: dict | None) -> tuple[bool, str]:
+    current_proposal = proposal or {}
+    proposal_type = str(current_proposal.get("proposal_type") or "").strip()
+    confidence = float(current_proposal.get("confidence", 0.0) or 0.0)
+    knowledge_supported = bool(current_proposal.get("knowledge_supported"))
+    canonical_supported = bool(current_proposal.get("canonical_supported"))
+
+    if proposal_type == "reject":
+        return False, "Reject proposals stay manual in this MVP."
+    if confidence < 0.85:
+        return False, "Confidence is below the safe auto-apply threshold (85%)."
+    if proposal_type == "switch_target" and not (knowledge_supported or canonical_supported):
+        return False, "Switch proposals need knowledge or canonical support for batch-safe apply."
+    return True, "Eligible for safe apply."
+
+
+def _build_llm_decision_proposal(mapping: dict | None, entry: dict | None = None) -> dict | None:
+    current_mapping = mapping or {}
+    current_entry = entry or {}
+    current_target = str(current_entry.get("target") or current_mapping.get("target") or "").strip()
+    current_status = str(current_entry.get("status") or current_mapping.get("status") or "needs_review").strip().lower() or "needs_review"
+    if current_status != "needs_review":
+        return None
+
+    source = str(current_mapping.get("source") or "").strip()
+    if not source:
+        return None
+
+    knowledge_supported, canonical_supported = _llm_support_flags(current_mapping)
+    refinement_response = current_entry.get("llm_mapping_refinement") if isinstance(current_entry.get("llm_mapping_refinement"), dict) else {}
+    refinement_selected = refinement_response.get("selected") or {}
+    refinement_target = str(refinement_selected.get("target") or "").strip()
+    refinement_applied = bool(current_entry.get("llm_mapping_refinement_applied"))
+
+    if refinement_response:
+        llm_recommendation = refinement_selected.get("llm_recommendation") or {}
+        llm_decision_proposition = refinement_selected.get("llm_decision_proposition") or {}
+        if refinement_target:
+            proposal_type = "accept_current" if refinement_target == current_target else "switch_target"
+            proposed_target = current_target if proposal_type == "accept_current" else refinement_target
+            proposed_status = "accepted"
+            summary = str(llm_decision_proposition.get("summary") or "LLM refine produced a proposal for this review item.")
+        else:
+            proposal_type = "reject"
+            proposed_target = current_target
+            proposed_status = "rejected"
+            summary = str(llm_decision_proposition.get("summary") or "LLM refine proposes no closed-set match for this review item.")
+        confidence = float(llm_recommendation.get("confidence", 0.0) or 0.0)
+        reasoning = [str(item) for item in (llm_recommendation.get("reasoning") or []) if str(item).strip()]
+        proposal = {
+            "source": source,
+            "current_target": current_target,
+            "current_status": current_status,
+            "proposal_type": proposal_type,
+            "proposed_target": proposed_target,
+            "proposed_status": proposed_status,
+            "summary": summary,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "origin": "llm_refine_applied" if refinement_applied else "llm_refine_preview",
+            "knowledge_supported": knowledge_supported,
+            "canonical_supported": canonical_supported,
+        }
+        safe_to_apply, safe_reason = _llm_decision_safe_to_apply(proposal)
+        proposal["safe_to_apply"] = safe_to_apply
+        proposal["safe_reason"] = safe_reason
+        return proposal
+
+    llm_decision_proposition = current_mapping.get("llm_decision_proposition") or {}
+    llm_recommendation = current_mapping.get("llm_recommendation") or {}
+    if not llm_decision_proposition:
+        return None
+
+    proposition_type = str(llm_decision_proposition.get("proposition_type") or "").strip()
+    proposed_target = str(llm_decision_proposition.get("proposed_target") or "").strip()
+    if proposition_type == "confirm" and current_target:
+        proposal_type = "accept_current"
+        final_target = current_target
+        proposed_status = "accepted"
+    elif proposition_type == "challenge" and proposed_target:
+        proposal_type = "switch_target"
+        final_target = proposed_target
+        proposed_status = "accepted"
+    elif proposition_type == "no_match":
+        proposal_type = "reject"
+        final_target = current_target
+        proposed_status = "rejected"
+    else:
+        return None
+
+    proposal = {
+        "source": source,
+        "current_target": current_target,
+        "current_status": current_status,
+        "proposal_type": proposal_type,
+        "proposed_target": final_target,
+        "proposed_status": proposed_status,
+        "summary": str(llm_decision_proposition.get("summary") or "LLM generated a decision proposition for this review item."),
+        "confidence": float(llm_recommendation.get("confidence", llm_decision_proposition.get("confidence", 0.0)) or 0.0),
+        "reasoning": [str(item) for item in (llm_recommendation.get("reasoning") or llm_decision_proposition.get("reasoning") or []) if str(item).strip()],
+        "origin": "mapping_validation",
+        "knowledge_supported": knowledge_supported,
+        "canonical_supported": canonical_supported,
+    }
+    safe_to_apply, safe_reason = _llm_decision_safe_to_apply(proposal)
+    proposal["safe_to_apply"] = safe_to_apply
+    proposal["safe_reason"] = safe_reason
+    return proposal
+
+
+def _llm_decision_proposals_for_filtered_rows(
+    filtered_rows: list[dict] | None,
+    mapping_response: dict,
+    editor_state: dict,
+    *,
+    include_live_llm_fill: bool = False,
+    request_llm_mapping_refinement=None,
+    llm_runtime_available: bool = False,
+) -> list[dict]:
+    ranked_by_source = {row.get("source"): row for row in mapping_response.get("ranked_mappings", [])}
+    selected_by_source = {row.get("source"): row for row in mapping_response.get("mappings", [])}
+    proposals: list[dict] = []
+
+    for row in filtered_rows or []:
+        source = str(row.get("source") or "").strip()
+        if not source or str(row.get("status") or "").strip().lower() != "needs_review":
+            continue
+        ranked = ranked_by_source.get(source) or {}
+        selected_row = selected_by_source.get(source) or {}
+        entry = editor_state.get(source, {})
+        current_target = str(entry.get("target") or selected_row.get("target") or "").strip()
+        selected_candidate = next(
+            (candidate for candidate in ranked.get("candidates", []) if str(candidate.get("target") or "").strip() == current_target),
+            None,
+        )
+        use_selected_row = current_target == str(selected_row.get("target") or "").strip()
+        active_row = selected_row if use_selected_row or not selected_candidate else selected_candidate
+        proposal = _build_llm_decision_proposal(
+            {
+                "source": source,
+                "target": current_target,
+                "status": row.get("status") or entry.get("status") or "needs_review",
+                "signals": active_row.get("signals") or {},
+                "explanation": active_row.get("explanation") or [],
+                "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
+                "llm_decision_proposition": selected_row.get("llm_decision_proposition") if use_selected_row else None,
+            },
+            entry,
+        )
+        if (
+            proposal is None
+            and include_live_llm_fill
+            and request_llm_mapping_refinement is not None
+            and llm_runtime_available
+        ):
+            candidate_targets = [
+                str(candidate.get("target") or "").strip()
+                for candidate in ranked.get("candidates", [])
+                if str(candidate.get("target") or "").strip()
+            ]
+            if candidate_targets:
+                refinement_response = request_llm_mapping_refinement(
+                    source,
+                    candidate_targets=candidate_targets,
+                    meaning_hint=str(entry.get("field_hint_meaning") or ""),
+                    negative_hint=str(entry.get("field_hint_negative") or ""),
+                    sample_values=_parse_hint_sample_values(str(entry.get("field_hint_samples") or "")),
+                    refinement_instruction=str(entry.get("llm_mapping_instruction") or ""),
+                )
+                _remember_llm_mapping_refinement(
+                    entry,
+                    refinement_response=refinement_response,
+                    current_target=current_target,
+                    current_status=str(entry.get("status") or "needs_review"),
+                    instruction=str(entry.get("llm_mapping_instruction") or ""),
+                )
+                proposal = _build_llm_decision_proposal(
+                    {
+                        "source": source,
+                        "target": current_target,
+                        "status": row.get("status") or entry.get("status") or "needs_review",
+                        "signals": active_row.get("signals") or {},
+                        "explanation": active_row.get("explanation") or [],
+                        "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
+                        "llm_decision_proposition": selected_row.get("llm_decision_proposition") if use_selected_row else None,
+                    },
+                    entry,
+                )
+        if proposal:
+            proposals.append(proposal)
+
+    return sorted(
+        proposals,
+        key=lambda item: (
+            not bool(item.get("safe_to_apply")),
+            -float(item.get("confidence", 0.0) or 0.0),
+            str(item.get("source") or "").lower(),
+        ),
+    )
 
 
 def _review_plan_request_payload(
@@ -1493,8 +1720,12 @@ def render_mapping_review(
     validator_badge,
     canonical_path_label,
     request_review_plan_summary,
+    llm_runtime_enabled,
+    request_llm_mapping_refinement,
 ) -> None:
     """Render review filters, ranked candidates, repeated attention groups, and queue plans."""
+
+    render_status_badge_legend(title="Review Status Legend")
 
     selected_rows = current_mapping_rows(mapping_response)
     source_concept_view_rows = source_concept_rows(mapping_response)
@@ -1612,6 +1843,88 @@ def render_mapping_review(
                     st.write(f"- {line}")
         else:
             st.info("No review queue plan has been generated yet for the current filters.")
+
+    pending_proposals = st.session_state.get("llm_decision_proposals") or []
+    proposal_candidates = _llm_decision_proposals_for_filtered_rows(
+        filtered_rows,
+        mapping_response,
+        st.session_state.get("mapping_editor_state", {}),
+    )
+    proposal_label = _section_label(
+        "LLM Decision Proposals",
+        f"{len(pending_proposals)} pending" if pending_proposals else (f"{len(proposal_candidates)} available" if proposal_candidates else None),
+    )
+    with st.expander(proposal_label, expanded=bool(pending_proposals)):
+        st.caption(
+            "Materialize opportunistic LLM decision proposals for the current `needs_review` slice. "
+            "This uses existing bounded LLM validation and any pending/applied row-level LLM refine evidence. "
+            "It does not change active decisions until you apply proposals from the Decisions tab."
+        )
+        can_live_fill = bool(llm_runtime_enabled()) and request_llm_mapping_refinement is not None
+        include_live_llm_fill = st.checkbox(
+            "Use live LLM fill for rows without cached proposition",
+            value=bool(st.session_state.get("llm_decision_proposals_live_fill", False)),
+            key="llm_decision_proposals_live_fill",
+            disabled=not can_live_fill,
+            help=(
+                "When enabled, Semantra will call bounded LLM refine for `needs_review` rows that do not yet have "
+                "cached LLM proposition data, and then materialize proposals from that response."
+            ),
+        )
+        if include_live_llm_fill and not can_live_fill:
+            st.caption("Live fill is unavailable because LLM runtime is not ready.")
+
+        if st.button(
+            "Generate proposals for current review slice",
+            key="generate_llm_decision_proposals",
+            width="stretch",
+            disabled=(not proposal_candidates and not include_live_llm_fill),
+        ):
+            try:
+                generated_proposals = _llm_decision_proposals_for_filtered_rows(
+                    filtered_rows,
+                    mapping_response,
+                    st.session_state.get("mapping_editor_state", {}),
+                    include_live_llm_fill=bool(include_live_llm_fill),
+                    request_llm_mapping_refinement=request_llm_mapping_refinement,
+                    llm_runtime_available=bool(llm_runtime_enabled()),
+                )
+                st.session_state["llm_decision_proposals"] = generated_proposals
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Prepared {len(generated_proposals)} LLM decision proposal(s) for the current needs-review slice.",
+                }
+                st.rerun()
+            except (ValueError, httpx.HTTPError) as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Generating LLM decision proposals failed: {error}",
+                }
+                st.rerun()
+
+        if pending_proposals:
+            st.dataframe(
+                [
+                    {
+                        "source": proposal.get("source"),
+                        "current_target": proposal.get("current_target") or "unmapped",
+                        "action": proposal.get("proposal_type"),
+                        "proposed_target": proposal.get("proposed_target") or "unmapped",
+                        "confidence": round(float(proposal.get("confidence", 0.0) or 0.0) * 100),
+                        "origin": proposal.get("origin"),
+                        "safe_to_apply": "yes" if proposal.get("safe_to_apply") else "no",
+                    }
+                    for proposal in pending_proposals
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+            safe_count = sum(1 for proposal in pending_proposals if proposal.get("safe_to_apply"))
+            st.caption(f"{safe_count} pending proposal(s) are currently marked safe for batch apply in Decisions.")
+        else:
+            st.info(
+                "No LLM decision proposals are cached yet. If this stays empty, regenerate mapping with LLM enabled or run row/batch LLM refine first."
+            )
 
     st.subheader(_section_label("Selected Mapping", f"{len(selected_mapping_display_rows)} active" if selected_mapping_display_rows else None))
     st.caption(

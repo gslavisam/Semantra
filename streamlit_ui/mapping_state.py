@@ -153,10 +153,14 @@ def build_mapping_decisions(
 def export_mapping_payload(session_state: dict, *, build_mapping_decisions_func: Callable[[], list[dict]]) -> str:
     """Serialize the current mapping workspace into downloadable JSON."""
 
+    decision_audit = session_state.get("mapping_decision_audit")
+    if not isinstance(decision_audit, dict):
+        decision_audit = {}
     payload = {
         "source_dataset_id": session_state.get("upload_response", {}).get("source", {}).get("dataset_id"),
         "target_dataset_id": session_state.get("upload_response", {}).get("target", {}).get("dataset_id"),
         "mapping_decisions": build_mapping_decisions_func(),
+        "mapping_decision_audit": decision_audit,
     }
     return json.dumps(payload, indent=2, ensure_ascii=True)
 
@@ -252,6 +256,7 @@ def apply_imported_mapping_payload(
 
     payload = json.loads(raw_payload.decode("utf-8"))
     imported_decisions = payload.get("mapping_decisions", [])
+    imported_audit = payload.get("mapping_decision_audit", {})
     editor_state = session_state.get("mapping_editor_state", {})
     upload_response = session_state.get("upload_response")
     valid_sources = set(schema_column_names_func(upload_response["source"])) if upload_response else set()
@@ -276,6 +281,23 @@ def apply_imported_mapping_payload(
         session_state[f"manual_transform_{source}"] = decision.get("transformation_code", "")
         session_state[f"manual_apply_{source}"] = bool(decision.get("transformation_code"))
     session_state["mapping_editor_state"] = editor_state
+
+    sanitized_audit: dict[str, dict] = {}
+    if isinstance(imported_audit, dict):
+        for source, metadata in imported_audit.items():
+            source_name = str(source or "").strip()
+            if not source_name:
+                continue
+            if valid_sources and source_name not in valid_sources:
+                continue
+            if not isinstance(metadata, dict):
+                continue
+            sanitized_audit[source_name] = {
+                "origin": str(metadata.get("origin") or "manual_or_imported").strip() or "manual_or_imported",
+                "applied_at": str(metadata.get("applied_at") or ""),
+                "details": metadata.get("details") if isinstance(metadata.get("details"), dict) else {},
+            }
+    session_state["mapping_decision_audit"] = sanitized_audit
 
 
 def build_pending_corrections(session_state: dict) -> list[dict]:

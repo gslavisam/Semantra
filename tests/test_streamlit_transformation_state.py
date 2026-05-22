@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -935,3 +936,103 @@ def test_export_mapping_excel_bytes_creates_tabular_mapping_workbook() -> None:
         'df_source["cust_id"].astype(str)',
     ]
     assert [cell.value for cell in worksheet[3]] == ["phone", "phone_number", "needs_review", None]
+
+
+def test_export_mapping_payload_includes_mapping_decision_audit() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "resolve_suggested_transformation_code",
+        "effective_transformation_code",
+        "build_mapping_decisions",
+        "export_mapping_payload",
+    )
+    export_mapping_payload = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "upload_response": {
+                "source": {"dataset_id": "source-1"},
+                "target": {"dataset_id": "target-1"},
+            },
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+            "manual_transform_cust_id": "",
+            "manual_apply_cust_id": False,
+            "mapping_decision_audit": {
+                "cust_id": {
+                    "origin": "llm_proposal",
+                    "applied_at": "2026-05-22T12:00:00+00:00",
+                    "details": {"mode": "accept_current"},
+                }
+            },
+        }
+    )
+
+    payload = json.loads(export_mapping_payload())
+
+    assert payload["mapping_decision_audit"] == {
+        "cust_id": {
+            "origin": "llm_proposal",
+            "applied_at": "2026-05-22T12:00:00+00:00",
+            "details": {"mode": "accept_current"},
+        }
+    }
+
+
+def test_apply_imported_mapping_payload_restores_mapping_decision_audit() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "schema_column_names",
+        "apply_imported_mapping_payload",
+    )
+    apply_imported_mapping_payload = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "upload_response": {
+                "source": {
+                    "schema_profile": {
+                        "columns": [
+                            {"name": "cust_id"},
+                            {"name": "phone"},
+                        ]
+                    }
+                }
+            },
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {
+                "stale_field": {
+                    "origin": "manual_mapping",
+                    "applied_at": "old",
+                    "details": {},
+                }
+            },
+        }
+    )
+
+    payload = {
+        "mapping_decisions": [
+            {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+        ],
+        "mapping_decision_audit": {
+            "cust_id": {
+                "origin": "llm_proposal",
+                "applied_at": "2026-05-22T12:00:00+00:00",
+                "details": {"mode": "switch_target", "confidence": 0.91},
+            },
+            "unknown_source": {
+                "origin": "llm_proposal",
+                "applied_at": "2026-05-22T12:00:00+00:00",
+                "details": {"mode": "switch_target"},
+            },
+        },
+    }
+
+    apply_imported_mapping_payload(json.dumps(payload).encode("utf-8"))
+
+    assert fake_streamlit.session_state["mapping_decision_audit"] == {
+        "cust_id": {
+            "origin": "llm_proposal",
+            "applied_at": "2026-05-22T12:00:00+00:00",
+            "details": {"mode": "switch_target", "confidence": 0.91},
+        }
+    }
