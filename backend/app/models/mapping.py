@@ -887,6 +887,122 @@ class CatalogReuseFitResponse(BaseModel):
     generation_metadata: CatalogReuseFitGenerationMetadata = Field(default_factory=CatalogReuseFitGenerationMetadata)
 
 
+class CatalogIntegrationCompareRequest(BaseModel):
+    """Request payload for comparing two catalog integrations."""
+
+    base_integration_name: str
+    peer_integration_name: str
+
+
+class CatalogIntegrationCompareResponse(BaseModel):
+    """Deterministic compare summary between two catalog integrations."""
+
+    base_integration: CatalogIntegrationDetail
+    peer_integration: CatalogIntegrationDetail
+    shared_concepts: list[str] = Field(default_factory=list)
+    base_only_concepts: list[str] = Field(default_factory=list)
+    peer_only_concepts: list[str] = Field(default_factory=list)
+    same_source_system: bool = False
+    same_target_system: bool = False
+    same_business_domain: bool = False
+    same_artifact_type: bool = False
+    compare_summary: str = ""
+    suggested_next_actions: list[str] = Field(default_factory=list)
+
+
+class CatalogWorkspaceReuseShortlistRequest(BaseModel):
+    """Request payload for ranking catalog reuse candidates against workspace context."""
+
+    workspace_context: CatalogReuseFitWorkspaceContext = Field(default_factory=CatalogReuseFitWorkspaceContext)
+    top_n: int = Field(default=5, ge=1, le=25)
+
+
+class CatalogWorkspaceReuseCandidate(BaseModel):
+    """One ranked catalog reuse candidate for the current workspace snapshot."""
+
+    integration_name: str
+    mapping_set_id: int
+    version: int
+    status: MappingSetStatus = "approved"
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    artifact_type: CatalogArtifactType = "standard"
+    score: float = 0.0
+    concept_overlap_score: float = 0.0
+    system_match_score: float = 0.0
+    domain_match_score: float = 0.0
+    accepted_quality_score: float = 0.0
+    shared_concepts: list[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+
+
+class CatalogWorkspaceReuseShortlistResponse(BaseModel):
+    """Ranked shortlist for workspace-aware catalog reuse discovery."""
+
+    workspace_loaded: bool = False
+    considered_integrations: int = 0
+    candidates: list[CatalogWorkspaceReuseCandidate] = Field(default_factory=list)
+
+
+class CatalogFieldReuseSelection(BaseModel):
+    """One selected workspace field used for field-scoped Catalog reuse discovery."""
+
+    source_field: str
+    current_target: str | None = None
+    current_status: DecisionStatus | None = None
+
+
+class CatalogFieldReuseMatch(BaseModel):
+    """One saved mapping decision that overlaps a selected workspace source field."""
+
+    source_field: str
+    target: str | None = None
+    status: DecisionStatus = "needs_review"
+    transformation_present: bool = False
+    current_target_match: bool = False
+
+
+class CatalogFieldReuseShortlistRequest(BaseModel):
+    """Request payload for ranking catalog candidates against selected workspace fields."""
+
+    workspace_context: CatalogReuseFitWorkspaceContext = Field(default_factory=CatalogReuseFitWorkspaceContext)
+    selected_fields: list[CatalogFieldReuseSelection] = Field(default_factory=list)
+    top_n: int = Field(default=5, ge=1, le=25)
+
+
+class CatalogFieldReuseCandidate(BaseModel):
+    """One ranked Catalog candidate for field-scoped reuse discovery."""
+
+    integration_name: str
+    mapping_set_id: int
+    version: int
+    status: MappingSetStatus = "approved"
+    source_system: str | None = None
+    target_system: str | None = None
+    business_domain: str | None = None
+    artifact_type: CatalogArtifactType = "standard"
+    score: float = 0.0
+    matched_field_count: int = 0
+    selected_field_count: int = 0
+    source_field_overlap_score: float = 0.0
+    current_target_match_score: float = 0.0
+    system_match_score: float = 0.0
+    domain_match_score: float = 0.0
+    accepted_quality_score: float = 0.0
+    matched_fields: list[CatalogFieldReuseMatch] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+
+
+class CatalogFieldReuseShortlistResponse(BaseModel):
+    """Ranked shortlist for field-scoped Catalog reuse discovery."""
+
+    workspace_loaded: bool = False
+    selected_field_count: int = 0
+    considered_integrations: int = 0
+    candidates: list[CatalogFieldReuseCandidate] = Field(default_factory=list)
+
+
 class MappingSetStatusUpdateRequest(BaseModel):
     """Request payload for changing mapping-set governance status or ownership metadata."""
 
@@ -962,6 +1078,7 @@ class RuntimeConfigSnapshot(BaseModel):
     lmstudio_orpheus_model: str = ""
     lmstudio_orpheus_voice: str = ""
     scoring_profile: str = "balanced"
+    available_scoring_profiles: list[str] = Field(default_factory=list)
     llm_status: str = "configured"
     llm_reachable: bool | None = None
     llm_status_detail: str = ""
@@ -972,6 +1089,12 @@ class RuntimeConfigSnapshot(BaseModel):
     llm_gate_min_score: float
     llm_gate_max_score: float
     admin_api_token_configured: bool = False
+
+
+class ScoringProfileUpdateRequest(BaseModel):
+    """Request payload for switching the active runtime scoring profile."""
+
+    scoring_profile: str
 
 
 class BenchmarkDatasetCreateRequest(BaseModel):

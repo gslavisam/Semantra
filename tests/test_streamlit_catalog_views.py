@@ -66,6 +66,216 @@ def test_apply_mapping_set_detail_to_workspace_sets_editor_state(monkeypatch) ->
     assert fake_streamlit.session_state["mapping_set_owner"] == "governance-team"
 
 
+def test_merge_mapping_set_fields_into_workspace_updates_only_selected_sources(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "upload_response": {
+                "source": {
+                    "schema_profile": {
+                        "columns": [
+                            {"name": "KUNNR"},
+                            {"name": "NAME1"},
+                            {"name": "LAND1"},
+                        ]
+                    }
+                }
+            },
+            "mapping_editor_state": {
+                "KUNNR": {
+                    "target": "customer_id",
+                    "status": "needs_review",
+                    "suggested_target": "customer_id",
+                    "suggested_transformation_code": "",
+                    "manual_transformation_code": "",
+                    "llm_transformation_instruction": "",
+                    "generated_transformation_reasoning": [],
+                    "generated_transformation_warnings": [],
+                    "apply_transformation": False,
+                    "manual_apply_transformation": False,
+                    "manual": False,
+                },
+                "NAME1": {
+                    "target": "customer_name",
+                    "status": "needs_review",
+                    "suggested_target": "customer_name",
+                    "suggested_transformation_code": "",
+                    "manual_transformation_code": "",
+                    "llm_transformation_instruction": "",
+                    "generated_transformation_reasoning": [],
+                    "generated_transformation_warnings": [],
+                    "apply_transformation": False,
+                    "manual_apply_transformation": False,
+                    "manual": False,
+                },
+            },
+            "mapping_decision_audit": {
+                "NAME1": {"origin": "manual", "applied_at": "", "details": {}}
+            },
+            "preview_response": {"preview": []},
+            "codegen_response": {"code": "x"},
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    applied_count = catalog_views._merge_mapping_set_fields_into_workspace(
+        {
+            "mapping_set_id": 9,
+            "name": "customer-master",
+            "version": 3,
+            "mapping_decisions": [
+                {
+                    "source": "KUNNR",
+                    "target": "customer.id",
+                    "status": "accepted",
+                    "transformation_code": 'df_target["customer_id"] = df_source["KUNNR"]',
+                },
+                {
+                    "source": "LAND1",
+                    "target": "customer.country_code",
+                    "status": "accepted",
+                },
+            ],
+        },
+        selected_sources=["KUNNR"],
+    )
+
+    assert applied_count == 1
+    assert fake_streamlit.session_state["mapping_editor_state"]["KUNNR"]["target"] == "customer.id"
+    assert fake_streamlit.session_state["mapping_editor_state"]["NAME1"]["target"] == "customer_name"
+    assert fake_streamlit.session_state["manual_transform_KUNNR"] == 'df_target["customer_id"] = df_source["KUNNR"]'
+    assert fake_streamlit.session_state["mapping_decision_audit"]["KUNNR"]["origin"] == "catalog_field_reuse"
+    assert fake_streamlit.session_state[catalog_views.CATALOG_LAST_FIELD_IMPORT_STATE_KEY]["imported_sources"] == ["KUNNR"]
+    assert "preview_response" not in fake_streamlit.session_state
+    assert "codegen_response" not in fake_streamlit.session_state
+
+
+def test_catalog_field_reuse_compare_rows_shows_current_vs_saved_state(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "mapping_editor_state": {
+                "KUNNR": {
+                    "target": "customer_id",
+                    "status": "needs_review",
+                    "manual_transformation_code": "existing_transform()",
+                },
+                "LAND1": {
+                    "target": "",
+                    "status": "rejected",
+                    "manual_transformation_code": "",
+                },
+            }
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    rows = catalog_views._catalog_field_reuse_compare_rows(
+        [
+            {
+                "source_field": "KUNNR",
+                "target": "customer.id",
+                "status": "accepted",
+                "transformation_present": True,
+            },
+            {
+                "source_field": "LAND1",
+                "target": "customer.country_code",
+                "status": "accepted",
+                "transformation_present": False,
+            },
+        ]
+    )
+
+    assert rows[0]["source_field"] == "KUNNR"
+    assert rows[0]["target_change"] == "override"
+    assert rows[0]["transformation_change"] == "transform replace"
+    assert rows[0]["reuse_label"] == "override + transform replace"
+    assert rows[0]["conflict"] == "yes"
+    assert rows[1]["source_field"] == "LAND1"
+    assert rows[1]["target_change"] == "safe fill"
+    assert rows[1]["reuse_label"] == "safe fill"
+    assert rows[1]["conflict"] == "no"
+
+
+def test_restore_last_field_import_reverts_selected_sources(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "mapping_editor_state": {
+                "KUNNR": {
+                    "target": "customer.id",
+                    "status": "accepted",
+                    "suggested_target": "customer_id",
+                    "suggested_transformation_code": "",
+                    "manual_transformation_code": 'df_target["customer_id"] = df_source["KUNNR"]',
+                    "llm_transformation_instruction": "",
+                    "generated_transformation_reasoning": [],
+                    "generated_transformation_warnings": [],
+                    "apply_transformation": False,
+                    "manual_apply_transformation": True,
+                    "manual": False,
+                },
+                "NAME1": {
+                    "target": "customer_name",
+                    "status": "needs_review",
+                    "suggested_target": "customer_name",
+                    "suggested_transformation_code": "",
+                    "manual_transformation_code": "",
+                    "llm_transformation_instruction": "",
+                    "generated_transformation_reasoning": [],
+                    "generated_transformation_warnings": [],
+                    "apply_transformation": False,
+                    "manual_apply_transformation": False,
+                    "manual": False,
+                },
+            },
+            "mapping_decision_audit": {
+                "KUNNR": {"origin": "catalog_field_reuse", "applied_at": "", "details": {}},
+                "NAME1": {"origin": "manual", "applied_at": "", "details": {}},
+            },
+            "manual_transform_KUNNR": 'df_target["customer_id"] = df_source["KUNNR"]',
+            "manual_apply_KUNNR": True,
+            "transform_KUNNR": False,
+            "preview_response": {"preview": []},
+            catalog_views.CATALOG_LAST_FIELD_IMPORT_STATE_KEY: {
+                "mapping_set_id": 9,
+                "mapping_set_name": "customer-master",
+                "mapping_set_version": 3,
+                "imported_sources": ["KUNNR"],
+                "previous_editor_state": {
+                    "KUNNR": {
+                        "target": "customer_id",
+                        "status": "needs_review",
+                        "suggested_target": "customer_id",
+                        "suggested_transformation_code": "",
+                        "manual_transformation_code": "",
+                        "llm_transformation_instruction": "",
+                        "generated_transformation_reasoning": [],
+                        "generated_transformation_warnings": [],
+                        "apply_transformation": False,
+                        "manual_apply_transformation": False,
+                        "manual": False,
+                    }
+                },
+                "previous_decision_audit": {"KUNNR": None},
+                "previous_manual_transform": {"KUNNR": None},
+                "previous_manual_apply": {"KUNNR": None},
+                "previous_transform_apply": {"KUNNR": True},
+            },
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    restored_count = catalog_views._restore_last_field_import()
+
+    assert restored_count == 1
+    assert fake_streamlit.session_state["mapping_editor_state"]["KUNNR"]["target"] == "customer_id"
+    assert "KUNNR" not in fake_streamlit.session_state["mapping_decision_audit"]
+    assert "manual_transform_KUNNR" not in fake_streamlit.session_state
+    assert "manual_apply_KUNNR" not in fake_streamlit.session_state
+    assert fake_streamlit.session_state["transform_KUNNR"] is True
+    assert catalog_views.CATALOG_LAST_FIELD_IMPORT_STATE_KEY not in fake_streamlit.session_state
+    assert "preview_response" not in fake_streamlit.session_state
+
+
 def test_mapping_set_reuse_block_reason_requires_approved_status() -> None:
     assert catalog_views._mapping_set_reuse_block_reason("approved") == ""
     assert (
@@ -284,7 +494,7 @@ def test_catalog_next_action_plan_prefers_governance_for_unapproved_version() ->
     )
 
     assert plan["table_label"] == "Canonical governance handoff"
-    assert plan["primary_area"] == "Canonical Console"
+    assert plan["primary_area"] == "Governance"
     assert plan["secondary_area"] == "Workspace"
     assert "Inspect governance owner" in plan["primary_summary"]
 
@@ -304,7 +514,7 @@ def test_catalog_next_action_plan_adds_canonical_secondary_for_unmatched_sources
 
     assert plan["table_label"] == "Workspace review handoff"
     assert plan["primary_area"] == "Workspace"
-    assert plan["secondary_area"] == "Canonical Console"
+    assert plan["secondary_area"] == "Governance"
     assert "canonical gaps" in plan["primary_summary"]
 
 
@@ -321,6 +531,23 @@ def test_open_catalog_handoff_switches_top_level_area(monkeypatch) -> None:
     assert fake_streamlit.session_state["pending_top_level_area"] == "Workspace"
     assert fake_streamlit.session_state["last_action"]["level"] == "info"
     assert "Catalog handoff: customer-master v4 -> Workspace." in fake_streamlit.session_state["last_action"]["message"]
+
+
+def test_open_catalog_review_focus_handoff_sets_workspace_review_filters(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_review_focus_handoff(
+        mapping_set_detail={"name": "customer-master", "version": 4},
+        canonical_concept="customer.id",
+    )
+
+    assert fake_streamlit.session_state["pending_top_level_area"] == "Workspace"
+    assert fake_streamlit.session_state["filter_status"] == "needs_review"
+    assert fake_streamlit.session_state["filter_confidence"] == "All"
+    assert fake_streamlit.session_state["filter_source"] == "All"
+    assert fake_streamlit.session_state["filter_canonical_concept"] == "customer.id"
+    assert "Workspace Review with filters" in fake_streamlit.session_state["last_action"]["message"]
 
 
 def test_catalog_detail_state_recovery_clears_stale_catalog_state(monkeypatch) -> None:

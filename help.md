@@ -12,6 +12,11 @@ Semantra trenutno ima pet glavnih area:
 - `System`
 - `Governance`
 
+Brza terminološka napomena:
+
+- `Canonical Console` je i dalje ključna governance površina, ali danas živi unutar `Governance`, a nije zaseban top-level tab
+- `System` je operativni naslednik ranijeg `Admin / Debug` opisa
+
 Ako prvi put ulaziš u aplikaciju, kreni ovim redom:
 
 1. `Workspace`
@@ -65,14 +70,14 @@ Kada koristiš `Standard`:
 
 - imaš realan source i realan target
 - možeš dodati odvojene companion fajlove za source i target kada su row-data uploadi ili SQL DDL nema dovoljno opisa
-- kasnije možeš da radiš preview i Pandas code generation
+- kasnije možeš da radiš preview, Pandas/PySpark code generation i artifact refinement
 
 Kada koristiš `Canonical`:
 
 - nemaš još realan target ili želiš prvo semantic normalization pass
 - rezultat je source -> canonical concept mapping
 - preview nije dostupan jer nema realnog target dataseta
-- codegen je i dalje dostupan nad trenutnim source -> canonical odlukama
+- codegen i artifact refinement su i dalje dostupni nad trenutnim source -> canonical odlukama
 
 ### `Review`
 
@@ -104,6 +109,7 @@ Važna razlika:
 - `Mapping Analysis Overview` opisuje trenutno stanje mapping-a kao tehnički readout
 - `Review Queue Plan` ne objašnjava mapping globalno, već predlaže kojim redom da rešavaš current review queue
 - `Gap Queue Summary` radi isto to, ali samo za canonical gap candidate red
+- `LLM Decision Proposals` ostaju advisory dok ih eksplicitno ne apply-uješ u `Decisions`
 
 ### `Decisions`
 
@@ -121,6 +127,7 @@ Važna pravila:
 
 - mapping set reuse nazad u Workspace radi samo za `approved` mapping setove
 - corrections se čuvaju samo kada je review ishod zatvoren, ne dok je odluka još nerešena
+- `Apply safe` je konzervativni batch mode za proposal apply, ne široko automatsko prihvatanje AI predloga
 - `Active Decisions` sada prikazuje i decision-origin metadata (`manual_mapping`, `llm_proposal`) kada je dostupna
 - decision-origin audit metadata je uključena i u decision JSON export/import tok
 
@@ -131,12 +138,14 @@ Ovde radiš:
 - `Generate preview`
 - `Generate Pandas code` ili `Generate PySpark code`
 - `Refine with LLM` nad već generisanim artefaktom
+- save/list/run transformation test set tokove kada su odluke accepted
 
 Važna razlika:
 
 - preview je advisory i možeš ga koristiti i pre finalnog odobravanja, da vidiš trenutno ponašanje mapping-a
 - standard code generation je governance-sensitive surface i traži accepted aktivne odluke
-- u canonical modu preview nije dostupan, ali code generation radi nad aktivnim source -> canonical odlukama
+- transformation test sets su governed artefakti i traže accepted aktivne odluke
+- u canonical modu preview nije dostupan, ali code generation i artifact refinement rade nad aktivnim source -> canonical odlukama
 
 Ako koristiš refinement:
 
@@ -164,6 +173,43 @@ Glavni panel unutar ovog dela je `Canonical Console`, koji je centralno mesto za
 - `Knowledge`
 - `Overlays & Runtime`
 - `Stewardship`
+
+### Canonical / Knowledge / Overlay Cheat Sheet
+
+Brzi mentalni model:
+
+- `Canonical` = stabilan poslovni jezik (šta pojam znači na nivou firme, nezavisno od sistema)
+- `Knowledge` = sistemsko-vendorski prevod (kako se isti pojam pojavljuje u SAP/Workday/QAD nazivima)
+- `Overlay` = kontrolisana dopuna (brzi patch aliasa/konteksta bez trajnog menjanja baze)
+- `Runtime` = aktivna kompozicija koju mapping engine stvarno koristi u tom trenutku
+
+Hijerarhija i prioritet pri preporukama:
+
+1. `Canonical` je semantički autoritet
+2. `Knowledge` vezuje sistemske termine za canonical koncepte
+3. `Active Overlay` ima prioritet u runtime-u nad baznim knowledge unosima
+4. `Runtime` je efektivno stanje za scoring, candidate ranking i explainability
+
+Kada šta koristiš:
+
+- koristi `Canonical` kada definišeš trajne, business-normalized koncepte
+- koristi `Knowledge` kada modeluješ sinonime i varijante po sistemu/domenima
+- koristi `Overlay` kada brzo zatvaraš konkretan gap bez full canonical promene
+- proveri `Overlays & Runtime` kada želiš da potvrdiš šta je trenutno aktivno u engine-u
+
+U procesu preporuka (praktično):
+
+- tokom candidate/ranking faze knowledge i canonical signali ulaze u finalni score zajedno sa lexical/semantic signalima
+- `Overlay` može odmah da promeni kvalitet preporuke jer menja aktivni runtime signal
+- ako nema dovoljno canonical pokrivenosti, red tipično ostaje `needs_review` i ulazi u canonical gap tok
+- u canonical-only modu canonical signal ima veću operativnu važnost jer nema realnog target dataseta
+
+Tipične odluke:
+
+- lokalni, sistemski problem: prvo `Overlay`
+- stabilan i opšti biznis pojam: `Canonical`
+- vendor-specifičan naziv/sinonim: `Knowledge`
+- kada je predlog neočekivan: prvo proveri runtime/active overlay pa tek onda engine tuning
 
 Ovde možeš:
 
@@ -198,6 +244,8 @@ Ovde možeš:
 - gledati concept-centric detail iz kataloga
 - učitati mapping set detail, audit i diff
 - videti hint tipa `similar approved integration exists`
+- generisati `Workspace Reuse Shortlist` za trenutni Workspace context
+- koristiti `Field Reuse Search` za pretragu samo nad izabranim source poljima iz aktivnog Workspace-a
 - pokrenuti `Workspace Reuse Fit` za izabranu catalog verziju
 - reuse-ovati odobren mapping set nazad u Workspace
 
@@ -205,6 +253,8 @@ Važno:
 
 - Catalog radi nad sačuvanim mapping set i catalog projekcijama, nije zamena za live review tok
 - reuse nazad u Workspace je governance-gated i zavisi od statusa mapping seta
+- `Workspace Reuse Shortlist` radi na nivou cele trenutne aktivnosti, ne na nivou pojedinačnog field subset-a
+- `Field Reuse Search` radi field-scoped shortlist i pregled preklapanja po source poljima, ali ne radi selektivni pull odluka sam po sebi
 - `Workspace Reuse Fit` je bounded explanation layer; ne apply-je ništa automatski, već objašnjava da li je selected version dobar kandidat za trenutni Workspace context
 
 Za detaljan opis catalog search-a, similarity heuristike i `Reuse in Workspace` ponašanja pogledaj `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
@@ -249,6 +299,11 @@ Ovde tipično proveravaš:
 
 Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš glavni mapping ili canonical stewardship tok.
 
+Važno:
+
+- `System` nije zamena za `Governance > Canonical Console`
+- write governance akcije ostaju u zasebnim workflow-ima
+
 ## Preporučeni tok rada
 
 ### Standard mapping tok
@@ -259,8 +314,8 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 4. Klikni `Generate mapping`.
 5. U `Review` po potrebi generiši `Mapping Analysis Overview`, koristi per-row ili batch `LLM refine`, zatim proveri trust layer, canonical path i eventualne canonical gap predloge.
 6. Ako review red deluje velik ili šumovit, koristi `Review Queue Plan` i po potrebi `Gap Queue Summary`.
-7. U `Decisions` unesi ručne izmene, eksportuj checkpoint ili sačuvaj mapping set.
-8. U `Output` koristi preview, pa zatim codegen kada su odluke accepted.
+7. U `Decisions` unesi ručne izmene, po potrebi apply-uj `LLM Decision Proposals`, eksportuj checkpoint ili sačuvaj mapping set.
+8. U `Output` koristi preview, zatim codegen kada su odluke accepted, a po potrebi i transformation test set tok.
 9. Ako generated artifact treba poliranje, koristi `Refine with LLM`, pa onda `Accept refined version` ili `Discard refinement`.
 
 ### Canonical-first tok
@@ -269,8 +324,8 @@ Koristi ovaj ekran kada ti treba operativni pregled sistema, a ne kada radiš gl
 2. Uploaduj source row-data ili source spec i po potrebi podesi `Canonical candidate pool size`.
 3. Po potrebi dodaj source companion metadata, pa klikni `Upload and profile`, zatim `Generate canonical mapping`.
 4. U `Review` proveri source -> canonical path i po potrebi koristi per-row `LLM refine`.
-5. U `Decisions` možeš ručno mapirati na canonical opcije.
-6. U `Output` možeš generisati kod i bez preview-a.
+5. U `Decisions` možeš ručno mapirati na canonical opcije i po potrebi zatvoriti advisory proposal tokove.
+6. U `Output` možeš generisati kod i raditi artifact refinement bez preview-a.
 7. Ako postoje semantic gap-ovi, po potrebi ih prebaci u canonical governance tok kroz `Governance` (`Canonical Console`).
 
 ### Canonical governance tok

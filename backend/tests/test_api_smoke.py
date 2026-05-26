@@ -2850,6 +2850,226 @@ def test_catalog_integration_detail_endpoint_returns_similar_integrations() -> N
     assert payload["similar_integrations"][0]["same_target_system"] is True
 
 
+def test_catalog_compare_integrations_endpoint_returns_overlap_and_delta_summary() -> None:
+    settings.admin_api_token = "secret-token"
+
+    client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "integration_name": "Customer Master Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "artifact_type": "canonical-only",
+            "canonical_concepts": ["customer.id", "customer.name", "customer.country_code"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer.id", "status": "accepted"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+    client.post(
+        "/mapping/sets",
+        json={
+            "name": "lead-master",
+            "integration_name": "Lead Reuse Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "artifact_type": "canonical-only",
+            "canonical_concepts": ["customer.id", "customer.name", "lead.id"],
+            "mapping_decisions": [
+                {"source": "lead_ref", "target": "customer.id", "status": "accepted"},
+            ],
+        },
+        headers=admin_headers(),
+    )
+
+    response = client.post(
+        "/catalog/compare-integrations",
+        json={
+            "base_integration_name": "Customer Master Sync",
+            "peer_integration_name": "Lead Reuse Sync",
+        },
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["same_source_system"] is True
+    assert payload["same_target_system"] is True
+    assert payload["same_business_domain"] is True
+    assert payload["same_artifact_type"] is True
+    assert payload["shared_concepts"] == ["customer.id", "customer.name"]
+    assert payload["base_only_concepts"] == ["customer.country_code"]
+    assert payload["peer_only_concepts"] == ["lead.id"]
+
+
+def test_catalog_workspace_reuse_shortlist_endpoint_ranks_best_match_first() -> None:
+    settings.admin_api_token = "secret-token"
+
+    first = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "integration_name": "Customer Master Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "artifact_type": "standard",
+            "canonical_concepts": ["customer.id", "customer.name"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer.id", "status": "accepted"},
+                {"source": "name", "target": "customer.name", "status": "accepted"},
+            ],
+            "unmatched_sources": [],
+        },
+        headers=admin_headers(),
+    )
+    first_id = first.json()["mapping_set_id"]
+    client.post(
+        f"/mapping/sets/{first_id}/status",
+        json={"status": "approved", "owner": "governance-team"},
+        headers=admin_headers(),
+    )
+
+    second = client.post(
+        "/mapping/sets",
+        json={
+            "name": "vendor-master",
+            "integration_name": "Vendor Master Sync",
+            "source_system": "SAP",
+            "target_system": "Coupa",
+            "business_domain": "Vendor",
+            "artifact_type": "standard",
+            "canonical_concepts": ["vendor.id"],
+            "mapping_decisions": [
+                {"source": "vendor_id", "target": "vendor.id", "status": "accepted"},
+            ],
+            "unmatched_sources": [],
+        },
+        headers=admin_headers(),
+    )
+    second_id = second.json()["mapping_set_id"]
+    client.post(
+        f"/mapping/sets/{second_id}/status",
+        json={"status": "approved", "owner": "governance-team"},
+        headers=admin_headers(),
+    )
+
+    response = client.post(
+        "/catalog/reuse-shortlist",
+        json={
+            "workspace_context": {
+                "workspace_loaded": True,
+                "source_system": "SAP",
+                "target_system": "Salesforce",
+                "business_domain": "Customer",
+                "current_shared_concepts": ["customer.id", "customer.name"],
+            },
+            "top_n": 5,
+        },
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["workspace_loaded"] is True
+    assert payload["considered_integrations"] >= 2
+    assert payload["candidates"][0]["integration_name"] == "Customer Master Sync"
+    assert payload["candidates"][0]["mapping_set_id"] == first_id
+    assert payload["candidates"][0]["score"] >= payload["candidates"][1]["score"]
+
+
+def test_catalog_field_reuse_shortlist_endpoint_ranks_by_selected_field_overlap() -> None:
+    settings.admin_api_token = "secret-token"
+
+    first = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-master",
+            "integration_name": "Customer Master Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "artifact_type": "standard",
+            "canonical_concepts": ["customer.id", "customer.name"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {
+                    "source": "name",
+                    "target": "customer_name",
+                    "status": "accepted",
+                    "transformation_code": "df_target['customer_name'] = df_source['name']",
+                },
+            ],
+            "unmatched_sources": [],
+        },
+        headers=admin_headers(),
+    )
+    first_id = first.json()["mapping_set_id"]
+    client.post(
+        f"/mapping/sets/{first_id}/status",
+        json={"status": "approved", "owner": "governance-team"},
+        headers=admin_headers(),
+    )
+
+    second = client.post(
+        "/mapping/sets",
+        json={
+            "name": "customer-lite",
+            "integration_name": "Customer Lite Sync",
+            "source_system": "SAP",
+            "target_system": "Salesforce",
+            "business_domain": "Customer",
+            "artifact_type": "standard",
+            "canonical_concepts": ["customer.id"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+            ],
+            "unmatched_sources": [],
+        },
+        headers=admin_headers(),
+    )
+    second_id = second.json()["mapping_set_id"]
+    client.post(
+        f"/mapping/sets/{second_id}/status",
+        json={"status": "approved", "owner": "governance-team"},
+        headers=admin_headers(),
+    )
+
+    response = client.post(
+        "/catalog/field-reuse-shortlist",
+        json={
+            "workspace_context": {
+                "workspace_loaded": True,
+                "source_system": "SAP",
+                "target_system": "Salesforce",
+                "business_domain": "Customer",
+            },
+            "selected_fields": [
+                {"source_field": "cust_id", "current_target": "customer_id", "current_status": "accepted"},
+                {"source_field": "name", "current_target": "customer_name", "current_status": "accepted"},
+                {"source_field": "country", "current_target": "country_code", "current_status": "needs_review"},
+            ],
+            "top_n": 5,
+        },
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["workspace_loaded"] is True
+    assert payload["selected_field_count"] == 3
+    assert payload["candidates"][0]["integration_name"] == "Customer Master Sync"
+    assert payload["candidates"][0]["matched_field_count"] == 2
+    assert payload["candidates"][0]["matched_fields"][0]["source_field"] == "cust_id"
+    assert payload["candidates"][0]["matched_fields"][0]["current_target_match"] is True
+    assert payload["candidates"][1]["integration_name"] == "Customer Lite Sync"
+    assert payload["candidates"][1]["matched_field_count"] == 1
+
+
 def test_catalog_concept_endpoint_returns_matching_integrations() -> None:
     settings.admin_api_token = "secret-token"
 
@@ -3551,6 +3771,38 @@ def test_runtime_config_endpoints_expose_and_reload_settings() -> None:
 
     assert reload_response.status_code == 200
     assert "sqlite_path" in reload_response.json()
+
+
+def test_runtime_config_scoring_profile_update_endpoint() -> None:
+    settings.admin_api_token = "secret-token"
+    previous_profile = settings.scoring_profile
+    try:
+        response = client.post(
+            "/observability/config/scoring-profile",
+            json={"scoring_profile": "canonical_first"},
+            headers=admin_headers(),
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload.get("scoring_profile") == "canonical_first"
+        assert "available_scoring_profiles" in payload
+        assert "canonical_first" in payload.get("available_scoring_profiles", [])
+    finally:
+        settings.scoring_profile = previous_profile
+
+
+def test_runtime_config_scoring_profile_update_rejects_unknown_profile() -> None:
+    settings.admin_api_token = "secret-token"
+
+    response = client.post(
+        "/observability/config/scoring-profile",
+        json={"scoring_profile": "definitely_unknown_profile"},
+        headers=admin_headers(),
+    )
+
+    assert response.status_code == 400
+    assert "Unknown scoring profile" in response.json().get("detail", "")
 
 
 def test_benchmark_dataset_endpoints_save_list_and_run_custom_benchmark() -> None:

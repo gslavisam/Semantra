@@ -11,7 +11,7 @@ import streamlit as st
 from streamlit_ui.governance import mapping_benchmark_block_reason
 
 
-AVAILABLE_SCORING_PROFILES = ["balanced", "schema_only", "data_rich", "canonical_first"]
+AVAILABLE_SCORING_PROFILES = ["balanced", "schema_only", "data_rich", "canonical_first", "description_priority"]
 
 
 def benchmark_dataset_options() -> list[tuple[str, int]]:
@@ -160,10 +160,21 @@ def render_benchmark_tab(
         with_llm = st.checkbox("Run selected benchmark with configured LLM", key="benchmark_with_llm")
         current_runtime_profile = str(st.session_state.get("runtime_config_snapshot", {}).get("scoring_profile", "balanced"))
         st.caption(f"Current runtime scoring profile: {current_runtime_profile}")
+        available_profiles = list(
+            st.session_state.get("runtime_config_snapshot", {}).get("available_scoring_profiles")
+            or AVAILABLE_SCORING_PROFILES
+        )
+        default_profiles = [
+            profile
+            for profile in st.session_state.get("benchmark_profile_compare_selection", available_profiles)
+            if profile in available_profiles
+        ]
+        if not default_profiles:
+            default_profiles = list(available_profiles)
         selected_profiles = st.multiselect(
             "Profiles to compare",
-            AVAILABLE_SCORING_PROFILES,
-            default=st.session_state.get("benchmark_profile_compare_selection", AVAILABLE_SCORING_PROFILES),
+            available_profiles,
+            default=default_profiles,
             key="benchmark_profile_compare_selection",
             help="Compare saved benchmark accuracy across multiple scoring profiles and get a default-profile recommendation.",
         )

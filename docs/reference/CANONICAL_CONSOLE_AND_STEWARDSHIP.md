@@ -20,6 +20,7 @@ Use this document when you need to understand:
 - how overlay versions move through validation, activation, archive, and rollback
 - how canonical-gap triage and approval work
 - how overlay aliases become promotable stewardship items
+- how canonical-gap LLM suggestions differ from Workspace LLM decision proposals
 - which actions are advisory versus durable governance actions
 
 ## Important Framing
@@ -242,6 +243,19 @@ This is how the Canonical Console can mirror gap state discovered in Workspace r
 
 If no usable response is returned, the API emits a safe `no_action` result instead of pretending a good suggestion exists.
 
+### LLM proposal boundary (important)
+
+There are two different LLM-assisted proposal surfaces in the product, and they should not be conflated:
+
+- canonical-gap suggestion in this governance flow (`POST /knowledge/canonical-gaps/suggest`)
+- Workspace decision proposals in the review/decision flow (`LLM Decision Proposals` in `streamlit_ui/workspace_review_views.py` and `streamlit_ui/workspace_decision_views.py`)
+
+Operational distinction:
+
+- canonical-gap suggestions are concept-level governance inputs that can end in overlay updates and stewardship state changes
+- Workspace decision proposals are row-level mapping suggestions (`llm_proposal` origin in decision audit) and do not mutate canonical runtime or stewardship state by themselves
+- durable canonical changes still require explicit governance actions (canonical-gap approve into overlay, or overlay-promotion promote-to-glossary)
+
 ### Proposal triage states
 
 Current proposal triage states are:
@@ -395,6 +409,7 @@ Current boundaries to keep in mind:
 - the runtime is DB-first, but canonical authoring still includes file-backed reseed inputs
 - only one active overlay runtime is surfaced at a time through the current runtime-status model
 - LLM support is bounded to suggestion; persistence, approval, and promotion remain explicit human actions
+- Workspace `LLM Decision Proposals` are intentionally outside canonical stewardship write paths; they update mapping decisions, not canonical runtime state
 - overlay activation and archive rules are hard backend constraints, not only UI hints
 
 ## Practical Reading Guide

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -20,7 +21,12 @@ CATALOG_DETAIL_STATE_KEYS = (
     "catalog_selected_mapping_set_diff",
     "catalog_reuse_fit_summary",
     "catalog_reuse_fit_error",
+    "catalog_workspace_reuse_shortlist",
+    "catalog_workspace_field_reuse_shortlist",
+    "catalog_integration_pair_compare",
 )
+
+CATALOG_LAST_FIELD_IMPORT_STATE_KEY = "catalog_last_field_import"
 
 
 def _normalized_text(value: object) -> str:
@@ -305,6 +311,82 @@ def _catalog_reuse_fit_payload(mapping_set_detail: dict[str, Any]) -> dict[str, 
     return {
         "mapping_set_detail": mapping_set_detail,
         "workspace_context": _catalog_reuse_fit_workspace_context(),
+    }
+
+
+def _catalog_workspace_field_selection_rows() -> list[dict[str, Any]]:
+    upload_response = st.session_state.get("upload_response") or {}
+    mapping_response = st.session_state.get("mapping_response") or {}
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+
+    rows_by_source: dict[str, dict[str, Any]] = {}
+
+    source_columns = (((upload_response.get("source") or {}).get("schema_profile") or {}).get("columns") or [])
+    for column in source_columns:
+        source_field = _normalized_text((column or {}).get("name"))
+        if not source_field:
+            continue
+        rows_by_source[source_field] = {
+            "source_field": source_field,
+            "current_target": "",
+            "current_status": "",
+        }
+
+    for mapping in mapping_response.get("mappings") or []:
+        source_field = _normalized_text((mapping or {}).get("source"))
+        if not source_field:
+            continue
+        row = rows_by_source.setdefault(
+            source_field,
+            {"source_field": source_field, "current_target": "", "current_status": ""},
+        )
+        row["current_target"] = _normalized_text((mapping or {}).get("target")) or row["current_target"]
+        row["current_status"] = _normalized_text((mapping or {}).get("status")) or row["current_status"]
+
+    for ranked in mapping_response.get("ranked_mappings") or []:
+        source_field = _normalized_text((ranked or {}).get("source"))
+        if not source_field:
+            continue
+        selected = (ranked or {}).get("selected") or {}
+        row = rows_by_source.setdefault(
+            source_field,
+            {"source_field": source_field, "current_target": "", "current_status": ""},
+        )
+        row["current_target"] = _normalized_text(selected.get("target")) or row["current_target"]
+        row["current_status"] = _normalized_text(selected.get("status")) or row["current_status"]
+
+    for source_field, entry in editor_state.items():
+        source_name = _normalized_text(source_field)
+        if not source_name:
+            continue
+        row = rows_by_source.setdefault(
+            source_name,
+            {"source_field": source_name, "current_target": "", "current_status": ""},
+        )
+        row["current_target"] = _normalized_text((entry or {}).get("target")) or row["current_target"]
+        row["current_status"] = _normalized_text((entry or {}).get("status")) or row["current_status"]
+
+    return sorted(rows_by_source.values(), key=lambda item: _normalized_text(item.get("source_field")).lower())
+
+
+def _catalog_field_reuse_shortlist_payload(selected_source_fields: list[str]) -> dict[str, Any]:
+    selection_rows = _catalog_workspace_field_selection_rows()
+    selection_by_source = {
+        _normalized_text(item.get("source_field")): item
+        for item in selection_rows
+        if _normalized_text(item.get("source_field"))
+    }
+    return {
+        "workspace_context": _catalog_reuse_fit_workspace_context(),
+        "selected_fields": [
+            {
+                "source_field": source_field,
+                "current_target": selection_by_source.get(source_field, {}).get("current_target") or None,
+                "current_status": selection_by_source.get(source_field, {}).get("current_status") or None,
+            }
+            for source_field in selected_source_fields
+            if source_field in selection_by_source
+        ],
     }
 
 
@@ -612,6 +694,34 @@ def _open_catalog_handoff(area: str, mapping_set_detail: dict[str, Any], summary
     }
 
 
+def _open_catalog_review_focus_handoff(
+    *,
+    mapping_set_detail: dict[str, Any],
+    canonical_concept: str | None = None,
+    confidence_label: str | None = None,
+) -> None:
+    """Open Workspace with Review filters prefilled from Catalog discovery context."""
+
+    concept = _normalized_text(canonical_concept)
+    confidence = _normalized_text(confidence_label) or "All"
+    name = _normalized_text(mapping_set_detail.get("name")) or "mapping-set"
+    version = int(mapping_set_detail.get("version") or 0)
+
+    st.session_state["pending_top_level_area"] = "Workspace"
+    st.session_state["filter_status"] = "needs_review"
+    st.session_state["filter_confidence"] = confidence if confidence else "All"
+    st.session_state["filter_source"] = "All"
+    st.session_state["filter_canonical_concept"] = concept if concept else "All"
+    st.session_state["last_action"] = {
+        "level": "info",
+        "message": (
+            f"Catalog handoff: {name} v{version} -> Workspace Review with filters "
+            f"status=needs_review, confidence={st.session_state['filter_confidence']}, "
+            f"canonical_concept={st.session_state['filter_canonical_concept']}."
+        ),
+    }
+
+
 def _catalog_detail_state_recovery(error: httpx.HTTPError) -> dict[str, str] | None:
     response = getattr(error, "response", None)
     if response is None or response.status_code != 404:
@@ -853,6 +963,244 @@ def _apply_mapping_set_detail_to_workspace(mapping_set_detail: dict[str, Any]) -
     st.session_state["mapping_set_review_note"] = mapping_set_detail.get("review_note") or ""
 
 
+def _reset_workspace_generated_artifacts() -> None:
+    for key in (
+        "preview_response",
+        "codegen_response",
+        "codegen_refinement_response",
+        "mapping_analysis_summary",
+        "mapping_analysis_error",
+        "mapping_analysis_spoken_script",
+        "mapping_analysis_audio_bytes",
+        "mapping_analysis_audio_mime_type",
+        "mapping_analysis_audio_error",
+        "review_plan_summary",
+        "review_plan_error",
+    ):
+        st.session_state.pop(key, None)
+
+
+def _catalog_field_reuse_compare_rows(matched_rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Build a side-by-side current-versus-saved comparison for matched field reuse rows."""
+
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    rows: list[dict[str, str | bool]] = []
+    for item in matched_rows:
+        source = _normalized_text(item.get("source_field"))
+        if not source:
+            continue
+        current_entry = editor_state.get(source) or {}
+        current_target = _normalized_text(current_entry.get("target"))
+        saved_target = _normalized_text(item.get("target"))
+        current_status = _normalized_text(current_entry.get("status"))
+        saved_status = _normalized_text(item.get("status"))
+        current_transform = _normalized_text(current_entry.get("manual_transformation_code"))
+        saved_transform_present = bool(item.get("transformation_present"))
+        if current_target and saved_target:
+            target_change = "same target" if current_target == saved_target else "override"
+        elif saved_target:
+            target_change = "safe fill"
+        elif current_target:
+            target_change = "clear current target"
+        else:
+            target_change = "still unmapped"
+        if current_transform and saved_transform_present:
+            transformation_change = "transform replace"
+        elif saved_transform_present:
+            transformation_change = "transform add"
+        elif current_transform:
+            transformation_change = "keep current transform"
+        else:
+            transformation_change = "no transform"
+        has_conflict = target_change in {"override", "clear current target"} or transformation_change == "transform replace"
+        if target_change == "safe fill" and transformation_change == "transform add":
+            review_label = "safe fill + transform add"
+        elif target_change == "safe fill":
+            review_label = "safe fill"
+        elif target_change == "override" and transformation_change == "transform replace":
+            review_label = "override + transform replace"
+        elif target_change == "override":
+            review_label = "override"
+        elif target_change == "clear current target":
+            review_label = "clear current target"
+        elif transformation_change == "transform replace":
+            review_label = "transform replace"
+        elif transformation_change == "transform add":
+            review_label = "transform add"
+        else:
+            review_label = "aligned"
+        rows.append(
+            {
+                "source_field": source,
+                "current_target": current_target or "",
+                "saved_target": saved_target or "",
+                "reuse_label": review_label,
+                "conflict": "yes" if has_conflict else "no",
+                "target_change": target_change,
+                "current_status": current_status or "",
+                "saved_status": saved_status or "",
+                "transformation_change": transformation_change,
+            }
+        )
+    return rows
+
+
+def _restore_last_field_import() -> int:
+    """Undo the most recent partial field import from Catalog back into Workspace."""
+
+    snapshot = st.session_state.get(CATALOG_LAST_FIELD_IMPORT_STATE_KEY) or {}
+    imported_sources = [source for source in snapshot.get("imported_sources") or [] if _normalized_text(source)]
+    if not imported_sources:
+        return 0
+
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    decision_audit = st.session_state.get("mapping_decision_audit") or {}
+    previous_editor_state = snapshot.get("previous_editor_state") or {}
+    previous_decision_audit = snapshot.get("previous_decision_audit") or {}
+    previous_manual_transform = snapshot.get("previous_manual_transform") or {}
+    previous_manual_apply = snapshot.get("previous_manual_apply") or {}
+    previous_transform_apply = snapshot.get("previous_transform_apply") or {}
+
+    restored_count = 0
+    for raw_source in imported_sources:
+        source = _normalized_text(raw_source)
+        if not source:
+            continue
+        if source in previous_editor_state:
+            previous_entry = previous_editor_state[source]
+            if previous_entry is None:
+                editor_state.pop(source, None)
+            else:
+                editor_state[source] = previous_entry
+        if source in previous_decision_audit:
+            previous_audit = previous_decision_audit[source]
+            if previous_audit is None:
+                decision_audit.pop(source, None)
+            else:
+                decision_audit[source] = previous_audit
+        if source in previous_manual_transform:
+            previous_value = previous_manual_transform[source]
+            if previous_value is None:
+                st.session_state.pop(f"manual_transform_{source}", None)
+            else:
+                st.session_state[f"manual_transform_{source}"] = previous_value
+        if source in previous_manual_apply:
+            previous_value = previous_manual_apply[source]
+            if previous_value is None:
+                st.session_state.pop(f"manual_apply_{source}", None)
+            else:
+                st.session_state[f"manual_apply_{source}"] = previous_value
+        if source in previous_transform_apply:
+            previous_value = previous_transform_apply[source]
+            if previous_value is None:
+                st.session_state.pop(f"transform_{source}", None)
+            else:
+                st.session_state[f"transform_{source}"] = previous_value
+        restored_count += 1
+
+    if not restored_count:
+        return 0
+
+    st.session_state["mapping_editor_state"] = editor_state
+    st.session_state["mapping_decision_audit"] = decision_audit
+    _reset_workspace_generated_artifacts()
+    st.session_state.pop(CATALOG_LAST_FIELD_IMPORT_STATE_KEY, None)
+    return restored_count
+
+
+def _merge_mapping_set_fields_into_workspace(
+    mapping_set_detail: dict[str, Any],
+    *,
+    selected_sources: list[str],
+) -> int:
+    """Merge only selected mapping decisions from a saved mapping set into the active workspace state."""
+
+    normalized_sources = [source for source in {_normalized_text(item) for item in selected_sources} if source]
+    if not normalized_sources:
+        return 0
+
+    upload_response = st.session_state.get("upload_response") or {}
+    valid_source_names = {
+        _normalized_text((column or {}).get("name"))
+        for column in (((upload_response.get("source") or {}).get("schema_profile") or {}).get("columns") or [])
+        if _normalized_text((column or {}).get("name"))
+    }
+    if valid_source_names:
+        normalized_sources = [source for source in normalized_sources if source in valid_source_names]
+    if not normalized_sources:
+        return 0
+
+    selected_source_set = set(normalized_sources)
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    decision_audit = st.session_state.get("mapping_decision_audit") or {}
+    previous_editor_state: dict[str, dict[str, Any] | None] = {}
+    previous_decision_audit: dict[str, dict[str, Any] | None] = {}
+    previous_manual_transform: dict[str, str | None] = {}
+    previous_manual_apply: dict[str, bool | None] = {}
+    previous_transform_apply: dict[str, bool | None] = {}
+    applied_count = 0
+
+    for decision in mapping_set_detail.get("mapping_decisions", []):
+        source = _normalized_text((decision or {}).get("source"))
+        if source not in selected_source_set:
+            continue
+        target = _normalized_text((decision or {}).get("target"))
+        status = _normalized_text((decision or {}).get("status")) or "needs_review"
+        transformation_code = _normalized_text((decision or {}).get("transformation_code"))
+        current_entry = editor_state.get(source, {})
+        previous_editor_state[source] = dict(current_entry) if source in editor_state else None
+        previous_decision_audit[source] = dict(decision_audit[source]) if source in decision_audit else None
+        previous_manual_transform[source] = st.session_state.get(f"manual_transform_{source}")
+        previous_manual_apply[source] = st.session_state.get(f"manual_apply_{source}")
+        previous_transform_apply[source] = st.session_state.get(f"transform_{source}")
+        editor_state[source] = {
+            "target": target,
+            "status": status,
+            "suggested_target": current_entry.get("suggested_target", ""),
+            "suggested_transformation_code": current_entry.get("suggested_transformation_code", ""),
+            "manual_transformation_code": transformation_code,
+            "llm_transformation_instruction": current_entry.get("llm_transformation_instruction", ""),
+            "generated_transformation_reasoning": current_entry.get("generated_transformation_reasoning", []),
+            "generated_transformation_warnings": current_entry.get("generated_transformation_warnings", []),
+            "apply_transformation": False,
+            "manual_apply_transformation": bool(transformation_code),
+            "manual": source not in editor_state or bool(current_entry.get("manual", False)),
+        }
+        st.session_state[f"transform_{source}"] = False
+        st.session_state[f"manual_transform_{source}"] = transformation_code
+        st.session_state[f"manual_apply_{source}"] = bool(transformation_code)
+        decision_audit[source] = {
+            "origin": "catalog_field_reuse",
+            "applied_at": datetime.now(UTC).isoformat(),
+            "details": {
+                "mapping_set_id": int(mapping_set_detail.get("mapping_set_id") or 0),
+                "mapping_set_name": _normalized_text(mapping_set_detail.get("name")) or None,
+                "mapping_set_version": int(mapping_set_detail.get("version") or 0),
+                "mode": "selected_field_import",
+            },
+        }
+        applied_count += 1
+
+    if not applied_count:
+        return 0
+
+    st.session_state["mapping_editor_state"] = editor_state
+    st.session_state["mapping_decision_audit"] = decision_audit
+    st.session_state[CATALOG_LAST_FIELD_IMPORT_STATE_KEY] = {
+        "mapping_set_id": int(mapping_set_detail.get("mapping_set_id") or 0),
+        "mapping_set_name": _normalized_text(mapping_set_detail.get("name")) or None,
+        "mapping_set_version": int(mapping_set_detail.get("version") or 0),
+        "imported_sources": list(previous_editor_state.keys()),
+        "previous_editor_state": previous_editor_state,
+        "previous_decision_audit": previous_decision_audit,
+        "previous_manual_transform": previous_manual_transform,
+        "previous_manual_apply": previous_manual_apply,
+        "previous_transform_apply": previous_transform_apply,
+    }
+    _reset_workspace_generated_artifacts()
+    return applied_count
+
+
 def _reuse_catalog_mapping_set_in_workspace(
     mapping_set_id: int,
     *,
@@ -1067,6 +1415,444 @@ def render_catalog_tab(
             if integration_name and integration_name not in seen_names:
                 seen_names.add(integration_name)
                 unique_names.append(integration_name)
+
+        with st.expander("Workspace Reuse Shortlist", expanded=False):
+            st.caption(
+                "Rank approved catalog candidates against the current workspace context using deterministic concept/system/domain/quality signals."
+            )
+            st.caption(
+                "This panel is action-based: click Generate workspace shortlist. Candidates are drawn from approved catalog integrations, not only from the visible table row."
+            )
+            shortlist_top_n = st.slider(
+                "Top candidates",
+                min_value=3,
+                max_value=15,
+                value=int(st.session_state.get("catalog_reuse_shortlist_top_n", 5) or 5),
+                key="catalog_reuse_shortlist_top_n",
+            )
+            if st.button("Generate workspace shortlist", width="stretch", key="catalog_generate_reuse_shortlist"):
+                try:
+                    shortlist_payload = api_request(
+                        "POST",
+                        "/catalog/reuse-shortlist",
+                        json={
+                            "workspace_context": _catalog_reuse_fit_workspace_context(),
+                            "top_n": shortlist_top_n,
+                        },
+                    )
+                    st.session_state["catalog_workspace_reuse_shortlist"] = shortlist_payload
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Generated workspace reuse shortlist with {len(shortlist_payload.get('candidates', []))} candidate(s).",
+                    }
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Generating workspace shortlist failed: {error}",
+                    }
+                    st.rerun()
+
+            has_shortlist_run = "catalog_workspace_reuse_shortlist" in st.session_state
+            shortlist = st.session_state.get("catalog_workspace_reuse_shortlist") or {}
+            shortlist_rows = shortlist.get("candidates") or []
+            if shortlist_rows:
+                st.caption(
+                    f"Considered integrations: {shortlist.get('considered_integrations', 0)} | workspace_loaded={shortlist.get('workspace_loaded', False)}"
+                )
+                st.dataframe(
+                    [
+                        {
+                            "integration_name": item.get("integration_name"),
+                            "mapping_set_id": item.get("mapping_set_id"),
+                            "version": item.get("version"),
+                            "score": round(float(item.get("score", 0.0) or 0.0), 3),
+                            "concept_overlap": round(float(item.get("concept_overlap_score", 0.0) or 0.0), 3),
+                            "system_match": round(float(item.get("system_match_score", 0.0) or 0.0), 3),
+                            "domain_match": round(float(item.get("domain_match_score", 0.0) or 0.0), 3),
+                            "quality": round(float(item.get("accepted_quality_score", 0.0) or 0.0), 3),
+                            "shared_concepts": ", ".join(item.get("shared_concepts") or []),
+                        }
+                        for item in shortlist_rows
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+                shortlist_names = [item.get("integration_name") for item in shortlist_rows if _normalized_text(item.get("integration_name"))]
+                shortlist_selected_name = st.selectbox(
+                    "Open shortlist integration",
+                    shortlist_names,
+                    key="catalog_shortlist_selected_integration",
+                )
+                shortlist_selected = next(
+                    (
+                        item
+                        for item in shortlist_rows
+                        if _normalized_text(item.get("integration_name")) == _normalized_text(shortlist_selected_name)
+                    ),
+                    shortlist_rows[0],
+                )
+                for reason in shortlist_selected.get("reasons") or []:
+                    st.caption(f"- {reason}")
+                shortlist_actions = st.columns(3)
+                if shortlist_actions[0].button("Open shortlisted integration", width="stretch", key="catalog_open_shortlist_integration"):
+                    try:
+                        _load_catalog_integration_detail(shortlist_selected_name, api_request=api_request)
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Loading shortlisted integration failed: {error}",
+                        }
+                        st.rerun()
+                if shortlist_actions[1].button("Open shortlisted version", width="stretch", key="catalog_open_shortlist_version"):
+                    try:
+                        _load_catalog_mapping_set_detail(int(shortlist_selected.get("mapping_set_id") or 0), api_request=api_request)
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Loading shortlisted version failed: {error}",
+                        }
+                        st.rerun()
+                if shortlist_actions[2].button("Open review focus", width="stretch", key="catalog_open_shortlist_review_focus"):
+                    _open_catalog_review_focus_handoff(
+                        mapping_set_detail={
+                            "name": shortlist_selected.get("integration_name"),
+                            "version": shortlist_selected.get("version"),
+                        },
+                        canonical_concept=(shortlist_selected.get("shared_concepts") or [""])[0],
+                    )
+
+        with st.expander("Field Reuse Search", expanded=False):
+            st.caption(
+                "Search approved catalog integrations using only selected source fields from the current workspace. "
+                "This is field-scoped discovery before any reuse action."
+            )
+            st.caption(
+                "The shortlist uses exact source-field overlap first, then current target agreement, system/domain alignment, and approved-artifact quality proxies."
+            )
+            field_rows = _catalog_workspace_field_selection_rows()
+            if not field_rows:
+                st.info("Load a source dataset in Workspace first so Catalog can search by selected workspace fields.")
+            else:
+                selected_source_fields = st.multiselect(
+                    "Selected workspace source fields",
+                    options=[item.get("source_field") for item in field_rows if _normalized_text(item.get("source_field"))],
+                    key="catalog_field_reuse_selected_sources",
+                    help="Choose only the source fields you want to search across approved saved integrations.",
+                )
+                field_top_n = st.slider(
+                    "Top field-match candidates",
+                    min_value=3,
+                    max_value=15,
+                    value=int(st.session_state.get("catalog_field_reuse_shortlist_top_n", 5) or 5),
+                    key="catalog_field_reuse_shortlist_top_n",
+                )
+                if st.button(
+                    "Generate field reuse shortlist",
+                    width="stretch",
+                    key="catalog_generate_field_reuse_shortlist",
+                    disabled=not selected_source_fields,
+                ):
+                    try:
+                        shortlist_payload = _catalog_field_reuse_shortlist_payload(selected_source_fields)
+                        shortlist_payload["top_n"] = field_top_n
+                        field_shortlist = api_request(
+                            "POST",
+                            "/catalog/field-reuse-shortlist",
+                            json=shortlist_payload,
+                        )
+                        st.session_state["catalog_workspace_field_reuse_shortlist"] = field_shortlist
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": f"Generated field reuse shortlist with {len(field_shortlist.get('candidates', []))} candidate(s).",
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Generating field reuse shortlist failed: {error}",
+                        }
+                        st.rerun()
+
+                has_field_shortlist_run = "catalog_workspace_field_reuse_shortlist" in st.session_state
+                field_shortlist = st.session_state.get("catalog_workspace_field_reuse_shortlist") or {}
+                field_shortlist_rows = field_shortlist.get("candidates") or []
+                if field_shortlist_rows:
+                    st.caption(
+                        f"Selected fields: {field_shortlist.get('selected_field_count', 0)} | "
+                        f"considered integrations: {field_shortlist.get('considered_integrations', 0)} | "
+                        f"workspace_loaded={field_shortlist.get('workspace_loaded', False)}"
+                    )
+                    st.dataframe(
+                        [
+                            {
+                                "integration_name": item.get("integration_name"),
+                                "mapping_set_id": item.get("mapping_set_id"),
+                                "version": item.get("version"),
+                                "score": round(float(item.get("score", 0.0) or 0.0), 3),
+                                "matched_fields": int(item.get("matched_field_count") or 0),
+                                "source_overlap": round(float(item.get("source_field_overlap_score", 0.0) or 0.0), 3),
+                                "target_match": round(float(item.get("current_target_match_score", 0.0) or 0.0), 3),
+                                "system_match": round(float(item.get("system_match_score", 0.0) or 0.0), 3),
+                                "domain_match": round(float(item.get("domain_match_score", 0.0) or 0.0), 3),
+                            }
+                            for item in field_shortlist_rows
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+                    field_shortlist_names = [
+                        item.get("integration_name")
+                        for item in field_shortlist_rows
+                        if _normalized_text(item.get("integration_name"))
+                    ]
+                    selected_field_candidate_name = st.selectbox(
+                        "Open field-match candidate",
+                        field_shortlist_names,
+                        key="catalog_field_reuse_selected_integration",
+                    )
+                    selected_field_candidate = next(
+                        (
+                            item
+                            for item in field_shortlist_rows
+                            if _normalized_text(item.get("integration_name")) == _normalized_text(selected_field_candidate_name)
+                        ),
+                        field_shortlist_rows[0],
+                    )
+                    for reason in selected_field_candidate.get("reasons") or []:
+                        st.caption(f"- {reason}")
+                    matched_rows = selected_field_candidate.get("matched_fields") or []
+                    if matched_rows:
+                        st.dataframe(
+                            [
+                                {
+                                    "source_field": item.get("source_field"),
+                                    "saved_target": item.get("target") or "",
+                                    "status": item.get("status") or "",
+                                    "current_target_match": "yes" if item.get("current_target_match") else "no",
+                                    "transformation": "yes" if item.get("transformation_present") else "no",
+                                }
+                                for item in matched_rows
+                            ],
+                            width="stretch",
+                            hide_index=True,
+                        )
+                        compare_rows = _catalog_field_reuse_compare_rows(matched_rows)
+                        if compare_rows:
+                            conflicts_only = st.checkbox(
+                                "Show only conflict fields",
+                                value=False,
+                                key=f"catalog_field_reuse_conflicts_only_{int(selected_field_candidate.get('mapping_set_id') or 0)}",
+                                help="Filter the comparison to fields where import would override the current target or replace an existing transform.",
+                            )
+                            display_compare_rows = [row for row in compare_rows if row.get("conflict") == "yes"] if conflicts_only else compare_rows
+                            st.caption("Current Workspace vs saved mapping set for the selected matched fields.")
+                            if display_compare_rows:
+                                st.dataframe(display_compare_rows, width="stretch", hide_index=True)
+                            else:
+                                st.caption("No conflict fields in the current comparison.")
+                    selected_match_sources = st.multiselect(
+                        "Matched fields to import",
+                        options=[_normalized_text(item.get("source_field")) for item in matched_rows if _normalized_text(item.get("source_field"))],
+                        default=[_normalized_text(item.get("source_field")) for item in matched_rows if _normalized_text(item.get("source_field"))],
+                        key=f"catalog_field_reuse_matched_sources_{int(selected_field_candidate.get('mapping_set_id') or 0)}",
+                        help="Choose which overlapping source fields should be merged into the active Workspace decisions.",
+                    )
+                    last_field_import = st.session_state.get(CATALOG_LAST_FIELD_IMPORT_STATE_KEY) or {}
+                    last_import_sources = [source for source in last_field_import.get("imported_sources") or [] if _normalized_text(source)]
+                    if last_import_sources:
+                        last_import_name = _normalized_text(last_field_import.get("mapping_set_name")) or "saved mapping set"
+                        last_import_version = int(last_field_import.get("mapping_set_version") or 0)
+                        st.caption(
+                            f"Last partial import: {last_import_name} v{last_import_version} | fields: {', '.join(last_import_sources)}"
+                        )
+                    field_actions = st.columns(4)
+                    if field_actions[0].button(
+                        "Open field-match integration",
+                        width="stretch",
+                        key="catalog_open_field_reuse_integration",
+                    ):
+                        try:
+                            _load_catalog_integration_detail(selected_field_candidate_name, api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Loading field-match integration failed: {error}",
+                            }
+                            st.rerun()
+                    if field_actions[1].button(
+                        "Open field-match version",
+                        width="stretch",
+                        key="catalog_open_field_reuse_version",
+                    ):
+                        try:
+                            _load_catalog_mapping_set_detail(int(selected_field_candidate.get("mapping_set_id") or 0), api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Loading field-match version failed: {error}",
+                            }
+                            st.rerun()
+                    if field_actions[2].button(
+                        "Import selected fields into Workspace",
+                        width="stretch",
+                        key="catalog_import_field_reuse_selection",
+                        disabled=not selected_match_sources,
+                    ):
+                        try:
+                            mapping_set_detail = api_request(
+                                "GET",
+                                f"/mapping/sets/{int(selected_field_candidate.get('mapping_set_id') or 0)}",
+                            )
+                            applied_count = _merge_mapping_set_fields_into_workspace(
+                                mapping_set_detail,
+                                selected_sources=selected_match_sources,
+                            )
+                            if applied_count:
+                                st.session_state["last_action"] = {
+                                    "level": "success",
+                                    "message": (
+                                        f"Imported {applied_count} field decision(s) from '{selected_field_candidate_name}' into the active Workspace. "
+                                        "Open Workspace > Decisions or Review to continue."
+                                    ),
+                                }
+                                st.session_state["pending_top_level_area"] = "Workspace"
+                            else:
+                                st.session_state["last_action"] = {
+                                    "level": "warning",
+                                    "message": "No selected field decisions were imported into the current Workspace.",
+                                }
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Importing selected field decisions failed: {error}",
+                            }
+                            st.rerun()
+                    if field_actions[3].button(
+                        "Undo last field import",
+                        width="stretch",
+                        key="catalog_undo_last_field_reuse_import",
+                        disabled=not last_import_sources,
+                    ):
+                        restored_count = _restore_last_field_import()
+                        if restored_count:
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": f"Reverted the last partial field import for {restored_count} field(s).",
+                            }
+                            st.session_state["pending_top_level_area"] = "Workspace"
+                        else:
+                            st.session_state["last_action"] = {
+                                "level": "warning",
+                                "message": "There is no partial field import snapshot to restore.",
+                            }
+                        st.rerun()
+                else:
+                    if has_field_shortlist_run:
+                        st.info(
+                            "No field-match candidates were returned. Most commonly this means there are no approved integrations with overlap for the selected fields."
+                        )
+                        st.caption(
+                            f"Considered integrations: {field_shortlist.get('considered_integrations', 0)} | workspace_loaded={field_shortlist.get('workspace_loaded', False)}"
+                        )
+                    else:
+                        st.info("No field reuse shortlist generated yet. Click Generate field reuse shortlist.")
+
+        if len(unique_names) >= 2:
+            with st.expander("Integration Pair Compare", expanded=False):
+                st.caption("Compare two integrations side-by-side before deciding reuse or diff drilldown.")
+                compare_columns = st.columns(2)
+                compare_base_name = compare_columns[0].selectbox(
+                    "Base integration",
+                    unique_names,
+                    key="catalog_compare_base_name",
+                )
+                compare_peer_options = [name for name in unique_names if _normalized_text(name) != _normalized_text(compare_base_name)]
+                compare_peer_name = compare_columns[1].selectbox(
+                    "Peer integration",
+                    compare_peer_options,
+                    key="catalog_compare_peer_name",
+                )
+                if st.button("Compare integrations", width="stretch", key="catalog_compare_integrations"):
+                    try:
+                        compare_payload = api_request(
+                            "POST",
+                            "/catalog/compare-integrations",
+                            json={
+                                "base_integration_name": compare_base_name,
+                                "peer_integration_name": compare_peer_name,
+                            },
+                        )
+                        st.session_state["catalog_integration_pair_compare"] = compare_payload
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": "Loaded integration compare summary.",
+                        }
+                        st.rerun()
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Comparing integrations failed: {error}",
+                        }
+                        st.rerun()
+
+                compare_payload = st.session_state.get("catalog_integration_pair_compare") or {}
+                if compare_payload:
+                    st.write(compare_payload.get("compare_summary") or "")
+                    summary_metrics = st.columns(4)
+                    summary_metrics[0].metric("Shared concepts", len(compare_payload.get("shared_concepts") or []))
+                    summary_metrics[1].metric("Base-only concepts", len(compare_payload.get("base_only_concepts") or []))
+                    summary_metrics[2].metric("Peer-only concepts", len(compare_payload.get("peer_only_concepts") or []))
+                    summary_metrics[3].metric(
+                        "System/domain parity",
+                        "yes"
+                        if (
+                            compare_payload.get("same_source_system")
+                            and compare_payload.get("same_target_system")
+                            and compare_payload.get("same_business_domain")
+                        )
+                        else "partial",
+                    )
+                    st.dataframe(
+                        [
+                            {
+                                "bucket": "shared_concepts",
+                                "concepts": ", ".join(compare_payload.get("shared_concepts") or []),
+                            },
+                            {
+                                "bucket": "base_only_concepts",
+                                "concepts": ", ".join(compare_payload.get("base_only_concepts") or []),
+                            },
+                            {
+                                "bucket": "peer_only_concepts",
+                                "concepts": ", ".join(compare_payload.get("peer_only_concepts") or []),
+                            },
+                        ],
+                        width="stretch",
+                        hide_index=True,
+                    )
+                    for action in compare_payload.get("suggested_next_actions") or []:
+                        st.caption(f"- {action}")
+                    compare_focus_columns = st.columns(2)
+                    if compare_focus_columns[0].button("Open base review focus", width="stretch", key="catalog_open_compare_base_focus"):
+                        _open_catalog_review_focus_handoff(
+                            mapping_set_detail=compare_payload.get("base_integration", {}).get("latest_version", {})
+                            or {"name": compare_base_name, "version": 0},
+                            canonical_concept=(compare_payload.get("shared_concepts") or [""])[0],
+                        )
+                        st.rerun()
+                    if compare_focus_columns[1].button("Open peer review focus", width="stretch", key="catalog_open_compare_peer_focus"):
+                        _open_catalog_review_focus_handoff(
+                            mapping_set_detail=compare_payload.get("peer_integration", {}).get("latest_version", {})
+                            or {"name": compare_peer_name, "version": 0},
+                            canonical_concept=(compare_payload.get("shared_concepts") or [""])[0],
+                        )
+                        st.rerun()
 
         detail_columns = st.columns([3, 1])
         selected_name = detail_columns[0].selectbox(

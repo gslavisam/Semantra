@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.deps import require_admin
-from app.models.mapping import CatalogConceptDetail, CatalogIntegrationDetail, CatalogIntegrationRecord, CatalogReuseFitRequest, CatalogReuseFitResponse
+from app.models.mapping import CatalogConceptDetail, CatalogFieldReuseShortlistRequest, CatalogFieldReuseShortlistResponse, CatalogIntegrationDetail, CatalogIntegrationRecord, CatalogReuseFitRequest, CatalogReuseFitResponse
+from app.models.mapping import (
+    CatalogIntegrationCompareRequest,
+    CatalogIntegrationCompareResponse,
+    CatalogWorkspaceReuseShortlistRequest,
+    CatalogWorkspaceReuseShortlistResponse,
+)
 from app.services.catalog_reuse_fit_service import build_catalog_reuse_fit
 from app.services.catalog_repository import catalog_repository
 from app.services.llm_service import build_provider_from_settings
@@ -98,3 +104,41 @@ async def explain_catalog_reuse_fit(request: CatalogReuseFitRequest) -> CatalogR
 
     provider = build_provider_from_settings()
     return build_catalog_reuse_fit(request, provider=provider)
+
+
+@router.post("/compare-integrations", response_model=CatalogIntegrationCompareResponse, dependencies=[Depends(require_admin)])
+async def compare_catalog_integrations(request: CatalogIntegrationCompareRequest) -> CatalogIntegrationCompareResponse:
+    """Compare two catalog integrations and return deterministic overlap/delta signals."""
+
+    try:
+        return catalog_repository.compare_integrations(
+            request.base_integration_name,
+            request.peer_integration_name,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/reuse-shortlist", response_model=CatalogWorkspaceReuseShortlistResponse, dependencies=[Depends(require_admin)])
+async def catalog_workspace_reuse_shortlist(
+    request: CatalogWorkspaceReuseShortlistRequest,
+) -> CatalogWorkspaceReuseShortlistResponse:
+    """Return ranked approved catalog candidates for the current workspace context."""
+
+    return catalog_repository.workspace_reuse_shortlist(
+        workspace_context=request.workspace_context.model_dump(),
+        top_n=request.top_n,
+    )
+
+
+@router.post("/field-reuse-shortlist", response_model=CatalogFieldReuseShortlistResponse, dependencies=[Depends(require_admin)])
+async def catalog_workspace_field_reuse_shortlist(
+    request: CatalogFieldReuseShortlistRequest,
+) -> CatalogFieldReuseShortlistResponse:
+    """Return ranked approved catalog candidates for selected workspace source fields."""
+
+    return catalog_repository.workspace_field_reuse_shortlist(
+        workspace_context=request.workspace_context.model_dump(),
+        selected_fields=[item.model_dump() for item in request.selected_fields],
+        top_n=request.top_n,
+    )

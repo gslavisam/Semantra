@@ -68,6 +68,7 @@ Available built-in profiles are:
 - `schema_only`
 - `data_rich`
 - `canonical_first`
+- `description_priority`
 
 The default `balanced` profile preserves the original runtime behavior:
 
@@ -90,6 +91,11 @@ Profile intent:
 - `schema_only`: emphasizes lexical, semantic, knowledge, and canonical evidence when instance-level data is sparse
 - `data_rich`: emphasizes value-shape, overlap, and statistical compatibility when representative samples exist
 - `canonical_first`: increases `knowledge` and `canonical` influence for concept-centric or canonical-heavy mapping programs
+- `description_priority`: emphasizes semantic + knowledge context when schema metadata descriptions/types are available and row-level evidence is limited
+
+Auto-enable behavior:
+
+- in schema-spec style target cases (`row_count == 0` with metadata-described columns), Semantra can auto-enable description-priority scoring for that run
 
 Optional fine-tuning can be applied with `SEMANTRA_SCORING_WEIGHT_OVERRIDES` as a JSON object, for example:
 
@@ -253,6 +259,27 @@ Where:
 - each signal value is already normalized to `0..1`
 - the final score is rounded and returned as the candidate confidence
 
+## Runtime Confidence Calibration
+
+After the weighted normalization above, Semantra applies bounded runtime calibration rules in the current implementation.
+
+### 1. Strong identifier consensus hard-cap
+
+If business/value/pattern/LLM evidence all align strongly, the score is forced to `1.0`.
+
+### 2. SAP context boosts
+
+When SAP table+field context and exact canonical-code evidence are present, additive boosts are applied.
+
+### 3. SAP business anchor floor
+
+For strong SAP business anchors, weak heuristic dilution is bounded by a minimum floor.
+
+Operational meaning:
+
+- the weighted average is still the base signal fusion model
+- but final score can be calibrated upward in these narrowly-scoped, explicitly-coded consensus/context cases
+
 ## Confidence Labels
 
 The current thresholds come from `backend/app/core/config.py`:
@@ -260,6 +287,11 @@ The current thresholds come from `backend/app/core/config.py`:
 - `high_confidence >= 0.85`
 - `medium_confidence >= 0.65`
 - otherwise `low_confidence`
+
+SAP PIR override thresholds:
+
+- `high_confidence >= 0.82`
+- `medium_confidence >= 0.58`
 
 These labels are mapped from score only.
 
@@ -275,8 +307,16 @@ They mean only how strong the current ranking evidence is.
 
 For selected heuristic mappings:
 
-- `high_confidence` becomes initial status `accepted`
-- everything else becomes initial status `needs_review`
+- score `>= auto_accept_threshold` becomes initial status `accepted`
+- score below `auto_accept_threshold` becomes initial status `needs_review`
+
+Current default threshold:
+
+- `auto_accept_threshold = 0.75`
+
+SAP PIR override:
+
+- `sap_pir_auto_accept_threshold = 0.72`
 
 This is a convenience for the review loop, not a governance override.
 
@@ -300,6 +340,15 @@ Why this exists:
 
 - canonical targets represent normalized business concepts, not only physical column labels
 - otherwise a semantically correct canonical match could be unfairly penalized by weak lexical similarity
+
+Additional strong-concept deemphasis (current implementation):
+
+- in strong concept-lock situations with weak physical evidence, Semantra can also deemphasize:
+	- `name` (weak lexical evidence)
+	- `pattern` (very weak pattern alignment)
+	- `overlap` (very weak sample overlap)
+
+These are bounded rules and do not replace the main weighted scoring model.
 
 ## Candidate Explanations
 

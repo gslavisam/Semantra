@@ -13,16 +13,27 @@ from app.models.mapping import (
     ReusableCorrectionRule,
     ReusableCorrectionRulePromotionRequest,
     RuntimeConfigSnapshot,
+    ScoringProfileUpdateRequest,
     UserCorrectionEntry,
 )
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.services.llm_service import summarize_llm_runtime
+from app.services.mapping_service import SCORING_PROFILES, normalize_scoring_profile_name
 from app.services.mapping_job_service import mapping_job_store
 from app.services.persistence_service import persistence_service
 
 
 router = APIRouter(prefix="/observability", tags=["observability"])
+
+
+def _runtime_config_snapshot_response() -> RuntimeConfigSnapshot:
+    """Build one runtime config snapshot payload enriched with LLM and scoring metadata."""
+
+    snapshot = settings_snapshot()
+    snapshot["available_scoring_profiles"] = sorted(SCORING_PROFILES)
+    snapshot.update(summarize_llm_runtime())
+    return RuntimeConfigSnapshot.model_validate(snapshot)
 
 
 @router.get("/decision-logs", response_model=list[DecisionLogEntry], dependencies=[Depends(require_admin)])
@@ -77,9 +88,22 @@ async def promote_reusable_correction_rule(
 async def get_runtime_config() -> RuntimeConfigSnapshot:
     """Return the current runtime configuration snapshot, including LLM runtime state."""
 
-    snapshot = settings_snapshot()
-    snapshot.update(summarize_llm_runtime())
-    return RuntimeConfigSnapshot.model_validate(snapshot)
+    return _runtime_config_snapshot_response()
+
+
+@router.post("/config/scoring-profile", response_model=RuntimeConfigSnapshot, dependencies=[Depends(require_admin)])
+async def update_scoring_profile(request: ScoringProfileUpdateRequest) -> RuntimeConfigSnapshot:
+    """Update the active runtime scoring profile used by new mapping runs."""
+
+    normalized_profile = normalize_scoring_profile_name(request.scoring_profile)
+    if normalized_profile not in SCORING_PROFILES:
+        available = ", ".join(sorted(SCORING_PROFILES))
+        raise HTTPException(status_code=400, detail=f"Unknown scoring profile '{normalized_profile}'. Available profiles: {available}.")
+
+    from app.core.config import settings
+
+    settings.scoring_profile = normalized_profile
+    return _runtime_config_snapshot_response()
 
 
 @router.get("/mapping-jobs/runtime", response_model=MappingJobRuntimeStatusResponse, dependencies=[Depends(require_admin)])
@@ -95,6 +119,4 @@ async def reload_runtime_config() -> RuntimeConfigSnapshot:
 
     reloaded = reload_settings()
     persistence_service.reconfigure(reloaded.sqlite_path)
-    snapshot = settings_snapshot()
-    snapshot.update(summarize_llm_runtime())
-    return RuntimeConfigSnapshot.model_validate(snapshot)
+    return _runtime_config_snapshot_response()

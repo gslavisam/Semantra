@@ -12,6 +12,11 @@ Semantra currently has five top-level areas:
 - `System`
 - `Governance`
 
+Quick terminology note:
+
+- `Canonical Console` is still a key governance surface, but it now lives inside `Governance` rather than as a separate top-level tab
+- `System` is the operational successor to the older `Admin / Debug` description
+
 Recommended order for a new session:
 
 1. start in `Workspace`
@@ -65,7 +70,7 @@ Use `Standard` when:
 
 - you have a real source and a real target
 - you may want separate companion files for both source and target when the uploaded row data lacks descriptions or the SQL DDL is too thin
-- you want preview and Pandas code generation later
+- you want preview, Pandas/PySpark code generation, and artifact refinement later
 
 Use `Canonical` when:
 
@@ -73,7 +78,7 @@ Use `Canonical` when:
 - you want to normalize source fields to business concepts first
 - you want a semantic preparation pass before a concrete source-to-target run
 - preview is intentionally unavailable because no concrete target rows exist
-- code generation can still be produced from the current source-to-canonical decisions
+- code generation and artifact refinement can still be produced from the current source-to-canonical decisions
 
 ### `Review`
 
@@ -105,6 +110,7 @@ Important distinction:
 - `Mapping Analysis Overview` explains the current mapping state as a technical readout
 - `Review Queue Plan` is about review order, clustering, and follow-up for the current queue
 - `Gap Queue Summary` applies the same idea specifically to the canonical-gap queue
+- `LLM Decision Proposals` remain advisory until you explicitly apply them in `Decisions`
 
 ### `Decisions`
 
@@ -122,6 +128,7 @@ Important current rules:
 
 - mapping-set reuse back into Workspace works only for `approved` mapping sets
 - corrections become durable only after the review outcome is closed
+- `Apply safe` is a conservative batch apply mode, not broad automatic acceptance of AI proposals
 - `Active Decisions` now surfaces decision-origin metadata (`manual_mapping`, `llm_proposal`) when available
 - decision-origin audit metadata is now included in decision JSON export/import
 
@@ -132,12 +139,14 @@ Use `Output` for:
 - `Generate preview`
 - `Generate Pandas code` or `Generate PySpark code`
 - `Refine with LLM` on an already generated artifact
+- saving, listing, or running transformation test sets when decisions are accepted
 
 Important distinction:
 
 - preview is advisory and can be used before final approval
 - standard-mode code generation is governance-sensitive and requires accepted active decisions
-- canonical mode skips preview but still allows code generation from active source-to-canonical decisions
+- transformation test sets are governed artifacts and require accepted active decisions
+- canonical mode skips preview but still allows code generation and artifact refinement from active source-to-canonical decisions
 
 If you use refinement:
 
@@ -159,6 +168,50 @@ If you are using transformations:
 `Governance` is the top-level area for canonical and knowledge governance.
 
 Its main panel is `Canonical Console`, which is the central canonical governance surface.
+
+`Canonical Console` currently has four sub-tabs:
+
+- `Canonical`
+- `Knowledge`
+- `Overlays & Runtime`
+- `Stewardship`
+
+### Canonical / Knowledge / Overlay Cheat Sheet
+
+Quick mental model:
+
+- `Canonical` = stable business language (what a concept means across the company)
+- `Knowledge` = system/vendor translation layer (how the same concept appears in SAP/Workday/QAD naming)
+- `Overlay` = controlled additive patch (fast alias/context update without changing the base layer)
+- `Runtime` = active composition the mapping engine is currently using
+
+Hierarchy and recommendation priority:
+
+1. `Canonical` is the semantic authority
+2. `Knowledge` links system terms to canonical concepts
+3. `Active Overlay` overrides base knowledge entries in runtime
+4. `Runtime` is the effective state used for scoring, candidate ranking, and explainability
+
+When to use what:
+
+- use `Canonical` for durable, business-normalized concepts
+- use `Knowledge` for system/domain synonyms and vendor-specific naming
+- use `Overlay` to close a specific gap quickly without full canonical authoring
+- check `Overlays & Runtime` when you need to confirm what is currently active in the engine
+
+In the recommendation flow (practical):
+
+- during candidate/ranking phases, knowledge and canonical signals contribute to final score together with lexical/semantic signals
+- `Overlay` can immediately change recommendation quality because it changes the active runtime signal
+- if canonical coverage is still weak, the row usually remains `needs_review` and enters the canonical-gap loop
+- in canonical-only mode, canonical signal importance is operationally higher because there is no concrete target dataset
+
+Typical decisions:
+
+- local system-specific issue: start with `Overlay`
+- stable and broadly reusable business concept: promote via `Canonical`
+- vendor-specific name or synonym: model in `Knowledge`
+- unexpected recommendation: inspect runtime/active overlay first, then tune the engine if needed
 
 Use it to:
 
@@ -191,6 +244,8 @@ Use it to:
 - inspect concept-centric catalog detail
 - load mapping-set detail, audit, and diff
 - use `similar approved integration exists` hints in result browsing
+- generate `Workspace Reuse Shortlist` for the current Workspace context
+- use `Field Reuse Search` to search only across selected source fields from the active Workspace
 - run `Workspace Reuse Fit` for the selected catalog version
 - reuse an approved mapping set back into Workspace
 
@@ -198,6 +253,8 @@ Important:
 
 - Catalog works over saved artifacts, not the live review state
 - reuse back into Workspace is governance-gated by mapping-set status
+- `Workspace Reuse Shortlist` works at whole-activity level, not at per-field subset level
+- `Field Reuse Search` adds field-scoped shortlist and overlap inspection, but it does not selectively pull decisions by itself
 - `Workspace Reuse Fit` is a bounded explanation layer; it does not apply anything automatically, it only explains whether the selected version fits the current Workspace context
 
 For the detailed reference on catalog search, similarity heuristics, and `Reuse in Workspace` behavior, see `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`.
@@ -238,6 +295,11 @@ Use it for:
 - correction and reusable-rule inspection
 - other supporting observability and runtime checks that are not part of the main canonical governance flow
 
+Important:
+
+- `System` is not a replacement for `Governance > Canonical Console`
+- write-governance actions remain in their dedicated workflows
+
 ## Recommended workflows
 
 ### Standard mapping workflow
@@ -248,9 +310,9 @@ Use it for:
 4. Click `Generate mapping`.
 5. In `Review`, optionally generate `Mapping Analysis Overview`, use per-row or batch `LLM refine`, then inspect trust-layer output, canonical paths, and any canonical-gap suggestions.
 6. If the review queue is large or noisy, use `Review Queue Plan` and, when relevant, `Gap Queue Summary`.
-6. In `Decisions`, make manual edits, export a checkpoint, or save a mapping set.
-7. In `Output`, use preview first, then code generation when the decisions are accepted.
-8. If the generated artifact needs polishing, use `Refine with LLM`, then explicitly accept or discard the refinement.
+7. In `Decisions`, make manual edits, optionally apply `LLM Decision Proposals`, export a checkpoint, or save a mapping set.
+8. In `Output`, use preview first, then code generation when the decisions are accepted, and use transformation test-set flows when needed.
+9. If the generated artifact needs polishing, use `Refine with LLM`, then explicitly accept or discard the refinement.
 
 ### Canonical-first workflow
 
@@ -258,8 +320,8 @@ Use it for:
 2. Upload source row data or a source spec and, if needed, adjust `Canonical candidate pool size`.
 3. Optionally add source companion metadata, then click `Upload and profile` and `Generate canonical mapping`.
 4. In `Review`, inspect the source -> canonical path and use per-row `LLM refine` when needed.
-5. In `Decisions`, you can manually map to canonical options.
-6. In `Output`, generate code without preview.
+5. In `Decisions`, you can manually map to canonical options and close any advisory proposal flows when relevant.
+6. In `Output`, generate code and use artifact refinement without preview.
 7. If you find semantic gaps, continue the governance loop in `Governance` (`Canonical Console`).
 
 ### Canonical governance workflow

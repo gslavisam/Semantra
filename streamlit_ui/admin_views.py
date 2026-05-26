@@ -3549,7 +3549,9 @@ def render_admin_debug_tab(
         action_columns = st.columns(3)
         if action_columns[0].button("Load runtime config", width="stretch", key="debug_load_runtime_config"):
             try:
-                st.session_state["debug_runtime_config"] = api_request("GET", "/observability/config")
+                loaded_runtime = api_request("GET", "/observability/config")
+                st.session_state["debug_runtime_config"] = loaded_runtime
+                st.session_state["runtime_config_snapshot"] = loaded_runtime
                 st.session_state["last_action"] = {"level": "success", "message": "Loaded runtime config snapshot."}
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {"level": "error", "message": f"Loading runtime config failed: {error}"}
@@ -3569,6 +3571,62 @@ def render_admin_debug_tab(
                 st.session_state["last_action"] = {"level": "success", "message": "Loaded evaluation runs."}
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {"level": "error", "message": f"Loading evaluation runs failed: {error}"}
+            st.rerun()
+
+        runtime_source = runtime_config or st.session_state.get("runtime_config_snapshot") or {}
+        available_scoring_profiles = list(runtime_source.get("available_scoring_profiles") or [])
+        if not available_scoring_profiles:
+            available_scoring_profiles = [
+                "balanced",
+                "schema_only",
+                "data_rich",
+                "canonical_first",
+                "description_priority",
+            ]
+        current_scoring_profile = str(runtime_source.get("scoring_profile") or "balanced").strip() or "balanced"
+        if current_scoring_profile not in available_scoring_profiles:
+            available_scoring_profiles = [current_scoring_profile, *available_scoring_profiles]
+        current_backend_build = str(runtime_source.get("backend_build") or "n/a").strip() or "n/a"
+        current_app_version = str(runtime_source.get("app_version") or "n/a").strip() or "n/a"
+
+        st.subheader("Scoring Runtime")
+        st.caption(f"Current build: {current_backend_build} | app_version={current_app_version}")
+
+        if st.button("Refresh runtime snapshot", width="stretch", key="debug_refresh_runtime_snapshot"):
+            try:
+                refreshed_runtime = api_request("GET", "/observability/config")
+                st.session_state["debug_runtime_config"] = refreshed_runtime
+                st.session_state["runtime_config_snapshot"] = refreshed_runtime
+                st.session_state["last_action"] = {"level": "success", "message": "Refreshed runtime snapshot."}
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {"level": "error", "message": f"Refreshing runtime snapshot failed: {error}"}
+            st.rerun()
+
+        selected_scoring_profile = st.selectbox(
+            "Active scoring profile",
+            available_scoring_profiles,
+            index=available_scoring_profiles.index(current_scoring_profile),
+            key="debug_active_scoring_profile",
+            help="Applies to new mapping runs after this update. Existing mapping results keep their original runtime fingerprint.",
+        )
+        if st.button("Apply scoring profile", width="stretch", key="debug_apply_scoring_profile"):
+            try:
+                updated_runtime = api_request(
+                    "POST",
+                    "/observability/config/scoring-profile",
+                    json={"scoring_profile": selected_scoring_profile},
+                )
+                st.session_state["debug_runtime_config"] = updated_runtime
+                st.session_state["runtime_config_snapshot"] = updated_runtime
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": f"Updated active scoring profile to {updated_runtime.get('scoring_profile', selected_scoring_profile)}.",
+                }
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Updating scoring profile failed: {error}",
+                }
             st.rerun()
 
         if runtime_config:

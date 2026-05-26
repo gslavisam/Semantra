@@ -1730,10 +1730,24 @@ def render_mapping_review(
     selected_rows = current_mapping_rows(mapping_response)
     source_concept_view_rows = source_concept_rows(mapping_response)
     concept_target_view_rows = concept_target_rows(mapping_response)
-    filter_columns = st.columns(3)
+    filter_columns = st.columns(4)
     status_options = [all_filter_option, "accepted", "needs_review", "rejected"]
     confidence_options = [all_filter_option, "high_confidence", "medium_confidence", "low_confidence"]
     source_options = [all_filter_option, *[row["source"] for row in selected_rows]]
+    canonical_concept_options = [all_filter_option]
+    concept_seen: set[str] = set()
+    for row in selected_rows:
+        for field in ("shared_concepts", "source_concepts", "target_concepts"):
+            raw = str(row.get(field) or "")
+            for item in raw.split("|"):
+                concept = str(item).strip()
+                if concept and concept not in concept_seen:
+                    concept_seen.add(concept)
+                    canonical_concept_options.append(concept)
+
+    preset_canonical_concept = str(st.session_state.get("filter_canonical_concept") or all_filter_option)
+    if preset_canonical_concept not in canonical_concept_options:
+        st.session_state["filter_canonical_concept"] = all_filter_option
 
     selected_status = filter_columns[0].selectbox("Filter by status", status_options, key="filter_status")
     selected_confidence = filter_columns[1].selectbox(
@@ -1742,6 +1756,11 @@ def render_mapping_review(
         key="filter_confidence",
     )
     selected_source = filter_columns[2].selectbox("Filter by source", source_options, key="filter_source")
+    selected_canonical_concept = filter_columns[3].selectbox(
+        "Filter by canonical concept",
+        canonical_concept_options,
+        key="filter_canonical_concept",
+    )
 
     filtered_rows = [
         row
@@ -1749,6 +1768,16 @@ def render_mapping_review(
         if (selected_status == all_filter_option or row["status"] == selected_status)
         and (selected_confidence == all_filter_option or row["confidence_label"] == selected_confidence)
         and (selected_source == all_filter_option or row["source"] == selected_source)
+        and (
+            selected_canonical_concept == all_filter_option
+            or selected_canonical_concept
+            in {
+                concept.strip()
+                for field in ("shared_concepts", "source_concepts", "target_concepts")
+                for concept in str(row.get(field) or "").split("|")
+                if concept.strip()
+            }
+        )
     ]
     canonical_mismatch_rows = [
         row

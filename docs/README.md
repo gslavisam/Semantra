@@ -30,3 +30,4 @@ Koristi ga za:
 	- pilot test planovi, benchmark matrix-i i execution logovi
 - `presentation/`
 	- stakeholder i demo artefakti
+	- `CATALOG_WINDOW_USE_CASE.md` za praktično objašnjenje šta se radi u Catalog prozoru i koja je poslovna vrednost
