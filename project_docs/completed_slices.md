@@ -354,6 +354,54 @@ Ishod:
 
 - dokumentacija sada odražava aktuelno implementirano ponašanje (proposals, audit, sidebar guidance, continuity boundary) i sledeći design fokus
 
+## 2026-05-26
+
+### Bounded guidance productization follow-through
+
+Isporučeno:
+
+- svih pet bounded guidance panela sada dele isti `LLM` / `Fallback` header-detail obrazac
+- `Benchmark Explanation` i `Workspace Reuse Fit` više ne mešaju `summary` i `explanation` u action/empty-state copy-ju
+- success/error copy je poravnat na obrazac `Generated ...` / `... generation failed: ...` kroz `Mapping Analysis Overview`, `Review Queue Plan`, `Gap Queue Summary`, `Benchmark Explanation` i `Workspace Reuse Fit`
+- read-only intro caption i unlock copy su poravnati kroz `Workspace`, `Benchmarks` i `Catalog`
+- output-section heading pattern je poravnat kroz guidance surface-e uz zadržanu domen-specifičnu terminologiju (`Key matches`, `Key findings`, `Risks`, `Next actions`)
+- `Workspace Reuse Fit` generation metadata više ne koristi poseban metric tretman, već isti caption obrazac kao `Workspace` i `Benchmarks`
+- `implementation_checklists.md` je proširen punom guidance matricom i ažuriran kroz šest uzastopnih productization slice-ova
+
+Ishod:
+
+- bounded guidance family sada deluje kao jedan koherentan product surface na helper/test nivou, a sledeći korak prelazi sa copy/alignment cleanup-a na browser-level pilot proveru discoverability-ja
+
+## 2026-05-27
+
+### Epic 13D completion wave: discovery/reuse handoffs, CTA clarity, and live governance smoke
+
+Isporučeno:
+
+- field-scoped Catalog reuse discovery je proširen compare-before-import, parcijalnim importom i undo putanjom
+- `Catalog` sada pokriva compare -> detail drilldown za peer integracije i version baseline poređenja umesto da staje na summary readout-u
+- `Catalog` version diff readout sada direktno otvara `Workspace Review` sa source-scoped fokusom za changed rows
+- `Catalog` governance handoff sada otvara uži `Canonical` ili `Stewardship` landing umesto generičkog console ulaza, uz reset stale filtera pre preuzimanja novog fokusa
+- diff CTA copy i glavni drilldown CTA copy sada eksplicitno kažu da li vode u `Canonical review` ili `Stewardship`
+- live browser smoke je potvrđen i za current diff `Canonical` handoff i za unmatched-source `Stewardship` handoff nad seeded catalog zapisom
+
+Ishod:
+
+- `Epic 13D` je zatvoren kao trenutni feature wave; sledeći aktivni execution fokus vraćen je na uži operational hardening i regression capture nad pilot površinama
+
+### dbt Output enablement and runtime hardening follow-through
+
+Isporučeno:
+
+- `dbt` je dodat kao treći Output artifact mode uz `Pandas` i `PySpark`, uključujući `sql-dbt` generated artifact surface u `Workspace > Output`
+- live browser smoke je potvrdio čist `Catalog -> Workspace reuse -> Output -> Generate dbt model -> Refine with LLM` tok nad svežim `8001` backendom i seeded approved mapping set-om
+- promena `API Base URL` u sidebar-u sada resetuje transient backend-bound session state i vraća UI na `Workspace > Setup`, čime se sprečava mešanje starih dataset handle-ova, generated artifacts i handoff fokusa preko backend granice
+- `dbt` artifact refinement parser je hardenovan za LM Studio near-JSON/prompt-echo odgovore koji rewritten artifact vraćaju kroz `current_code` i `response_format`, uključujući malformed JSON shape koji je ranije izazivao `502` na `/mapping/codegen/refine`
+
+Ishod:
+
+- `dbt` Output slice više nije samo helper/API capability; potvrđen je i na browser nivou, a promena backend endpoint-a više ne ostavlja UI u stale cross-runtime stanju
+
 ## Napomena
 
 - Završeni slice-ovi su namerno odvojeni od backlog-a kako bi `epics.md` ostao pregledan.

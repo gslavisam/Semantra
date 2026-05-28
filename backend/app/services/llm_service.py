@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from urllib import parse, request
@@ -13,6 +14,7 @@ from typing import Callable, Protocol
 from app.core.config import settings
 from app.models.mapping import ArtifactRefinementResponse, LLMValidationResult, TransformationGenerationResponse
 from app.models.mapping import CanonicalGapCandidate, CanonicalGapSuggestion
+from app.services.dbt_codegen_profile import dbt_profile_snapshot
 
 
 logger = logging.getLogger(__name__)
@@ -366,6 +368,47 @@ def request_bounded_llm_json(
     )
 
 
+def parse_artifact_refinement_payload(raw_response: str) -> dict:
+    """Salvage near-JSON artifact refinement responses that embed code strings unsafely."""
+
+    current_code_match = re.search(
+        r'"current_code"\s*:\s*"(?P<code>.*?)"\s*,\s*"mapping_decisions"\s*:',
+        raw_response,
+        re.DOTALL,
+    )
+    top_level_code_match = re.search(
+        r'"code"\s*:\s*"(?P<code>.*?)"\s*,\s*"reasoning"\s*:',
+        raw_response,
+        re.DOTALL,
+    )
+    reasoning_match = re.search(r'"reasoning"\s*:\s*(\[[\s\S]*?\])', raw_response, re.DOTALL)
+    warnings_match = re.search(r'"warnings"\s*:\s*(\[[\s\S]*?\])', raw_response, re.DOTALL)
+
+    if not current_code_match and not top_level_code_match:
+        raise json.JSONDecodeError("Could not salvage artifact refinement payload", raw_response, 0)
+
+    def _decode_code_fragment(fragment: str) -> str:
+        return (
+            fragment.replace('\\r', '\r')
+            .replace('\\n', '\n')
+            .replace('\\t', '\t')
+            .replace('\\"', '"')
+            .replace("\\'", "'")
+            .replace('\\\\', '\\')
+        )
+
+    response_format: dict[str, object] = {}
+    if reasoning_match:
+        response_format["reasoning"] = json.loads(reasoning_match.group(1))
+    if warnings_match:
+        response_format["warnings"] = json.loads(warnings_match.group(1))
+
+    return {
+        "current_code": _decode_code_fragment((current_code_match or top_level_code_match).group("code")),
+        "response_format": response_format,
+    }
+
+
 def parse_llm_json_payload(raw_response: str) -> dict:
     """Parse JSON from raw model output, tolerating markdown fences and leading prose."""
 
@@ -613,21 +656,60 @@ def call_artifact_refinement(
         reference_excerpt=reference_excerpt,
     )
 
-    response = request_llm_json(provider, prompt, timeout, retries, "artifact_refinement")
+    response = None
+    for attempt in range(retries):
+        try:
+            raw_response = provider.generate(prompt, timeout)
+            try:
+                parsed = parse_llm_json_payload(raw_response)
+            except json.JSONDecodeError:
+                parsed = parse_artifact_refinement_payload(raw_response)
+            response = (raw_response, parsed)
+            break
+        except Exception as error:
+            logger.warning(
+                "LLM %s attempt %s/%s failed (%s): %s",
+                "artifact_refinement",
+                attempt + 1,
+                retries,
+                classify_llm_error(error),
+                error,
+            )
+        if attempt < retries - 1:
+            time.sleep(0.05)
     if response is None:
         return None
 
     _raw_response, parsed = response
     try:
-        code = sanitize_generated_code(str(parsed.get("code") or parsed.get("artifact_code") or "").strip())
+        response_format = parsed.get("response_format") if isinstance(parsed.get("response_format"), dict) else {}
+        echoed_current_code = str(parsed.get("current_code") or "").strip()
+        fallback_code = echoed_current_code if echoed_current_code and echoed_current_code != current_code.strip() else ""
+        code = sanitize_generated_code(
+            str(
+                parsed.get("code")
+                or parsed.get("artifact_code")
+                or response_format.get("code")
+                or fallback_code
+                or ""
+            ).strip()
+        )
         if not code:
             return None
 
         return ArtifactRefinementResponse(
-            language="python-pyspark" if mode == "pyspark" else "python-pandas",
+            language=(
+                "python-pyspark"
+                if mode == "pyspark"
+                else "sql-dbt"
+                if mode == "dbt"
+                else "python-pandas"
+            ),
             code=code,
-            reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
-            warnings=normalize_llm_list_field(parsed.get("warnings") or []),
+            reasoning=normalize_llm_list_field(
+                parsed.get("reasoning") or parsed.get("explanation") or response_format.get("reasoning") or []
+            ),
+            warnings=normalize_llm_list_field(parsed.get("warnings") or response_format.get("warnings") or []),
         )
     except Exception as error:
         logger.warning("LLM artifact refinement response rejected (%s): %s", classify_llm_error(error), error)
@@ -821,8 +903,15 @@ def build_artifact_refinement_prompt(
 ) -> str:
     """Build the bounded prompt used to refine an already generated code artifact."""
 
-    runtime_language = "python-pyspark" if mode == "pyspark" else "python-pandas"
-    allowed_objects = ["df_source", "df_target", "F"] if mode == "pyspark" else ["df_source", "df_target", "pd"]
+    runtime_language = "python-pyspark" if mode == "pyspark" else "sql-dbt" if mode == "dbt" else "python-pandas"
+    dbt_profile = dbt_profile_snapshot() if mode == "dbt" else None
+    allowed_objects = (
+        ["df_source", "df_target", "F"]
+        if mode == "pyspark"
+        else [str(dbt_profile["source_cte_name"]), "ref", "source", "config", "adapter.quote"]
+        if mode == "dbt"
+        else ["df_source", "df_target", "pd"]
+    )
     payload = {
         "artifact_mode": mode,
         "current_code": current_code.strip(),
@@ -844,6 +933,7 @@ def build_artifact_refinement_prompt(
             "preserve_existing_scaffold_when_possible": True,
             "return_full_rewritten_code": True,
             "allowed_objects": allowed_objects,
+            "dbt_profile": dbt_profile,
         },
         "response_format": {
             "code": "string",

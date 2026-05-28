@@ -340,6 +340,41 @@ def test_filter_canonical_concepts_by_focus_matches_overlay_and_usage_states() -
     ]
 
 
+def test_resolve_active_governance_section_prefers_pending_section() -> None:
+    session_state = {"pending_governance_section": "Stewardship", "active_governance_section": "Canonical"}
+
+    active_section = admin_views.resolve_active_governance_section(session_state)
+
+    assert active_section == "Stewardship"
+    assert session_state["active_governance_section"] == "Stewardship"
+    assert "pending_governance_section" not in session_state
+
+
+def test_pending_canonical_concept_label_consumes_matching_pending_id() -> None:
+    session_state = {"pending_governance_canonical_concept_id": "customer.id"}
+    concepts = [
+        {
+            "concept_id": "customer.id",
+            "display_name": "Customer ID",
+            "source": "base",
+            "usage_count": 3,
+        }
+    ]
+
+    label = admin_views._pending_canonical_concept_label(concepts, session_state)
+
+    assert label == "customer.id | Customer ID | source=base | usage=3"
+    assert "pending_governance_canonical_concept_id" not in session_state
+
+
+def test_governance_focus_source_caption_reports_multi_source_scope() -> None:
+    caption = admin_views._governance_focus_source_caption("", ["KUNNR", "LAND1"])
+
+    assert caption == (
+        "Catalog handoff focus keeps Stewardship scoped to 2 unmatched source fields while the source filter remains All."
+    )
+
+
 def test_canonical_overlay_summary_aggregates_runtime_and_overlay_versions() -> None:
     summary = admin_views._canonical_overlay_summary(
         {

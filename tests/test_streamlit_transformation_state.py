@@ -21,7 +21,10 @@ def load_streamlit_functions(*function_names: str):
         node for node in module.body if isinstance(node, ast.FunctionDef) and node.name in function_names
     ]
     fake_streamlit = SimpleNamespace(session_state={})
-    namespace = {"st": fake_streamlit}
+    namespace = {
+        "st": fake_streamlit,
+        "DEFAULT_API_BASE_URL": "http://127.0.0.1:8000",
+    }
     exec(compile(ast.Module(body=selected_nodes, type_ignores=[]), str(STREAMLIT_APP_PATH), "exec"), namespace)
     return fake_streamlit, [namespace[name] for name in function_names]
 
@@ -189,6 +192,53 @@ def test_correction_governance_block_reason_reports_unclosed_review_status() -> 
         "Saving reviewed corrections is blocked until pending corrections come from closed review outcomes "
         "(accepted or rejected). Review statuses: needs_review."
     )
+
+
+def test_handle_api_base_url_change_clears_transient_backend_state() -> None:
+    fake_streamlit, functions = load_streamlit_functions("reset_flow_state", "handle_api_base_url_change")
+    handle_api_base_url_change = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "api_base_url": "http://127.0.0.1:8001/",
+            "active_api_base_url": "http://127.0.0.1:8000",
+            "upload_response": {"source": {"dataset_id": "src-1"}},
+            "mapping_response": {"mappings": [{"source": "cust_id"}]},
+            "codegen_response": {"language": "sql-dbt"},
+            "runtime_config_snapshot": {"app_version": "0.1.0"},
+            "runtime_config_snapshot_refreshed_at": 123.0,
+            "admin_requirement": {"reachable": True, "requires_token": False},
+            "backend_reachable": True,
+            "backend_reachable_base_url": "http://127.0.0.1:8000",
+            "catalog_results": [{"mapping_set_id": 771}],
+            "benchmark_datasets": [{"dataset_id": 1}],
+            "debug_runtime_config": {"app_version": "0.1.0"},
+            "pending_workspace_section": "Output",
+            "pending_governance_section": "Canonical",
+            "review_focus_sources": ["KUNNR"],
+            "active_top_level_area": "Catalog",
+            "active_workspace_section": "Output",
+        }
+    )
+
+    handle_api_base_url_change()
+
+    assert fake_streamlit.session_state["api_base_url"] == "http://127.0.0.1:8001"
+    assert fake_streamlit.session_state["active_api_base_url"] == "http://127.0.0.1:8001"
+    assert fake_streamlit.session_state["active_top_level_area"] == "Workspace"
+    assert fake_streamlit.session_state["active_workspace_section"] == "Setup"
+    assert "upload_response" not in fake_streamlit.session_state
+    assert "mapping_response" not in fake_streamlit.session_state
+    assert "codegen_response" not in fake_streamlit.session_state
+    assert "runtime_config_snapshot" not in fake_streamlit.session_state
+    assert "admin_requirement" not in fake_streamlit.session_state
+    assert "backend_reachable" not in fake_streamlit.session_state
+    assert "catalog_results" not in fake_streamlit.session_state
+    assert "benchmark_datasets" not in fake_streamlit.session_state
+    assert "debug_runtime_config" not in fake_streamlit.session_state
+    assert "review_focus_sources" not in fake_streamlit.session_state
+    assert fake_streamlit.session_state["last_action"]["level"] == "info"
+    assert "http://127.0.0.1:8001" in fake_streamlit.session_state["last_action"]["message"]
 
 
 def test_materialize_transformation_template_replaces_source_and_target_placeholders() -> None:

@@ -6,19 +6,23 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from app.models.schema import DatasetHandle
+
 
 ConfidenceLabel = Literal["high_confidence", "medium_confidence", "low_confidence"]
 DecisionStatus = Literal["accepted", "needs_review", "rejected"]
 UserCorrectionStatus = Literal["accepted", "rejected", "overridden"]
 ReusableCorrectionRuleStatus = Literal["accepted", "rejected", "overridden"]
 MappingSetStatus = Literal["draft", "review", "approved", "archived"]
+WorkspaceMappingMode = Literal["standard", "canonical"]
+WorkspaceSection = Literal["Setup", "Review", "Decisions", "Output"]
 CatalogArtifactType = Literal["standard", "canonical-only"]
 TransformationPreviewMode = Literal["direct", "custom"]
 TransformationPreviewStatus = Literal["direct", "validated", "fallback"]
 TransformationPreviewClassification = Literal["direct", "safe", "risky", "custom"]
 TransformationIssueStage = Literal["preview", "codegen"]
 TransformationIssueSeverity = Literal["warning", "error"]
-CodegenMode = Literal["pandas", "pyspark"]
+CodegenMode = Literal["pandas", "pyspark", "dbt"]
 TransformationWarningCode = Literal[
     "syntax_error",
     "runtime_error",
@@ -757,6 +761,68 @@ class MappingSetDetail(MappingSetRecord):
     mapping_decisions: list[MappingDecision] = Field(default_factory=list)
 
 
+class DraftSessionEditorEntry(BaseModel):
+    """Minimal durable workspace editor state needed to resume review and decisions."""
+
+    target: str = ""
+    status: DecisionStatus = "needs_review"
+    suggested_target: str = ""
+    suggested_transformation_code: str = ""
+    manual_transformation_code: str = ""
+    llm_transformation_instruction: str = ""
+    manual_apply_transformation: bool = False
+    manual: bool = False
+
+
+class DraftSessionDecisionAuditEntry(BaseModel):
+    """Durable decision-audit metadata attached to one source field in a draft session."""
+
+    origin: str = "manual_or_imported"
+    applied_at: str = ""
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class DraftSessionCreateRequest(BaseModel):
+    """Request payload for saving one durable draft workspace session snapshot."""
+
+    name: str
+    api_base_url: str = ""
+    mapping_mode: WorkspaceMappingMode = "standard"
+    active_workspace_section: WorkspaceSection = "Review"
+    source_handle: DatasetHandle
+    target_handle: DatasetHandle | None = None
+    canonical_target_system: str | None = None
+    mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
+    mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
+    mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+
+
+class DraftSessionRecord(BaseModel):
+    """Summary record for one saved draft workspace session."""
+
+    draft_session_id: int
+    name: str
+    api_base_url: str = ""
+    mapping_mode: WorkspaceMappingMode = "standard"
+    active_workspace_section: WorkspaceSection = "Review"
+    source_dataset_name: str = ""
+    target_dataset_name: str = ""
+    canonical_target_system: str | None = None
+    decision_count: int = 0
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class DraftSessionDetail(DraftSessionRecord):
+    """Expanded draft session record including the persisted restore payload."""
+
+    source_handle: DatasetHandle
+    target_handle: DatasetHandle | None = None
+    mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
+    mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
+    mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+
+
 class CatalogIntegrationRecord(BaseModel):
     """Catalog summary record for one saved integration version."""
 
@@ -1077,6 +1143,14 @@ class RuntimeConfigSnapshot(BaseModel):
     lmstudio_tts_base_url: str = ""
     lmstudio_orpheus_model: str = ""
     lmstudio_orpheus_voice: str = ""
+    dbt_materialization: str = "view"
+    dbt_source_mode: str = "ref"
+    dbt_source_name: str = "raw"
+    dbt_source_table_name: str = "source_model"
+    dbt_ref_name: str = "source_model"
+    dbt_quote_identifiers: bool = True
+    dbt_source_cte_name: str = "source_data"
+    dbt_source_reference: str = "{{ ref('source_model') }}"
     scoring_profile: str = "balanced"
     available_scoring_profiles: list[str] = Field(default_factory=list)
     llm_status: str = "configured"
@@ -1322,7 +1396,7 @@ class TransformationTestSetRunResponse(BaseModel):
 
 
 class CodegenRequest(BaseModel):
-    """Request payload for generating Pandas or PySpark mapping code."""
+    """Request payload for generating Pandas, PySpark, or dbt mapping code."""
 
     mapping_decisions: list[MappingDecision]
     mode: CodegenMode = "pandas"
@@ -1332,7 +1406,7 @@ class CodegenRequest(BaseModel):
 class GeneratedArtifact(BaseModel):
     """Generated code artifact returned from a mapping codegen request."""
 
-    language: Literal["python-pandas", "python-pyspark"] = "python-pandas"
+    language: Literal["python-pandas", "python-pyspark", "sql-dbt"] = "python-pandas"
     code: str
     warnings: list[TransformationPreviewWarning] = Field(default_factory=list)
 
@@ -1352,7 +1426,7 @@ class ArtifactRefinementRequest(BaseModel):
 class ArtifactRefinementResponse(BaseModel):
     """Response containing refined code, reasoning, and warnings from artifact refinement."""
 
-    language: Literal["python-pandas", "python-pyspark"]
+    language: Literal["python-pandas", "python-pyspark", "sql-dbt"]
     code: str
     reasoning: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

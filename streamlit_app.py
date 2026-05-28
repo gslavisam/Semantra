@@ -306,6 +306,50 @@ def reset_flow_state() -> None:
         st.session_state.pop(key, None)
 
 
+def handle_api_base_url_change() -> None:
+    normalized_base_url = str(st.session_state.get("api_base_url") or "").strip().rstrip("/") or DEFAULT_API_BASE_URL
+    previous_base_url = str(st.session_state.get("active_api_base_url") or DEFAULT_API_BASE_URL).strip().rstrip("/") or DEFAULT_API_BASE_URL
+    st.session_state["api_base_url"] = normalized_base_url
+    if normalized_base_url == previous_base_url:
+        return
+
+    reset_flow_state()
+    for key in list(st.session_state.keys()):
+        if key.startswith(("benchmark_", "catalog_", "debug_")):
+            st.session_state.pop(key, None)
+
+    for key in (
+        "runtime_config_snapshot",
+        "runtime_config_snapshot_refreshed_at",
+        "admin_requirement",
+        "admin_requirement_signature",
+        "backend_reachable",
+        "backend_reachable_base_url",
+        "pending_top_level_area",
+        "pending_workspace_section",
+        "pending_governance_section",
+        "active_governance_section",
+        "review_focus_sources",
+        "governance_focus_sources",
+        "pending_governance_canonical_concept_id",
+        "pending_governance_canonical_source_system",
+        "pending_governance_canonical_business_domain",
+        "pending_governance_gap_source_filter",
+    ):
+        st.session_state.pop(key, None)
+
+    st.session_state["active_api_base_url"] = normalized_base_url
+    st.session_state["active_top_level_area"] = "Workspace"
+    st.session_state["active_workspace_section"] = "Setup"
+    st.session_state["last_action"] = {
+        "level": "info",
+        "message": (
+            f"API base URL switched to {normalized_base_url}. "
+            "Cleared transient backend state so the UI can reload against the new runtime."
+        ),
+    }
+
+
 def llm_runtime_enabled() -> bool:
     config = st.session_state.get("runtime_config_snapshot")
     if not config:
@@ -698,7 +742,7 @@ def main() -> None:
 
     with st.sidebar:
         st.header("Connection")
-        st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url")
+        st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url", on_change=handle_api_base_url_change)
         st.text_input("Admin Token", value="", key="admin_token", type="password")
         st.markdown(
             "This UI talks to the Semantra FastAPI backend. LLM and TTS provider endpoints are configured behind that backend and shown below in Runtime."

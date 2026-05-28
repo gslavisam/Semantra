@@ -20,6 +20,9 @@ from app.models.mapping import (
     MappingAnalysisSummaryResponse,
     CanonicalMappingRequest,
     CodegenRequest,
+    DraftSessionCreateRequest,
+    DraftSessionDetail,
+    DraftSessionRecord,
     GeneratedArtifact,
     MappingRefinementRequest,
     MappingDecision,
@@ -48,7 +51,8 @@ from app.models.mapping import (
 from app.services.llm_service import build_provider_from_settings, call_artifact_refinement, call_transformation_generator
 from app.services.mapping_analysis_service import build_mapping_analysis_narration, build_mapping_analysis_summary
 from app.services.mapping_audio_service import synthesize_orpheus_wav
-from app.services.codegen_service import generate_pandas_code, generate_pyspark_code
+from app.services.codegen_service import generate_dbt_code, generate_pandas_code, generate_pyspark_code
+from app.services.draft_session_repository import draft_session_repository
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.mapping_governance_repository import mapping_governance_repository
 from app.services.review_plan_service import build_review_plan
@@ -488,7 +492,7 @@ async def save_source_field_hint(request: SourceFieldHintUpsertRequest) -> Sourc
 
 @router.post("/codegen", response_model=GeneratedArtifact)
 async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
-    """Generate Pandas or PySpark mapping code from accepted mapping decisions."""
+    """Generate Pandas, PySpark, or dbt mapping code from accepted mapping decisions."""
 
     _require_accepted_output_decisions(
         request.mapping_decisions,
@@ -497,6 +501,8 @@ async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
     )
     if request.mode == "pyspark":
         return generate_pyspark_code(request.mapping_decisions)
+    if request.mode == "dbt":
+        return generate_dbt_code(request.mapping_decisions)
     return generate_pandas_code(request.mapping_decisions)
 
 
@@ -553,6 +559,32 @@ async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetReco
     )
     append_mapping_set_audit("create", saved, changed_by=request.created_by, note=request.note)
     return saved
+
+
+@router.post("/draft-sessions", response_model=DraftSessionRecord, dependencies=[Depends(require_admin)])
+async def create_draft_session(request: DraftSessionCreateRequest) -> DraftSessionRecord:
+    """Persist one minimal durable workspace snapshot for later resume."""
+
+    if request.mapping_mode == "standard" and request.target_handle is None:
+        raise HTTPException(status_code=400, detail="Standard draft sessions require a target_handle snapshot.")
+    return draft_session_repository.save_draft_session(request)
+
+
+@router.get("/draft-sessions", response_model=list[DraftSessionRecord], dependencies=[Depends(require_admin)])
+async def list_draft_sessions() -> list[DraftSessionRecord]:
+    """List saved durable workspace snapshots available for resume."""
+
+    return draft_session_repository.list_draft_sessions()
+
+
+@router.get("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+async def get_draft_session(draft_session_id: int) -> DraftSessionDetail:
+    """Return one saved durable workspace snapshot with its restore payload."""
+
+    try:
+        return draft_session_repository.get_draft_session(draft_session_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.get("/sets", response_model=list[MappingSetRecord], dependencies=[Depends(require_admin)])

@@ -1,0 +1,47 @@
+{
+  "workspace": {
+    "draft_session_label": "customer-draft-session",
+    "review_focus_restored": true,
+    "source_filter_visible": true,
+    "screenshots": [
+      "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\screenshots\\02_workspace_resume_01.png"
+    ]
+  },
+  "catalog": {
+    "approved_reuse": {
+      "integration_label": "approved-customer-reuse-smoke",
+      "latest_approved_visible": true,
+      "reuse_applied": true,
+      "screenshots": [
+        "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\screenshots\\01_catalog_reuse_01.png"
+      ]
+    },
+    "diff_review_handoff": {
+      "integration_label": "browser-diff-focus",
+      "diff_loaded": true,
+      "workspace_review_handoff": true,
+      "screenshots": [
+        "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\screenshots\\03_catalog_diff_handoff_01.png"
+      ]
+    },
+    "stewardship_handoff": {
+      "integration_label": "stewardship-smoke-sync",
+      "governance_handoff": true,
+      "screenshots": [
+        "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\screenshots\\04_catalog_stewardship_handoff_01.png"
+      ]
+    }
+  },
+  "benchmarks": {
+    "dataset_label": "operational-smoke-benchmark",
+    "profile_comparison_visible": true,
+    "recommended_profile_visible": true,
+    "benchmark_explanation_generated": true,
+    "explanation_metadata": "Fallback",
+    "screenshots": [
+      "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\screenshots\\05_benchmarks_explanation_01.png"
+    ]
+  },
+  "artifacts_dir": "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527",
+  "demo_video": "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\manual_live_demo_20260527\\manual_live_demo_recording.webm"
+}

@@ -28,6 +28,9 @@ from app.models.mapping import (
     CatalogIntegrationRecord,
     CatalogSimilarIntegrationRecord,
     DecisionLogEntry,
+    DraftSessionCreateRequest,
+    DraftSessionDetail,
+    DraftSessionRecord,
     EvaluationMetrics,
     EvaluationRunRecord,
     MappingSetAuditEntry,
@@ -109,6 +112,15 @@ class SQLitePersistenceService:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS mapping_sets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS draft_sessions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     payload TEXT NOT NULL
@@ -1479,6 +1491,77 @@ class SQLitePersistenceService:
             connection.execute("DELETE FROM mapping_catalog_concepts")
             connection.execute("DELETE FROM mapping_catalog_entries")
             connection.execute("DELETE FROM mapping_sets")
+
+    def save_draft_session(self, request: DraftSessionCreateRequest) -> DraftSessionRecord:
+        """Persist one durable draft workspace snapshot for later resume."""
+
+        created_at = datetime.now(UTC).isoformat()
+        decision_count = len(request.mapping_editor_state)
+        payload = DraftSessionDetail(
+            draft_session_id=0,
+            name=request.name,
+            api_base_url=request.api_base_url,
+            mapping_mode=request.mapping_mode,
+            active_workspace_section=request.active_workspace_section,
+            source_dataset_name=request.source_handle.dataset_name,
+            target_dataset_name=request.target_handle.dataset_name if request.target_handle else "",
+            canonical_target_system=request.canonical_target_system,
+            decision_count=decision_count,
+            created_at=created_at,
+            updated_at=created_at,
+            source_handle=request.source_handle,
+            target_handle=request.target_handle,
+            mapping_runtime=request.mapping_runtime,
+            mapping_editor_state=request.mapping_editor_state,
+            mapping_decision_audit=request.mapping_decision_audit,
+        )
+        with self.connection() as connection:
+            cursor = connection.execute(
+                "INSERT INTO draft_sessions (name, payload) VALUES (?, ?)",
+                (request.name, payload.model_dump_json(exclude={"draft_session_id"})),
+            )
+            draft_session_id = int(cursor.lastrowid)
+        return payload.model_copy(update={"draft_session_id": draft_session_id})
+
+    def list_draft_sessions(self) -> list[DraftSessionRecord]:
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT id, name, payload FROM draft_sessions ORDER BY id DESC"
+            ).fetchall()
+        records: list[DraftSessionRecord] = []
+        for row in rows:
+            payload = json.loads(row[2])
+            records.append(
+                DraftSessionRecord(
+                    draft_session_id=int(row[0]),
+                    name=row[1],
+                    api_base_url=payload.get("api_base_url", ""),
+                    mapping_mode=payload.get("mapping_mode", "standard"),
+                    active_workspace_section=payload.get("active_workspace_section", "Review"),
+                    source_dataset_name=payload.get("source_dataset_name", ""),
+                    target_dataset_name=payload.get("target_dataset_name", ""),
+                    canonical_target_system=payload.get("canonical_target_system"),
+                    decision_count=payload.get("decision_count", len(payload.get("mapping_editor_state", {}))),
+                    created_at=payload.get("created_at"),
+                    updated_at=payload.get("updated_at"),
+                )
+            )
+        return records
+
+    def get_draft_session(self, draft_session_id: int) -> DraftSessionDetail:
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT payload FROM draft_sessions WHERE id = ?",
+                (draft_session_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown draft session id: {draft_session_id}")
+        payload = json.loads(row[0])
+        return DraftSessionDetail.model_validate({**payload, "draft_session_id": draft_session_id})
+
+    def clear_draft_sessions(self) -> None:
+        with self.connection() as connection:
+            connection.execute("DELETE FROM draft_sessions")
 
     def _catalog_record_from_row(self, row: sqlite3.Row | tuple[object, ...]) -> CatalogIntegrationRecord:
         return CatalogIntegrationRecord(

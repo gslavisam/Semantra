@@ -24,6 +24,278 @@ def _section_label(title: str, detail: str | None = None) -> str:
     return f"{title} · {detail_text}" if detail_text else title
 
 
+def _draft_session_restore_section(section: str | None, draft_session_detail: dict | None = None) -> str:
+    normalized = str(section or "").strip()
+    if normalized == "Review":
+        runtime = (draft_session_detail or {}).get("mapping_runtime") or {}
+        if runtime:
+            return "Review"
+    if normalized == "Decisions":
+        return "Decisions"
+    return "Decisions"
+
+
+def _normalized_api_base_url(value: str | None) -> str:
+    return str(value or "").strip().rstrip("/")
+
+
+def _schema_column_names_from_handle(handle: dict | None) -> list[str]:
+    return [
+        str((column or {}).get("name") or "").strip()
+        for column in ((handle or {}).get("schema_profile") or {}).get("columns", [])
+        if str((column or {}).get("name") or "").strip()
+    ]
+
+
+def _draft_session_restore_conflict_reason(draft_session_detail: dict) -> str:
+    saved_base_url = _normalized_api_base_url(draft_session_detail.get("api_base_url"))
+    current_base_url = _normalized_api_base_url(
+        st.session_state.get("api_base_url") or st.session_state.get("active_api_base_url")
+    )
+    if saved_base_url and current_base_url and saved_base_url != current_base_url:
+        return (
+            f"Draft session targets API base URL {saved_base_url}, but the active workspace uses {current_base_url}. "
+            "Switch API Base URL first, then retry resume."
+        )
+
+    current_upload = st.session_state.get("upload_response") or {}
+    if not current_upload:
+        return ""
+
+    saved_mode = str(draft_session_detail.get("mapping_mode") or "standard").strip().lower() or "standard"
+    current_mode = str(current_upload.get("mapping_mode") or "standard").strip().lower() or "standard"
+    if saved_mode != current_mode:
+        return (
+            f"Draft session was saved in {saved_mode} mode, but the active workspace is in {current_mode} mode. "
+            "Clear the current workspace context before resuming this draft."
+        )
+
+    current_source_columns = _schema_column_names_from_handle(current_upload.get("source"))
+    saved_source_columns = _schema_column_names_from_handle(draft_session_detail.get("source_handle"))
+    if current_source_columns and saved_source_columns and current_source_columns != saved_source_columns:
+        return "Draft session source schema does not match the active workspace source schema. Clear the current workspace before resuming this draft."
+
+    if saved_mode == "canonical":
+        current_target_system = str(current_upload.get("target_system") or "canonical").strip().lower() or "canonical"
+        saved_target_system = str(draft_session_detail.get("canonical_target_system") or "canonical").strip().lower() or "canonical"
+        if current_target_system != saved_target_system:
+            return (
+                f"Draft session targets canonical system {saved_target_system}, but the active workspace uses {current_target_system}. "
+                "Clear the current workspace before resuming this draft."
+            )
+        return ""
+
+    current_target_columns = _schema_column_names_from_handle(current_upload.get("target"))
+    saved_target_columns = _schema_column_names_from_handle(draft_session_detail.get("target_handle"))
+    if current_target_columns and saved_target_columns and current_target_columns != saved_target_columns:
+        return "Draft session target schema does not match the active workspace target schema. Clear the current workspace before resuming this draft."
+    return ""
+
+
+def _draft_session_confidence_label(confidence: float) -> str:
+    if confidence >= 0.85:
+        return "high_confidence"
+    if confidence >= 0.65:
+        return "medium_confidence"
+    return "low_confidence"
+
+
+def _build_draft_session_request_payload(name: str) -> dict:
+    upload_response = st.session_state.get("upload_response")
+    if not upload_response:
+        raise ValueError("Load a workspace dataset context before saving a draft session.")
+
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    if not editor_state:
+        raise ValueError("Draft session save requires an active mapping editor state.")
+
+    mapping_mode = str(upload_response.get("mapping_mode") or "standard").strip().lower() or "standard"
+    target_handle = upload_response.get("target") if mapping_mode != "canonical" else None
+    mapping_response = st.session_state.get("mapping_response") or {}
+    return {
+        "name": name,
+        "api_base_url": _normalized_api_base_url(
+            st.session_state.get("api_base_url") or st.session_state.get("active_api_base_url")
+        ),
+        "mapping_mode": mapping_mode,
+        "active_workspace_section": str(st.session_state.get("active_workspace_section") or "Decisions").strip() or "Decisions",
+        "source_handle": upload_response["source"],
+        "target_handle": target_handle,
+        "canonical_target_system": upload_response.get("target_system") if mapping_mode == "canonical" else None,
+        "mapping_runtime": dict(mapping_response.get("mapping_runtime") or {}),
+        "mapping_editor_state": {
+            str(source): {
+                "target": str(entry.get("target") or ""),
+                "status": str(entry.get("status") or "needs_review"),
+                "suggested_target": str(entry.get("suggested_target") or ""),
+                "suggested_transformation_code": str(entry.get("suggested_transformation_code") or ""),
+                "manual_transformation_code": str(entry.get("manual_transformation_code") or ""),
+                "llm_transformation_instruction": str(entry.get("llm_transformation_instruction") or ""),
+                "manual_apply_transformation": bool(entry.get("manual_apply_transformation", False)),
+                "manual": bool(entry.get("manual", False)),
+            }
+            for source, entry in editor_state.items()
+            if str(source or "").strip()
+        },
+        "mapping_decision_audit": _decision_audit_map(),
+    }
+
+
+def _build_draft_session_mapping_response(draft_session_detail: dict) -> dict:
+    source_handle = draft_session_detail.get("source_handle") or {}
+    target_handle = draft_session_detail.get("target_handle") or {}
+    mapping_mode = str(draft_session_detail.get("mapping_mode") or "standard").strip().lower() or "standard"
+    editor_state = draft_session_detail.get("mapping_editor_state") or {}
+
+    mappings: list[dict] = []
+    ranked_mappings: list[dict] = []
+    matched_sources = 0
+    canonical_concepts: list[str] = []
+
+    for column in (source_handle.get("schema_profile") or {}).get("columns", []):
+        source = str((column or {}).get("name") or "").strip()
+        if not source:
+            continue
+        entry = editor_state.get(source) or {}
+        target = str(entry.get("target") or "").strip()
+        status = str(entry.get("status") or "needs_review").strip() or "needs_review"
+        transformation_code = str(entry.get("manual_transformation_code") or "").strip()
+        confidence = 0.95 if target and status == "accepted" else 0.7 if target else 0.35
+        selected = {
+            "target": target,
+            "status": status,
+            "confidence": confidence,
+            "confidence_label": _draft_session_confidence_label(confidence),
+            "method": "draft_restore",
+            "explanation": [f"Restored from draft session '{draft_session_detail.get('name') or 'draft-session'}'."],
+            "signals": {
+                "name": 0.0,
+                "semantic": 0.0,
+                "knowledge": 0.0,
+                "canonical": 1.0 if mapping_mode == "canonical" and target else 0.0,
+                "pattern": 0.0,
+                "statistical": 0.0,
+                "overlap": 0.0,
+                "embedding": 0.0,
+                "correction": 0.0,
+                "llm": 0.0,
+            },
+            "canonical_details": {"source_concepts": [], "target_concepts": [], "shared_concepts": []},
+        }
+        if transformation_code:
+            selected["transformation_code"] = transformation_code
+        if target:
+            matched_sources += 1
+            if mapping_mode == "canonical" and target not in canonical_concepts:
+                canonical_concepts.append(target)
+        ranked_mappings.append(
+            {
+                "source": source,
+                "selected": selected if target else {},
+                "candidates": [selected] if target else [],
+            }
+        )
+        if target:
+            mappings.append({**selected, "source": source})
+
+    target_columns = ((target_handle.get("schema_profile") or {}).get("columns") or []) if mapping_mode != "canonical" else []
+    target_total = len(target_columns) if mapping_mode != "canonical" else len(canonical_concepts)
+    source_total = len((source_handle.get("schema_profile") or {}).get("columns") or [])
+    source_ratio = (matched_sources / source_total) if source_total else 0.0
+    distinct_targets = len({item.get("target") for item in mappings if item.get("target")})
+    target_ratio = (distinct_targets / target_total) if target_total else 0.0
+
+    return {
+        "mappings": mappings,
+        "ranked_mappings": ranked_mappings,
+        "mapping_runtime": dict(draft_session_detail.get("mapping_runtime") or {}),
+        "canonical_coverage": {
+            "source": {
+                "coverage_ratio": source_ratio,
+                "matched_columns": matched_sources,
+                "total_columns": source_total,
+                "unmatched_columns": [
+                    ranked["source"] for ranked in ranked_mappings if not (ranked.get("selected") or {}).get("target")
+                ],
+            },
+            "target": {
+                "coverage_ratio": target_ratio,
+                "matched_columns": distinct_targets,
+                "total_columns": target_total,
+            },
+            "project": {
+                "coverage_ratio": 1.0 if canonical_concepts else target_ratio,
+                "matched_columns": len(canonical_concepts) if canonical_concepts else distinct_targets,
+                "total_columns": len(canonical_concepts) if canonical_concepts else target_total,
+                "concept_count": len(canonical_concepts),
+                "shared_concept_count": len(canonical_concepts),
+                "concepts": canonical_concepts,
+            },
+        },
+    }
+
+
+def _reset_draft_session_transient_outputs() -> None:
+    for key in (
+        "preview_response",
+        "codegen_response",
+        "codegen_refinement_response",
+        "mapping_analysis_summary",
+        "mapping_analysis_error",
+        "mapping_analysis_spoken_script",
+        "mapping_analysis_audio_bytes",
+        "mapping_analysis_audio_mime_type",
+        "mapping_analysis_audio_error",
+        "review_plan_summary",
+        "review_plan_error",
+        "canonical_gap_candidates",
+        "canonical_gap_suggestions",
+        "canonical_gap_triage_summary",
+        "canonical_gap_triage_error",
+        "llm_decision_proposals",
+    ):
+        st.session_state.pop(key, None)
+
+
+def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
+    conflict_reason = _draft_session_restore_conflict_reason(draft_session_detail)
+    if conflict_reason:
+        raise ValueError(conflict_reason)
+
+    mapping_mode = str(draft_session_detail.get("mapping_mode") or "standard").strip().lower() or "standard"
+    source_handle = draft_session_detail.get("source_handle")
+    if not source_handle:
+        raise KeyError("Draft session is missing source_handle.")
+
+    upload_response = {
+        "source": source_handle,
+        "mapping_mode": mapping_mode,
+    }
+    if mapping_mode == "canonical":
+        upload_response["target_system"] = draft_session_detail.get("canonical_target_system") or "canonical"
+    else:
+        target_handle = draft_session_detail.get("target_handle")
+        if not target_handle:
+            raise KeyError("Standard draft session is missing target_handle.")
+        upload_response["target"] = target_handle
+
+    st.session_state["upload_response"] = upload_response
+    st.session_state["mapping_mode"] = "Canonical" if mapping_mode == "canonical" else "Standard"
+    if mapping_mode == "canonical":
+        st.session_state["canonical_target_system"] = upload_response["target_system"]
+    st.session_state["mapping_response"] = _build_draft_session_mapping_response(draft_session_detail)
+    st.session_state["mapping_editor_state"] = dict(draft_session_detail.get("mapping_editor_state") or {})
+    st.session_state["mapping_decision_audit"] = dict(draft_session_detail.get("mapping_decision_audit") or {})
+    restore_section = _draft_session_restore_section(
+        draft_session_detail.get("active_workspace_section"),
+        draft_session_detail,
+    )
+    st.session_state["pending_top_level_area"] = "Workspace"
+    st.session_state["pending_workspace_section"] = restore_section
+    _reset_draft_session_transient_outputs()
+    return restore_section
+
+
 def _decision_audit_map() -> dict[str, dict]:
     current = st.session_state.get("mapping_decision_audit") or {}
     if isinstance(current, dict):
@@ -673,6 +945,115 @@ def render_mapping_set_versions_panel(
                 st.dataframe(changes, width="stretch", hide_index=True)
             else:
                 st.info("No decision changes between the selected mapping set versions.")
+
+        st.divider()
+        saved_draft_sessions = st.session_state.get("saved_draft_sessions")
+        st.caption("Draft sessions resume the active Decisions workspace without entering governance/versioning flow.")
+        draft_session_name = st.text_input(
+            "Draft session name",
+            value="",
+            key="draft_session_name",
+            placeholder="Example: customer-master-review-wip",
+        )
+        draft_session_actions = st.columns(2)
+        if draft_session_actions[0].button(
+            "Save draft session",
+            width="stretch",
+            key="save_draft_session",
+            disabled=(not decisions) or (not draft_session_name.strip()),
+        ):
+            try:
+                saved_draft_session = api_request(
+                    "POST",
+                    "/mapping/draft-sessions",
+                    json=_build_draft_session_request_payload(draft_session_name),
+                )
+                st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": (
+                        f"Saved draft session '{saved_draft_session['name']}' "
+                        f"for {saved_draft_session['active_workspace_section']}."
+                    ),
+                }
+                st.rerun()
+            except (ValueError, KeyError) as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Saving draft session failed: {error}",
+                }
+                st.rerun()
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Saving draft session failed"),
+                }
+                st.rerun()
+
+        if draft_session_actions[1].button(
+            "Load draft sessions",
+            width="stretch",
+            key="load_draft_sessions",
+        ):
+            try:
+                st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": "Loaded saved draft sessions.",
+                }
+                st.rerun()
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Loading draft sessions failed"),
+                }
+                st.rerun()
+
+        saved_draft_sessions = st.session_state.get("saved_draft_sessions")
+        if saved_draft_sessions:
+            st.caption("Saved draft sessions")
+            st.dataframe(saved_draft_sessions, width="stretch", hide_index=True)
+            draft_session_labels = [
+                f"#{item['draft_session_id']} | {item['name']} | {item['active_workspace_section']} | {item['source_dataset_name']}"
+                for item in saved_draft_sessions
+            ]
+            selected_draft_session_label = st.selectbox(
+                "Select draft session",
+                draft_session_labels,
+                key="selected_draft_session_label",
+            )
+            selected_draft_session = saved_draft_sessions[draft_session_labels.index(selected_draft_session_label)]
+            if st.button(
+                "Resume draft session",
+                width="stretch",
+                key="resume_draft_session",
+            ):
+                try:
+                    draft_session_detail = api_request(
+                        "GET",
+                        f"/mapping/draft-sessions/{selected_draft_session['draft_session_id']}",
+                    )
+                    restored_section = _apply_draft_session_detail_to_workspace(draft_session_detail)
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": (
+                            f"Resumed draft session '{draft_session_detail['name']}' "
+                            f"into Workspace {restored_section}."
+                        ),
+                    }
+                    st.rerun()
+                except (KeyError, ValueError) as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": f"Resuming draft session failed: {error}",
+                    }
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": api_error_message(error, default_prefix="Resuming draft session failed"),
+                    }
+                    st.rerun()
 
 
 def render_correction_panel(

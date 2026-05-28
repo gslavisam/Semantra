@@ -1,0 +1,25 @@
+{
+  "artifacts_dir": "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\workspace_recordings_llm_check_20260527",
+  "scenarios": {
+    "llm_decision_flow": {
+      "title": "LLM Decision Flow",
+      "objective": "Generate bounded LLM decision proposals from review and show the downstream Decisions workflow.",
+      "folder": "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\workspace_recordings_llm_check_20260527\\03_llm_decision_flow",
+      "video": "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\workspace_recordings_llm_check_20260527\\03_llm_decision_flow\\03_llm_decision_flow.webm",
+      "screenshots": [
+        "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\workspace_recordings_llm_check_20260527\\03_llm_decision_flow\\screenshots\\03_llm_decision_flow_01.png"
+      ],
+      "result": {
+        "fixture": {
+          "source": "D:\\py_radno\\Semantra\\ui_fixtures\\showcase_customer_mapping\\showcase_customer_source.csv",
+          "target": "D:\\py_radno\\Semantra\\ui_fixtures\\showcase_customer_mapping\\showcase_customer_target.json"
+        },
+        "proposals_generated": true,
+        "safe_proposals_applied": false,
+        "screenshots": [
+          "D:\\py_radno\\Semantra\\docs\\pilot\\demo_assets\\workspace_recordings_llm_check_20260527\\03_llm_decision_flow\\screenshots\\03_llm_decision_flow_01.png"
+        ]
+      }
+    }
+  }
+}

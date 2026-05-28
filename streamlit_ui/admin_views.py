@@ -14,6 +14,9 @@ import streamlit as st
 from streamlit_ui.shared_views import render_status_badge_legend
 
 
+GOVERNANCE_SECTIONS = ("Canonical", "Knowledge", "Overlays & Runtime", "Stewardship")
+
+
 def _normalized_text(value: object) -> str:
     return str(value or "").strip()
 
@@ -21,6 +24,64 @@ def _normalized_text(value: object) -> str:
 def _section_label(title: str, detail: str | None = None) -> str:
     detail_text = str(detail or "").strip()
     return f"{title} · {detail_text}" if detail_text else title
+
+
+def resolve_active_governance_section(session_state: dict) -> str:
+    preferred = str(session_state.pop("pending_governance_section", "") or "").strip()
+    current = str(session_state.get("active_governance_section", "") or "").strip()
+    if preferred in GOVERNANCE_SECTIONS:
+        session_state["active_governance_section"] = preferred
+    elif current not in GOVERNANCE_SECTIONS:
+        session_state["active_governance_section"] = GOVERNANCE_SECTIONS[0]
+    return str(session_state.get("active_governance_section") or GOVERNANCE_SECTIONS[0])
+
+
+def _apply_pending_governance_selectbox_value(
+    session_state: dict,
+    *,
+    pending_key: str,
+    target_key: str,
+    options: list[str],
+) -> bool:
+    pending_value = _normalized_text(session_state.get(pending_key))
+    if not pending_value or not options:
+        return False
+    matched = pending_value in {_normalized_text(option) for option in options if _normalized_text(option)}
+    if matched:
+        session_state[target_key] = pending_value
+    session_state.pop(pending_key, None)
+    return matched
+
+
+def _pending_canonical_concept_label(concepts: list[dict] | None, session_state: dict) -> str:
+    pending_concept_id = _normalized_text(session_state.get("pending_governance_canonical_concept_id"))
+    if not pending_concept_id:
+        return ""
+    for concept in concepts or []:
+        if _normalized_text(concept.get("concept_id")) == pending_concept_id:
+            session_state.pop("pending_governance_canonical_concept_id", None)
+            return _canonical_concept_option_label(concept)
+    return ""
+
+
+def _governance_focus_sources(session_state: dict) -> list[str]:
+    focus_sources: list[str] = []
+    for value in session_state.get("governance_focus_sources") or []:
+        source = _normalized_text(value)
+        if source and source not in focus_sources:
+            focus_sources.append(source)
+    return focus_sources
+
+
+def _governance_focus_source_caption(source_filter: str | None, focus_sources: list[str] | None) -> str:
+    if _normalized_text(source_filter):
+        return ""
+    sources = [value for value in focus_sources or [] if _normalized_text(value)]
+    if len(sources) == 1:
+        return f"Catalog handoff focus keeps Stewardship scoped to source field {sources[0]} while the source filter remains All."
+    if sources:
+        return f"Catalog handoff focus keeps Stewardship scoped to {len(sources)} unmatched source fields while the source filter remains All."
+    return ""
 
 
 def _filter_canonical_concepts(concepts: list[dict] | None, query: str | None = None) -> list[dict]:
@@ -1229,9 +1290,15 @@ def render_canonical_console_panel(
         except httpx.HTTPError:
             st.session_state["debug_canonical_gap_proposal_states"] = {}
 
-    governance_tabs = st.tabs(["Canonical", "Knowledge", "Overlays & Runtime", "Stewardship"])
+    resolve_active_governance_section(st.session_state)
+    active_governance_section = st.radio(
+        "Governance section",
+        GOVERNANCE_SECTIONS,
+        key="active_governance_section",
+        horizontal=True,
+    )
 
-    with governance_tabs[2]:
+    if active_governance_section == "Overlays & Runtime":
         overlay_header_actions = st.columns(2)
         if overlay_header_actions[0].button(
             "Refresh overlay summary",
@@ -1720,7 +1787,7 @@ def render_canonical_console_panel(
                     if _normalized_text(version.get("status")) != "active" and not selected_promotion_item_id:
                         st.caption("Activate this overlay before creating a new promotion candidate. Existing candidates can still be reviewed.")
 
-    with governance_tabs[1]:
+    if active_governance_section == "Knowledge":
         st.caption("Knowledge registry stewardship with concept counts, linked canonical paths, and promotion readiness.")
         knowledge_header_actions = st.columns(2)
         if knowledge_header_actions[0].button(
@@ -2168,7 +2235,7 @@ def render_canonical_console_panel(
             else:
                 st.info("No field contexts are attached to this knowledge concept.")
 
-    with governance_tabs[0]:
+    if active_governance_section == "Canonical":
         st.caption("Canonical glossary stewardship with filtered/total concept counts and context coverage.")
         canonical_header_actions = st.columns(1)
         if canonical_header_actions[0].button(
@@ -2266,6 +2333,18 @@ def render_canonical_console_panel(
                     if _normalized_text(value)
                 }
             )
+            _apply_pending_governance_selectbox_value(
+                st.session_state,
+                pending_key="pending_governance_canonical_source_system",
+                target_key="debug_canonical_concept_source_system",
+                options=available_source_systems,
+            )
+            _apply_pending_governance_selectbox_value(
+                st.session_state,
+                pending_key="pending_governance_canonical_business_domain",
+                target_key="debug_canonical_concept_business_domain",
+                options=available_business_domains,
+            )
             filter_columns = st.columns(4)
             concept_query = filter_columns[0].text_input(
                 "Canonical concept search",
@@ -2322,6 +2401,9 @@ def render_canonical_console_panel(
 
             if filtered_concepts:
                 concept_options = {_canonical_concept_option_label(item): item["concept_id"] for item in filtered_concepts}
+                pending_concept_label = _pending_canonical_concept_label(filtered_concepts, st.session_state)
+                if pending_concept_label and st.session_state.get("debug_selected_canonical_concept_label") != pending_concept_label:
+                    st.session_state["debug_selected_canonical_concept_label"] = pending_concept_label
                 preferred_concept_label = _preferred_canonical_concept_label(
                     filtered_concepts,
                     st.session_state.get("debug_knowledge_stewardship_items"),
@@ -2789,7 +2871,7 @@ def render_canonical_console_panel(
                     st.write("**Knowledge audit references**")
                     st.dataframe(canonical_concept_detail.get("audit_entries"), width="stretch", hide_index=True)
 
-    with governance_tabs[3]:
+    if active_governance_section == "Stewardship":
         stewardship_header_actions = st.columns(1)
         if stewardship_header_actions[0].button(
             "Clear governance state",
@@ -2817,6 +2899,11 @@ def render_canonical_console_panel(
                 "debug_canonical_glossary_import",
                 "canonical_glossary_export_bytes",
                 "debug_canonical_console_bootstrapped",
+                "pending_governance_canonical_concept_id",
+                "pending_governance_canonical_source_system",
+                "pending_governance_canonical_business_domain",
+                "pending_governance_gap_source_filter",
+                "governance_focus_sources",
             ):
                 st.session_state.pop(key, None)
             st.session_state["debug_canonical_console_manual_clear"] = True
@@ -2943,7 +3030,20 @@ def render_canonical_console_panel(
                     if _normalized_text(item.get("assignee"))
                 }
             )
-            queue_filter_columns = st.columns(3)
+            available_sources = sorted(
+                {
+                    _normalized_text(candidate.get("source"))
+                    for candidate in canonical_gap_candidates
+                    if _normalized_text(candidate.get("source"))
+                }
+            )
+            _apply_pending_governance_selectbox_value(
+                st.session_state,
+                pending_key="pending_governance_gap_source_filter",
+                target_key="debug_canonical_gap_source_filter",
+                options=available_sources,
+            )
+            queue_filter_columns = st.columns(4)
             queue_status_filter = queue_filter_columns[0].selectbox(
                 "Stewardship status",
                 options=[""] + available_stewardship_statuses,
@@ -2962,6 +3062,16 @@ def render_canonical_console_panel(
                 key="debug_canonical_gap_assignee_filter",
                 format_func=lambda value: value or "All assignees",
             )
+            queue_source_filter = queue_filter_columns[3].selectbox(
+                "Source field",
+                options=[""] + available_sources,
+                key="debug_canonical_gap_source_filter",
+                format_func=lambda value: value or "All source fields",
+            )
+            focus_sources = _governance_focus_sources(st.session_state)
+            focus_caption = _governance_focus_source_caption(queue_source_filter, focus_sources)
+            if focus_caption:
+                st.caption(focus_caption)
             visible_gap_indices = [
                 index
                 for index, candidate in enumerate(canonical_gap_candidates)
@@ -2988,6 +3098,11 @@ def render_canonical_console_panel(
                         (canonical_gap_stewardship_items.get(_canonical_gap_candidate_key(index, candidate)) or {}).get("assignee")
                     )
                     == queue_assignee_filter
+                )
+                and (
+                    (not queue_source_filter and not focus_sources)
+                    or (queue_source_filter and _normalized_text(candidate.get("source")) == queue_source_filter)
+                    or ((not queue_source_filter) and focus_sources and _normalized_text(candidate.get("source")) in focus_sources)
                 )
             ]
             st.dataframe(

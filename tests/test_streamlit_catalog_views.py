@@ -378,6 +378,96 @@ def test_catalog_reuse_fit_label_formats_known_values() -> None:
     assert catalog_views._catalog_reuse_fit_label("unknown") == ""
 
 
+def test_preferred_catalog_review_handoff_concept_prefers_shared_concept() -> None:
+    assert catalog_views._preferred_catalog_review_handoff_concept(
+        ["customer.id", "customer.name"],
+        ["customer.id", "customer.email"],
+    ) == "customer.id"
+
+
+def test_preferred_catalog_review_handoff_concept_falls_back_to_first_available() -> None:
+    assert catalog_views._preferred_catalog_review_handoff_concept([], ["customer.email"]) == "customer.email"
+    assert catalog_views._preferred_catalog_review_handoff_concept(["customer.id"], []) == "customer.id"
+
+
+def test_catalog_mapping_set_record_by_id_returns_matching_version_record() -> None:
+    assert catalog_views._catalog_mapping_set_record_by_id(
+        [
+            {"mapping_set_id": 4, "name": "customer-master", "version": 1},
+            {"mapping_set_id": 7, "name": "customer-master", "version": 2},
+        ],
+        7,
+    ) == {"mapping_set_id": 7, "name": "customer-master", "version": 2}
+
+
+def test_catalog_mapping_set_record_by_id_returns_none_for_missing_id() -> None:
+    assert catalog_views._catalog_mapping_set_record_by_id([{"mapping_set_id": 4}], 0) is None
+    assert catalog_views._catalog_mapping_set_record_by_id([{"mapping_set_id": 4}], 7) is None
+
+
+def test_catalog_mapping_set_diff_focus_sources_returns_unique_ordered_sources() -> None:
+    assert catalog_views._catalog_mapping_set_diff_focus_sources(
+        [
+            {"source": "KUNNR"},
+            {"source": "LAND1"},
+            {"source": "KUNNR"},
+            {"source": ""},
+        ]
+    ) == ["KUNNR", "LAND1"]
+
+
+def test_catalog_reuse_fit_section_detail_combines_fit_and_generation_mode() -> None:
+    assert catalog_views._catalog_reuse_fit_section_detail(None) == ""
+    assert catalog_views._catalog_reuse_fit_section_detail(
+        {"fit_assessment": "strong_fit", "generation_metadata": {"used_llm": True}}
+    ) == "strong fit | LLM"
+    assert catalog_views._catalog_reuse_fit_section_detail(
+        {"fit_assessment": "partial_fit", "generation_metadata": {"used_llm": False}}
+    ) == "partial fit | Fallback"
+
+
+def test_catalog_reuse_fit_action_and_empty_state_helpers_use_explanation_noun() -> None:
+    assert catalog_views._catalog_reuse_fit_action_label(None) == "Generate reuse-fit explanation"
+    assert catalog_views._catalog_reuse_fit_action_label({"summary": "x"}) == "Refresh reuse-fit explanation"
+    assert catalog_views._catalog_reuse_fit_empty_message() == (
+        "No workspace reuse-fit explanation has been generated yet for the selected version."
+    )
+
+
+def test_catalog_reuse_fit_intro_and_unlock_helpers_state_read_only_role() -> None:
+    assert catalog_views._catalog_reuse_fit_intro_caption() == (
+        "Generate one bounded reuse-fit explanation for the selected catalog version against the current workspace snapshot before applying reuse. "
+        "This is a read-only guidance surface and does not apply or approve anything automatically."
+    )
+    assert catalog_views._catalog_reuse_fit_unlock_message() == (
+        "Open the selected catalog version first to unlock reuse-fit review against the current workspace snapshot."
+    )
+
+
+def test_catalog_reuse_fit_success_and_error_helpers_use_shared_copy_pattern() -> None:
+    assert catalog_views._catalog_reuse_fit_success_message() == (
+        "Generated workspace reuse-fit explanation for the selected catalog mapping set."
+    )
+    assert catalog_views._catalog_reuse_fit_error_message("boom") == (
+        "Workspace reuse-fit explanation generation failed: boom"
+    )
+
+
+def test_catalog_reuse_fit_metadata_caption_uses_llm_fallback_pattern() -> None:
+    assert catalog_views._catalog_reuse_fit_metadata_caption(None) == ""
+    assert catalog_views._catalog_reuse_fit_metadata_caption(
+        {"generation_metadata": {"used_llm": True, "fallback_used": False}}
+    ) == "LLM"
+    assert catalog_views._catalog_reuse_fit_metadata_caption(
+        {"generation_metadata": {"used_llm": False, "fallback_used": True}}
+    ) == "Fallback with fallback contract"
+
+
+def test_catalog_reuse_fit_output_heading_preserves_section_title() -> None:
+    assert catalog_views._catalog_reuse_fit_output_heading("Key matches") == "Key matches"
+    assert catalog_views._catalog_reuse_fit_output_heading(" Risks ") == "Risks"
+
+
 def test_catalog_reuse_fit_ready_for_selected_version_requires_matching_drilldown() -> None:
     assert catalog_views._catalog_reuse_fit_ready_for_selected_version(
         {"mapping_set_id": 7},
@@ -495,6 +585,7 @@ def test_catalog_next_action_plan_prefers_governance_for_unapproved_version() ->
 
     assert plan["table_label"] == "Canonical governance handoff"
     assert plan["primary_area"] == "Governance"
+    assert plan["primary_label"] == "Open Canonical review"
     assert plan["secondary_area"] == "Workspace"
     assert "Inspect governance owner" in plan["primary_summary"]
 
@@ -515,7 +606,110 @@ def test_catalog_next_action_plan_adds_canonical_secondary_for_unmatched_sources
     assert plan["table_label"] == "Workspace review handoff"
     assert plan["primary_area"] == "Workspace"
     assert plan["secondary_area"] == "Governance"
+    assert plan["secondary_label"] == "Open Stewardship"
     assert "canonical gaps" in plan["primary_summary"]
+
+
+def test_catalog_governance_handoff_summary_prefers_primary_governance_path() -> None:
+    assert catalog_views._catalog_governance_handoff_summary(
+        {
+            "primary_area": "Governance",
+            "primary_summary": "Inspect governance owner, review note, and canonical coverage.",
+            "secondary_area": "Workspace",
+            "secondary_summary": "Keep review visible.",
+        }
+    ) == "Inspect governance owner, review note, and canonical coverage."
+
+
+def test_catalog_governance_handoff_summary_falls_back_to_secondary_governance_path() -> None:
+    assert catalog_views._catalog_governance_handoff_summary(
+        {
+            "primary_area": "Workspace",
+            "primary_summary": "Keep review visible.",
+            "secondary_area": "Governance",
+            "secondary_summary": "Inspect canonical usage before reuse.",
+        }
+    ) == "Inspect canonical usage before reuse."
+    assert catalog_views._catalog_governance_handoff_summary({"primary_area": "Workspace"}) == ""
+
+
+def test_catalog_governance_handoff_payload_prioritizes_stewardship_for_unmatched_sources() -> None:
+    payload = catalog_views._catalog_governance_handoff_payload(
+        {
+            "artifact_type": "canonical-only",
+            "canonical_concepts": ["customer.id", "customer.name"],
+            "unmatched_sources": ["LAND1", "REGIO", "LAND1"],
+            "source_system": "SAP",
+            "business_domain": "Customer",
+        }
+    )
+
+    assert payload == {
+        "section": "Stewardship",
+        "canonical_concept_id": "customer.id",
+        "canonical_source_system": "SAP",
+        "canonical_business_domain": "Customer",
+        "focus_sources": ["LAND1", "REGIO"],
+        "gap_source_filter": "",
+    }
+
+
+def test_catalog_governance_handoff_action_label_prefers_stewardship_destination() -> None:
+    label = catalog_views._catalog_governance_handoff_action_label(
+        {
+            "unmatched_sources": ["LAND1", "REGIO"],
+            "canonical_concepts": ["customer.id"],
+        },
+        scope_label="current diff",
+    )
+
+    assert label == "Open current diff Stewardship"
+
+
+def test_catalog_governance_handoff_action_label_prefers_canonical_review_for_draft() -> None:
+    label = catalog_views._catalog_governance_handoff_action_label(
+        {
+            "status": "draft",
+            "canonical_concepts": ["customer.id"],
+            "artifact_type": "canonical-only",
+        },
+        scope_label="baseline diff",
+    )
+
+    assert label == "Open baseline diff Canonical review"
+
+
+def test_catalog_governance_handoff_action_label_supports_empty_scope_label() -> None:
+    label = catalog_views._catalog_governance_handoff_action_label(
+        {
+            "status": "draft",
+            "canonical_concepts": ["customer.id"],
+        },
+        scope_label="",
+    )
+
+    assert label == "Open Canonical review"
+
+
+def test_catalog_governance_follow_up_caption_uses_reason_priority() -> None:
+    unmatched_caption = catalog_views._catalog_governance_follow_up_caption(
+        {
+            "unmatched_sources": ["LAND1", "REGIO"],
+            "canonical_concepts": ["customer.id"],
+        },
+        scope_label="Current diff",
+    )
+    draft_caption = catalog_views._catalog_governance_follow_up_caption(
+        {
+            "status": "draft",
+            "canonical_concepts": ["customer.id"],
+            "artifact_type": "canonical-only",
+        },
+        scope_label="Baseline diff",
+    )
+
+    assert unmatched_caption == "Current diff: Stewardship for 2 unmatched source fields."
+    assert draft_caption == "Baseline diff: Canonical for draft version."
 
 
 def test_open_catalog_handoff_switches_top_level_area(monkeypatch) -> None:
@@ -533,8 +727,102 @@ def test_open_catalog_handoff_switches_top_level_area(monkeypatch) -> None:
     assert "Catalog handoff: customer-master v4 -> Workspace." in fake_streamlit.session_state["last_action"]["message"]
 
 
-def test_open_catalog_review_focus_handoff_sets_workspace_review_filters(monkeypatch) -> None:
+def test_open_catalog_handoff_governance_sets_pending_focus_state(monkeypatch) -> None:
     fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_handoff(
+        "Governance",
+        {
+            "name": "customer-master",
+            "version": 4,
+            "canonical_concepts": ["customer.id"],
+            "unmatched_sources": ["LAND1", "REGIO"],
+            "source_system": "SAP",
+            "business_domain": "Customer",
+        },
+        "Inspect canonical usage before reuse.",
+    )
+
+    assert fake_streamlit.session_state["pending_top_level_area"] == "Governance"
+    assert fake_streamlit.session_state["pending_governance_section"] == "Stewardship"
+    assert fake_streamlit.session_state["pending_governance_canonical_concept_id"] == "customer.id"
+    assert fake_streamlit.session_state["pending_governance_canonical_source_system"] == "SAP"
+    assert fake_streamlit.session_state["pending_governance_canonical_business_domain"] == "Customer"
+    assert fake_streamlit.session_state["governance_focus_sources"] == ["LAND1", "REGIO"]
+    assert "-> Governance (Stewardship)." in fake_streamlit.session_state["last_action"]["message"]
+
+
+def test_open_catalog_handoff_governance_clears_stale_stewardship_filters(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "debug_canonical_gap_status_filter": "ready_for_approval",
+            "debug_canonical_gap_owner_filter": "governance-team",
+            "debug_canonical_gap_assignee_filter": "analyst-1",
+            "debug_canonical_gap_source_filter": "OLD_FIELD",
+            "debug_selected_canonical_gap_label": "stale gap",
+            "governance_focus_sources": ["OLD_FIELD"],
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_handoff(
+        "Governance",
+        {
+            "name": "customer-master",
+            "version": 4,
+            "canonical_concepts": ["customer.id"],
+            "unmatched_sources": ["LAND1", "REGIO"],
+        },
+        "Inspect canonical usage before reuse.",
+    )
+
+    assert fake_streamlit.session_state["debug_canonical_gap_status_filter"] == ""
+    assert fake_streamlit.session_state["debug_canonical_gap_owner_filter"] == ""
+    assert fake_streamlit.session_state["debug_canonical_gap_assignee_filter"] == ""
+    assert fake_streamlit.session_state["debug_canonical_gap_source_filter"] == ""
+    assert "debug_selected_canonical_gap_label" not in fake_streamlit.session_state
+    assert fake_streamlit.session_state["governance_focus_sources"] == ["LAND1", "REGIO"]
+
+
+def test_open_catalog_handoff_governance_clears_stale_canonical_filters(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(
+        session_state={
+            "debug_canonical_concept_query": "legacy",
+            "debug_canonical_concept_focus": "overlay_only",
+            "debug_canonical_concept_source_system": "LegacyERP",
+            "debug_canonical_concept_business_domain": "Vendor",
+            "debug_selected_canonical_concept_label": "stale concept",
+            "governance_focus_sources": ["OLD_FIELD"],
+        }
+    )
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_handoff(
+        "Governance",
+        {
+            "name": "customer-master",
+            "version": 4,
+            "canonical_concepts": ["customer.id"],
+            "artifact_type": "canonical-only",
+            "source_system": "SAP",
+            "business_domain": "Customer",
+            "unmatched_sources": [],
+        },
+        "Inspect canonical usage before reuse.",
+    )
+
+    assert fake_streamlit.session_state["pending_governance_section"] == "Canonical"
+    assert fake_streamlit.session_state["debug_canonical_concept_query"] == ""
+    assert fake_streamlit.session_state["debug_canonical_concept_focus"] == "all"
+    assert fake_streamlit.session_state["debug_canonical_concept_source_system"] == ""
+    assert fake_streamlit.session_state["debug_canonical_concept_business_domain"] == ""
+    assert "debug_selected_canonical_concept_label" not in fake_streamlit.session_state
+    assert "governance_focus_sources" not in fake_streamlit.session_state
+
+
+def test_open_catalog_review_focus_handoff_sets_workspace_review_filters(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={"review_focus_sources": ["stale"]})
     monkeypatch.setattr(catalog_views, "st", fake_streamlit)
 
     catalog_views._open_catalog_review_focus_handoff(
@@ -543,11 +831,29 @@ def test_open_catalog_review_focus_handoff_sets_workspace_review_filters(monkeyp
     )
 
     assert fake_streamlit.session_state["pending_top_level_area"] == "Workspace"
+    assert fake_streamlit.session_state["pending_workspace_section"] == "Review"
     assert fake_streamlit.session_state["filter_status"] == "needs_review"
     assert fake_streamlit.session_state["filter_confidence"] == "All"
     assert fake_streamlit.session_state["filter_source"] == "All"
     assert fake_streamlit.session_state["filter_canonical_concept"] == "customer.id"
+    assert "review_focus_sources" not in fake_streamlit.session_state
     assert "Workspace Review with filters" in fake_streamlit.session_state["last_action"]["message"]
+
+
+def test_open_catalog_review_focus_handoff_preserves_multi_source_diff_focus(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(catalog_views, "st", fake_streamlit)
+
+    catalog_views._open_catalog_review_focus_handoff(
+        mapping_set_detail={"name": "customer-master", "version": 4},
+        canonical_concept="customer.id",
+        source_fields=["KUNNR", "LAND1", "KUNNR"],
+    )
+
+    assert fake_streamlit.session_state["filter_source"] == "All"
+    assert fake_streamlit.session_state["pending_workspace_section"] == "Review"
+    assert fake_streamlit.session_state["review_focus_sources"] == ["KUNNR", "LAND1"]
+    assert "source_scope=2 diff fields" in fake_streamlit.session_state["last_action"]["message"]
 
 
 def test_catalog_detail_state_recovery_clears_stale_catalog_state(monkeypatch) -> None:

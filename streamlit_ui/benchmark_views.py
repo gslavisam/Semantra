@@ -14,6 +14,11 @@ from streamlit_ui.governance import mapping_benchmark_block_reason
 AVAILABLE_SCORING_PROFILES = ["balanced", "schema_only", "data_rich", "canonical_first", "description_priority"]
 
 
+def _section_label(title: str, detail: str | None = None) -> str:
+    detail_text = str(detail or "").strip()
+    return f"{title} · {detail_text}" if detail_text else title
+
+
 def benchmark_dataset_options() -> list[tuple[str, int]]:
     """Build selectbox labels for saved benchmark datasets loaded into session state."""
 
@@ -45,8 +50,15 @@ def _benchmark_explanation_unlock_message(
     profile_comparison: dict[str, Any] | None,
 ) -> str:
     if _benchmark_explanation_enabled(benchmark_result, correction_impact, profile_comparison):
-        return "Generate or refresh the explanation for the currently loaded benchmark evidence."
-    return "Run a benchmark, correction-impact check, or scoring-profile comparison to unlock this explanation."
+        return "Loaded benchmark evidence is ready for benchmark explanation review."
+    return "Run a benchmark, correction-impact check, or scoring-profile comparison first to unlock benchmark explanation."
+
+
+def _benchmark_explanation_intro_caption() -> str:
+    return (
+        "Generate one bounded benchmark explanation for the currently loaded benchmark evidence before changing scoring assumptions. "
+        "This is a read-only guidance surface and does not change scoring state."
+    )
 
 
 def _benchmark_explanation_payload(
@@ -62,6 +74,45 @@ def _benchmark_explanation_payload(
         "correction_impact": correction_impact,
         "profile_comparison": profile_comparison,
     }
+
+
+def _benchmark_explanation_section_label(benchmark_explanation: dict[str, Any] | None) -> str:
+    metadata = (benchmark_explanation or {}).get("generation_metadata") or {}
+    detail = None
+    if benchmark_explanation:
+        detail = "LLM" if metadata.get("used_llm") else "Fallback"
+    return _section_label("Benchmark Explanation", detail)
+
+
+def _benchmark_explanation_action_label(benchmark_explanation: dict[str, Any] | None) -> str:
+    return "Refresh benchmark explanation" if benchmark_explanation else "Generate benchmark explanation"
+
+
+def _benchmark_explanation_empty_message(explanation_enabled: bool) -> str:
+    if not explanation_enabled:
+        return "No benchmark evidence is loaded yet."
+    return "No benchmark explanation has been generated yet for the loaded benchmark evidence."
+
+
+def _benchmark_explanation_success_message(dataset_name: str) -> str:
+    return f"Generated benchmark explanation for {dataset_name}."
+
+
+def _benchmark_explanation_error_message(error: object) -> str:
+    return f"Benchmark explanation generation failed: {error}"
+
+
+def _benchmark_explanation_metadata_caption(benchmark_explanation: dict[str, Any] | None) -> str:
+    if not benchmark_explanation:
+        return ""
+    metadata = (benchmark_explanation or {}).get("generation_metadata") or {}
+    detail = "LLM" if metadata.get("used_llm") else "Fallback"
+    fallback_suffix = " with fallback contract" if metadata.get("fallback_used") else ""
+    return f"{detail}{fallback_suffix}"
+
+
+def _benchmark_explanation_output_heading(title: str) -> str:
+    return str(title or "").strip()
 
 
 def render_benchmark_tab(
@@ -321,12 +372,10 @@ def render_benchmark_tab(
         loaded_profile_comparison,
     )
     with st.expander(
-        "Benchmark Explanation",
+        _benchmark_explanation_section_label(benchmark_explanation),
         expanded=bool(benchmark_explanation),
     ):
-        st.caption(
-            "Bounded explanation for the currently loaded benchmark evidence. This is separate from raw metrics and does not change scoring state."
-        )
+        st.caption(_benchmark_explanation_intro_caption())
         st.caption(
             _benchmark_explanation_unlock_message(
                 loaded_benchmark_result,
@@ -335,7 +384,7 @@ def render_benchmark_tab(
             )
         )
         if st.button(
-            "Refresh benchmark explanation" if benchmark_explanation else "Generate benchmark explanation",
+            _benchmark_explanation_action_label(benchmark_explanation),
             width="stretch",
             key="benchmark_explain_loaded_results",
             disabled=not explanation_enabled,
@@ -354,37 +403,36 @@ def render_benchmark_tab(
                 )
                 st.session_state["last_action"] = {
                     "level": "success",
-                    "message": f"Generated a benchmark explanation for {selected_dataset_name if dataset_options else 'the loaded benchmark'}.",
+                    "message": _benchmark_explanation_success_message(
+                        selected_dataset_name if dataset_options else "the loaded benchmark"
+                    ),
                 }
             except httpx.HTTPError as error:
                 st.session_state["last_action"] = {
                     "level": "error",
-                    "message": f"Benchmark explanation failed: {error}",
+                    "message": _benchmark_explanation_error_message(error),
                 }
             st.rerun()
 
         if benchmark_explanation:
-            metadata = benchmark_explanation.get("generation_metadata") or {}
-            st.caption("LLM explanation" if metadata.get("used_llm") else "Fallback explanation")
+            st.caption(_benchmark_explanation_metadata_caption(benchmark_explanation))
             if benchmark_explanation.get("summary"):
                 st.write(str(benchmark_explanation.get("summary")))
             findings_col, risks_col, actions_col = st.columns(3)
             with findings_col:
-                st.caption("Key findings")
+                st.caption(_benchmark_explanation_output_heading("Key findings"))
                 for line in benchmark_explanation.get("key_findings") or []:
                     st.write(f"- {line}")
             with risks_col:
-                st.caption("Risks")
+                st.caption(_benchmark_explanation_output_heading("Risks"))
                 for line in benchmark_explanation.get("risks") or []:
                     st.write(f"- {line}")
             with actions_col:
-                st.caption("Next actions")
+                st.caption(_benchmark_explanation_output_heading("Next actions"))
                 for line in benchmark_explanation.get("next_actions") or []:
                     st.write(f"- {line}")
-        elif not explanation_enabled:
-            st.info("No benchmark evidence is loaded yet.")
         else:
-            st.info("No benchmark explanation has been generated yet for the loaded results.")
+            st.info(_benchmark_explanation_empty_message(explanation_enabled))
 
     benchmark_runs = st.session_state.get("benchmark_runs")
     if benchmark_runs:

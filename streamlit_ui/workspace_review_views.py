@@ -102,6 +102,60 @@ def _invalidate_source_field_hint_cache() -> None:
     st.session_state.pop("source_field_hint_system_records", None)
 
 
+def _catalog_review_focus_sources() -> list[str]:
+    sources = st.session_state.get("review_focus_sources") or []
+    if not isinstance(sources, list):
+        return []
+    focused_sources: list[str] = []
+    focused_keys: set[str] = set()
+    for value in sources:
+        source = str(value or "").strip()
+        source_key = _normalized_text(source)
+        if source_key and source_key not in focused_keys:
+            focused_keys.add(source_key)
+            focused_sources.append(source)
+    return focused_sources
+
+
+def _filter_rows_for_catalog_review_focus(rows: list[dict] | None, focused_sources: list[str] | None) -> list[dict]:
+    focused_keys = {_normalized_text(item) for item in focused_sources or [] if _normalized_text(item)}
+    if not focused_keys:
+        return list(rows or [])
+    return [row for row in rows or [] if _normalized_text(row.get("source")) in focused_keys]
+
+
+def _catalog_review_focus_caption(focused_sources: list[str] | None) -> str:
+    sources = [str(item or "").strip() for item in focused_sources or [] if str(item or "").strip()]
+    if not sources:
+        return ""
+    if len(sources) == 1:
+        return (
+            "Catalog diff focus is limiting Workspace Review to the changed source field "
+            f"{sources[0]} while 'Filter by source' stays on All."
+        )
+    preview = ", ".join(sources[:3])
+    if len(sources) > 3:
+        preview += ", ..."
+    return (
+        "Catalog diff focus is limiting Workspace Review to "
+        f"{len(sources)} changed source fields: {preview}."
+    )
+
+
+def _effective_review_source_filter_label(
+    selected_source: str,
+    *,
+    all_filter_option: str,
+    focused_sources: list[str] | None,
+) -> str:
+    if selected_source != all_filter_option:
+        return selected_source
+    sources = [str(item or "").strip() for item in focused_sources or [] if str(item or "").strip()]
+    if not sources:
+        return all_filter_option
+    return f"Catalog diff focus ({len(sources)} sources)"
+
+
 def _compose_llm_mapping_refinement_instruction(*parts: str) -> str:
     return "\n\n".join(part.strip() for part in parts if str(part or "").strip())
 
@@ -525,6 +579,45 @@ def _section_label(title: str, detail: str | None = None) -> str:
     return f"{title} · {detail_text}" if detail_text else title
 
 
+def _guidance_generation_detail(payload: dict | None) -> str:
+    metadata = (payload or {}).get("generation_metadata") or {}
+    if not payload:
+        return ""
+    return "LLM" if metadata.get("used_llm") else "Fallback"
+
+
+def _guidance_generation_success_message(surface_label: str, scope_label: str) -> str:
+    return f"Generated {surface_label} for {scope_label}."
+
+
+def _guidance_generation_error_message(surface_label: str, error: object) -> str:
+    return f"{surface_label} generation failed: {error}"
+
+
+def _guidance_generation_metadata_caption(payload: dict | None) -> str:
+    detail = _guidance_generation_detail(payload)
+    if not detail:
+        return ""
+    metadata = (payload or {}).get("generation_metadata") or {}
+    fallback_suffix = " with fallback contract" if metadata.get("fallback_used") else ""
+    return f"{detail}{fallback_suffix}"
+
+
+def _canonical_gap_triage_intro_caption() -> str:
+    return (
+        "Generate one bounded gap queue summary for the current canonical-gap queue before reviewing candidates one by one. "
+        "This is a read-only guidance surface and does not change candidate decisions or approval state."
+    )
+
+
+def _canonical_gap_triage_unlock_message() -> str:
+    return "Run 'Find canonical gaps' first to unlock the queue-level summary."
+
+
+def _guidance_output_heading(title: str) -> str:
+    return str(title or "").strip()
+
+
 def _manual_review_open_item_count(mapping_response: dict, editor_state: dict, *, selected_target_options) -> int:
     open_count = 0
     for ranked in mapping_response.get("ranked_mappings", []):
@@ -817,10 +910,9 @@ def render_mapping_analysis_panel(
     force_open = bool(st.session_state.pop("mapping_analysis_force_open", False))
     analysis_label = "Mapping Analysis Overview"
     if summary:
-        metadata = summary.get("generation_metadata") or {}
         analysis_label = _section_label(
             analysis_label,
-            "LLM summary" if metadata.get("used_llm") else "Fallback summary",
+            _guidance_generation_detail(summary),
         )
 
     with st.expander(analysis_label, expanded=(summary is None or analysis_error is not None or force_open)):
@@ -843,14 +935,17 @@ def render_mapping_analysis_panel(
                 st.session_state["mapping_analysis_force_open"] = True
                 st.session_state["last_action"] = {
                     "level": "success",
-                    "message": "Generated a technical mapping analysis overview for the current review state.",
+                    "message": _guidance_generation_success_message(
+                        "mapping analysis overview",
+                        "the current review state",
+                    ),
                 }
                 st.rerun()
             except (ValueError, httpx.HTTPError) as error:
                 st.session_state["mapping_analysis_error"] = str(error)
                 st.session_state["last_action"] = {
                     "level": "error",
-                    "message": f"Mapping analysis generation failed: {error}",
+                    "message": _guidance_generation_error_message("Mapping analysis overview", error),
                 }
                 st.rerun()
         if audio_col.button(
@@ -882,16 +977,13 @@ def render_mapping_analysis_panel(
                 st.rerun()
 
         if analysis_error and not summary:
-            st.error(f"Analysis generation failed: {analysis_error}")
+            st.error(_guidance_generation_error_message("Mapping analysis overview", analysis_error))
 
         if not summary:
             st.info("No mapping overview has been generated yet. Use this panel to create a technical readout of the current mapping state.")
             return
 
-        metadata = summary.get("generation_metadata") or {}
-        llm_status = "LLM summary" if metadata.get("used_llm") else "Fallback summary"
-        fallback_suffix = " with fallback contract" if metadata.get("fallback_used") else ""
-        st.caption(f"{llm_status}{fallback_suffix}")
+        st.caption(_guidance_generation_metadata_caption(summary))
         if audio_error:
             st.error(f"Audio generation failed: {audio_error}")
         if audio_bytes:
@@ -916,7 +1008,7 @@ def render_mapping_analysis_panel(
 
         left, right = st.columns(2)
         with left:
-            st.markdown("#### Strongest matches")
+            st.caption(_guidance_output_heading("Key matches"))
             strongest_matches = summary.get("strongest_matches") or []
             if strongest_matches:
                 for item in strongest_matches:
@@ -942,7 +1034,7 @@ def render_mapping_analysis_panel(
             else:
                 st.info("No active review queue items are highlighted in the current payload.")
 
-        st.markdown("#### Canonical coverage and findings")
+            st.caption(_guidance_output_heading("Canonical coverage and findings"))
         canonical_summary = summary.get("canonical_coverage_summary") or {}
         coverage_columns = st.columns(3)
         coverage_columns[0].metric("Source coverage", f"{round(float(canonical_summary.get('source_coverage') or 0.0) * 100)}%")
@@ -956,7 +1048,7 @@ def render_mapping_analysis_panel(
 
         lower_left, lower_right = st.columns(2)
         with lower_left:
-            st.markdown("#### Transformation hotspots")
+            st.caption(_guidance_output_heading("Transformation hotspots"))
             hotspots = summary.get("transformation_hotspots") or []
             if hotspots:
                 for item in hotspots:
@@ -969,7 +1061,7 @@ def render_mapping_analysis_panel(
             else:
                 st.info("No transformation hotspots are currently flagged.")
         with lower_right:
-            st.markdown("#### Implementation risks")
+            st.caption(_guidance_output_heading("Risks"))
             risks = summary.get("implementation_risks") or []
             if risks:
                 for risk in risks:
@@ -977,7 +1069,7 @@ def render_mapping_analysis_panel(
             else:
                 st.info("No implementation risks were returned for the current payload.")
 
-        st.markdown("#### Recommended next actions")
+        st.caption(_guidance_output_heading("Next actions"))
         next_actions = summary.get("recommended_next_actions") or []
         if next_actions:
             for index, action in enumerate(next_actions, start=1):
@@ -1560,7 +1652,7 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
 
         if not candidates:
             with st.expander("Gap Queue Summary", expanded=False):
-                st.caption("Queue-level summary of repeated canonical-gap families once candidates are loaded.")
+                st.caption(_canonical_gap_triage_intro_caption())
                 st.info("Run 'Find canonical gaps' first to unlock the queue-level summary.")
             st.info("No canonical gap candidates loaded yet, or no high-confidence gaps were found.")
             return
@@ -1580,12 +1672,10 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
         triage_error = st.session_state.get("canonical_gap_triage_error")
         triage_label = _section_label(
             "Gap Queue Summary",
-            "LLM summary" if (triage_summary or {}).get("generation_metadata", {}).get("used_llm") else (
-                "Fallback summary" if triage_summary else None
-            ),
+            _guidance_generation_detail(triage_summary) or None,
         )
         with st.expander(triage_label, expanded=bool(triage_summary) or bool(triage_error)):
-            st.caption("Summarize the current canonical-gap queue into repeated families before reviewing candidates one by one.")
+            st.caption(_canonical_gap_triage_intro_caption())
             if st.button(
                 "Refresh gap summary" if triage_summary else "Generate gap summary",
                 key="canonical_gap_triage_summary",
@@ -1601,18 +1691,21 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
                     st.session_state.pop("canonical_gap_triage_error", None)
                     st.session_state["last_action"] = {
                         "level": "success",
-                        "message": "Generated a batch triage summary for the current canonical-gap queue.",
+                        "message": _guidance_generation_success_message(
+                            "gap queue summary",
+                            "the current canonical-gap queue",
+                        ),
                     }
                 except httpx.HTTPError as error:
                     st.session_state["canonical_gap_triage_error"] = str(error)
                     st.session_state["last_action"] = {
                         "level": "error",
-                        "message": f"Canonical gap triage summary failed: {error}",
+                        "message": _guidance_generation_error_message("Gap queue summary", error),
                     }
                 st.rerun()
 
             if triage_error and not triage_summary:
-                st.error(f"Canonical gap triage summary failed: {triage_error}")
+                st.error(_guidance_generation_error_message("Gap queue summary", triage_error))
             elif triage_summary:
                 st.write(str(triage_summary.get("summary") or ""))
                 triage_rows = _canonical_gap_triage_group_rows(triage_summary)
@@ -1628,7 +1721,7 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
                     for line in triage_summary.get("next_actions") or []:
                         st.write(f"- {line}")
             else:
-                st.info("No queue-level canonical-gap triage summary has been generated yet.")
+                st.info(_canonical_gap_triage_unlock_message() if not candidates else "No queue-level canonical-gap triage summary has been generated yet.")
 
         for candidate in candidates:
             source = candidate.get("source", "")
@@ -1761,6 +1854,12 @@ def render_mapping_review(
         canonical_concept_options,
         key="filter_canonical_concept",
     )
+    focused_sources = _catalog_review_focus_sources()
+    focused_source_keys = {_normalized_text(item) for item in focused_sources if _normalized_text(item)}
+    source_focus_active = selected_source == all_filter_option and bool(focused_source_keys)
+
+    if source_focus_active:
+        st.caption(_catalog_review_focus_caption(focused_sources))
 
     filtered_rows = [
         row
@@ -1779,6 +1878,10 @@ def render_mapping_review(
             }
         )
     ]
+    if source_focus_active:
+        filtered_rows = _filter_rows_for_catalog_review_focus(filtered_rows, focused_sources)
+        source_concept_view_rows = _filter_rows_for_catalog_review_focus(source_concept_view_rows, focused_sources)
+        concept_target_view_rows = _filter_rows_for_catalog_review_focus(concept_target_view_rows, focused_sources)
     canonical_mismatch_rows = [
         row
         for row in filtered_rows
@@ -1812,9 +1915,7 @@ def render_mapping_review(
 
     review_plan_label = _section_label(
         "Review Queue Plan",
-        "LLM plan" if (review_plan_summary or {}).get("generation_metadata", {}).get("used_llm") else (
-            "Fallback plan" if review_plan_summary else None
-        ),
+        _guidance_generation_detail(review_plan_summary) or None,
     )
     with st.expander(review_plan_label, expanded=bool(review_plan_summary) or bool(review_plan_error)):
         st.caption(
@@ -1830,7 +1931,11 @@ def render_mapping_review(
                     attention_summary_rows,
                     status_filter=selected_status,
                     confidence_filter=selected_confidence,
-                    source_filter=selected_source,
+                    source_filter=_effective_review_source_filter_label(
+                        selected_source,
+                        all_filter_option=all_filter_option,
+                        focused_sources=focused_sources if source_focus_active else [],
+                    ),
                 )
                 st.session_state["review_plan_summary"] = request_review_plan_summary(
                     payload["filtered_rows"],
@@ -1842,19 +1947,22 @@ def render_mapping_review(
                 st.session_state.pop("review_plan_error", None)
                 st.session_state["last_action"] = {
                     "level": "success",
-                    "message": "Generated a bounded queue plan for the current review set.",
+                    "message": _guidance_generation_success_message(
+                        "review queue plan",
+                        "the current review set",
+                    ),
                 }
                 st.rerun()
             except (ValueError, httpx.HTTPError) as error:
                 st.session_state["review_plan_error"] = str(error)
                 st.session_state["last_action"] = {
                     "level": "error",
-                    "message": f"Review queue plan generation failed: {error}",
+                    "message": _guidance_generation_error_message("Review queue plan", error),
                 }
                 st.rerun()
 
         if review_plan_error and not review_plan_summary:
-            st.error(f"Review queue plan generation failed: {review_plan_error}")
+            st.error(_guidance_generation_error_message("Review queue plan", review_plan_error))
 
         if review_plan_summary:
             st.write(str(review_plan_summary.get("queue_summary") or ""))
@@ -1978,6 +2086,8 @@ def render_mapping_review(
     with st.expander("Ranked Candidates"):
         for ranked in mapping_response["ranked_mappings"]:
             if selected_source != all_filter_option and ranked["source"] != selected_source:
+                continue
+            if source_focus_active and _normalized_text(ranked.get("source")) not in focused_source_keys:
                 continue
             with st.expander(f"{ranked['source']}"):
                 st.dataframe(

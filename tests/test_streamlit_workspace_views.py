@@ -4,17 +4,21 @@ import pytest
 from types import SimpleNamespace
 
 from streamlit_ui.workspace_views import (
+    WORKSPACE_SECTIONS,
     poll_mapping_job,
     default_llm_validation_enabled,
     _workspace_codegen_action_label,
     _workspace_codegen_button_label,
     _workspace_codegen_block_reason,
+    _workspace_codegen_format_label,
     _workspace_generated_artifact_header,
+    _workspace_generated_artifact_code_language,
     _workspace_llm_refinement_enabled,
     _workspace_output_section_label,
     _workspace_preview_advisory_message,
     _workspace_refinement_source_response,
     companion_enrichment_message,
+    resolve_active_workspace_section,
     should_show_table_selector,
 )
 
@@ -72,6 +76,18 @@ def test_workspace_codegen_helpers_switch_to_pyspark_labels() -> None:
     ) == ""
 
 
+def test_workspace_codegen_helpers_support_dbt_labels() -> None:
+    assert _workspace_codegen_action_label("dbt") == "dbt model generation"
+    assert _workspace_codegen_button_label("dbt") == "Generate dbt model"
+    assert _workspace_codegen_format_label("dbt") == "dbt model starter"
+    assert _workspace_generated_artifact_header("sql-dbt") == "Generated dbt Model SQL"
+    assert _workspace_generated_artifact_code_language("sql-dbt") == "sql"
+    assert _workspace_codegen_block_reason([{"source": "cust_id", "status": "needs_review"}], "dbt") == (
+        "dbt model generation is blocked until all active mapping decisions are accepted. "
+        "Review statuses: needs_review."
+    )
+
+
 def test_workspace_output_section_label_appends_detail_only_when_present() -> None:
     assert _workspace_output_section_label("Preview Result", "12 rows") == "Preview Result · 12 rows"
     assert _workspace_output_section_label("Generated Pandas Code", "") == "Generated Pandas Code"
@@ -117,6 +133,21 @@ def test_default_llm_validation_enabled_defaults_off_but_preserves_user_choice()
     assert default_llm_validation_enabled({}) is False
     assert default_llm_validation_enabled({"use_llm_validation": False}) is False
     assert default_llm_validation_enabled({"use_llm_validation": True}) is True
+
+
+def test_resolve_active_workspace_section_prefers_pending_handoff() -> None:
+    session_state = {"active_workspace_section": "Setup", "pending_workspace_section": "Review"}
+
+    assert resolve_active_workspace_section(session_state) == "Review"
+    assert session_state["active_workspace_section"] == "Review"
+    assert "pending_workspace_section" not in session_state
+
+
+def test_resolve_active_workspace_section_defaults_to_setup_for_unknown_state() -> None:
+    session_state = {"active_workspace_section": "Unknown"}
+
+    assert resolve_active_workspace_section(session_state) == WORKSPACE_SECTIONS[0]
+    assert session_state["active_workspace_section"] == "Setup"
 
 
 def test_poll_mapping_job_raises_on_canceled_status() -> None:

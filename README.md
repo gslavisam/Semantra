@@ -8,7 +8,7 @@ It combines deterministic profiling and ranking with bounded AI assistance so a 
 - generate explainable source-to-target or source-to-canonical mapping proposals
 - review explicit source -> concept -> target paths and canonical coverage
 - generate technical mapping analysis summaries and optional narration/audio
-- author transformations, preview output, and generate starter Pandas or PySpark artifacts
+- author transformations, preview output, and generate starter Pandas, PySpark, or dbt artifacts
 - refine generated artifacts through controlled LLM prompts with accept/discard workflow
 - persist governed mapping sets, benchmark datasets, transformation test sets, and correction history
 - manage canonical concepts, overlays, and stewardship workflows through a dedicated Canonical Console
@@ -46,7 +46,7 @@ Core implemented capabilities:
 - local decision-origin audit trail (`manual_mapping`, `llm_proposal`) surfaced in Active Decisions
 - mapping decision audit persistence through decision JSON export/import
 - per-row and batch LLM mapping refinement with transient field context and accept/revert controls
-- transformation generation, templates, advisory preview, and Pandas/PySpark starter generation
+- transformation generation, templates, advisory preview, and Pandas/PySpark/dbt starter generation
 - canonical-mode manual mapping and canonical-mode code generation against virtual canonical targets
 - LLM-based artifact refinement with split-view compare and accept/discard actions
 - governed mapping-set persistence with status, audit, diff, and approved-only reuse
@@ -94,6 +94,27 @@ If needed, create `backend/.env` and set values such as:
 - `SEMANTRA_LMSTUDIO_BASE_URL`
 - `SEMANTRA_OPENAI_API_KEY`
 - `SEMANTRA_GEMINI_API_KEY`
+- `SEMANTRA_DBT_MATERIALIZATION`
+- `SEMANTRA_DBT_SOURCE_MODE`
+- `SEMANTRA_DBT_SOURCE_NAME`
+- `SEMANTRA_DBT_SOURCE_TABLE_NAME`
+- `SEMANTRA_DBT_REF_NAME`
+- `SEMANTRA_DBT_QUOTE_IDENTIFIERS`
+- `SEMANTRA_DBT_SOURCE_CTE_NAME`
+
+Example `backend/.env` snippet for dbt starter conventions:
+
+```env
+SEMANTRA_DBT_MATERIALIZATION=table
+SEMANTRA_DBT_SOURCE_MODE=source
+SEMANTRA_DBT_SOURCE_NAME=sap_raw
+SEMANTRA_DBT_SOURCE_TABLE_NAME=customer_extract
+SEMANTRA_DBT_REF_NAME=stg_customer
+SEMANTRA_DBT_QUOTE_IDENTIFIERS=false
+SEMANTRA_DBT_SOURCE_CTE_NAME=stage_input
+```
+
+Use `SEMANTRA_DBT_SOURCE_MODE=ref` when the generated model should read from `{{ ref(...) }}` instead of `{{ source(...) }}`.
 
 ### 3. Start the app
 

@@ -17,7 +17,7 @@ from app.main import app
 from app.models.mapping import CanonicalGapSuggestion, MappingJobStatusResponse
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
-from app.services.llm_service import StaticLLMProvider
+from app.services.llm_service import StaticLLMProvider, build_artifact_refinement_prompt, call_artifact_refinement
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
@@ -33,6 +33,7 @@ def setup_function() -> None:
     correction_store.clear()
     correction_store.clear_reusable_rules()
     persistence_service.clear_mapping_sets()
+    persistence_service.clear_draft_sessions()
     persistence_service.clear_benchmark_datasets()
     persistence_service.clear_evaluation_runs()
     persistence_service.clear_transformation_test_sets()
@@ -2228,6 +2229,183 @@ def test_codegen_returns_pyspark_snippet_for_mapping_decisions() -> None:
     assert 'F.col("phone").alias("phone_number")' in payload["code"]
 
 
+def test_codegen_returns_dbt_snippet_for_mapping_decisions() -> None:
+    response = client.post(
+        "/mapping/codegen",
+        json={
+            "mode": "dbt",
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "phone", "target": "phone_number", "status": "accepted"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["language"] == "sql-dbt"
+    assert "{{ config(materialized='view') }}" in payload["code"]
+    assert "from {{ ref('source_model') }}" in payload["code"]
+    assert '{{ adapter.quote("cust_id") }} as {{ adapter.quote("customer_id") }}' in payload["code"]
+    assert '{{ adapter.quote("phone") }} as {{ adapter.quote("phone_number") }}' in payload["code"]
+
+
+def test_codegen_returns_dbt_snippet_with_runtime_profile_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "dbt_materialization", "table")
+    monkeypatch.setattr(settings, "dbt_source_mode", "source")
+    monkeypatch.setattr(settings, "dbt_source_name", "sap_raw")
+    monkeypatch.setattr(settings, "dbt_source_table_name", "customer_extract")
+    monkeypatch.setattr(settings, "dbt_ref_name", "ignored_ref")
+    monkeypatch.setattr(settings, "dbt_quote_identifiers", False)
+    monkeypatch.setattr(settings, "dbt_source_cte_name", "stage_input")
+
+    response = client.post(
+        "/mapping/codegen",
+        json={
+            "mode": "dbt",
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "{{ config(materialized='table') }}" in payload["code"]
+    assert "from {{ source('sap_raw', 'customer_extract') }}" in payload["code"]
+    assert "with stage_input as (" in payload["code"]
+    assert "stage_input.cust_id as customer_id" in payload["code"]
+    assert "adapter.quote" not in payload["code"]
+
+
+def test_dbt_artifact_refinement_accepts_payload_echo_shape() -> None:
+    original_code = """{{ config(materialized='view') }}
+
+with source_data as (
+    select *
+    from {{ ref('source_model') }}
+)
+
+select
+    source_data.{{ adapter.quote("cust_id") }} as {{ adapter.quote("customer_id") }},
+    source_data.{{ adapter.quote("phone") }} as {{ adapter.quote("phone_number") }}
+from source_data"""
+    echoed_response = json.dumps(
+        {
+            "artifact_mode": "dbt",
+            "current_code": (
+                "{{ config(materialized='view') }}\n\n"
+                "with source_data as (\n"
+                "    select *\n"
+                "    from {{ ref('source_model') }}\n"
+                ")\n\n"
+                "select\n"
+                "    cast(source_data.{{ adapter.quote(\"cust_id\") }} as varchar) as {{ adapter.quote(\"customer_id\") }},\n"
+                "    trim(source_data.{{ adapter.quote(\"phone\") }}) as {{ adapter.quote(\"phone_number\") }}\n"
+                "from source_data"
+            ),
+            "response_format": {
+                "reasoning": ["Applied casting to string for customer_id."],
+                "warnings": ["Null handling remains implicit."],
+            },
+        }
+    )
+
+    result = call_artifact_refinement(
+        mapping_decisions=[
+            {"source": "cust_id", "target": "customer_id", "status": "accepted", "transformation_code": ""},
+            {"source": "phone", "target": "phone_number", "status": "accepted", "transformation_code": ""},
+        ],
+        mode="dbt",
+        current_code=original_code,
+        instruction="Cast customer_id to string and trim phone_number.",
+        edge_cases="Keep null-safe behavior.",
+        reference_excerpt="",
+        provider=StaticLLMProvider(echoed_response),
+        max_retries=1,
+        timeout_seconds=1.0,
+    )
+
+    assert result is not None
+    assert result.language == "sql-dbt"
+    assert "cast(source_data." in result.code
+    assert "trim(source_data." in result.code
+    assert result.reasoning == ["Applied casting to string for customer_id."]
+    assert result.warnings == ["Null handling remains implicit."]
+
+
+def test_dbt_artifact_refinement_accepts_invalid_json_echo_shape() -> None:
+    original_code = """{{ config(materialized='view') }}
+
+with source_data as (
+    select *
+    from {{ ref('source_model') }}
+)
+
+select
+    source_data.{{ adapter.quote("cust_id") }} as {{ adapter.quote("customer_id") }},
+    source_data.{{ adapter.quote("phone") }} as {{ adapter.quote("phone_number") }}
+from source_data"""
+    malformed_response = (
+        '{"artifact_mode": "dbt", '
+        '"current_code": "{{ config(materialized=\'view\') }}\\n\\nwith source_data as (\\n    select *\\n    from {{ ref(source_model) }}\\n)\\n\\nselect\\n    cast(source_data.{{ adapter.quote("cust_id") }} as varchar) as {{ adapter.quote("customer_id") }},\\n    trim(source_data.{{ adapter.quote("phone") }}) as {{ adapter.quote("phone_number") }}\\nfrom source_data", '
+        '"mapping_decisions": [{"source": "cust_id"}], '
+        '"response_format": {"reasoning": ["Applied casting to string for customer_id."], "warnings": ["Null handling remains implicit."]}}'
+    )
+
+    result = call_artifact_refinement(
+        mapping_decisions=[
+            {"source": "cust_id", "target": "customer_id", "status": "accepted", "transformation_code": ""},
+            {"source": "phone", "target": "phone_number", "status": "accepted", "transformation_code": ""},
+        ],
+        mode="dbt",
+        current_code=original_code,
+        instruction="Cast customer_id to string and trim phone_number.",
+        edge_cases="Keep null-safe behavior.",
+        reference_excerpt="",
+        provider=StaticLLMProvider(malformed_response),
+        max_retries=1,
+        timeout_seconds=1.0,
+    )
+
+    assert result is not None
+    assert result.language == "sql-dbt"
+    assert 'adapter.quote("cust_id")' in result.code
+    assert result.reasoning == ["Applied casting to string for customer_id."]
+
+
+def test_build_artifact_refinement_prompt_includes_active_dbt_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings, "dbt_materialization", "table")
+    monkeypatch.setattr(settings, "dbt_source_mode", "source")
+    monkeypatch.setattr(settings, "dbt_source_name", "sap_raw")
+    monkeypatch.setattr(settings, "dbt_source_table_name", "customer_extract")
+    monkeypatch.setattr(settings, "dbt_ref_name", "stg_customer")
+    monkeypatch.setattr(settings, "dbt_quote_identifiers", False)
+    monkeypatch.setattr(settings, "dbt_source_cte_name", "stage_input")
+
+    prompt = build_artifact_refinement_prompt(
+        mapping_decisions=[{"source": "cust_id", "target": "customer_id", "status": "accepted"}],
+        mode="dbt",
+        current_code="select cust_id as customer_id",
+        instruction="trim customer ids",
+        edge_cases="",
+        reference_excerpt="",
+    )
+    payload = json.loads(prompt.split("\n\n", 1)[1])
+
+    assert payload["rules"]["allowed_objects"] == ["stage_input", "ref", "source", "config", "adapter.quote"]
+    assert payload["rules"]["dbt_profile"] == {
+        "materialization": "table",
+        "source_mode": "source",
+        "source_name": "sap_raw",
+        "source_table_name": "customer_extract",
+        "ref_name": "stg_customer",
+        "quote_identifiers": False,
+        "source_cte_name": "stage_input",
+        "source_reference": "{{ source('sap_raw', 'customer_extract') }}",
+    }
+
+
 def test_codegen_reports_warning_when_pyspark_cannot_translate_custom_pandas_logic() -> None:
     response = client.post(
         "/mapping/codegen",
@@ -2662,6 +2840,93 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     assert audits[0]["created_at"] is not None
     assert audits[1]["action"] == "status_change"
     assert audits[-1]["action"] == "create"
+
+
+def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_runtime": {
+                "generated_at": "2026-05-27T10:00:00+00:00",
+                "app_version": "dev",
+                "scoring_profile": "balanced",
+                "description_priority": False,
+                "code_fingerprint": "draft-build-1",
+            },
+            "mapping_editor_state": {
+                "cust_id": {
+                    "target": "customer_id",
+                    "status": "accepted",
+                    "suggested_target": "customer_id",
+                    "manual_transformation_code": "",
+                    "suggested_transformation_code": "",
+                    "llm_transformation_instruction": "",
+                    "manual_apply_transformation": False,
+                    "manual": False,
+                },
+                "phone": {
+                    "target": "phone_number",
+                    "status": "needs_review",
+                    "suggested_target": "phone_number",
+                    "manual_transformation_code": "value.strip()",
+                    "suggested_transformation_code": "",
+                    "llm_transformation_instruction": "trim spaces",
+                    "manual_apply_transformation": True,
+                    "manual": True,
+                },
+            },
+            "mapping_decision_audit": {
+                "cust_id": {
+                    "origin": "manual_mapping",
+                    "applied_at": "2026-05-27T10:00:00+00:00",
+                    "details": {"reason": "validated during review"},
+                }
+            },
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    created = create_response.json()
+    draft_session_id = created["draft_session_id"]
+    assert created["active_workspace_section"] == "Review"
+    assert created["decision_count"] == 2
+
+    list_response = client.get("/mapping/draft-sessions", headers=admin_headers())
+    detail_response = client.get(f"/mapping/draft-sessions/{draft_session_id}", headers=admin_headers())
+
+    assert list_response.status_code == 200
+    assert detail_response.status_code == 200
+
+    listed = list_response.json()
+    detail = detail_response.json()
+
+    assert listed[0]["draft_session_id"] == draft_session_id
+    assert listed[0]["source_dataset_name"] == upload_payload["source"]["dataset_name"]
+    assert detail["source_handle"]["dataset_name"] == upload_payload["source"]["dataset_name"]
+    assert detail["target_handle"]["dataset_name"] == upload_payload["target"]["dataset_name"]
+    assert detail["mapping_runtime"]["code_fingerprint"] == "draft-build-1"
+    assert detail["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
+    assert detail["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
 
 
 def test_apply_mapping_set_blocks_non_approved_versions() -> None:
@@ -3551,9 +3816,13 @@ def test_admin_guard_allows_sensitive_endpoints_with_correct_token() -> None:
     response = client.get("/observability/config", headers=admin_headers())
 
     assert response.status_code == 200
-    assert "llm_provider" in response.json()
-    assert "tts_provider" in response.json()
-    assert "lmstudio_tts_base_url" in response.json()
+    payload = response.json()
+    assert "llm_provider" in payload
+    assert "tts_provider" in payload
+    assert "lmstudio_tts_base_url" in payload
+    assert payload["dbt_materialization"] == "view"
+    assert payload["dbt_source_mode"] == "ref"
+    assert payload["dbt_source_reference"] == "{{ ref('source_model') }}"
 
 
 def test_evaluation_benchmark_endpoint_returns_metrics() -> None:

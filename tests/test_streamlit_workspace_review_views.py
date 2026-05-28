@@ -2,7 +2,37 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from streamlit_ui import workspace_review_views
+
+
+def test_catalog_review_focus_sources_deduplicate_session_state_entries(monkeypatch) -> None:
+    fake_streamlit = SimpleNamespace(session_state={"review_focus_sources": [" KUNNR ", "LAND1", "kunnr", ""]})
+    monkeypatch.setattr(workspace_review_views, "st", fake_streamlit)
+
+    assert workspace_review_views._catalog_review_focus_sources() == ["KUNNR", "LAND1"]
+
+
+def test_filter_rows_for_catalog_review_focus_matches_sources_case_insensitively() -> None:
+    assert workspace_review_views._filter_rows_for_catalog_review_focus(
+        [
+            {"source": "KUNNR", "target": "customer_id"},
+            {"source": "LAND1", "target": "country_code"},
+        ],
+        ["kunnr"],
+    ) == [{"source": "KUNNR", "target": "customer_id"}]
+
+
+def test_catalog_review_focus_helpers_describe_multi_source_scope() -> None:
+    assert workspace_review_views._catalog_review_focus_caption(["KUNNR", "LAND1"]) == (
+        "Catalog diff focus is limiting Workspace Review to 2 changed source fields: KUNNR, LAND1."
+    )
+    assert workspace_review_views._effective_review_source_filter_label(
+        "All",
+        all_filter_option="All",
+        focused_sources=["KUNNR", "LAND1"],
+    ) == "Catalog diff focus (2 sources)"
 
 
 def test_canonical_gap_approval_block_reason_requires_ready_for_approval() -> None:
@@ -108,6 +138,47 @@ def test_review_attention_summary_rows_groups_unmatched_and_low_confidence_patte
 def test_section_label_appends_detail_only_when_present() -> None:
     assert workspace_review_views._section_label("Manual Review", "5 items") == "Manual Review · 5 items"
     assert workspace_review_views._section_label("Selected Mapping", "") == "Selected Mapping"
+
+
+def test_guidance_generation_detail_uses_shared_llm_fallback_pattern() -> None:
+    assert workspace_review_views._guidance_generation_detail(None) == ""
+    assert workspace_review_views._guidance_generation_detail({"generation_metadata": {"used_llm": True}}) == "LLM"
+    assert workspace_review_views._guidance_generation_detail({"generation_metadata": {"used_llm": False}}) == "Fallback"
+
+
+def test_guidance_generation_message_helpers_use_shared_copy_pattern() -> None:
+    assert workspace_review_views._guidance_generation_success_message(
+        "review queue plan",
+        "the current review set",
+    ) == "Generated review queue plan for the current review set."
+    assert workspace_review_views._guidance_generation_error_message("Review queue plan", "boom") == (
+        "Review queue plan generation failed: boom"
+    )
+
+
+def test_guidance_generation_metadata_caption_uses_llm_fallback_pattern() -> None:
+    assert workspace_review_views._guidance_generation_metadata_caption(None) == ""
+    assert workspace_review_views._guidance_generation_metadata_caption(
+        {"generation_metadata": {"used_llm": True, "fallback_used": False}}
+    ) == "LLM"
+    assert workspace_review_views._guidance_generation_metadata_caption(
+        {"generation_metadata": {"used_llm": False, "fallback_used": True}}
+    ) == "Fallback with fallback contract"
+
+
+def test_guidance_output_heading_preserves_section_title() -> None:
+    assert workspace_review_views._guidance_output_heading("Key matches") == "Key matches"
+    assert workspace_review_views._guidance_output_heading(" Risks ") == "Risks"
+
+
+def test_canonical_gap_triage_copy_helpers_state_read_only_and_unlock_roles() -> None:
+    assert workspace_review_views._canonical_gap_triage_intro_caption() == (
+        "Generate one bounded gap queue summary for the current canonical-gap queue before reviewing candidates one by one. "
+        "This is a read-only guidance surface and does not change candidate decisions or approval state."
+    )
+    assert workspace_review_views._canonical_gap_triage_unlock_message() == (
+        "Run 'Find canonical gaps' first to unlock the queue-level summary."
+    )
 
 
 def test_manual_review_open_item_count_counts_non_accepted_or_unmapped_rows() -> None:

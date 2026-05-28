@@ -143,3 +143,173 @@ Severity:
 - the focused pilot/UAT cycle for the current hardening wave is in a good stopping state
 - no immediate blocker was reproduced in the tested deterministic baseline, the re-checked LLM customer scenario, governance/output flow, or cancel edge-case behavior
 - remaining unclosed risk is broader coverage, not a currently observed failure in the tested paths
+
+## Scenario 4
+
+Name: catalog handoff regression subset
+
+Artifacts:
+
+- seeded `browser-diff-focus` integration family (`v2` vs `v1`, both draft)
+- seeded `Stewardship Smoke Sync` mapping set (`#770`)
+
+Path:
+
+- `Catalog` / `Load all integrations`
+- `Browser Diff Focus Sync` detail -> `Open selected version` -> `Load version diff`
+- `Open current diff review focus`
+- manually set stale `Canonical concept search = legacy` in `Governance`
+- return to `Catalog` diff readout -> `Open current diff Canonical review`
+- switch integration detail to `Stewardship Smoke Sync` -> `Open selected version` -> `Open Stewardship`
+
+Observed result:
+
+- `Catalog` loaded `4` integrations with `2` approved entries on the live local stack
+- `browser-diff-focus` diff handoff moved the UI into `Workspace > Review` and surfaced the expected status message:
+	- `Catalog handoff: browser-diff-focus v2 -> Workspace Review with filters status=needs_review, confidence=All, canonical_concept=customer.id, source_scope=3 diff fields.`
+- after intentionally setting stale canonical search `legacy`, `Open current diff Canonical review` moved the UI into `Governance > Canonical`
+- the canonical handoff also cleared the stale search box and applied the expected scope filters:
+	- `Source system = SAP`
+	- `Business domain = Customer`
+	- filtered canonical count dropped to `2`, matching the scoped landing instead of the stale pre-handoff search state
+- `Stewardship Smoke Sync` integration detail showed `Unmatched sources: LAND1, REGIO` and the main drilldown CTA rendered as `Open Stewardship`
+- `Open Stewardship` moved the UI into `Governance > Stewardship` instead of the generic canonical landing
+- the live Stewardship landing remained operational even though the current canonical gap queue was empty on this runtime
+
+Operational conclusion:
+
+- the newer `Catalog` handoff CTA surfaces are now browser-confirmed end-to-end, not only helper-tested
+- canonical handoff reset behavior is doing real recovery work against stale Governance state before the new focus is applied
+- `Stewardship` routing from unmatched-source catalog drilldown is correctly distinguished from canonical review routing in the live UI
+- the visible `Filter by source = All` assertion should still be treated as conditional on an already loaded Workspace review set; this run confirmed the handoff intent and scope message, but not that extra loaded-workspace-only presentation detail
+
+Severity:
+
+- low immediate pilot risk for the observed catalog handoff paths on the current local stack
+- remaining follow-up is regression coverage depth, not an active blocker in the tested handoff behavior
+
+## Scenario 5
+
+Name: draft-session review restore with dirty review state
+
+Artifacts:
+
+- existing saved `Review` draft session (`customer-draft-session`)
+- live local `Workspace` review state with `source.csv` / `target.csv`
+
+Path:
+
+- `Workspace > Review`
+- set `Filter by source = phone`
+- generate `Review Queue Plan`
+- switch to `Workspace > Decisions -> Mapping Set Versions`
+- `Load draft sessions`
+- `Resume draft session`
+
+Observed result:
+
+- the live UI allowed the review slice to be intentionally dirtied with:
+	- `Filter by source = phone`
+	- generated `Review Queue Plan · LLM`
+	- `Selected Mapping · 1 active`
+- resuming the saved `Review` draft session returned the UI to `Workspace > Review` without a Streamlit navigation error
+- after resume, the review context came back clean instead of carrying stale local review state:
+	- `Filter by source = All`
+	- `Review Queue Plan` returned to its unopened / generate state
+	- `Selected Mapping · 2 active`
+	- `Mapping Trust Layer` and `Scoring runtime` both rendered normally from the restored minimal contract
+
+Operational conclusion:
+
+- the current draft-session restore path is now browser-confirmed not only for navigation, already checked earlier, but also for review-state hygiene under intentionally dirty local filter/guidance state
+- bounded guidance and filter state are not leaking across restore in a way that would silently narrow the restored review set
+- this continuity path is now strong enough to belong in the standing pilot regression subset, not only as an ad-hoc smoke
+
+Severity:
+
+- low immediate pilot risk for the observed draft-session restore path on the current local stack
+- useful hardening signal because the exercised failure mode would have been user-visible immediately after resume
+
+## Scenario 6
+
+Name: catalog diff review handoff over an already loaded review set
+
+Artifacts:
+
+- seeded `browser-diff-focus` integration family (`#778` v1, `#779` v2, both draft)
+- existing saved `Review` draft session (`customer-draft-session`)
+
+Path:
+
+- `Workspace > Decisions -> Mapping Set Versions`
+- `Resume draft session` for `customer-draft-session`
+- `Catalog` / `Load all integrations`
+- `browser-diff-focus` detail -> `Open selected version` -> `Load version diff`
+- `Open current diff review focus`
+
+Observed result:
+
+- the local runtime initially had `0` catalog integrations, so the smoke first seeded a minimal `browser-diff-focus` family through the existing `/mapping/sets` API instead of adding a dedicated seed path
+- after seeding, `Catalog` loaded `2` saved catalog integration versions and the drilldown exposed the expected version diff CTA path
+- `Open current diff review focus` moved the UI into `Workspace > Review` while preserving the already restored review-backed workspace state
+- the live UI showed the expected handoff status message:
+	- `Catalog handoff: Browser Diff Focus Sync v2 → Workspace Review with filters status=needs_review, confidence=All, canonical_concept=customer.id, source_scope=6 diff fields.`
+- the loaded-review presentation detail was now browser-confirmed, not only helper-tested:
+	- `Filter by source = All`
+	- review caption limited the scope through `Catalog diff focus is limiting Workspace Review to 6 changed source fields ...`
+	- the restored review rows from `customer-draft-session` remained visible instead of being replaced by catalog data
+
+Operational conclusion:
+
+- the previously pending loaded-review assertion for `Catalog -> Workspace Review` diff handoff is now confirmed in the live UI
+- this handoff uses a soft multi-source focus signal (`source_scope` plus review caption), not a hard source filter, which avoids silently narrowing an already loaded review set
+- an empty local catalog runtime is an operational precondition issue, not a product blocker; the existing `/mapping/sets` API is sufficient to seed repeatable smoke fixtures
+
+Severity:
+
+- low immediate pilot risk for the observed loaded-review catalog handoff path on the current local stack
+- useful operational hardening signal because it closes a browser-visible assertion that previously existed only in helper logic and tracker intent
+
+## Scenario 7
+
+Name: benchmark profile comparison and explanation over seeded saved dataset
+
+Artifacts:
+
+- seeded saved benchmark dataset `operational-smoke-benchmark` (`#156`, `v1`, `cases=3`)
+- active local runtime on `8000/8501`
+
+Path:
+
+- `Benchmarks`
+- `Load saved benchmark datasets`
+- select `#156 | operational-smoke-benchmark | v1 | cases=3`
+- `Compare scoring profiles`
+- open `Benchmark Explanation`
+- `Generate benchmark explanation`
+
+Observed result:
+
+- helper regression subset already passed for benchmark views together with Workspace and Catalog (`132 passed, 0 failed`), and the live runtime now also has a repeatable saved dataset fixture through the operational bootstrap
+- `Benchmarks` loaded the saved dataset cleanly and exposed the expected compare actions without requiring a manual ad-hoc benchmark save step
+- `Compare scoring profiles` returned a visible browser-level evidence surface:
+	- `Scoring Profile Comparison`
+	- `Recommended default profile: balanced`
+	- recommendation reason: `No decisive benchmark winner across compared profiles; keep balanced as the default because it ties for best metrics and preserves existing behavior.`
+- opening `Benchmark Explanation` after that evidence step showed the expected unlock state:
+	- `Loaded benchmark evidence is ready for benchmark explanation review.`
+- `Generate benchmark explanation` completed in the live UI and rendered a bounded fallback explanation with visible:
+	- success status `Generated benchmark explanation for operational-smoke-benchmark.`
+	- `Benchmark Explanation · Fallback`
+	- `Key findings`, `Risks`, and `Next actions`
+
+Operational conclusion:
+
+- `Benchmarks` is no longer the least-proven of the three main pilot surfaces in this local runtime; the saved-dataset -> evidence -> explanation path is now browser-confirmed end to end
+- the same operational bootstrap that already stabilized Catalog/Workspace smokes now removes the benchmark precondition gap as well, so the main pilot trio can be exercised repeatably on a fresh local runtime
+- current benchmark explanation behavior is at least operationally safe even when the LLM path is not needed, because the fallback contract renders a complete bounded explanation surface
+
+Severity:
+
+- low immediate pilot risk for the observed benchmark compare/explanation path on the current local stack
+- important closure signal because it expands operational hardening from mostly Workspace/Catalog confidence into a real Workspace/Catalog/Benchmarks trio

@@ -10,6 +10,10 @@ from streamlit_ui.api import current_workspace_scope
 from streamlit_ui.governance import api_error_message, mapping_output_block_reason
 
 
+WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output")
+WORKSPACE_CODEGEN_MODES = ("pandas", "pyspark", "dbt")
+
+
 def _set_active_mapping_job(job_id: str, *, start_path: str, payload: dict) -> None:
     st.session_state["active_mapping_job"] = {
         "job_id": job_id,
@@ -74,18 +78,43 @@ def poll_mapping_job(
 
 
 def _workspace_codegen_action_label(mode: str) -> str:
-    return "PySpark code generation" if str(mode).strip().lower() == "pyspark" else "Pandas code generation"
+    normalized = str(mode).strip().lower()
+    if normalized == "pyspark":
+        return "PySpark code generation"
+    if normalized == "dbt":
+        return "dbt model generation"
+    return "Pandas code generation"
 
 
 def _workspace_codegen_button_label(mode: str) -> str:
-    return "Generate PySpark code" if str(mode).strip().lower() == "pyspark" else "Generate Pandas code"
+    normalized = str(mode).strip().lower()
+    if normalized == "pyspark":
+        return "Generate PySpark code"
+    if normalized == "dbt":
+        return "Generate dbt model"
+    return "Generate Pandas code"
 
 
 def _workspace_generated_artifact_header(language: str | None) -> str:
     normalized = str(language or "").strip().lower()
     if normalized == "python-pyspark":
         return "Generated PySpark Code"
+    if normalized == "sql-dbt":
+        return "Generated dbt Model SQL"
     return "Generated Pandas Code"
+
+
+def _workspace_codegen_format_label(mode: str) -> str:
+    normalized = str(mode).strip().lower()
+    if normalized == "pyspark":
+        return "PySpark starter"
+    if normalized == "dbt":
+        return "dbt model starter"
+    return "Pandas starter"
+
+
+def _workspace_generated_artifact_code_language(language: str | None) -> str:
+    return "sql" if str(language or "").strip().lower() == "sql-dbt" else "python"
 
 
 def _workspace_output_section_label(title: str, detail: str | None = None) -> str:
@@ -203,6 +232,16 @@ def default_llm_validation_enabled(session_state: dict | None = None) -> bool:
     return bool(state.get("use_llm_validation"))
 
 
+def resolve_active_workspace_section(session_state: dict) -> str:
+    preferred = str(session_state.pop("pending_workspace_section", "") or "").strip()
+    current = str(session_state.get("active_workspace_section", "") or "").strip()
+    if preferred in WORKSPACE_SECTIONS:
+        session_state["active_workspace_section"] = preferred
+    elif current not in WORKSPACE_SECTIONS:
+        session_state["active_workspace_section"] = WORKSPACE_SECTIONS[0]
+    return str(session_state.get("active_workspace_section") or WORKSPACE_SECTIONS[0])
+
+
 def render_workspace_tab(
     *,
     all_upload_types,
@@ -229,7 +268,14 @@ def render_workspace_tab(
 ) -> None:
     """Render the full Workspace surface from setup through review, decisions, and output."""
 
-    setup_tab, review_tab, decisions_tab, output_tab = st.tabs(["Setup", "Review", "Decisions", "Output"])
+    resolve_active_workspace_section(st.session_state)
+    selected_workspace_section = st.radio(
+        "Workspace section",
+        WORKSPACE_SECTIONS,
+        key="active_workspace_section",
+        horizontal=True,
+        label_visibility="collapsed",
+    )
 
     active_mapping_mode = st.session_state.get("mapping_mode", "Standard")
     source_file = st.session_state.get("source_file")
@@ -254,7 +300,7 @@ def render_workspace_tab(
     codegen_response = st.session_state.get("codegen_response")
     codegen_refinement_response = st.session_state.get("codegen_refinement_response")
 
-    with setup_tab:
+    if selected_workspace_section == "Setup":
         st.subheader("1. Upload")
         st.caption("Any row-based format can map to any other row-based format across CSV, JSON, XML, and XLSX.")
         mapping_mode = st.radio(
@@ -829,7 +875,7 @@ def render_workspace_tab(
             else:
                 st.info("Upload and profile both datasets to unlock review, decision, and output sections.")
 
-    with review_tab:
+    if selected_workspace_section == "Review":
         if mapping_response:
             if (upload_response or {}).get("mapping_mode") == "canonical":
                 st.caption("Canonical-only review treats canonical concept IDs as virtual targets built from the glossary.")
@@ -845,7 +891,7 @@ def render_workspace_tab(
             else:
                 st.info("Generate mapping in Setup to populate trust, candidate review, and manual review controls.")
 
-    with decisions_tab:
+    if selected_workspace_section == "Decisions":
         if mapping_response:
             render_mapping_decision_summary()
             render_manual_mapping_panel(mapping_response)
@@ -861,7 +907,7 @@ def render_workspace_tab(
         else:
             st.info("Generate mapping in Setup before managing manual overrides, imports, mapping sets, or corrections.")
 
-    with output_tab:
+    if selected_workspace_section == "Output":
         if mapping_response:
             canonical_output_mode = (upload_response or {}).get("mapping_mode") == "canonical"
             mapping_decisions = build_mapping_decisions()
@@ -872,11 +918,15 @@ def render_workspace_tab(
             st.subheader("Artifact Generation")
             codegen_mode = st.radio(
                 "Artifact format",
-                options=["pandas", "pyspark"],
-                index=0 if st.session_state.get("output_codegen_mode", "pandas") == "pandas" else 1,
+                options=list(WORKSPACE_CODEGEN_MODES),
+                index=(
+                    WORKSPACE_CODEGEN_MODES.index(st.session_state.get("output_codegen_mode", "pandas"))
+                    if st.session_state.get("output_codegen_mode", "pandas") in WORKSPACE_CODEGEN_MODES
+                    else 0
+                ),
                 key="output_codegen_mode",
                 horizontal=True,
-                format_func=lambda value: "Pandas starter" if value == "pandas" else "PySpark starter",
+                format_func=_workspace_codegen_format_label,
             )
             codegen_block_reason = _workspace_codegen_block_reason(
                 mapping_decisions,
@@ -887,7 +937,9 @@ def render_workspace_tab(
             actions_left, actions_right = st.columns(2)
             with actions_left:
                 if canonical_output_mode:
-                    st.info("Preview is unavailable in canonical mode. Use code generation to produce Pandas or PySpark scaffolding against canonical targets.")
+                    st.info(
+                        "Preview is unavailable in canonical mode. Use code generation to produce Pandas, PySpark, or dbt scaffolding against canonical targets."
+                    )
                 else:
                     if st.button("Generate preview"):
                         if not mapping_decisions:
@@ -1009,7 +1061,10 @@ def render_workspace_tab(
                 original_col, refined_col = st.columns(2)
                 with original_col:
                     st.caption("Original generated code")
-                    st.code(codegen_response["code"], language="python")
+                    st.code(
+                        codegen_response["code"],
+                        language=_workspace_generated_artifact_code_language(codegen_response.get("language")),
+                    )
                     if warnings:
                         for warning in warnings:
                             if isinstance(warning, dict):
@@ -1024,7 +1079,12 @@ def render_workspace_tab(
                 with refined_col:
                     st.caption("Refined code")
                     if codegen_refinement_response is not None:
-                        st.code(codegen_refinement_response["code"], language="python")
+                        st.code(
+                            codegen_refinement_response["code"],
+                            language=_workspace_generated_artifact_code_language(
+                                codegen_refinement_response.get("language")
+                            ),
+                        )
                         reasoning = codegen_refinement_response.get("reasoning") or []
                         if reasoning:
                             st.caption("Refinement reasoning")
@@ -1108,7 +1168,13 @@ def render_workspace_tab(
                             "/mapping/codegen/refine",
                             json={
                                 "mapping_decisions": build_mapping_decisions(),
-                                "mode": "pyspark" if refinement_source.get("language") == "python-pyspark" else "pandas",
+                                "mode": (
+                                    "pyspark"
+                                    if refinement_source.get("language") == "python-pyspark"
+                                    else "dbt"
+                                    if refinement_source.get("language") == "sql-dbt"
+                                    else "pandas"
+                                ),
                                 "allow_unaccepted": canonical_output_mode,
                                 "current_code": refinement_source["code"],
                                 "instruction": refinement_instruction.strip(),

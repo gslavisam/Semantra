@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-22, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-27, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -19,6 +19,7 @@ What Semantra is not yet:
 - a multi-step enterprise workflow engine
 - a fully normalized metadata/knowledge platform with DB-only authoring and migration lifecycle
 - a full graph or ontology management product
+- a resume-by-design workspace with durable `draft session` restore across reloads or runtime switches
 
 ## Implemented User-Facing Capabilities
 
@@ -96,6 +97,7 @@ Important current behavior:
 - they are designed to stay close to a concrete local workflow step
 - they use deterministic fallback behavior when LLM output is unavailable or invalid
 - proposal generation in Review remains advisory until explicit apply actions are executed in Decisions
+- the five bounded guidance panels now share the same `LLM` / `Fallback` header-detail pattern, explicit read-only role messaging, aligned success/error copy, and aligned section-heading treatment for `Risks` and `Next actions`
 
 Main code surfaces:
 
@@ -114,7 +116,7 @@ Implemented:
 - apply/dismiss workflows for LLM decision proposals, including conservative `Apply safe` execution
 - transformation suggestion, template-assisted authoring, and manual transformation code editing
 - advisory row preview from active mapping decisions
-- Pandas and PySpark starter code generation from reviewed mapping decisions
+- Pandas, PySpark, and dbt starter code generation from reviewed mapping decisions
 - transformation generation via LLM when configured
 - structured preview/codegen warnings for syntax, runtime, type coercion, row-count mismatch, and related issues
 - transformation templates
@@ -126,7 +128,10 @@ Important current behavior:
 
 - preview is intentionally advisory and remains available before all decisions are accepted
 - standard-mode code generation is governance-gated and requires accepted active decisions
-- canonical mode intentionally skips preview because no concrete target dataset exists, but still supports Pandas/PySpark code generation and artifact refinement from active source-to-canonical decisions
+- canonical mode intentionally skips preview because no concrete target dataset exists, but still supports Pandas/PySpark/dbt code generation and artifact refinement from active source-to-canonical decisions
+- dbt output is currently scoped to starter-artifact generation and refinement; generating a fuller dbt package (`model.sql`, `schema.yml`, optional `sources.yml`) is intentionally deferred to a future iteration
+- draft-session continuity now has a minimal save/list/load path for `Workspace > Review` and `Workspace > Decisions`; restore rebuilds a stable mapping contract from saved schema handles, editor state, audit metadata, and `mapping_runtime`, while still clearing preview/codegen/guidance artifacts instead of reviving stale generated outputs
+- draft-session restore also persists the saved `api_base_url` and blocks resume when the active runtime or upload schema context does not match the saved draft
 - transformation test-set save and run are governance-gated and require accepted active decisions
 - refinement does not replace the active generated artifact until the user explicitly accepts it
 - decision-origin audit metadata is persisted through decision JSON export/import for analyst handoff continuity
@@ -250,14 +255,20 @@ Implemented:
 - Streamlit Catalog tab for browse/search/detail flows
 - source-system -> target-system discovery overview over catalog results
 - similar-approved-integration hints in result browsing
+- field-scoped reuse discovery with compare-before-import, partial import, and undo
 - mapping-set detail, audit, and diff drilldown
+- compare -> detail drilldown for peer integrations and version baselines
+- Catalog -> Workspace Review handoff for selected versions and diff-scoped changed-source review context
+- multi-source Catalog diff handoff now also has live browser confirmation on an already loaded Workspace review set: `Filter by source` stays `All`, while scope is carried through `source_scope` messaging and a review-focus caption instead of a hard source filter
+- Catalog -> Governance handoff with section-aware `Canonical` / `Stewardship` landing and stale-filter reset
 - approved-only reuse back into Workspace
 - Workspace Reuse Fit explanation for the selected catalog version against the current workspace context
 
 Current boundary:
 
-- basic catalog search and initial reuse discovery are implemented
-- broader concept/reuse visual discovery and richer comparison flows remain open
+- catalog search, drilldown, compare, reuse-fit, and review/governance handoff flows are implemented
+- broader concept/reuse visual discovery beyond the current table/drilldown and handoff surfaces remains open
+- Workspace Reuse Fit now follows the same bounded-guidance caption, unlock, metadata, and output-heading pattern as the Workspace and Benchmarks guidance panels
 
 Main code surfaces:
 
@@ -282,6 +293,7 @@ Important current behavior:
 
 - saving the current mapping as a benchmark is governance-gated and requires accepted active decisions
 - benchmark explanation is a readout surface only; it does not change runtime scoring state
+- benchmark explanation now uses the same bounded-guidance intro, unlock, metadata, and output-heading treatment as the other guidance panels
 
 Main code surfaces:
 
@@ -397,8 +409,8 @@ The primary regression anchors are:
 
 The following items remain outside the current pilot-complete scope or are the next productization steps:
 
-- stronger cross-surface productization of the new bounded guidance panels so they feel like one coherent workflow family
-- richer concept/reuse visual discovery in the catalog (`Epic 13D`)
+- browser-level bounded guidance discoverability confirmation and regression capture across `Workspace`, `Catalog`, and `Benchmarks`
+- broader catalog visual discovery beyond the current compare and handoff surfaces
 - persistent background job queue/status backend for multi-user, restart-resilient, or materially longer-running tasks
 - DB-only canonical authoring and promotion model without file-backed reseed source inputs
 - system-specific virtual targets beyond canonical-only mode (`Epic 12B`)

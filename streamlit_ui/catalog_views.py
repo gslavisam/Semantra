@@ -390,6 +390,44 @@ def _catalog_field_reuse_shortlist_payload(selected_source_fields: list[str]) ->
     }
 
 
+def _preferred_catalog_review_handoff_concept(*concept_lists: list[str] | None) -> str:
+    normalized_lists = [
+        [_normalized_text(item) for item in (concept_list or []) if _normalized_text(item)]
+        for concept_list in concept_lists
+        if concept_list is not None
+    ]
+    for concept_list in normalized_lists:
+        for concept in concept_list:
+            if all(concept in other_list for other_list in normalized_lists[1:]):
+                return concept
+    for concept_list in normalized_lists:
+        if concept_list:
+            return concept_list[0]
+    return ""
+
+
+def _catalog_mapping_set_record_by_id(
+    version_records: list[dict[str, Any]] | None,
+    mapping_set_id: int | None,
+) -> dict[str, Any] | None:
+    target_id = int(mapping_set_id or 0)
+    if target_id <= 0:
+        return None
+    for record in version_records or []:
+        if int(record.get("mapping_set_id") or 0) == target_id:
+            return record
+    return None
+
+
+def _catalog_mapping_set_diff_focus_sources(changes: list[dict[str, Any]] | None) -> list[str]:
+    sources: list[str] = []
+    for change in changes or []:
+        source = _normalized_text(change.get("source"))
+        if source and source not in sources:
+            sources.append(source)
+    return sources
+
+
 def _catalog_reuse_fit_label(fit_assessment: str | None) -> str:
     normalized = _normalized_text(fit_assessment).lower()
     labels = {
@@ -398,6 +436,58 @@ def _catalog_reuse_fit_label(fit_assessment: str | None) -> str:
         "low_fit": "low fit",
     }
     return labels.get(normalized, "")
+
+
+def _catalog_reuse_fit_section_detail(reuse_fit_summary: dict[str, Any] | None) -> str:
+    summary = reuse_fit_summary or {}
+    fit_label = _catalog_reuse_fit_label(summary.get("fit_assessment"))
+    if not summary:
+        return ""
+    metadata = summary.get("generation_metadata") or {}
+    generation_label = "LLM" if metadata.get("used_llm") else "Fallback"
+    if fit_label:
+        return f"{fit_label} | {generation_label}"
+    return generation_label
+
+
+def _catalog_reuse_fit_action_label(reuse_fit_summary: dict[str, Any] | None) -> str:
+    return "Refresh reuse-fit explanation" if reuse_fit_summary else "Generate reuse-fit explanation"
+
+
+def _catalog_reuse_fit_intro_caption() -> str:
+    return (
+        "Generate one bounded reuse-fit explanation for the selected catalog version against the current workspace snapshot before applying reuse. "
+        "This is a read-only guidance surface and does not apply or approve anything automatically."
+    )
+
+
+def _catalog_reuse_fit_unlock_message() -> str:
+    return "Open the selected catalog version first to unlock reuse-fit review against the current workspace snapshot."
+
+
+def _catalog_reuse_fit_empty_message() -> str:
+    return "No workspace reuse-fit explanation has been generated yet for the selected version."
+
+
+def _catalog_reuse_fit_success_message() -> str:
+    return "Generated workspace reuse-fit explanation for the selected catalog mapping set."
+
+
+def _catalog_reuse_fit_error_message(error: object) -> str:
+    return f"Workspace reuse-fit explanation generation failed: {error}"
+
+
+def _catalog_reuse_fit_metadata_caption(reuse_fit_summary: dict[str, Any] | None) -> str:
+    if not reuse_fit_summary:
+        return ""
+    metadata = (reuse_fit_summary or {}).get("generation_metadata") or {}
+    detail = "LLM" if metadata.get("used_llm") else "Fallback"
+    fallback_suffix = " with fallback contract" if metadata.get("fallback_used") else ""
+    return f"{detail}{fallback_suffix}"
+
+
+def _catalog_reuse_fit_output_heading(title: str) -> str:
+    return str(title or "").strip()
 
 
 def _catalog_reuse_fit_ready_for_selected_version(
@@ -634,7 +724,7 @@ def _catalog_next_action_plan(
             plan.update(
                 {
                     "secondary_area": "Governance",
-                    "secondary_label": "Open canonical governance handoff",
+                    "secondary_label": _catalog_governance_handoff_action_label(mapping_set_detail, scope_label=""),
                     "secondary_summary": (
                         "Inspect canonical coverage, stewardship, and approval context before treating this version as a stable reuse baseline."
                     ),
@@ -646,7 +736,7 @@ def _catalog_next_action_plan(
         return {
             "table_label": "Canonical governance handoff",
             "primary_area": "Governance",
-            "primary_label": "Open canonical governance handoff",
+            "primary_label": _catalog_governance_handoff_action_label(mapping_set_detail, scope_label=""),
             "primary_summary": (
                 f"This version is {status}. Inspect governance owner, review note, and canonical coverage before reusing it in Workspace."
             ),
@@ -668,7 +758,7 @@ def _catalog_next_action_plan(
     secondary_summary = ""
     if unmatched_sources or artifact_type == "canonical-only":
         secondary_area = "Governance"
-        secondary_label = "Open canonical governance handoff"
+        secondary_label = _catalog_governance_handoff_action_label(mapping_set_detail, scope_label="")
         secondary_summary = (
             "Inspect canonical usage, gap queue, and overlay context for the concepts behind this reuse candidate."
         )
@@ -684,7 +774,164 @@ def _catalog_next_action_plan(
     }
 
 
+def _catalog_governance_handoff_summary(next_action_plan: dict[str, Any] | None) -> str:
+    plan = next_action_plan or {}
+    if _normalized_text(plan.get("primary_area")).lower() == "governance":
+        return str(plan.get("primary_summary") or "").strip()
+    if _normalized_text(plan.get("secondary_area")).lower() == "governance":
+        return str(plan.get("secondary_summary") or "").strip()
+    return ""
+
+
+def _catalog_governance_handoff_payload(mapping_set_detail: dict[str, Any] | None) -> dict[str, Any]:
+    detail = mapping_set_detail or {}
+    unmatched_sources: list[str] = []
+    for value in detail.get("unmatched_sources", []):
+        source = _normalized_text(value)
+        if source and source not in unmatched_sources:
+            unmatched_sources.append(source)
+
+    canonical_concepts: list[str] = []
+    for value in detail.get("canonical_concepts", []):
+        concept = _normalized_text(value)
+        if concept and concept not in canonical_concepts:
+            canonical_concepts.append(concept)
+
+    section = "Stewardship" if unmatched_sources else "Canonical"
+    return {
+        "section": section,
+        "canonical_concept_id": canonical_concepts[0] if canonical_concepts else "",
+        "canonical_source_system": _normalized_text(detail.get("source_system")),
+        "canonical_business_domain": _normalized_text(detail.get("business_domain")),
+        "focus_sources": unmatched_sources,
+        "gap_source_filter": unmatched_sources[0] if len(unmatched_sources) == 1 else "",
+    }
+
+
+def _catalog_governance_handoff_reason(mapping_set_detail: dict[str, Any] | None) -> str:
+    detail = mapping_set_detail or {}
+    unmatched_sources = [
+        _normalized_text(value)
+        for value in detail.get("unmatched_sources", [])
+        if _normalized_text(value)
+    ]
+    if len(unmatched_sources) == 1:
+        return "1 unmatched source field"
+    if unmatched_sources:
+        return f"{len(unmatched_sources)} unmatched source fields"
+
+    status = _normalized_text(detail.get("status")).lower()
+    if status and status != "approved":
+        return f"{status} version"
+
+    artifact_type = _normalized_text(detail.get("artifact_type")).lower()
+    if artifact_type == "canonical-only":
+        return "canonical-only coverage"
+
+    concept_count = len(
+        [
+            _normalized_text(value)
+            for value in detail.get("canonical_concepts", [])
+            if _normalized_text(value)
+        ]
+    )
+    if concept_count:
+        return "canonical coverage review"
+    return "governance follow-up"
+
+
+def _catalog_governance_handoff_action_label(
+    mapping_set_detail: dict[str, Any] | None,
+    *,
+    scope_label: str,
+) -> str:
+    payload = _catalog_governance_handoff_payload(mapping_set_detail)
+    section = _normalized_text(payload.get("section")) or "Governance"
+    destination = "Stewardship" if section == "Stewardship" else "Canonical review"
+    prefix = f"{scope_label} " if _normalized_text(scope_label) else ""
+    return f"Open {prefix}{destination}"
+
+
+def _catalog_governance_follow_up_caption(
+    mapping_set_detail: dict[str, Any] | None,
+    *,
+    scope_label: str,
+) -> str:
+    payload = _catalog_governance_handoff_payload(mapping_set_detail)
+    section = _normalized_text(payload.get("section")) or "Governance"
+    reason = _catalog_governance_handoff_reason(mapping_set_detail)
+    return f"{scope_label}: {section} for {reason}."
+
+
+def _reset_catalog_governance_handoff_filters() -> None:
+    st.session_state["debug_canonical_concept_query"] = ""
+    st.session_state["debug_canonical_concept_focus"] = "all"
+    st.session_state["debug_canonical_concept_source_system"] = ""
+    st.session_state["debug_canonical_concept_business_domain"] = ""
+    st.session_state.pop("debug_selected_canonical_concept_label", None)
+
+    st.session_state["debug_canonical_gap_status_filter"] = ""
+    st.session_state["debug_canonical_gap_owner_filter"] = ""
+    st.session_state["debug_canonical_gap_assignee_filter"] = ""
+    st.session_state["debug_canonical_gap_source_filter"] = ""
+    st.session_state.pop("debug_selected_canonical_gap_label", None)
+
+
+def _open_catalog_governance_handoff(mapping_set_detail: dict[str, Any], summary: str) -> None:
+    version = int(mapping_set_detail.get("version") or 0)
+    name = _normalized_text(mapping_set_detail.get("name")) or "mapping-set"
+    handoff_payload = _catalog_governance_handoff_payload(mapping_set_detail)
+    section = _normalized_text(handoff_payload.get("section")) or "Governance"
+
+    _reset_catalog_governance_handoff_filters()
+
+    st.session_state["pending_top_level_area"] = "Governance"
+    st.session_state["pending_governance_section"] = section
+
+    canonical_concept_id = _normalized_text(handoff_payload.get("canonical_concept_id"))
+    if canonical_concept_id:
+        st.session_state["pending_governance_canonical_concept_id"] = canonical_concept_id
+    else:
+        st.session_state.pop("pending_governance_canonical_concept_id", None)
+
+    canonical_source_system = _normalized_text(handoff_payload.get("canonical_source_system"))
+    if canonical_source_system:
+        st.session_state["pending_governance_canonical_source_system"] = canonical_source_system
+    else:
+        st.session_state.pop("pending_governance_canonical_source_system", None)
+
+    canonical_business_domain = _normalized_text(handoff_payload.get("canonical_business_domain"))
+    if canonical_business_domain:
+        st.session_state["pending_governance_canonical_business_domain"] = canonical_business_domain
+    else:
+        st.session_state.pop("pending_governance_canonical_business_domain", None)
+
+    gap_source_filter = _normalized_text(handoff_payload.get("gap_source_filter"))
+    if gap_source_filter:
+        st.session_state["pending_governance_gap_source_filter"] = gap_source_filter
+    else:
+        st.session_state.pop("pending_governance_gap_source_filter", None)
+
+    focus_sources = [
+        _normalized_text(value)
+        for value in handoff_payload.get("focus_sources", [])
+        if _normalized_text(value)
+    ]
+    if focus_sources:
+        st.session_state["governance_focus_sources"] = focus_sources
+    else:
+        st.session_state.pop("governance_focus_sources", None)
+
+    st.session_state["last_action"] = {
+        "level": "info",
+        "message": f"Catalog handoff: {name} v{version} -> Governance ({section}). {summary}",
+    }
+
+
 def _open_catalog_handoff(area: str, mapping_set_detail: dict[str, Any], summary: str) -> None:
+    if _normalized_text(area).lower() == "governance":
+        _open_catalog_governance_handoff(mapping_set_detail, summary)
+        return
     version = int(mapping_set_detail.get("version") or 0)
     name = _normalized_text(mapping_set_detail.get("name")) or "mapping-set"
     st.session_state["pending_top_level_area"] = area
@@ -699,25 +946,41 @@ def _open_catalog_review_focus_handoff(
     mapping_set_detail: dict[str, Any],
     canonical_concept: str | None = None,
     confidence_label: str | None = None,
+    source_fields: list[str] | None = None,
 ) -> None:
     """Open Workspace with Review filters prefilled from Catalog discovery context."""
 
     concept = _normalized_text(canonical_concept)
     confidence = _normalized_text(confidence_label) or "All"
+    focus_sources: list[str] = []
+    for value in source_fields or []:
+        source = _normalized_text(value)
+        if source and source not in focus_sources:
+            focus_sources.append(source)
     name = _normalized_text(mapping_set_detail.get("name")) or "mapping-set"
     version = int(mapping_set_detail.get("version") or 0)
 
     st.session_state["pending_top_level_area"] = "Workspace"
+    st.session_state["pending_workspace_section"] = "Review"
     st.session_state["filter_status"] = "needs_review"
     st.session_state["filter_confidence"] = confidence if confidence else "All"
-    st.session_state["filter_source"] = "All"
+    st.session_state["filter_source"] = focus_sources[0] if len(focus_sources) == 1 else "All"
     st.session_state["filter_canonical_concept"] = concept if concept else "All"
+    if focus_sources:
+        st.session_state["review_focus_sources"] = focus_sources
+    else:
+        st.session_state.pop("review_focus_sources", None)
+    focus_summary = ""
+    if len(focus_sources) == 1:
+        focus_summary = f", source={focus_sources[0]}"
+    elif focus_sources:
+        focus_summary = f", source_scope={len(focus_sources)} diff fields"
     st.session_state["last_action"] = {
         "level": "info",
         "message": (
             f"Catalog handoff: {name} v{version} -> Workspace Review with filters "
             f"status=needs_review, confidence={st.session_state['filter_confidence']}, "
-            f"canonical_concept={st.session_state['filter_canonical_concept']}."
+            f"canonical_concept={st.session_state['filter_canonical_concept']}{focus_summary}."
         ),
     }
 
@@ -1838,15 +2101,35 @@ def render_catalog_tab(
                     )
                     for action in compare_payload.get("suggested_next_actions") or []:
                         st.caption(f"- {action}")
-                    compare_focus_columns = st.columns(2)
-                    if compare_focus_columns[0].button("Open base review focus", width="stretch", key="catalog_open_compare_base_focus"):
+                    compare_action_columns = st.columns(4)
+                    if compare_action_columns[0].button("Open base detail", width="stretch", key="catalog_open_compare_base_detail"):
+                        try:
+                            _load_catalog_integration_detail(compare_base_name, api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = _catalog_detail_state_recovery(error) or {
+                                "level": "error",
+                                "message": f"Loading base integration detail failed: {error}",
+                            }
+                            st.rerun()
+                    if compare_action_columns[1].button("Open peer detail", width="stretch", key="catalog_open_compare_peer_detail"):
+                        try:
+                            _load_catalog_integration_detail(compare_peer_name, api_request=api_request)
+                            st.rerun()
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = _catalog_detail_state_recovery(error) or {
+                                "level": "error",
+                                "message": f"Loading peer integration detail failed: {error}",
+                            }
+                            st.rerun()
+                    if compare_action_columns[2].button("Open base review focus", width="stretch", key="catalog_open_compare_base_focus"):
                         _open_catalog_review_focus_handoff(
                             mapping_set_detail=compare_payload.get("base_integration", {}).get("latest_version", {})
                             or {"name": compare_base_name, "version": 0},
                             canonical_concept=(compare_payload.get("shared_concepts") or [""])[0],
                         )
                         st.rerun()
-                    if compare_focus_columns[1].button("Open peer review focus", width="stretch", key="catalog_open_compare_peer_focus"):
+                    if compare_action_columns[3].button("Open peer review focus", width="stretch", key="catalog_open_compare_peer_focus"):
                         _open_catalog_review_focus_handoff(
                             mapping_set_detail=compare_payload.get("peer_integration", {}).get("latest_version", {})
                             or {"name": compare_peer_name, "version": 0},
@@ -1978,14 +2261,11 @@ def render_catalog_tab(
             with st.expander(
                 _section_label(
                     "Workspace Reuse Fit",
-                    _catalog_reuse_fit_label((reuse_fit_summary or {}).get("fit_assessment")) if reuse_fit_summary else None,
+                    _catalog_reuse_fit_section_detail(reuse_fit_summary) or None,
                 ),
                 expanded=bool(reuse_fit_summary or reuse_fit_error),
             ):
-                st.caption(
-                    "Bounded reuse assessment for the selected catalog version against the current workspace snapshot. "
-                    "This does not apply or approve anything automatically."
-                )
+                st.caption(_catalog_reuse_fit_intro_caption())
                 st.caption(
                     "Workspace context: "
                     f"{reuse_fit_context.get('source_dataset_name') or 'Source dataset'} -> "
@@ -1996,7 +2276,7 @@ def render_catalog_tab(
                     f"unmatched sources={len(reuse_fit_context.get('current_unmatched_sources', []))}"
                 )
                 if not reuse_fit_ready:
-                    st.info("Open the selected catalog version first to inspect workspace fit.")
+                    st.info(_catalog_reuse_fit_unlock_message())
                     if st.button(
                         "Open selected version for fit review",
                         width="stretch",
@@ -2013,7 +2293,7 @@ def render_catalog_tab(
                             st.rerun()
                 else:
                     if st.button(
-                        "Refresh reuse fit" if reuse_fit_summary else "Generate reuse fit",
+                        _catalog_reuse_fit_action_label(reuse_fit_summary),
                         width="stretch",
                         key="catalog_explain_workspace_fit",
                     ):
@@ -2027,12 +2307,12 @@ def render_catalog_tab(
                             st.session_state["catalog_reuse_fit_error"] = None
                             st.session_state["last_action"] = {
                                 "level": "success",
-                                "message": "Generated workspace reuse-fit explanation for the selected catalog mapping set.",
+                                "message": _catalog_reuse_fit_success_message(),
                             }
                             st.rerun()
                         except httpx.HTTPError as error:
                             st.session_state["catalog_reuse_fit_summary"] = None
-                            st.session_state["catalog_reuse_fit_error"] = f"Generating reuse-fit explanation failed: {error}"
+                            st.session_state["catalog_reuse_fit_error"] = _catalog_reuse_fit_error_message(error)
                             st.session_state["last_action"] = {
                                 "level": "error",
                                 "message": st.session_state["catalog_reuse_fit_error"],
@@ -2042,25 +2322,22 @@ def render_catalog_tab(
                     if reuse_fit_error:
                         st.warning(reuse_fit_error)
                     if reuse_fit_summary:
-                        fit_columns = st.columns(3)
+                        fit_columns = st.columns(2)
                         fit_columns[0].metric("Fit", _catalog_reuse_fit_label(reuse_fit_summary.get("fit_assessment")))
-                        fit_columns[1].metric(
-                            "Generated with",
-                            "LLM" if (reuse_fit_summary.get("generation_metadata") or {}).get("used_llm") else "Fallback",
-                        )
-                        fit_columns[2].metric("Catalog decisions", selected_mapping_set_detail.get("decision_count", 0))
+                        fit_columns[1].metric("Catalog decisions", selected_mapping_set_detail.get("decision_count", 0))
+                        st.caption(_catalog_reuse_fit_metadata_caption(reuse_fit_summary))
                         st.write(reuse_fit_summary.get("summary") or "")
-                        st.write("**Key matches**")
+                        st.caption(_catalog_reuse_fit_output_heading("Key matches"))
                         for item in reuse_fit_summary.get("key_matches", []):
                             st.write(f"- {item}")
-                        st.write("**Risks**")
+                        st.caption(_catalog_reuse_fit_output_heading("Risks"))
                         for item in reuse_fit_summary.get("risks", []):
                             st.write(f"- {item}")
-                        st.write("**Next actions**")
+                        st.caption(_catalog_reuse_fit_output_heading("Next actions"))
                         for item in reuse_fit_summary.get("next_actions", []):
                             st.write(f"- {item}")
                     else:
-                        st.info("No workspace reuse-fit explanation has been generated yet for the selected version.")
+                        st.info(_catalog_reuse_fit_empty_message())
 
             if selected_mapping_set_detail:
                 selected_workspace_context = _catalog_reuse_fit_workspace_context()
@@ -2160,7 +2437,12 @@ def render_catalog_tab(
                     comparison_mapping_set = comparison_candidates[
                         comparison_labels.index(selected_comparison_label)
                     ]
-                    if comparison_columns[1].button(
+                    selected_review_focus_concept = _preferred_catalog_review_handoff_concept(
+                        selected_mapping_set_detail.get("canonical_concepts", []),
+                        comparison_mapping_set.get("canonical_concepts", []),
+                    )
+                    comparison_action_columns = st.columns(2)
+                    if comparison_action_columns[0].button(
                         "Load version diff",
                         width="stretch",
                         key="catalog_load_selected_mapping_set_diff",
@@ -2178,6 +2460,16 @@ def render_catalog_tab(
                                 "message": f"Loading mapping set diff failed: {error}",
                             }
                             st.rerun()
+                    if comparison_action_columns[1].button(
+                        "Open compare review focus",
+                        width="stretch",
+                        key="catalog_open_selected_mapping_set_review_focus",
+                    ):
+                        _open_catalog_review_focus_handoff(
+                            mapping_set_detail=comparison_mapping_set,
+                            canonical_concept=selected_review_focus_concept,
+                        )
+                        st.rerun()
 
                 selected_mapping_set_audit = st.session_state.get("catalog_selected_mapping_set_audit")
                 if selected_mapping_set_audit:
@@ -2186,6 +2478,23 @@ def render_catalog_tab(
 
                 selected_mapping_set_diff = st.session_state.get("catalog_selected_mapping_set_diff")
                 if selected_mapping_set_diff:
+                    baseline_mapping_set = _catalog_mapping_set_record_by_id(
+                        version_records,
+                        selected_mapping_set_diff.get("against_mapping_set_id"),
+                    )
+                    diff_focus_sources = _catalog_mapping_set_diff_focus_sources(
+                        selected_mapping_set_diff.get("changes", [])
+                    )
+                    diff_review_focus_concept = _preferred_catalog_review_handoff_concept(
+                        selected_mapping_set_detail.get("canonical_concepts", []),
+                        (baseline_mapping_set or {}).get("canonical_concepts", []),
+                    )
+                    current_governance_summary = _catalog_governance_handoff_summary(
+                        _catalog_next_action_plan(selected_mapping_set_detail, selected_workspace_context)
+                    )
+                    baseline_governance_summary = _catalog_governance_handoff_summary(
+                        _catalog_next_action_plan(baseline_mapping_set, selected_workspace_context)
+                    )
                     st.caption(
                         "Selected mapping set diff: "
                         f"v{selected_mapping_set_diff.get('current_version')} vs "
@@ -2195,6 +2504,86 @@ def render_catalog_tab(
                     diff_summary[0].metric("Added", selected_mapping_set_diff.get("added_count", 0))
                     diff_summary[1].metric("Removed", selected_mapping_set_diff.get("removed_count", 0))
                     diff_summary[2].metric("Changed", selected_mapping_set_diff.get("changed_count", 0))
+                    diff_actions: list[dict[str, Any]] = [
+                        {
+                            "label": "Open current diff review focus",
+                            "key": "catalog_open_current_diff_review_focus",
+                            "callback": lambda: _open_catalog_review_focus_handoff(
+                                mapping_set_detail=selected_mapping_set_detail,
+                                canonical_concept=diff_review_focus_concept,
+                                source_fields=diff_focus_sources,
+                            ),
+                        },
+                        {
+                            "label": "Open baseline diff review focus",
+                            "key": "catalog_open_baseline_diff_review_focus",
+                            "callback": lambda: _open_catalog_review_focus_handoff(
+                                mapping_set_detail=baseline_mapping_set
+                                or {
+                                    "name": selected_mapping_set_diff.get("against_name") or selected_mapping_set_detail.get("name"),
+                                    "version": selected_mapping_set_diff.get("against_version") or 0,
+                                },
+                                canonical_concept=diff_review_focus_concept,
+                                source_fields=diff_focus_sources,
+                            ),
+                        },
+                    ]
+                    if current_governance_summary:
+                        diff_actions.append(
+                            {
+                                "label": _catalog_governance_handoff_action_label(
+                                    selected_mapping_set_detail,
+                                    scope_label="current diff",
+                                ),
+                                "key": "catalog_open_current_diff_governance_handoff",
+                                "callback": lambda: _open_catalog_handoff(
+                                    "Governance",
+                                    selected_mapping_set_detail,
+                                    current_governance_summary,
+                                ),
+                            }
+                        )
+                    if baseline_governance_summary and baseline_mapping_set:
+                        diff_actions.append(
+                            {
+                                "label": _catalog_governance_handoff_action_label(
+                                    baseline_mapping_set,
+                                    scope_label="baseline diff",
+                                ),
+                                "key": "catalog_open_baseline_diff_governance_handoff",
+                                "callback": lambda: _open_catalog_handoff(
+                                    "Governance",
+                                    baseline_mapping_set,
+                                    baseline_governance_summary,
+                                ),
+                            }
+                        )
+                    diff_action_columns = st.columns(len(diff_actions))
+                    for diff_action_column, diff_action in zip(diff_action_columns, diff_actions):
+                        if diff_action_column.button(
+                            diff_action["label"],
+                            width="stretch",
+                            key=diff_action["key"],
+                        ):
+                            diff_action["callback"]()
+                            st.rerun()
+                    governance_follow_up_notes: list[str] = []
+                    if current_governance_summary:
+                        governance_follow_up_notes.append(
+                            _catalog_governance_follow_up_caption(
+                                selected_mapping_set_detail,
+                                scope_label="Current diff",
+                            )
+                        )
+                    if baseline_governance_summary and baseline_mapping_set:
+                        governance_follow_up_notes.append(
+                            _catalog_governance_follow_up_caption(
+                                baseline_mapping_set,
+                                scope_label="Baseline diff",
+                            )
+                        )
+                    if governance_follow_up_notes:
+                        st.caption("Governance follow-up: " + " | ".join(governance_follow_up_notes))
                     st.dataframe(selected_mapping_set_diff.get("changes", []), width="stretch", hide_index=True)
 
             similar_integrations = integration_detail.get("similar_integrations", [])
@@ -2230,7 +2619,7 @@ def render_catalog_tab(
                     st.dataframe(similar_compare_payload["rows"], width="stretch", hide_index=True)
                 similar_names = [item["integration_name"] for item in similar_integrations]
                 recommended_similar_name = _normalized_text(similar_compare_payload.get("recommended_integration_name"))
-                similar_columns = st.columns([3, 1, 1])
+                similar_columns = st.columns([3, 1, 1, 1])
                 selected_similar_name = similar_columns[0].selectbox(
                     "Open similar integration detail",
                     similar_names,
@@ -2258,6 +2647,10 @@ def render_catalog_tab(
                     f"({selected_peer_version.get('status') or '-'}) | "
                     f"{similar_compare_payload.get('recommended_reason') if _normalized_text(selected_similar_name) == recommended_similar_name else 'Open peer detail to inspect version lineage.'}"
                 )
+                selected_peer_review_focus_concept = _preferred_catalog_review_handoff_concept(
+                    selected_version.get("canonical_concepts", []),
+                    selected_similar_integration.get("shared_concepts", []),
+                )
                 if similar_columns[1].button("Open similar integration", width="stretch", key="catalog_open_similar_integration"):
                     try:
                         _load_catalog_integration_detail(selected_similar_name, api_request=api_request)
@@ -2283,6 +2676,17 @@ def render_catalog_tab(
                             "message": f"Loading similar integration version failed: {error}",
                         }
                         st.rerun()
+                if similar_columns[3].button(
+                    "Open peer review focus",
+                    width="stretch",
+                    key="catalog_open_similar_integration_review_focus",
+                    disabled=not bool(selected_peer_version),
+                ):
+                    _open_catalog_review_focus_handoff(
+                        mapping_set_detail=selected_peer_version or {"name": selected_similar_name, "version": 0},
+                        canonical_concept=selected_peer_review_focus_concept,
+                    )
+                    st.rerun()
 
     st.subheader("Concept Lookup")
     concept_columns = st.columns([3, 1])

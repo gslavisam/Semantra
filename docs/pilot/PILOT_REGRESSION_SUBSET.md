@@ -29,9 +29,45 @@ Razlog:
 1. Pokreni lokalni stack.
 	Sačekaj da `start_semantra.ps1` prijavi `Backend is ready` i `Streamlit is ready` pre otvaranja UI-ja.
 2. Potvrdi da `Workspace`, `Catalog` i `Canonical Console` otvaraju bez runtime grešaka.
-3. Za showcase quick demo koristi `ui_fixtures/showcase_customer_mapping/showcase_customer_source.csv` i `ui_fixtures/showcase_customer_mapping/showcase_customer_target.json`.
+3. Ako lokalni runtime nema potrebne smoke fixture podatke, pokreni `backend/scripts/bootstrap_operational_smoke.ps1` ili `backend/scripts/bootstrap_operational_smoke.py` da repeatable seeduje `browser-diff-focus`, `Stewardship Smoke Sync`, `approved-customer-reuse-smoke`, `customer-draft-session` i `operational-smoke-benchmark` kroz postojeće API-je.
+4. Za showcase quick demo koristi `ui_fixtures/showcase_customer_mapping/showcase_customer_source.csv` i `ui_fixtures/showcase_customer_mapping/showcase_customer_target.json`.
 
 ## Regression komande
+
+Za jedan repeatable operational-hardening prolaz preko `Workspace`, `Catalog` i `Benchmarks`, koristi:
+
+```powershell
+python backend/scripts/run_operational_hardening.py --base-url http://127.0.0.1:8000 --admin-token <token>
+```
+
+ili na Windows-u:
+
+```powershell
+.\backend\scripts\run_operational_hardening.ps1 -AdminToken <token>
+```
+
+Ovaj runner radi tri stvari redom:
+
+- pokreće bootstrap fixture-a za repeatable smoke preuslove
+- izvršava fokusirani Streamlit regression subset
+- proverava live API smoke baseline za `Workspace`, `Catalog` i `Benchmarks`
+
+Za browser-level potvrdu istog pilot trija koristi fokusirani Playwright smoke runner:
+
+```powershell
+python -m playwright install chromium
+python backend/scripts/run_operational_browser_e2e.py --streamlit-url http://127.0.0.1:8501 --base-url http://127.0.0.1:8000 --admin-token <token>
+```
+
+ili na Windows-u:
+
+```powershell
+.\backend\scripts\run_operational_browser_e2e.ps1 -AdminToken <token>
+```
+
+Ovaj runner automatizuje glavni browser smoke put preko `Workspace`, `Catalog`, `Governance` i `Benchmarks`; detalji su u [docs/pilot/OPERATIONAL_BROWSER_E2E.md](D:/py_radno/Semantra/docs/pilot/OPERATIONAL_BROWSER_E2E.md).
+
+Ako želiš isti tok da vodiš ručno pred publikom, koristi [docs/pilot/MANUAL_LIVE_DEMO_SCRIPT.md](D:/py_radno/Semantra/docs/pilot/MANUAL_LIVE_DEMO_SCRIPT.md).
 
 Pusti ovaj uski subset iz repo root-a:
 
@@ -61,6 +97,8 @@ python -m pytest backend/tests/test_mapping_service.py backend/tests/test_spec_u
 - concept-centric reuse view
 - discovery overview matrix
 - reuse hint-ovi, stale-state recovery i mapping-set reuse guard
+- version diff -> `Workspace Review` handoff sa changed-source scope signalom
+- `Canonical review` / `Stewardship` governance handoff sa section-aware landing-om
 
 ### Benchmarks
 
@@ -107,6 +145,34 @@ Koristi aktivni workspace showcase snapshot i bar jedan `approved` saved mapping
 4. Klikni `Reuse in Workspace` samo za `approved` version i potvrdi da se pojavi success status poruka za apply/reuse tok.
 5. Klikni `Open workspace review handoff` i potvrdi da top-level navigacija zaista pređe u `Workspace` umesto da ostane u `Catalog` ili padne na Streamlit grešku.
 6. Ako `Catalog` pokuša da otvori integration detail koji više ne postoji u backend-u, potvrdi da se stale state očisti i da status traka traži refresh query rezultata.
+
+## Catalog handoff regression smoke
+
+Koristi seeded `browser-diff-focus` integration family za diff handoff putanje i jedan seeded unmatched-source draft mapping set (na primer `Stewardship Smoke Sync`) za `Stewardship` granu:
+
+Ako lokalni runtime krene bez catalog podataka, prvo seeduj minimalni `browser-diff-focus` v1/v2 par preko postojećeg `POST /mapping/sets` API-ja; za ovaj smoke nije potreban poseban seed helper u kodu.
+
+1. U `Catalog` učitaj `browser-diff-focus` detail i otvori najnoviji draft version sa dostupnim baseline diff-om.
+2. Klikni `Open current diff review focus` i potvrdi da UI prelazi u `Workspace > Review`, a status poruka jasno signalizuje multi-source diff scope (`source_scope=... diff fields`).
+3. Ako aktivni Workspace već ima učitan review set, potvrdi i da `Filter by source` ostaje na `All` dok review caption nosi multi-source diff fokus umesto tvrdog source filtera.
+4. Vrati se u isti `Catalog` diff readout, klikni `Open current diff Canonical review` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Canonical`, uz očišćen stale `Canonical concept search` ili drugi prethodni governance filter.
+5. Učitaj unmatched-source draft mapping set (na primer `Stewardship Smoke Sync`), otvori `Mapping Set Drilldown` i potvrdi da glavni Governance CTA eksplicitno glasi `Open Stewardship`.
+6. Klikni `Open Stewardship` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Stewardship`, umesto da ostane na generičkom canonical landing-u.
+
+Ovaj smoke proverava da noviji `Catalog` handoff CTA-e nisu samo helper-level signal, već da stvarno prebacuju korisnika na tačan top-level area, odgovarajuću sekciju i očekivani filter/focus scope.
+
+## Draft-session review restore smoke
+
+Koristi jedan postojeći `Review` draft session ili ga prvo sačuvaj iz `Workspace > Decisions`:
+
+1. U `Workspace > Review` učitaj review-ready mapping state i namerno postavi ne-default review slice, na primer `Filter by source = phone`.
+2. Generiši `Review Queue Plan` za taj filtrirani slice i potvrdi da surface jasno govori da plan važi za trenutno filtrirani review set.
+3. Pređi u `Workspace > Decisions -> Mapping Set Versions`, učitaj saved draft sessions i resumuj jedan `Review` draft session.
+4. Potvrdi da UI zaista vraća korisnika u `Workspace > Review` bez Streamlit runtime greške pri navigaciji.
+5. Potvrdi da se review filteri vraćaju na podrazumevani `All` slice i da prethodno generisani `Review Queue Plan` ne ostaje zalepljen kao stale guidance output.
+6. Potvrdi da se minimalni restored review contract ipak normalno renderuje: `Mapping Trust Layer`, `Review Queue Plan` expander u praznom/generate stanju, `Selected Mapping`, i `Scoring runtime` caption.
+
+Ovaj smoke proverava da draft-session resume ne vraća samo navigaciju, već i čist review context bez slučajno prenetih filtera ili bounded guidance output-a iz prethodnog session state-a.
 
 ## Benchmark explanation end-to-end smoke
 

@@ -146,6 +146,8 @@ Validate:
 - integration detail drilldown
 - similar integrations
 - `Reuse in Workspace`
+- version diff handoff into `Workspace Review`
+- governance handoff into `Canonical` and `Stewardship`
 
 Expected outcomes:
 
@@ -153,6 +155,8 @@ Expected outcomes:
 - approved versions can be reused back into the active review loop
 - concept-centric lookup exposes real reuse evidence
 - similarity signals are plausible, not random
+- review handoff lands on the intended `Workspace` section and preserves diff-source scope without forcing a narrow source filter
+- governance handoff lands on the intended `Canonical` or `Stewardship` surface and does not inherit stale governance filters
 
 ### Track E. Canonical Console and stewardship
 

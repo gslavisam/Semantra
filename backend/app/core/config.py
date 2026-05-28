@@ -65,6 +65,13 @@ class Settings:
     lmstudio_tts_base_url: str = "http://127.0.0.1:1234"
     lmstudio_orpheus_model: str = "orpheus-3b-0.1-ft"
     lmstudio_orpheus_voice: str = "tara"
+    dbt_materialization: str = "view"
+    dbt_source_mode: str = "ref"
+    dbt_source_name: str = "raw"
+    dbt_source_table_name: str = "source_model"
+    dbt_ref_name: str = "source_model"
+    dbt_quote_identifiers: bool = True
+    dbt_source_cte_name: str = "source_data"
     gemini_api_key: str = ""
     gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
@@ -105,6 +112,10 @@ def backend_code_fingerprint() -> str:
 
 
 def settings_snapshot() -> dict[str, Any]:
+    from app.services.dbt_codegen_profile import dbt_profile_snapshot
+
+    dbt_profile = dbt_profile_snapshot()
+
     return {
         "app_version": settings.app_version,
         "backend_build": backend_code_fingerprint(),
@@ -117,6 +128,14 @@ def settings_snapshot() -> dict[str, Any]:
         "lmstudio_tts_base_url": settings.lmstudio_tts_base_url,
         "lmstudio_orpheus_model": settings.lmstudio_orpheus_model,
         "lmstudio_orpheus_voice": settings.lmstudio_orpheus_voice,
+        "dbt_materialization": dbt_profile["materialization"],
+        "dbt_source_mode": dbt_profile["source_mode"],
+        "dbt_source_name": dbt_profile["source_name"],
+        "dbt_source_table_name": dbt_profile["source_table_name"],
+        "dbt_ref_name": dbt_profile["ref_name"],
+        "dbt_quote_identifiers": dbt_profile["quote_identifiers"],
+        "dbt_source_cte_name": dbt_profile["source_cte_name"],
+        "dbt_source_reference": dbt_profile["source_reference"],
         "embedding_provider": settings.embedding_provider,
         "scoring_profile": settings.scoring_profile,
         "cors_origins": list(settings.cors_origins),
