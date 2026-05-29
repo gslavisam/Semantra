@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-27, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, and reuse discovery. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-29, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, reuse discovery, and a first pilot RBAC slice for selected mapping-governance surfaces. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -19,7 +19,7 @@ What Semantra is not yet:
 - a multi-step enterprise workflow engine
 - a fully normalized metadata/knowledge platform with DB-only authoring and migration lifecycle
 - a full graph or ontology management product
-- a resume-by-design workspace with durable `draft session` restore across reloads or runtime switches
+- a full auto-resume or collaborative resume-by-design workspace across reloads, days, teams, or runtime switches
 
 ## Persistence And State Placement Today
 
@@ -87,6 +87,17 @@ The current state is:
 - Workspace interaction state is still largely session-local.
 
 So the next architecture step is not "introduce persistence from scratch". It is to finish the move from `pilot DB-backed runtime plus session orchestration` to `DB-first domain model with clear boundaries for what may remain ephemeral UI state`.
+
+## Authorization Posture Today
+
+Authorization is now split into two layers rather than one, but it is still not enterprise-complete.
+
+- many protected surfaces still use the older binary `X-Admin-Token` model
+- a minimal authenticated principal model and role enum now exist in the backend
+- the new `require_roles()` layer is currently applied only to `mapping/draft-sessions*` and `mapping/sets*`
+- draft sessions are now owner-scoped for non-admin principals in that pilot slice
+- mapping-set create/status/apply audit actors must now align with the authenticated principal in that pilot slice
+- this is a real RBAC foothold, but not yet a product-wide multi-role enforcement model
 
 ## Implemented User-Facing Capabilities
 
@@ -405,11 +416,12 @@ Main code surfaces:
 Current behavior:
 
 - browser session state is not automatically resumed across days
-- continuation is supported through explicit persisted artifacts (mapping sets or exported/imported decision checkpoints)
+- continuation is supported through explicit persisted artifacts (draft sessions, mapping sets, or exported/imported decision checkpoints)
+- current draft-session continuity is intentionally minimal and bounded: save, list, load, and restore of the stable review/decision workspace contract
 
 Open design track:
 
-- design a deliberate draft/resume model (scope, conflict handling, audit) before enabling auto-resume behavior
+- deepen the draft/resume model deliberately (scope, conflict handling, sharing, audit) before enabling auto-resume behavior
 
 ## Enforced Governance Rules Today
 
@@ -474,8 +486,13 @@ The primary regression anchors are:
 
 ## Known Boundaries and Immediate Next Steps
 
-The following items remain outside the current pilot-complete scope or are the next productization steps:
+The following items remain outside the current pilot-complete scope or are the next validation and productization steps:
 
+- keep the documentation aligned with the real current product surface, current boundaries, and pilot-only enforcement model
+- run more manual pilot scenarios, proof-of-concept passes, and value-verification checks against realistic organizational workflows
+- package those validated flows into presentation assets, live demo runbooks, and repeatable showcase scenarios
+- only after those proofs are strong, choose the next enterprise-wide hardening wave deliberately
+- broader RBAC coverage beyond the current pilot slice on `mapping/draft-sessions*` and `mapping/sets*`
 - browser-level bounded guidance discoverability confirmation and regression capture across `Workspace`, `Catalog`, and `Benchmarks`
 - broader catalog visual discovery beyond the current compare and handoff surfaces
 - persistent background job queue/status backend for multi-user, restart-resilient, or materially longer-running tasks

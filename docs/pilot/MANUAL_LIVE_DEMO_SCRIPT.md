@@ -4,6 +4,8 @@ Ovaj dokument je namenjen za ručnu, uživo prezentaciju Semantra aplikacije pre
 
 Nije automation runner i nije regression checklist. Njegova svrha je da ti da gotov presenterski tok: šta kažeš, šta klikćeš i šta publika treba da vidi kao dokaz da aplikacija radi.
 
+Ovo je preporučeni glavni demo za trenutnu fazu proizvoda: stabilan proof-of-value tok za pilot, PoC i stakeholder prezentacije. Nije namenjen da pokaže svaki ekran aplikacije, nego da pokaže najjaču poslovnu priču bez improvizacije.
+
 Najstabilniji live-demo tok koristi već potvrđene operational smoke fixture-e:
 
 - `approved-customer-reuse-smoke`
@@ -19,6 +21,8 @@ Publika treba da razume tri stvari:
 1. Semantra ne počinje svaki put od nule, već ume da koristi već odobrene integracije iz `Catalog`-a.
 2. Aktivni analitički rad može da se nastavi kroz `Workspace` bez gubitka konteksta.
 3. Kvalitet mapping-a može da se proveri i objasni kroz `Benchmarks`.
+
+Sekundarni cilj je da ovaj tok bude dovoljno stabilan da se isti scenario može koristiti i za manualni pilot prolaz i za live prezentaciju.
 
 ## Pre-flight pre prezentacije
 
@@ -51,11 +55,17 @@ Za live demo koristi ovaj redosled:
 
 Ovim redosledom priča prirodno ide od reusable znanja, preko aktivnog rada, do governance i kvaliteta.
 
+Ako neko traži "glavni demo Semantre", koristi upravo ovaj tok pre bilo kog šireg full-surface walkthrough-a.
+
 ## Kratka narativna mapa
 
 Ako želiš jednu rečenicu koja drži ceo demo na okupu, koristi ovo:
 
 "Semantra koristi prethodno odobreno integraciono znanje iz kataloga, vraća korisnika u aktivni review kontekst bez ručnog rekonstruisanja rada, i na kraju meri i objašnjava kvalitet mapping odluka kroz benchmark evidence."
+
+Ako treba kraća poslovna verzija za stakeholder-e:
+
+"Ne krećemo od nule, ne gubimo kontekst rada, i možemo da pokažemo zašto verujemo rezultatu."
 
 ## Demo script: puni prolaz 10-15 minuta
 
@@ -109,9 +119,14 @@ Publika treba da vidi sledeće:
 
 - draft session lista se učita
 - izabrani session ima ime `customer-draft-session`
-- UI se vrati u `Workspace > Review`
-- pojavljuju se review elementi kao `Filter by source` i `Review Queue Plan`
+- idealno, UI se vrati u `Workspace > Review`
+- idealno, pojavljuju se review elementi kao `Filter by source` i `Review Queue Plan`
 - nema runtime greške niti ručnog resetovanja stanja
+
+Napomena iz live smoke prolaza 2026-05-29:
+
+- continuity slice je ostao upotrebljiv, ali automatski povratak na `Review` nije bio dosledno potvrđen u svakom browser prolazu
+- praktični fallback za demo je: ako posle `Resume draft session` ostaneš u `Decisions`, ručno klikni `Review` i naglasi da se vraćaš na već učitan radni kontekst, ne na prazan workspace
 
 ### Šta naglašavaš
 

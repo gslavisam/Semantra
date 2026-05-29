@@ -1,8 +1,18 @@
 # Semantra Live Demo Runbook
 
-Ovaj dokument je namenjen za live demo prema osam stavki sa slajda.
+Ovaj dokument je namenjen za glavni live demo u trenutnoj pilot fazi.
 
-Ideja je da koristis jedan glavni scenario kroz `Workspace`, zatim da iz istog rada predjes u `Catalog`, `Canonical Console` i `Benchmarks`.
+Za ovu fazu proizvoda preporučeni demo nije "prođi kroz sve ekrane", nego jedan stabilan proof-of-value scenario koji se može ponavljati pred stakeholder-ima bez improvizacije.
+
+Primarni demo tok je:
+
+1. `Catalog` reuse
+2. `Workspace` resume
+3. `Catalog` diff handoff
+4. `Catalog` stewardship handoff
+5. `Benchmarks` comparison and explanation
+
+Prošireni `Workspace -> Setup -> Review -> Decisions -> Output` walkthrough i dalje ima smisla, ali kao sekundarni ili tehnički demo, ne kao glavni stakeholder story.
 
 ## 0. Priprema pre demo-a
 
@@ -11,13 +21,115 @@ Pre pocetka uradi sledece:
 1. Pokreni aplikaciju kao i inace.
 2. U sidebar-u proveri da je `API Base URL` ispravan.
 3. Ako backend trazi admin token, unesi ga pre otvaranja `Catalog`, `Canonical Console` i `Benchmarks`.
-4. Za glavni tok koristi ove fajlove:
-   - `ui_fixtures/showcase_customer_mapping/showcase_customer_source.csv`
-   - `ui_fixtures/showcase_customer_mapping/showcase_customer_target.json`
-5. Za Canonical Console overlay deo koristi ovaj fajl:
-   - `ui_fixtures/knowledge_demo_overlay.csv`
+4. Za glavni tok koristi već potvrđene operational smoke fixture-e:
+   - `approved-customer-reuse-smoke`
+   - `customer-draft-session`
+   - `browser-diff-focus`
+   - `stewardship-smoke-sync`
+   - `operational-smoke-benchmark`
+5. Ako želiš čist repeatable start, pre demo-a pokreni bootstrap script za operational smoke stanje.
 
-## 1. Workspace -> Setup with one source/target pair
+## 1. Glavna poruka demoa
+
+Ako želiš jednu rečenicu koja drži ceo demo na okupu, koristi ovo:
+
+"Semantra koristi prethodno odobreno integraciono znanje iz kataloga, vraća korisnika u aktivni review kontekst bez ručnog rekonstruisanja rada, i na kraju meri i objašnjava kvalitet mapping odluka kroz benchmark evidence."
+
+## 2. Primarni stakeholder demo tok
+
+Za glavni live demo koristi ovaj redosled:
+
+1. `Catalog` reuse
+2. `Workspace` resume
+3. `Catalog` diff handoff
+4. `Catalog` stewardship handoff
+5. `Benchmarks` comparison and explanation
+
+Ovaj tok je najbolji kada želiš da pokažeš organizacionu vrednost: reuse, continuity, governance handoff i quality evidence.
+
+## 3. Primarni demo koraci
+
+### 3.1 Catalog reuse
+
+1. Otvori `Catalog`.
+2. U `Search` upiši `approved-customer-reuse-smoke`.
+3. Klikni `Run catalog query`.
+4. Klikni `Load detail`.
+5. Kratko pokaži `Latest approved version` i `approved` status.
+6. Klikni `Reuse in Workspace`.
+
+Naglasak:
+
+- Semantra ne kreće od nule kada već postoji odobreno integraciono znanje.
+- Ovo je reuse produkcionog artefakta, ne samo pasivan pregled istorije.
+
+### 3.2 Workspace resume
+
+1. Pređi u `Workspace`.
+2. Otvori `Decisions`.
+3. U `Mapping Set Versions` klikni `Load draft sessions`.
+4. Izaberi `customer-draft-session`.
+5. Klikni `Resume draft session`.
+6. Pokaži da se UI vraća u review-ready stanje bez ručnog rekonstruisanja konteksta.
+
+Naglasak:
+
+- continuity rada je konkretna vrednost, ne samo UI trik
+- draft session ovde služi kao bounded continuity slice, ne kao full collaborative workspace model
+
+Operativna napomena iz live smoke prolaza 2026-05-29:
+
+- ako `Resume draft session` ne vrati UI automatski na `Review`, koristi mali presenterski fallback: ručno klikni `Review` i naglasi da je poenta u očuvanom radnom kontekstu, ne u samoj navigacionoj animaciji
+- ovaj fallback je prihvatljiv za trenutni pilot/demo sloj, ali behavior i dalje vredi dodatno harden-ovati pre šireg showcase korišćenja
+
+### 3.3 Catalog diff handoff
+
+1. Vrati se u `Catalog`.
+2. Resetuj catalog state ako je potrebno.
+3. U `Search` upiši `browser-diff-focus`.
+4. Klikni `Run catalog query` i `Load detail`.
+5. Otvori izabranu verziju i učitaj diff.
+6. Klikni `Open current diff review focus`.
+
+Naglasak:
+
+- Catalog nije samo istorijska arhiva
+- diff vodi direktno u pravi review kontekst
+
+### 3.4 Catalog stewardship handoff
+
+1. Vrati se u `Catalog`.
+2. Resetuj catalog state.
+3. U `Search` upiši `stewardship-smoke-sync`.
+4. Klikni `Run catalog query`, `Load detail`, pa `Open selected version`.
+5. U `Mapping Set Drilldown` klikni `Open Stewardship`.
+
+Naglasak:
+
+- governance nije odvojeni ostrvski ekran
+- reuse i diff mogu direktno da generišu governance follow-up u pravom kontekstu
+
+### 3.5 Benchmarks comparison and explanation
+
+1. Idi u `Benchmarks`.
+2. Klikni `Load saved benchmark datasets`.
+3. Izaberi `operational-smoke-benchmark`.
+4. Klikni `Compare scoring profiles`.
+5. Pokaži `Recommended default profile`.
+6. U `Benchmark Explanation` klikni `Generate benchmark explanation`.
+
+Naglasak:
+
+- ovde pokazuješ dokaz kvaliteta, ne još jedan mapping editor
+- explanation pomaže da se rezultat objasni organizaciji, ne samo da se vidi skor
+
+## 4. Prošireni tehnički demo
+
+Ako publika traži širi product walkthrough ili hoćeš da pokažeš pun analyst lifecycle, koristi sekundarni `Workspace -> Setup -> Review -> Decisions -> Output` tok.
+
+Taj tok je koristan, ali nije preporučeni prvi demo za stakeholder-e u ovoj fazi.
+
+## 5. Prošireni tehnički demo: Workspace -> Setup with one source/target pair
 
 Ovo je prvi demo korak sa slajda.
 
@@ -38,7 +150,7 @@ Sta da kazes dok radis ovaj korak:
 - ovde pokazujem da setup nije vezan za jedan format, nego za source/target par
 - source je CSV, target je JSON, dakle cross-format mapping je normalan tok
 
-## 2. Generate mapping -> Review (signal ranking + canonical path)
+## 6. Prošireni tehnički demo: Generate mapping -> Review (signal ranking + canonical path)
 
 Ovo je drugi demo korak sa slajda.
 
@@ -63,7 +175,7 @@ Sta da kazes dok radis ovaj korak:
 - ovde se vidi da Semantra ne daje samo target, nego i zasto je taj target predlozen
 - ranking i canonical path su review materijal za analiticara, nisu skriveni iza modela
 
-## 3. Decisions: one accepted, one manual override
+## 7. Prošireni tehnički demo: Decisions: one accepted, one manual override
 
 Bitna napomena: per-field override se radi u `Review > Manual Review`, a zatim se rezultat prikazuje u `Decisions`.
 
@@ -84,7 +196,7 @@ Ako zelis jos direktniji override demo:
 2. Promeni status iz `accepted` ili `needs_review` u ono sto zelis da demonstriras.
 3. Objasni da operator ima poslednju rec i da confidence nije automatsko odobrenje.
 
-## 4. Output: advisory preview + accepted-only codegen gate
+## 8. Prošireni tehnički demo: Output: advisory preview + accepted-only codegen gate
 
 Ovo je cetvrti demo korak sa slajda i idealno je da ga odradis dok jos postoji makar jedna odluka koja nije `accepted`.
 
@@ -102,7 +214,7 @@ Sta da kazes dok radis ovaj korak:
 - preview je savetodavan i sluzi za proveru
 - codegen je striktno governance-gated i trazi accepted aktivne odluke
 
-## 5. Save mapping set and move to approved
+## 9. Prošireni tehnički demo: Save mapping set and move to approved
 
 Ovo je peti demo korak sa slajda.
 
@@ -121,7 +233,7 @@ Ovo je peti demo korak sa slajda.
 7. Klikni `Update saved mapping set status`.
 8. Kratko pokazi da je isti mapping sada durable artefakt, a ne samo session state.
 
-## 6. Catalog: detail, latest approved version, Reuse in Workspace
+## 10. Prošireni tehnički demo: Catalog: detail, latest approved version, Reuse in Workspace
 
 Ovo je sesti demo korak sa slajda i direktno se nastavlja na prethodni.
 
@@ -145,7 +257,7 @@ Sta da kazes dok radis ovaj korak:
 - Catalog nije live session view, nego reuse sloj nad sacuvanim artefaktima
 - Reuse vraca odobrenu verziju nazad u Workspace, ne rerun-uje mapper od nule
 
-## 7. Canonical Console: concept detail + stewardship action
+## 11. Prošireni tehnički demo: Canonical Console: concept detail + stewardship action
 
 Za ovaj deo koristi `ui_fixtures/knowledge_demo_overlay.csv`.
 
@@ -184,7 +296,7 @@ Sta da kazes dok radis ovaj korak:
 - ovo nije debug-only povrsina, nego governance povrsina za canonical runtime
 - promene nad knowledge slojem su eksplicitne i auditabilne
 
-## 8. Benchmarks: run + correction-impact check
+## 12. Prošireni tehnički demo: Benchmarks: run + correction-impact check
 
 Ovo je osmi demo korak sa slajda.
 
@@ -207,7 +319,7 @@ Sta da kazes dok radis ovaj korak:
 - Benchmarks nisu analyst review ekran, nego quality measurement povrsina
 - correction impact pokazuje da sistem moze da meri efekat governovanog ucenja
 
-## Preporuceni redosled live demo-a
+## Preporuceni redosled za prošireni tehnički demo
 
 Ako zelis da sve ide glatko, drzi se ovog reda:
 
@@ -224,11 +336,8 @@ Ako zelis da sve ide glatko, drzi se ovog reda:
 
 Ako moras da skratis demo, zadrzi sledece:
 
-1. `Workspace > Setup` sa quick demo parom
-2. `Generate mapping` + jedan trust-layer primer
-3. Jedan accepted i jedan manual-review primer
-4. `Generate preview` + codegen gate
-5. `Save mapping set version` + status `approved`
-6. `Catalog > Reuse in Workspace`
+1. `Catalog -> approved-customer-reuse-smoke -> Reuse in Workspace`
+2. `Workspace -> Resume draft session`
+3. `Benchmarks -> operational-smoke-benchmark -> Compare scoring profiles -> Generate benchmark explanation`
 
-To ti pokriva glavni lifecycle bez dubljeg governance i benchmark dela.
+To ti pokriva reuse, continuity i quality evidence, što je trenutno najjača kratka priča.

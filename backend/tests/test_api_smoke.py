@@ -2797,6 +2797,7 @@ def test_codegen_reports_structured_syntax_warning_and_falls_back_to_direct_mapp
 
 def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     settings.admin_api_token = "secret-token"
+    headers = role_headers("reviewer-1", "reviewer")
 
     create_response = client.post(
         "/mapping/sets",
@@ -2817,14 +2818,14 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
                 {"source": "cust_id", "target": "customer_id", "status": "accepted"},
                 {"source": "phone", "target": "phone_number", "status": "needs_review"},
             ],
-            "created_by": "demo-user",
+            "created_by": "reviewer-1",
             "workspace_id": "ws-customer-01",
             "note": "Initial draft",
             "owner": "governance-team",
             "assignee": "analyst-1",
             "review_note": "Prepared for governance review",
         },
-        headers=admin_headers(),
+        headers=headers,
     )
 
     assert create_response.status_code == 200
@@ -2834,26 +2835,26 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     assert created["version"] == 1
     assert created["workspace_id"] == "ws-customer-01"
 
-    list_response = client.get("/mapping/sets", headers=admin_headers())
-    detail_response = client.get(f"/mapping/sets/{mapping_set_id}", headers=admin_headers())
+    list_response = client.get("/mapping/sets", headers=headers)
+    detail_response = client.get(f"/mapping/sets/{mapping_set_id}", headers=headers)
     status_response = client.post(
         f"/mapping/sets/{mapping_set_id}/status",
         json={
             "status": "approved",
-            "changed_by": "demo-user",
+            "changed_by": "reviewer-1",
             "note": "Ready for production use",
             "owner": "governance-team",
             "assignee": "analyst-2",
             "review_note": "Approved for reuse",
         },
-        headers=admin_headers(),
+        headers=headers,
     )
     apply_response = client.post(
         f"/mapping/sets/{mapping_set_id}/apply",
-        json={"changed_by": "demo-user", "note": "Applied to current review state"},
-        headers=admin_headers(),
+        json={"changed_by": "reviewer-1", "note": "Applied to current review state"},
+        headers=headers,
     )
-    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=admin_headers())
+    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=headers)
 
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
@@ -2894,6 +2895,7 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
 
 def test_apply_mapping_set_rejects_cross_workspace_apply_requests() -> None:
     settings.admin_api_token = "secret-token"
+    headers = role_headers("reviewer-1", "reviewer")
 
     create_response = client.post(
         "/mapping/sets",
@@ -2904,11 +2906,11 @@ def test_apply_mapping_set_rejects_cross_workspace_apply_requests() -> None:
             "mapping_decisions": [
                 {"source": "vendor_id", "target": "supplier.id", "status": "accepted"},
             ],
-            "created_by": "demo-user",
+            "created_by": "reviewer-1",
             "workspace_id": "ws-owner-01",
             "note": "Approved mapping set",
         },
-        headers=admin_headers(),
+        headers=headers,
     )
 
     assert create_response.status_code == 200
@@ -2918,17 +2920,17 @@ def test_apply_mapping_set_rejects_cross_workspace_apply_requests() -> None:
         f"/mapping/sets/{mapping_set_id}/status",
         json={
             "status": "approved",
-            "changed_by": "demo-user",
+            "changed_by": "reviewer-1",
             "note": "Approved for workspace reuse",
         },
-        headers=admin_headers(),
+        headers=headers,
     )
     apply_response = client.post(
         f"/mapping/sets/{mapping_set_id}/apply",
-        json={"changed_by": "demo-user", "workspace_id": "ws-other-02", "note": "Cross-workspace apply"},
-        headers=admin_headers(),
+        json={"changed_by": "reviewer-1", "workspace_id": "ws-other-02", "note": "Cross-workspace apply"},
+        headers=headers,
     )
-    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=admin_headers())
+    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=headers)
 
     assert status_response.status_code == 200
     assert apply_response.status_code == 409
@@ -2941,6 +2943,7 @@ def test_apply_mapping_set_rejects_cross_workspace_apply_requests() -> None:
 
 def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     settings.admin_api_token = "secret-token"
+    headers = role_headers("qa-user", "analyst")
 
     upload_response = client.post(
         "/upload",
@@ -3001,7 +3004,7 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
                 }
             },
         },
-        headers=admin_headers(),
+        headers=headers,
     )
 
     assert create_response.status_code == 200
@@ -3014,8 +3017,8 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     assert created["version"] == 1
     assert created["last_writer"] == "qa-user"
 
-    list_response = client.get("/mapping/draft-sessions", headers=admin_headers())
-    detail_response = client.get(f"/mapping/draft-sessions/{draft_session_id}", headers=admin_headers())
+    list_response = client.get("/mapping/draft-sessions", headers=headers)
+    detail_response = client.get(f"/mapping/draft-sessions/{draft_session_id}", headers=headers)
 
     assert list_response.status_code == 200
     assert detail_response.status_code == 200
@@ -3040,6 +3043,56 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     assert detail["mapping_decision_audit"]["cust_id"]["workspace_id"] == "ws-customer-01"
     assert detail["version"] == 1
     assert detail["last_writer"] == "qa-user"
+
+
+def test_mapping_set_endpoints_reject_analyst_role() -> None:
+    settings.admin_api_token = "secret-token"
+
+    response = client.get("/mapping/sets", headers=role_headers("analyst-1", "analyst"))
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "One of the following roles is required: reviewer, steward, platform_admin."
+
+
+def test_draft_session_list_is_scoped_to_principal_actor() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    for principal_id in ("qa-user", "other-user"):
+        create_response = client.post(
+            "/mapping/draft-sessions",
+            json={
+                "name": f"draft-{principal_id}",
+                "created_by": principal_id,
+                "workspace_id": f"ws-{principal_id}",
+                "mapping_mode": "standard",
+                "active_workspace_section": "Review",
+                "source_handle": upload_payload["source"],
+                "target_handle": upload_payload["target"],
+                "mapping_editor_state": {},
+                "mapping_decision_audit": {},
+            },
+            headers=role_headers(principal_id, "analyst"),
+        )
+        assert create_response.status_code == 200
+
+    list_response = client.get("/mapping/draft-sessions", headers=role_headers("qa-user", "analyst"))
+
+    assert list_response.status_code == 200
+    listed = list_response.json()
+    assert len(listed) == 1
+    assert listed[0]["created_by"] == "qa-user"
 
 
 def test_canonical_draft_session_persists_workspace_target_context() -> None:
@@ -4953,3 +5006,10 @@ def admin_headers() -> dict[str, str]:
     if not settings.admin_api_token:
         return {}
     return {"X-Admin-Token": settings.admin_api_token}
+
+
+def role_headers(principal_id: str, *roles: str) -> dict[str, str]:
+    return {
+        "X-Principal-Id": principal_id,
+        "X-Principal-Roles": ", ".join(roles),
+    }

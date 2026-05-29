@@ -5,6 +5,22 @@ Ovaj dokument je strogo hronološki ledger isporučenih slice-ova i završenih t
 Za današnje stanje proizvoda koristi `current_state.md`.
 Za plan i backlog koristi `plan.md` i `epics.md`.
 
+## 2026-05-29
+
+### Documentation alignment, Workspace guidance hardening, and pilot RBAC bootstrap
+
+Isporučeno:
+
+- `README`, `PROJECT_OVERVIEW`, `project_docs/current_state.md`, `project_docs/plan.md` i `docs/README.md` usklađeni su sa realnim trenutnim stanjem proizvoda
+- dokumentacija sada eksplicitno opisuje minimalni `draft session` continuity slice umesto starog "još ne postoji" narativa
+- dokumentacija sada eksplicitno opisuje da postoji prvi pilot RBAC slice, ali ne i enterprise-wide RBAC za celu aplikaciju
+- `docs/reference/RBAC_ACTION_AND_ENDPOINT_MATRIX.md` dopunjen je current-state napomenom o implementiranom `mapping/draft-sessions*` i `mapping/sets*` role sloju
+- prezentacioni next-step narativ prebačen je na documentation -> manual proof -> live demo -> enterprise hardening redosled
+
+Ishod:
+
+- entry-point dokumenti, reference i stakeholder narrative sada pričaju istu priču o tome šta Semantra danas stvarno jeste, gde su joj granice i kojim redom ima smisla raditi sledeće korake
+
 ## 2026-05-02
 
 ### Epic 5 MVP: Canonical semantic layer

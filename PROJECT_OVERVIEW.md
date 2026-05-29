@@ -279,11 +279,12 @@ Main anchors:
 Current behavior:
 
 - browser session state is local UI state and is not automatically resumed across days
-- durable continuation is supported through explicit artifacts (saved mapping sets, exported/imported decision checkpoints)
+- durable continuation is supported through explicit artifacts (saved draft sessions, saved mapping sets, exported/imported decision checkpoints)
+- current draft-session restore is intentionally bounded to the stable workspace contract needed for review and decisions; generated outputs are rebuilt instead of blindly replayed
 
 Open productization task:
 
-- design a deliberate draft/resume model (scope, conflict handling, and audit semantics) before introducing auto-resume behavior
+- deepen the draft/resume model deliberately (scope, conflict handling, sharing, and audit semantics) before introducing auto-resume behavior
 
 ### 9. Enterprise Integration Catalog
 
@@ -352,6 +353,15 @@ Intentional distinction:
 - preview remains advisory so analysts can inspect behavior before final approval
 - durable artifact and execution-like surfaces remain governed
 
+## Authorization Model Today
+
+The current authorization posture is intentionally described as transitional rather than complete.
+
+- most protected governance and admin routes still use the existing binary `X-Admin-Token` guard
+- a minimal principal, role enum, and `require_roles()` layer now exists in the backend
+- that new RBAC bootstrap is currently applied only to `mapping/draft-sessions*` and `mapping/sets*`
+- this means Semantra now has a real pilot RBAC slice, but not yet a complete multi-role authorization model across the whole application
+
 ## Architecture Notes
 
 ### Backend
@@ -400,12 +410,12 @@ Not yet in current scope:
 
 ## Immediate Next Steps
 
-The next product wave should focus on:
+The next product wave should focus on proof, not feature sprawl:
 
-1. productizing the new bounded guidance surfaces so they read as one coherent user story across Workspace, Benchmarks, and Catalog
-2. expanding catalog and concept-level reuse discovery beyond the initial matrix and hint layer
-3. continuing pilot hardening through broader regression coverage and runtime discipline
-4. separating persistence/runtime concerns where current local assumptions are likely to age poorly
+1. keep the documentation aligned with the real current state of the product and its boundaries
+2. run manual pilot scenarios and proof-of-concept checks that show whether the current surface adds concrete value to analyst and governance workflows
+3. package those validated flows into stakeholder-facing presentations, repeatable live demos, and supporting artifacts
+4. only after that evidence is strong, decide which enterprise-wide investments should come next: broader RBAC, deeper persistence, runtime hardening, and wider operational packaging
 
 ## Recommended Reading Order
 

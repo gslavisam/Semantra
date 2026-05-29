@@ -4,7 +4,7 @@
 
 This document defines a practical pilot-validation sprint for the current Semantra product state.
 
-It is aligned to the product shape as of 2026-05-10:
+It is aligned to the product shape as of 2026-05-29:
 
 - `Workspace`
 - `Canonical Console`
@@ -12,7 +12,7 @@ It is aligned to the product shape as of 2026-05-10:
 - `Benchmarks`
 - `Admin / Debug`
 
-The goal is not to add new scope during the sprint. The goal is to validate whether the implemented product behaves correctly on realistic, sanitized project inputs and whether the current governance and reuse model is usable in real analyst work.
+The goal is not to add new scope during the sprint. The goal is to validate whether the implemented product behaves correctly on realistic, sanitized project inputs, whether the current governance and reuse model is usable in real analyst work, and whether the current product already demonstrates value worth presenting to the organization.
 
 ## What the Pilot Should Prove
 
@@ -23,6 +23,7 @@ At the end of the sprint, the team should be able to answer:
 3. Do governance gates behave correctly on saved artifacts?
 4. Is the Catalog useful as a reuse surface, not just as a metadata list?
 5. Does the Canonical Console support a practical stewardship loop on real findings?
+6. Which flows are strong enough today to become the primary proof-of-concept and live-demo story?
 
 ## Recommended Mode
 
@@ -38,6 +39,7 @@ Recommended rules:
 - allow bug fixes, diagnostics, hardening, and documentation corrections
 - save artifacts whenever a scenario reaches a stable review state
 - classify issues immediately as `blocker`, `important`, or `nice-to-have`
+- capture value evidence as explicitly as defects: reuse saved time, avoided remapping, clearer governance handoff, stronger benchmark explanation, or easier stakeholder explanation
 
 ## Environment Prerequisites
 
@@ -218,6 +220,7 @@ Use one record per executed scenario.
 - Expected behavior:
 - Screenshot or artifact reference:
 - Saved mapping set IDs or integration names:
+- Evidence of value to the organization:
 - Recommendation:
 ```
 
@@ -241,11 +244,13 @@ Treat the sprint as successful when all of the following are true:
 4. Catalog search/detail/reuse works on real saved artifacts
 5. Canonical Console stewardship actions are understandable and operable on real findings
 6. remaining open issues are mostly `important` or `nice-to-have`, not `blocker`
+7. at least one stable end-to-end story is strong enough to be reused in presentation and live-demo form without improvisation
 
 ## Recommended Next Step After the Pilot
 
 Once the sprint completes:
 
 1. fix blockers first
-2. run one focused hardening pass based only on pilot findings
-3. then decide whether the next priority is deeper concept/reuse discovery, operational hardening, or another bounded feature slice
+2. update the demo script, runbook, and presentation materials to use the strongest validated story
+3. run one focused hardening pass based only on pilot findings
+4. then decide whether the next priority is deeper concept/reuse discovery, operational hardening, or another bounded feature slice

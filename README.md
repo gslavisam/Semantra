@@ -189,8 +189,20 @@ Semantra today is not yet:
 Semantra currently treats browser session state as local UI state.
 
 - if the browser is closed, transient Workspace state is not automatically restored on the next day
-- continuing work is supported through explicit artifacts: saved mapping-set versions or exported mapping JSON/Excel
-- the next hardening step is to design a durable draft/resume model intentionally (scope, conflicts, audit), not as a quick auto-save patch
+- continuing work is supported through explicit persisted artifacts: saved draft sessions, saved mapping-set versions, and exported mapping JSON/Excel
+- current draft-session continuity is intentionally minimal: save, list, load, and bounded restore for the active review/decision contract
+- generated guidance, preview, codegen, and refinement outputs are still intentionally rebuilt instead of being blindly revived from an older UI session
+
+## Authorization Posture Today
+
+Semantra does not yet have enterprise-wide RBAC across the full product.
+
+- most protected governance and admin surfaces still use the existing `X-Admin-Token` model
+- a minimal principal plus role bootstrap now exists in the backend for the first pilot RBAC slice
+- that pilot slice currently covers only `mapping/draft-sessions*` and `mapping/sets*`
+- when no admin token is configured, the backend still allows a development-friendly fallback principal; that is useful for local work, not a production security posture
+
+For the detailed role and endpoint breakdown, see `docs/reference/RBAC_ACTION_AND_ENDPOINT_MATRIX.md`.
 
 ## Documentation Map
 
@@ -225,9 +237,9 @@ Supporting docs:
 
 ## Immediate Next Steps
 
-The next project focus is not more feature sprawl. It is:
+The next project focus is not more feature sprawl. It is validation and product proof:
 
-1. productizing the new bounded guidance surfaces so they are easier to discover and use consistently in pilot flows
-2. expanding catalog and concept-level reuse discovery beyond the initial slice
-3. continuing regression hardening and runtime discipline on the existing pilot surfaces
-4. separating persistence/runtime concerns where the current local model is starting to show strain
+1. keep the documentation fully aligned with the real current state of the product so pilot users, reviewers, and stakeholders all see the same truthful picture
+2. run more manual pilot flows and proof-of-concept checks that show where the product actually saves time, improves review quality, or increases reuse
+3. turn those runs into organization-facing evidence through presentations, live demos, screenshots, and repeatable runbooks
+4. only after that validation gate, decide which enterprise-wide hardening investments are justified next: broader RBAC, deeper persistence, longer-running job runtime, and wider productization

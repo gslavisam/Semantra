@@ -6,7 +6,8 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from app.api.deps import require_admin
+from app.api.deps import require_admin, require_roles
+from app.models.auth import AuthenticatedPrincipal, PrincipalRole
 from app.models.knowledge import SourceFieldHintRecord, SourceFieldHintUpsertRequest
 from app.models.mapping import (
     ArtifactRefinementRequest,
@@ -78,6 +79,35 @@ from app.services.virtual_target_service import (
 
 
 router = APIRouter(prefix="/mapping", tags=["mapping"])
+
+
+def _principal_actor_constraint(
+    principal: AuthenticatedPrincipal,
+    requested_actor: str | None,
+    *,
+    field_label: str,
+) -> str | None:
+    normalized_actor = str(requested_actor or "").strip() or None
+    if principal.is_platform_admin:
+        return normalized_actor
+    principal_actor = str(principal.user_id or "").strip()
+    if not principal_actor:
+        raise HTTPException(status_code=403, detail=f"{field_label} requires an authenticated principal id.")
+    if normalized_actor and normalized_actor != principal_actor:
+        raise HTTPException(status_code=403, detail=f"{field_label} must match the authenticated principal.")
+    return principal_actor
+
+
+def _principal_actor_value(
+    principal: AuthenticatedPrincipal,
+    requested_actor: str | None,
+    *,
+    field_label: str,
+) -> str | None:
+    constrained_actor = _principal_actor_constraint(principal, requested_actor, field_label=field_label)
+    if constrained_actor:
+        return constrained_actor
+    return str(principal.user_id or "").strip() or None
 
 
 def _blocked_output_decision_statuses(
@@ -663,56 +693,93 @@ async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> Artifac
     return result
 
 
-@router.post("/sets", response_model=MappingSetRecord, dependencies=[Depends(require_admin)])
-async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetRecord:
+@router.post("/sets", response_model=MappingSetRecord)
+async def create_mapping_set(
+    request: MappingSetCreateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> MappingSetRecord:
     """Persist a reviewed mapping set together with metadata and audit history."""
 
-    saved = mapping_governance_repository.save_mapping_set(
-        request.name,
-        request.mapping_decisions,
-        source_dataset_id=request.source_dataset_id,
-        target_dataset_id=request.target_dataset_id,
-        integration_name=request.integration_name,
-        source_system=request.source_system,
-        target_system=request.target_system,
-        business_domain=request.business_domain,
-        interface_type=request.interface_type,
-        description=request.description,
-        artifact_type=request.artifact_type,
-        canonical_concepts=request.canonical_concepts,
-        unmatched_sources=request.unmatched_sources,
-        created_by=request.created_by,
-        workspace_id=request.workspace_id,
-        note=request.note,
-        owner=request.owner,
-        assignee=request.assignee,
-        review_note=request.review_note,
+    normalized_request = request.model_copy(
+        update={
+            "created_by": _principal_actor_value(principal, request.created_by, field_label="Mapping set created_by"),
+        }
     )
-    append_mapping_set_audit("create", saved, changed_by=request.created_by, workspace_id=request.workspace_id, note=request.note)
+    saved = mapping_governance_repository.save_mapping_set(
+        normalized_request.name,
+        normalized_request.mapping_decisions,
+        source_dataset_id=normalized_request.source_dataset_id,
+        target_dataset_id=normalized_request.target_dataset_id,
+        integration_name=normalized_request.integration_name,
+        source_system=normalized_request.source_system,
+        target_system=normalized_request.target_system,
+        business_domain=normalized_request.business_domain,
+        interface_type=normalized_request.interface_type,
+        description=normalized_request.description,
+        artifact_type=normalized_request.artifact_type,
+        canonical_concepts=normalized_request.canonical_concepts,
+        unmatched_sources=normalized_request.unmatched_sources,
+        created_by=normalized_request.created_by,
+        workspace_id=normalized_request.workspace_id,
+        note=normalized_request.note,
+        owner=normalized_request.owner,
+        assignee=normalized_request.assignee,
+        review_note=normalized_request.review_note,
+    )
+    append_mapping_set_audit(
+        "create",
+        saved,
+        changed_by=normalized_request.created_by,
+        workspace_id=normalized_request.workspace_id,
+        note=normalized_request.note,
+    )
     return saved
 
 
-@router.post("/draft-sessions", response_model=DraftSessionRecord, dependencies=[Depends(require_admin)])
-async def create_draft_session(request: DraftSessionCreateRequest) -> DraftSessionRecord:
+@router.post("/draft-sessions", response_model=DraftSessionRecord)
+async def create_draft_session(
+    request: DraftSessionCreateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> DraftSessionRecord:
     """Persist one minimal durable workspace snapshot for later resume."""
 
-    if request.mapping_mode == "standard" and request.target_handle is None:
+    normalized_request = request.model_copy(
+        update={
+            "created_by": _principal_actor_value(principal, request.created_by, field_label="Draft session created_by"),
+        }
+    )
+    if normalized_request.mapping_mode == "standard" and normalized_request.target_handle is None:
         raise HTTPException(status_code=400, detail="Standard draft sessions require a target_handle snapshot.")
-    return draft_session_repository.save_draft_session(request)
+    return draft_session_repository.save_draft_session(normalized_request)
 
 
-@router.get("/draft-sessions", response_model=list[DraftSessionRecord], dependencies=[Depends(require_admin)])
-async def list_draft_sessions() -> list[DraftSessionRecord]:
+@router.get("/draft-sessions", response_model=list[DraftSessionRecord])
+async def list_draft_sessions(
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> list[DraftSessionRecord]:
     """List saved durable workspace snapshots available for resume."""
 
-    return draft_session_repository.list_draft_sessions()
+    draft_sessions = draft_session_repository.list_draft_sessions()
+    requested_actor = _principal_actor_constraint(principal, None, field_label="Draft session access")
+    if requested_actor is None:
+        return draft_sessions
+    return [draft_session for draft_session in draft_sessions if draft_session.created_by == requested_actor]
 
 
-@router.get("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+@router.get("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail)
 async def get_draft_session(
     draft_session_id: int,
     created_by: str | None = Query(default=None),
     workspace_id: str | None = Query(default=None),
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> DraftSessionDetail:
     """Return one saved durable workspace snapshot with its restore payload."""
 
@@ -726,20 +793,33 @@ async def get_draft_session(
         requested_workspace_id=workspace_id,
         action="resumed",
     )
+    requested_actor = _principal_actor_constraint(principal, created_by, field_label="Draft session created_by")
     _require_actor_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_actor=draft_session.created_by,
-        requested_actor=created_by,
+        requested_actor=requested_actor,
         action="resumed",
     )
     return draft_session
 
 
-@router.put("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
-async def update_draft_session(draft_session_id: int, request: DraftSessionUpdateRequest) -> DraftSessionDetail:
+@router.put("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail)
+async def update_draft_session(
+    draft_session_id: int,
+    request: DraftSessionUpdateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> DraftSessionDetail:
     """Update one durable draft workspace snapshot with optimistic concurrency semantics."""
 
-    if request.mapping_mode == "standard" and request.target_handle is None:
+    normalized_request = request.model_copy(
+        update={
+            "created_by": _principal_actor_value(principal, request.created_by, field_label="Draft session created_by"),
+            "last_writer": _principal_actor_value(principal, request.last_writer, field_label="Draft session last_writer"),
+        }
+    )
+    if normalized_request.mapping_mode == "standard" and normalized_request.target_handle is None:
         raise HTTPException(status_code=400, detail="Standard draft sessions require a target_handle snapshot.")
     try:
         current_detail = draft_session_repository.get_draft_session(draft_session_id)
@@ -748,17 +828,17 @@ async def update_draft_session(draft_session_id: int, request: DraftSessionUpdat
     _require_workspace_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_workspace_id=current_detail.workspace_id,
-        requested_workspace_id=request.workspace_id,
+        requested_workspace_id=normalized_request.workspace_id,
         action="saved",
     )
     _require_actor_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_actor=current_detail.created_by,
-        requested_actor=request.created_by,
+        requested_actor=normalized_request.created_by,
         action="saved",
     )
     try:
-        return draft_session_repository.update_draft_session(draft_session_id, request)
+        return draft_session_repository.update_draft_session(draft_session_id, normalized_request)
     except DraftSessionStaleWriteError as error:
         raise HTTPException(
             status_code=409,
@@ -770,13 +850,22 @@ async def update_draft_session(draft_session_id: int, request: DraftSessionUpdat
         ) from error
 
 
-@router.put("/draft-sessions/{draft_session_id}/decision-state", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+@router.put("/draft-sessions/{draft_session_id}/decision-state", response_model=DraftSessionDetail)
 async def update_draft_session_decision_state(
     draft_session_id: int,
     request: DraftSessionDecisionStateUpdateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> DraftSessionDetail:
     """Persist durable decision-state changes for an existing draft session."""
 
+    normalized_request = request.model_copy(
+        update={
+            "created_by": _principal_actor_value(principal, request.created_by, field_label="Draft session created_by"),
+            "last_writer": _principal_actor_value(principal, request.last_writer, field_label="Draft session last_writer"),
+        }
+    )
     try:
         current_detail = draft_session_repository.get_draft_session(draft_session_id)
     except KeyError as error:
@@ -785,23 +874,23 @@ async def update_draft_session_decision_state(
     _require_workspace_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_workspace_id=current_detail.workspace_id,
-        requested_workspace_id=request.workspace_id,
+        requested_workspace_id=normalized_request.workspace_id,
         action="saved",
     )
     _require_actor_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_actor=current_detail.created_by,
-        requested_actor=request.created_by,
+        requested_actor=normalized_request.created_by,
         action="saved",
     )
 
     merged_request = _draft_session_update_request(
         current_detail,
-        expected_version=request.expected_version,
-        last_writer=request.last_writer,
-        active_workspace_section=request.active_workspace_section,
-        mapping_editor_state=request.mapping_editor_state,
-        mapping_decision_audit=request.mapping_decision_audit,
+        expected_version=normalized_request.expected_version,
+        last_writer=normalized_request.last_writer,
+        active_workspace_section=normalized_request.active_workspace_section,
+        mapping_editor_state=normalized_request.mapping_editor_state,
+        mapping_decision_audit=normalized_request.mapping_decision_audit,
     )
     try:
         return draft_session_repository.update_draft_session(draft_session_id, merged_request)
@@ -816,13 +905,22 @@ async def update_draft_session_decision_state(
         ) from error
 
 
-@router.put("/draft-sessions/{draft_session_id}/review-state", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+@router.put("/draft-sessions/{draft_session_id}/review-state", response_model=DraftSessionDetail)
 async def update_draft_session_review_state(
     draft_session_id: int,
     request: DraftSessionReviewStateUpdateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.ANALYST, PrincipalRole.REVIEWER, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> DraftSessionDetail:
     """Persist durable review-state changes for an existing draft session."""
 
+    normalized_request = request.model_copy(
+        update={
+            "created_by": _principal_actor_value(principal, request.created_by, field_label="Draft session created_by"),
+            "last_writer": _principal_actor_value(principal, request.last_writer, field_label="Draft session last_writer"),
+        }
+    )
     try:
         current_detail = draft_session_repository.get_draft_session(draft_session_id)
     except KeyError as error:
@@ -831,22 +929,22 @@ async def update_draft_session_review_state(
     _require_workspace_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_workspace_id=current_detail.workspace_id,
-        requested_workspace_id=request.workspace_id,
+        requested_workspace_id=normalized_request.workspace_id,
         action="saved",
     )
     _require_actor_context_match(
         resource_ref=f"Draft session {draft_session_id}",
         current_actor=current_detail.created_by,
-        requested_actor=request.created_by,
+        requested_actor=normalized_request.created_by,
         action="saved",
     )
 
     merged_request = _draft_session_update_request(
         current_detail,
-        expected_version=request.expected_version,
-        last_writer=request.last_writer,
-        active_workspace_section=request.active_workspace_section,
-        review_state=request.review_state,
+        expected_version=normalized_request.expected_version,
+        last_writer=normalized_request.last_writer,
+        active_workspace_section=normalized_request.active_workspace_section,
+        review_state=normalized_request.review_state,
     )
     try:
         return draft_session_repository.update_draft_session(draft_session_id, merged_request)
@@ -861,51 +959,78 @@ async def update_draft_session_review_state(
         ) from error
 
 
-@router.get("/sets", response_model=list[MappingSetRecord], dependencies=[Depends(require_admin)])
-async def list_mapping_sets() -> list[MappingSetRecord]:
+@router.get("/sets", response_model=list[MappingSetRecord])
+async def list_mapping_sets(
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> list[MappingSetRecord]:
     """List persisted mapping sets available for governance and reuse."""
 
+    _ = principal
     return mapping_governance_repository.list_mapping_sets()
 
 
-@router.get("/sets/{mapping_set_id}", response_model=MappingSetDetail, dependencies=[Depends(require_admin)])
-async def get_mapping_set(mapping_set_id: int) -> MappingSetDetail:
+@router.get("/sets/{mapping_set_id}", response_model=MappingSetDetail)
+async def get_mapping_set(
+    mapping_set_id: int,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> MappingSetDetail:
     """Return one persisted mapping set with full decision and governance detail."""
 
+    _ = principal
     try:
         return mapping_governance_repository.get_mapping_set(mapping_set_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
-@router.post("/sets/{mapping_set_id}/status", response_model=MappingSetRecord, dependencies=[Depends(require_admin)])
+@router.post("/sets/{mapping_set_id}/status", response_model=MappingSetRecord)
 async def update_mapping_set_status(
     mapping_set_id: int,
     request: MappingSetStatusUpdateRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> MappingSetRecord:
     """Update governance status and ownership fields for one mapping set."""
 
+    normalized_request = request.model_copy(
+        update={
+            "changed_by": _principal_actor_value(principal, request.changed_by, field_label="Mapping set changed_by"),
+        }
+    )
     try:
         updated = mapping_governance_repository.update_mapping_set_status(
             mapping_set_id,
-            request.status,
-            owner=request.owner,
-            assignee=request.assignee,
-            review_note=request.review_note,
+            normalized_request.status,
+            owner=normalized_request.owner,
+            assignee=normalized_request.assignee,
+            review_note=normalized_request.review_note,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    append_mapping_set_audit("status_change", updated, changed_by=request.changed_by, note=request.note)
+    append_mapping_set_audit("status_change", updated, changed_by=normalized_request.changed_by, note=normalized_request.note)
     return updated
 
 
-@router.post("/sets/{mapping_set_id}/apply", response_model=MappingSetDetail, dependencies=[Depends(require_admin)])
+@router.post("/sets/{mapping_set_id}/apply", response_model=MappingSetDetail)
 async def apply_mapping_set(
     mapping_set_id: int,
     request: MappingSetApplyRequest,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> MappingSetDetail:
     """Mark an approved mapping set as applied for downstream workspace reuse flows."""
 
+    normalized_request = request.model_copy(
+        update={
+            "changed_by": _principal_actor_value(principal, request.changed_by, field_label="Mapping set changed_by"),
+        }
+    )
     try:
         mapping_set = mapping_governance_repository.get_mapping_set(mapping_set_id)
     except KeyError as error:
@@ -921,34 +1046,44 @@ async def apply_mapping_set(
     _require_workspace_context_match(
         resource_ref=f"Mapping set #{mapping_set_id}",
         current_workspace_id=mapping_set.workspace_id,
-        requested_workspace_id=request.workspace_id,
+        requested_workspace_id=normalized_request.workspace_id,
         action="applied",
     )
-    effective_workspace_id = request.workspace_id or mapping_set.workspace_id
+    effective_workspace_id = normalized_request.workspace_id or mapping_set.workspace_id
     append_mapping_set_audit(
         "apply",
         mapping_set,
-        changed_by=request.changed_by,
+        changed_by=normalized_request.changed_by,
         workspace_id=effective_workspace_id,
-        note=request.note,
+        note=normalized_request.note,
     )
     return mapping_set
 
 
-@router.get("/sets/{mapping_set_id}/audit", response_model=list[MappingSetAuditEntry], dependencies=[Depends(require_admin)])
-async def get_mapping_set_audit(mapping_set_id: int) -> list[MappingSetAuditEntry]:
+@router.get("/sets/{mapping_set_id}/audit", response_model=list[MappingSetAuditEntry])
+async def get_mapping_set_audit(
+    mapping_set_id: int,
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
+) -> list[MappingSetAuditEntry]:
     """Return the audit trail for one persisted mapping set."""
 
+    _ = principal
     return mapping_governance_repository.list_audit_logs(mapping_set_id)
 
 
-@router.get("/sets/{mapping_set_id}/diff", response_model=MappingSetDiffResponse, dependencies=[Depends(require_admin)])
+@router.get("/sets/{mapping_set_id}/diff", response_model=MappingSetDiffResponse)
 async def get_mapping_set_diff(
     mapping_set_id: int,
     against_id: int = Query(...),
+    principal: AuthenticatedPrincipal = Depends(
+        require_roles(PrincipalRole.REVIEWER, PrincipalRole.STEWARD, PrincipalRole.PLATFORM_ADMIN)
+    ),
 ) -> MappingSetDiffResponse:
     """Compare one mapping set against another persisted version."""
 
+    _ = principal
     try:
         return mapping_governance_repository.diff_mapping_sets(mapping_set_id, against_id)
     except KeyError as error:

@@ -279,13 +279,13 @@ Where the Product Goes Next
 
 **Slide bullets:**
 
-- deeper concept and reuse discovery
-- operational hardening
-- clearer lineage across saved integration families
-- further productization of pilot-complete governance flows
+- documentation aligned with the real current product
+- manual pilot proof and value validation
+- repeatable live demo and presentation discipline
+- enterprise-wide hardening only after proven value
 
 **Key message:**
-The next step is to deepen reuse and harden operations on top of an already working core product.
+The next step is to prove and package the value of the current product clearly before expanding it into a broader enterprise program.
 
 ---
 
@@ -310,8 +310,8 @@ Semantra is the foundation for reusable semantic integration knowledge under ana
 
 If a live demo is included, use this sequence:
 
-1. `Workspace > Setup` with one realistic input pair
-2. `Workspace > Review` to show trust layer and canonical path
-3. `Workspace > Decisions` to show manual control and mapping-set save
-4. `Catalog` to show search and `Reuse in Workspace`
-5. `Canonical Console` to show stewardship or overlay-promotion flow
+1. `Catalog` to show approved reuse
+2. `Workspace` to show draft-session continuity and active review context
+3. `Catalog` diff or stewardship handoff to show governed follow-up
+4. `Benchmarks` to show profile comparison and explanation
+5. use the broader `Workspace > Setup -> Review -> Decisions -> Output` walkthrough only as an extended technical appendix when the audience wants implementation depth

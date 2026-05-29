@@ -19,15 +19,48 @@ Semantra je stigla do pilot-ready faze za glavni analyst + governance tok i zatv
 - mapping set governance postoji i backend ga stvarno enforce-uje
 - canonical layer i knowledge overlay lifecycle postoje kao product surface, ne samo kao interni runtime
 - Canonical Console je pilot-complete za glavni stewardship happy path
-- dokumentacija je ponovo usklađena sa realnim stanjem proizvoda
+- dokumentacija treba da ostane stalno usklađena sa realnim stanjem proizvoda, jer je to trenutno veća vrednost od daljeg feature širenja
 
-Sledeći korak nije nasumično širenje u mnogo pravaca odjednom, već produktizacija novih guidance tokova uz jedan kontrolisan SAP-first knowledge i canonical coverage wave koji može kasnije da se proširi na druge sisteme.
+Sledeći korak nije nasumično širenje u mnogo pravaca odjednom. U ovoj fazi najveću vrednost ima da proizvod bude precizno dokumentovan, manuelno proveren, dokazano koristan u realnim tokovima i spreman za jasne prezentacije i ponovljive live demo prolaze. Tek posle toga ima smisla zatvarati širi enterprise-wide app talas.
 
 ## Prioritetni redosled rada
 
-### 1. Produktizacija bounded guidance površina
+### 1. Dokumentacija i truth-aligned product narrative
 
-Prvi sledeći fokus je da novi bounded AI/guidance layer izgleda kao konzistentna porodica funkcija, a ne kao skup izdvojenih eksperimenata.
+Prvi fokus je da svi glavni entry-point dokumenti pričaju istu, tačnu priču o tome šta proizvod danas jeste, šta još nije, i gde je trenutni dokaz vrednosti.
+
+Fokus:
+
+- držati `README`, `PROJECT_OVERVIEW`, `project_docs/current_state.md`, `project_docs/completed_slices.md` i relevantne reference dokumente u istom realnom stanju
+- jasno razdvojiti pilot-complete surface-e od otvorenih enterprise tema
+- dokumentovati ne samo capability-je, nego i boundary-je, enforcement model i known limitations
+- izbeći situaciju u kojoj je prezentaciona priča ispred stvarnog proizvoda ili obrnuto
+
+### 2. Manualno testiranje, proof of concept i value proof
+
+Drugi fokus je da se postojeći proizvod dokaže kroz realne prolaze, a ne da se prerano širi novim capability-jima.
+
+Fokus:
+
+- proći glavne analyst i governance tokove ručno više puta sa realističnim ulazima
+- potvrditi gde `Workspace`, `Catalog`, `Benchmarks` i `Canonical Console` zaista dodaju vrednost organizaciji
+- izdvojiti konkretne use case-eve gde proizvod skraćuje review, povećava reuse ili pojačava governance kontrolu
+- pretvoriti te nalaze u jasan proof-of-concept i dokaz poslovne vrednosti
+
+### 3. Prezentacije, demo assets i ponovljiv live demo
+
+Treći fokus je da validated product story bude lako prenosiva prema stakeholder-ima.
+
+Fokus:
+
+- ažurirati prezentacije, live demo runbook-e i asset mapu tako da prate stvarni current state
+- držati jedan glavni demo tok koji je pouzdan, vrednosno jasan i lako ponovljiv
+- koristiti screenshot, recording i runbook materijale kao dokaz da proizvod nije samo lokalni eksperiment
+- vezati prezentacionu priču za konkretne pilot nalaze i value proof, ne za buduće feature nade
+
+### 4. Produktizacija bounded guidance površina
+
+Ovaj fokus i dalje ima smisla, ali tek nakon što validation i demo sloj potvrde gde guidance stvarno pomaže.
 
 Fokus:
 
@@ -36,7 +69,7 @@ Fokus:
 - izbeći semantičko preklapanje između postojećeg trust layer-a i novih queue/explanation panela
 - zadržati pravilo da nijedna od ovih površina ne radi auto-apply ili auto-approval
 
-### 2. Session continuity and resume-by-design (ne uvoditi na brzinu)
+### 5. Session continuity and resume-by-design (ne uvoditi na brzinu)
 
 Sledeći UX/produkt fokus koji treba osmisliti pažljivo pre implementacije je nastavak rada nakon zatvaranja browser-a ili narednog dana.
 
@@ -48,7 +81,7 @@ Fokus:
 - uključiti decision/audit semantiku u resume tok da poreklo odluka ostane jasno
 - ažurirati `README`, `help`, `PROJECT_OVERVIEW` i `project_docs` zajedno sa implementacijom da behavior bude transparentan
 
-### 3. SAP-first knowledge expansion i canonical coverage wave
+### 6. SAP-first knowledge expansion i canonical coverage wave
 
 Posle poslednjih SAP mapping poboljšanja postalo je jasno da sledeći veliki kvalitetni dobitak više nije samo engine tuning, nego sistematsko širenje knowledge pokrivenosti i disciplinovano izvlačenje canonical gap-ova iz postojećih vendor specifikacija.
 
@@ -62,7 +95,7 @@ Fokus:
 
 Detaljniji radni okvir za ovaj talas je u `docs/vision/KNOWLEDGE_EXPANSION_WAVE.md`.
 
-### 4. Epic 13D: Concept and reuse discovery expansion
+### 7. Epic 13D: Concept and reuse discovery expansion
 
 Početni 13D discovery talas je zatvoren kroz concept-centric reuse pregled, viši discovery overview, reuse hint-ove i surfacing ponavljanih review gap-ova. Sada sledi širenje tog sloja.
 
@@ -73,7 +106,7 @@ Fokus:
 - povezivanje Catalog reuse discovery signala sa Workspace review i canonical gap radom
 - jači reuse narativ pre samog `Reuse in Workspace` koraka
 
-### 5. Operational hardening nad postojećim pilot površinama
+### 8. Operational hardening nad postojećim pilot površinama
 
 Ovo ostaje stalni paralelni fokus pre većeg feature širenja, ali sa jasnim Workspace-first prioritetom.
 
@@ -92,6 +125,16 @@ Fokus:
 - UX poliranje zasnovano na realnim Workspace pilot prolazima
 - session continuity, draft resume, reuse handoff i output generation tretirati kao produžetke Workspace toka, ne kao odvojene UX ostrvske površine
 
+Future external API integration smer:
+
+- pošto se zajedno sa aplikacijom podiže i backend API, treba planirati i spoljašnji integration-ready surface za klijente koji neće koristiti Streamlit UI nego direktno HTTP pozive
+- taj budući sloj ne treba da bude samo izlaganje internih workflow koraka jedan-po-jedan, nego tanak orchestration contract nad postojećim upload/profile/mapping capability-jima
+- dva glavna spoljašnja use-case-a koja vredi zatvoriti su:
+	- `source recordset/spec -> canonical concepts overview`
+	- `source + target -> flattened mapping overview` sa `source field`, `canonical concept`, `target field`, confidence procentima, signal breakdown-om i `LLM` odgovorom kada postoji
+- ciljni oblik ovog future slice-a treba da bude jedan ili mali broj stabilnih endpoint-a namenjenih integraciji, umesto da eksterni klijent mora da poznaje ceo interni Workspace/API workflow
+- ovaj pravac ima smisla tek kada pilot validation i value proof potvrde da surface treba produktizovati za širu sistemsku integraciju, a ne samo za lokalni analyst workflow
+
 Workspace copilot smer za sledeći UX/productization slice:
 
 - ne dodavati novi generički chat koji živi pored proizvoda, nego objediniti postojeće bounded `LLM` / `Fallback` capability-je u jedan stalno dostupan `Workspace Copilot` sloj unutar glavnog analyst toka
@@ -100,7 +143,7 @@ Workspace copilot smer za sledeći UX/productization slice:
 - copilot mora da ostane bounded, audit-friendly i bez auto-apply ponašanja; njegov posao je da skrati put do postojećih akcija i da objasni trenutno stanje bez izbacivanja korisnika u eksterni LLM interfejs
 - detaljniji UX model i tehnička mapa za ovaj smer su u `project_docs/workspace_copilot_concept.md`
 
-### 6. Persistence i runtime separation hardening
+### 9. Persistence i runtime separation hardening
 
 Prvi lokalni/pilot slice ovog fokusa je zatvoren. Sledeći rad ovde više nije osnovno razdvajanje, nego tek naredna faza kada se pojavi stvarna operativna potreba.
 
@@ -111,7 +154,7 @@ Fokus:
 - širiti DB-normalized read/write modele samo na nove governance/discovery surface-e koji pokažu realan query pressure, ne kao globalni persistence redesign
 - nastaviti postepeno odvajanje canonical authoring od runtime matching sloja tek kada bude potreban širi DB-only authoring model
 
-### 7. Epic 14A i 14B: performance i signal precomputation
+### 10. Epic 14A i 14B: performance i signal precomputation
 
 Kada reuse discovery i bounded guidance produktizacija budu stabilni, sledeći racionalan korak je ubrzanje i rasterećenje ranking toka.
 
@@ -121,7 +164,7 @@ Fokus:
 - stabilni precomputed signali
 - jasna granica između runtime scoring-a i keširanih slojeva
 
-### 8. Epic 12B: system-specific virtual targets
+### 11. Epic 12B: system-specific virtual targets
 
 Ovaj pravac ima smisla tek kada canonical coverage i governance disciplina budu dovoljno stabilni.
 
@@ -130,11 +173,11 @@ Pravilo:
 - canonical-only ostaje baza
 - system-specific virtual target ne sme da zamagli current canonical-first model
 
-### 9. Epic 9: data quality intelligence
+### 12. Epic 9: data quality intelligence
 
 Ovo ostaje važna, ali sledeća liga prioriteta. Treba ga uvoditi tek kada reuse i operational hardening budu dovoljno zatvoreni.
 
-### 10. Epic 15: derived graph layer
+### 13. Epic 15: derived graph layer
 
 Graph projekcija ostaje kasniji derived sloj. Ne uvoditi je pre nego što canonical, catalog i usage modeli sazru dovoljno da graf ima stabilan izvor.
 
