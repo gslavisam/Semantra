@@ -779,10 +779,13 @@ def render_llm_runtime_status() -> None:
     backend_build = str(config.get("backend_build", "")).strip() or "n/a"
     scoring_profile = str(config.get("scoring_profile", "balanced")).strip() or "balanced"
     tts_provider = str(config.get("tts_provider", "none")).strip() or "none"
+    tts_status = str(config.get("tts_status", "configured")).strip().lower() or "configured"
+    tts_status_detail = str(config.get("tts_status_detail", "")).strip()
     tts_timeout = config.get("tts_timeout_seconds", "?")
     tts_endpoint = str(config.get("lmstudio_tts_base_url", "")).strip()
     tts_model = str(config.get("lmstudio_orpheus_model", "")).strip() or "n/a"
     tts_voice = str(config.get("lmstudio_orpheus_voice", "")).strip() or "n/a"
+    tts_display_provider = "lmstudio" if tts_provider.lower().startswith("lmstudio") else tts_provider
 
     st.write("**Backend**")
     st.caption(f"Version: {app_version}")
@@ -809,10 +812,18 @@ def render_llm_runtime_status() -> None:
     st.write("**TTS**")
     if tts_provider.lower() == "none":
         st.info("TTS is currently disabled.")
+    elif tts_status == "reachable":
+        st.success(f"TTS reachable: {tts_display_provider} / {tts_model}")
+    elif tts_status == "misconfigured":
+        st.error(f"TTS reachable, but configured model is unavailable: {tts_display_provider} / {tts_model}")
+    elif tts_status == "unreachable":
+        st.error(f"TTS configured but unreachable: {tts_display_provider} / {tts_model}")
     elif tts_provider.lower().startswith("lmstudio"):
-        st.success(f"TTS configured: {tts_provider} / {tts_model}")
+        st.info(f"TTS configured: {tts_display_provider} / {tts_model}")
     else:
         st.info(f"TTS configured: {tts_provider}")
+    if tts_status_detail:
+        st.caption(tts_status_detail)
     if tts_provider.lower() != "none":
         if tts_provider.lower().startswith("lmstudio") and tts_endpoint:
             st.caption(f"TTS endpoint: {tts_endpoint}")

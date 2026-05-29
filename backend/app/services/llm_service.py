@@ -242,6 +242,76 @@ def summarize_llm_runtime() -> dict[str, object]:
     return snapshot
 
 
+def summarize_tts_runtime() -> dict[str, object]:
+    """Summarize configured TTS runtime reachability and model status for admin surfaces."""
+
+    provider_name = settings.tts_provider.strip().lower() or "none"
+    configured_model = settings.lmstudio_orpheus_model.strip() or "n/a"
+
+    snapshot: dict[str, object] = {
+        "tts_status": "disabled",
+        "tts_reachable": False,
+        "tts_status_detail": "TTS is disabled in backend configuration.",
+    }
+    if provider_name == "none":
+        return snapshot
+
+    snapshot.update(
+        {
+            "tts_status": "configured",
+            "tts_reachable": None,
+            "tts_status_detail": "TTS is configured, but live reachability is not verified for this provider.",
+        }
+    )
+
+    if not provider_name.startswith("lmstudio"):
+        return snapshot
+
+    probe_base_url = str(settings.lmstudio_tts_base_url or "").strip() or str(settings.lmstudio_base_url or "").strip()
+    provider = LMStudioProvider(model=settings.lmstudio_orpheus_model, base_url=probe_base_url)
+    probe_timeout = max(0.5, min(settings.tts_timeout_seconds, 2.0))
+    try:
+        available_models = provider.list_models(probe_timeout)
+    except Exception as error:
+        snapshot.update(
+            {
+                "tts_status": "unreachable",
+                "tts_reachable": False,
+                "tts_status_detail": f"{classify_llm_error(error)}: {error}",
+            }
+        )
+        return snapshot
+
+    if not configured_model or configured_model.lower() == "auto":
+        snapshot.update(
+            {
+                "tts_status": "reachable",
+                "tts_reachable": True,
+                "tts_status_detail": "LM Studio is reachable and at least one model is available for TTS.",
+            }
+        )
+        return snapshot
+
+    if configured_model in available_models:
+        snapshot.update(
+            {
+                "tts_status": "reachable",
+                "tts_reachable": True,
+                "tts_status_detail": "LM Studio is reachable and the configured TTS model is available.",
+            }
+        )
+        return snapshot
+
+    snapshot.update(
+        {
+            "tts_status": "misconfigured",
+            "tts_reachable": True,
+            "tts_status_detail": f"Configured TTS model '{configured_model}' is not currently reported by LM Studio.",
+        }
+    )
+    return snapshot
+
+
 @dataclass
 class GeminiProvider:
     """Google Gemini via its OpenAI-compatible /v1beta/openai/chat/completions endpoint.

@@ -44,6 +44,8 @@ def test_render_llm_runtime_status_shows_llm_and_tts_details(monkeypatch) -> Non
                 "llm_gate_min_score": 0.3,
                 "llm_gate_max_score": 0.75,
                 "tts_provider": "lmstudio_orpheus",
+                "tts_status": "reachable",
+                "tts_status_detail": "LM Studio is reachable and the configured TTS model is available.",
                 "tts_timeout_seconds": 300.0,
                 "lmstudio_tts_base_url": "http://127.0.0.1:1234",
                 "lmstudio_orpheus_model": "orpheus-3b-0.1-ft",
@@ -59,11 +61,12 @@ def test_render_llm_runtime_status_shows_llm_and_tts_details(monkeypatch) -> Non
 
     assert captured["subheader"] == ["Runtime"]
     assert "LLM reachable: lmstudio / gemma-4-e2b-it" in captured["success"]
-    assert "TTS configured: lmstudio_orpheus / orpheus-3b-0.1-ft" in captured["success"]
+    assert "TTS reachable: lmstudio / orpheus-3b-0.1-ft" in captured["success"]
     assert "Version: 0.1.0" in captured["caption"]
     assert "Build: abc123def456" in captured["caption"]
     assert "Scoring profile: balanced" in captured["caption"]
     assert "LLM endpoint: http://127.0.0.1:1234/v1/chat/completions" in captured["caption"]
+    assert "LM Studio is reachable and the configured TTS model is available." in captured["caption"]
     assert "TTS endpoint: http://127.0.0.1:1234" in captured["caption"]
     assert "TTS voice: tara | timeout=300.0s" in captured["caption"]
 
@@ -93,6 +96,39 @@ def test_render_llm_runtime_status_handles_disabled_tts(monkeypatch) -> None:
 
     assert "LLM is currently disabled." in captured["warning"]
     assert "TTS is currently disabled." in captured["info"]
+
+
+def test_render_llm_runtime_status_marks_unreachable_tts_as_error(monkeypatch) -> None:
+    fake_streamlit, captured = _fake_streamlit(
+        {
+            "admin_requirement": {"reachable": True, "requires_token": False},
+            "runtime_config_snapshot": {
+                "app_version": "0.1.0",
+                "backend_build": "abc123def456",
+                "scoring_profile": "balanced",
+                "llm_provider": "none",
+                "llm_model": "mock-validator",
+                "llm_status": "disabled",
+                "llm_gate_min_score": 0.3,
+                "llm_gate_max_score": 0.75,
+                "tts_provider": "lmstudio_orpheus",
+                "tts_status": "unreachable",
+                "tts_status_detail": "network_error: <urlopen error connection refused>",
+                "tts_timeout_seconds": 300.0,
+                "lmstudio_tts_base_url": "http://127.0.0.1:1234",
+                "lmstudio_orpheus_model": "orpheus-3b-0.1-ft",
+                "lmstudio_orpheus_voice": "tara",
+            },
+        }
+    )
+
+    monkeypatch.setattr(shared_views, "st", fake_streamlit)
+    monkeypatch.setattr(shared_views, "admin_token_required", lambda: False)
+
+    shared_views.render_llm_runtime_status()
+
+    assert "TTS configured but unreachable: lmstudio / orpheus-3b-0.1-ft" in captured["error"]
+    assert "network_error: <urlopen error connection refused>" in captured["caption"]
 
 
 def test_workspace_copilot_sidebar_context_summarizes_workspace_state() -> None:

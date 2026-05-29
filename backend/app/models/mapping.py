@@ -1260,6 +1260,9 @@ class RuntimeConfigSnapshot(BaseModel):
     llm_reachable: bool | None = None
     llm_status_detail: str = ""
     llm_resolved_model: str = ""
+    tts_status: str = "configured"
+    tts_reachable: bool | None = None
+    tts_status_detail: str = ""
     embedding_provider: str
     cors_origins: list[str] = Field(default_factory=list)
     sqlite_path: str

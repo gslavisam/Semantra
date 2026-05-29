@@ -4364,6 +4364,8 @@ def test_admin_guard_allows_sensitive_endpoints_with_correct_token() -> None:
     payload = response.json()
     assert "llm_provider" in payload
     assert "tts_provider" in payload
+    assert "tts_status" in payload
+    assert "tts_status_detail" in payload
     assert "lmstudio_tts_base_url" in payload
     assert payload["dbt_materialization"] == "view"
     assert payload["dbt_source_mode"] == "ref"

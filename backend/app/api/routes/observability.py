@@ -18,7 +18,7 @@ from app.models.mapping import (
 )
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
-from app.services.llm_service import summarize_llm_runtime
+from app.services.llm_service import summarize_llm_runtime, summarize_tts_runtime
 from app.services.mapping_service import SCORING_PROFILES, normalize_scoring_profile_name
 from app.services.mapping_job_service import mapping_job_store
 from app.services.persistence_service import persistence_service
@@ -33,6 +33,7 @@ def _runtime_config_snapshot_response() -> RuntimeConfigSnapshot:
     snapshot = settings_snapshot()
     snapshot["available_scoring_profiles"] = sorted(SCORING_PROFILES)
     snapshot.update(summarize_llm_runtime())
+    snapshot.update(summarize_tts_runtime())
     return RuntimeConfigSnapshot.model_validate(snapshot)
 
 

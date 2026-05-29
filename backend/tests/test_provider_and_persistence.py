@@ -5,13 +5,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import URLError
 
 from app.core.config import reload_settings, settings
 from app.models.knowledge import KnowledgeAuditEntry, KnowledgeOverlayEntry
 from app.models.mapping import DecisionLogEntry, EvaluationMetrics, ReusableCorrectionRule, TransformationTestCase, UserCorrectionEntry
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
-from app.services.llm_service import LMStudioProvider, OllamaProvider, OpenAIResponsesProvider, build_provider_from_settings, summarize_llm_runtime
+from app.services.llm_service import (
+    LMStudioProvider,
+    OllamaProvider,
+    OpenAIResponsesProvider,
+    build_provider_from_settings,
+    summarize_llm_runtime,
+    summarize_tts_runtime,
+)
 from app.services.persistence_service import persistence_service
 
 
@@ -151,6 +159,53 @@ def test_summarize_llm_runtime_reports_missing_lmstudio_model() -> None:
         assert snapshot["llm_resolved_model"] == "nvidia/nemotron-3-nano-4b"
     finally:
         settings.llm_provider, settings.llm_model, settings.lmstudio_base_url = previous
+
+
+def test_summarize_tts_runtime_reports_unreachable_lmstudio() -> None:
+    previous = (settings.tts_provider, settings.lmstudio_orpheus_model, settings.lmstudio_tts_base_url, settings.tts_timeout_seconds)
+    settings.tts_provider = "lmstudio_orpheus"
+    settings.lmstudio_orpheus_model = "orpheus-3b-0.1-ft"
+    settings.lmstudio_tts_base_url = "http://127.0.0.1:1234"
+    settings.tts_timeout_seconds = 30.0
+    try:
+        with patch("app.services.llm_service.request.urlopen", side_effect=URLError("connection refused")):
+            snapshot = summarize_tts_runtime()
+
+        assert snapshot["tts_status"] == "unreachable"
+        assert snapshot["tts_reachable"] is False
+        assert "network_error" in snapshot["tts_status_detail"]
+    finally:
+        (
+            settings.tts_provider,
+            settings.lmstudio_orpheus_model,
+            settings.lmstudio_tts_base_url,
+            settings.tts_timeout_seconds,
+        ) = previous
+
+
+def test_summarize_tts_runtime_reports_missing_orpheus_model() -> None:
+    previous = (settings.tts_provider, settings.lmstudio_orpheus_model, settings.lmstudio_tts_base_url, settings.tts_timeout_seconds)
+    settings.tts_provider = "lmstudio_orpheus"
+    settings.lmstudio_orpheus_model = "orpheus-3b-0.1-ft"
+    settings.lmstudio_tts_base_url = "http://127.0.0.1:1234"
+    settings.tts_timeout_seconds = 30.0
+    try:
+        with patch(
+            "app.services.llm_service.request.urlopen",
+            return_value=FakeHTTPResponse({"data": [{"id": "gemma-4-e2b-it"}]}),
+        ):
+            snapshot = summarize_tts_runtime()
+
+        assert snapshot["tts_status"] == "misconfigured"
+        assert snapshot["tts_reachable"] is True
+        assert "Configured TTS model 'orpheus-3b-0.1-ft'" in snapshot["tts_status_detail"]
+    finally:
+        (
+            settings.tts_provider,
+            settings.lmstudio_orpheus_model,
+            settings.lmstudio_tts_base_url,
+            settings.tts_timeout_seconds,
+        ) = previous
 
 
 def test_openai_compatible_provider_omits_authorization_when_api_key_is_empty() -> None:
