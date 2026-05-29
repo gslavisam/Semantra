@@ -21,6 +21,7 @@ from app.services.mapping_service import (
 )
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.services.profiling_service import build_schema_profile
 from app.services.virtual_target_service import build_virtual_target_schema
 from app.utils.normalization import semantic_token_set
 
@@ -70,6 +71,36 @@ def test_mapping_prefers_phone_pattern_when_name_is_weak() -> None:
     assert result.mappings[0].target == "phone_number"
     assert any("Strong pattern alignment" in line for line in result.mappings[0].explanation)
     assert result.ranked_mappings[0].candidates[0].target == "phone_number"
+
+
+def test_mapping_returns_no_match_when_closed_set_is_only_weak_candidates() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=2,
+        columns=[make_column("NAME1", ["text"], ["Acme GmbH", "Contoso AG"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=2,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1000", "2000"]),
+            make_column("customer_email", ["email"], ["ana@example.com", "bob@example.com"]),
+            make_column("phone_number", ["phone"], ["0641234567", "0659998888"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema, write_decision_log=False)
+
+    assert result.mappings[0].target is None
+    assert result.mappings[0].method == "closed_set_no_match"
+    assert result.mappings[0].confidence == 0.0
+    assert result.ranked_mappings[0].selected is not None
+    assert result.ranked_mappings[0].selected.target is None
+    assert result.ranked_mappings[0].candidates[0].target == "phone_number"
+    assert result.ranked_mappings[0].candidates[0].confidence < settings.medium_confidence_threshold
+    assert any("No candidate in the closed target set cleared the minimum confidence gate" in line for line in result.mappings[0].explanation)
 
 
 def test_mapping_uses_synonym_enrichment_for_email_fields() -> None:
@@ -648,6 +679,23 @@ def test_canonical_glossary_influences_mapping_for_business_concepts() -> None:
     assert result.mappings[0].canonical_details.shared_concepts[0].concept_id == "customer.id"
     assert result.mappings[0].canonical_details.shared_concepts[0].display_name == "Customer ID"
     assert any("Canonical glossary aligns both fields to business concept 'Customer ID'" in line for line in result.mappings[0].explanation)
+
+
+def test_canonical_virtual_target_prefers_core_customer_id_for_sold_to_party_alias() -> None:
+    source_schema = build_schema_profile(
+        [{"sold_to_party": "C001"}, {"sold_to_party": "C002"}],
+        dataset_id="source",
+        dataset_name="source.csv",
+    )
+
+    result = generate_mapping_candidates(
+        source_schema,
+        build_virtual_target_schema("canonical"),
+        llm_provider=None,
+        write_decision_log=False,
+    )
+
+    assert result.mappings[0].target == "customer.id"
 
 
 def test_canonical_coverage_reports_matched_and_unmatched_columns() -> None:

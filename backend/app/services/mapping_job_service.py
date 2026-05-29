@@ -5,7 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Protocol
 from uuid import uuid4
 
@@ -17,6 +17,7 @@ MAX_ACTIVITY_LINES = 500
 MAX_ACTIVE_JOBS = 4
 MAX_FINISHED_JOBS = 32
 FINISHED_JOB_TTL_SECONDS = 15 * 60
+MAPPING_JOB_LEASE_SECONDS = 30
 ACTIVE_JOB_STATUSES = {"queued", "running", "cancel_requested"}
 FINISHED_JOB_STATUSES = {"completed", "failed", "canceled"}
 
@@ -43,7 +44,14 @@ class MappingJob:
     """Runtime record for one async mapping job."""
 
     job_id: str
+    created_by: str | None = None
+    workspace_id: str | None = None
+    worker_id: str | None = None
     status: str = "queued"
+    claimed_at: str | None = None
+    heartbeat_at: str | None = None
+    lease_expires_at: str | None = None
+    recovery_signal: str | None = None
     activity: list[str] = field(default_factory=list)
     response: AutoMappingResponse | None = None
     error: str | None = None
@@ -130,7 +138,7 @@ class SQLiteMappingJobStateStore:
     """SQLite-backed status and progress persistence for mapping jobs."""
 
     storage_mode = "sqlite_status"
-    restart_safe = False
+    restart_safe = True
     cross_process_safe = False
 
     def __init__(self) -> None:
@@ -139,7 +147,14 @@ class SQLiteMappingJobStateStore:
     def save_job(self, job: MappingJob) -> None:
         persistence_service.save_mapping_job(
             job_id=job.job_id,
+            created_by=job.created_by,
+            workspace_id=job.workspace_id,
+            worker_id=job.worker_id,
             status=job.status,
+            claimed_at=job.claimed_at,
+            heartbeat_at=job.heartbeat_at,
+            lease_expires_at=job.lease_expires_at,
+            recovery_signal=job.recovery_signal,
             created_at=job.created_at,
             updated_at=job.updated_at,
             created_at_monotonic=job.created_at_monotonic,
@@ -157,7 +172,14 @@ class SQLiteMappingJobStateStore:
             raise KeyError(job_id)
         return MappingJob(
             job_id=payload["job_id"],
+            created_by=payload.get("created_by"),
+            workspace_id=payload.get("workspace_id"),
+            worker_id=payload.get("worker_id"),
             status=payload["status"],
+            claimed_at=payload.get("claimed_at"),
+            heartbeat_at=payload.get("heartbeat_at"),
+            lease_expires_at=payload.get("lease_expires_at"),
+            recovery_signal=payload.get("recovery_signal"),
             activity=persistence_service.list_mapping_job_events(job_id, limit=MAX_ACTIVITY_LINES),
             response=payload["response"],
             error=payload["error"],
@@ -176,7 +198,14 @@ class SQLiteMappingJobStateStore:
             jobs.append(
                 MappingJob(
                     job_id=payload["job_id"],
+                    created_by=payload.get("created_by"),
+                    workspace_id=payload.get("workspace_id"),
+                    worker_id=payload.get("worker_id"),
                     status=payload["status"],
+                    claimed_at=payload.get("claimed_at"),
+                    heartbeat_at=payload.get("heartbeat_at"),
+                    lease_expires_at=payload.get("lease_expires_at"),
+                    recovery_signal=payload.get("recovery_signal"),
                     response=payload["response"],
                     error=payload["error"],
                     created_at=payload["created_at"],
@@ -244,7 +273,7 @@ class MappingJobStore:
             return self._state_store._jobs
         raise AttributeError("The configured mapping job store does not expose an in-memory _jobs dictionary.")
 
-    def start(self, worker) -> MappingJob:
+    def start(self, worker, *, created_by: str | None = None, workspace_id: str | None = None) -> MappingJob:
         """Create and launch one background mapping job for the supplied worker callback."""
 
         with self._lock:
@@ -254,7 +283,7 @@ class MappingJobStore:
                 raise MappingJobCapacityError(
                     f"Too many active mapping jobs ({active_jobs}/{MAX_ACTIVE_JOBS}). Try again after current jobs finish."
                 )
-            job = MappingJob(job_id=uuid4().hex)
+            job = MappingJob(job_id=uuid4().hex, created_by=created_by, workspace_id=workspace_id)
             self._state_store.save_job(job)
 
         thread = threading.Thread(target=self._run_worker, args=(job.job_id, worker), daemon=True)
@@ -330,6 +359,7 @@ class MappingJobStore:
             self.append_activity(job_id, "Mapping job canceled before execution started.")
             self._set_status(job_id, "canceled")
             return
+        self._claim_job(job_id)
         self._set_status(job_id, "running")
         self.append_activity(job_id, "Mapping job started.")
         try:
@@ -385,8 +415,14 @@ class MappingJobStore:
             self._state_store.save_job(job)
 
     def _touch_job_locked(self, job: MappingJob) -> None:
-        job.updated_at = datetime.now(UTC).isoformat()
+        now = datetime.now(UTC)
+        job.updated_at = now.isoformat()
         job.updated_at_monotonic = time.monotonic()
+        if job.worker_id and job.status in ACTIVE_JOB_STATUSES:
+            job.heartbeat_at = now.isoformat()
+            job.lease_expires_at = (now + timedelta(seconds=MAPPING_JOB_LEASE_SECONDS)).isoformat()
+        elif job.status in FINISHED_JOB_STATUSES:
+            job.lease_expires_at = None
 
     def _append_activity_locked(self, job: MappingJob, message: str) -> None:
         line = f"{datetime.now(UTC).strftime('%H:%M:%S')} | {message}"
@@ -399,10 +435,31 @@ class MappingJobStore:
         return MappingJobStatusResponse(
             job_id=job.job_id,
             status=job.status,
+            created_by=job.created_by,
+            workspace_id=job.workspace_id,
+            worker_id=job.worker_id,
+            claimed_at=job.claimed_at,
+            heartbeat_at=job.heartbeat_at,
+            lease_expires_at=job.lease_expires_at,
+            recovery_signal=job.recovery_signal,
             activity=list(job.activity),
             response=job.response,
             error=job.error,
         )
+
+    def _claim_job(self, job_id: str) -> None:
+        with self._lock:
+            job = self._state_store.get_job(job_id)
+            now = datetime.now(UTC)
+            if job.worker_id is None:
+                job.worker_id = f"local-thread:{threading.current_thread().name}"
+            if job.claimed_at is None:
+                job.claimed_at = now.isoformat()
+            job.heartbeat_at = now.isoformat()
+            job.lease_expires_at = (now + timedelta(seconds=MAPPING_JOB_LEASE_SECONDS)).isoformat()
+            job.recovery_signal = None
+            self._touch_job_locked(job)
+            self._state_store.save_job(job)
 
     def _make_progress_callback(self, job_id: str):
         def callback(message: str) -> None:

@@ -38,7 +38,10 @@ def test_canonical_mapping_endpoint_maps_source_to_canonical_concept() -> None:
 
     response = client.post(
         "/mapping/canonical",
-        json={"source_dataset_id": upload_response.json()["dataset_id"]},
+        json={
+            "source_dataset_id": upload_response.json()["dataset_id"],
+            "use_llm": False,
+        },
     )
 
     assert response.status_code == 200
@@ -279,6 +282,57 @@ def test_mapping_target_fields_endpoint_returns_virtual_canonical_targets() -> N
     payload = response.json()
     assert isinstance(payload, list)
     assert "customer.id" in payload
+
+
+def test_mapping_target_fields_endpoint_supports_target_aware_sap_projection() -> None:
+    response = client.get(
+        "/mapping/target-fields",
+        params={"target_system": "sap"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert isinstance(payload, list)
+    assert "customer.id" in payload
+
+
+def test_mapping_target_intents_endpoint_lists_supported_options() -> None:
+    response = client.get("/mapping/target-intents")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["target_system"] for item in payload] == ["canonical", "sap"]
+    assert payload[1]["projection_mode"] == "target_aware_canonical"
+
+
+def test_canonical_mapping_endpoint_reports_target_aware_sap_runtime_metadata() -> None:
+    upload_response = client.post(
+        "/upload/handle",
+        files={
+            "file": (
+                "source.csv",
+                csv_bytes("kunnr\nC001\nC002\n"),
+                "text/csv",
+            )
+        },
+    )
+    assert upload_response.status_code == 200
+
+    response = client.post(
+        "/mapping/canonical",
+        json={
+            "source_dataset_id": upload_response.json()["dataset_id"],
+            "target_system": "sap",
+            "use_llm": False,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["mapping_runtime"]["target_system"] == "sap"
+    assert payload["mapping_runtime"]["target_profile"] == "sap_customer_master"
+    assert payload["mapping_runtime"]["target_projection_mode"] == "target_aware_canonical"
+    assert payload["mappings"][0]["target"] == "customer.id"
 
 
 def test_codegen_endpoint_allows_needs_review_when_explicitly_enabled() -> None:

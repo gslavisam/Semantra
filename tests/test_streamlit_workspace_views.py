@@ -5,6 +5,12 @@ from types import SimpleNamespace
 
 from streamlit_ui.workspace_views import (
     WORKSPACE_SECTIONS,
+    _workspace_copilot_context,
+    _workspace_copilot_decisions_result,
+    _workspace_copilot_handoff,
+    _workspace_copilot_output_result,
+    _workspace_copilot_review_result,
+    _workspace_copilot_setup_result,
     poll_mapping_job,
     default_llm_validation_enabled,
     _workspace_codegen_action_label,
@@ -148,6 +154,113 @@ def test_resolve_active_workspace_section_defaults_to_setup_for_unknown_state() 
 
     assert resolve_active_workspace_section(session_state) == WORKSPACE_SECTIONS[0]
     assert session_state["active_workspace_section"] == "Setup"
+
+
+def test_workspace_copilot_context_reads_workspace_state() -> None:
+    context = _workspace_copilot_context(
+        {
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+                "phone": {"target": "phone_number", "status": "needs_review"},
+            },
+            "llm_decision_proposals": [{"source": "phone"}],
+            "runtime_config_snapshot": {"llm_provider": "lmstudio", "llm_status": "reachable", "llm_resolved_model": "gemma"},
+        },
+        selected_workspace_section="Review",
+        upload_response={"mapping_mode": "canonical", "target_system": "sap"},
+        mapping_response={"mapping_runtime": {"target_system": "sap", "target_projection_mode": "target_aware_canonical"}},
+        preview_response=None,
+        codegen_response=None,
+    )
+
+    assert context["section"] == "Review"
+    assert context["active_decisions"] == 2
+    assert context["accepted_items"] == 1
+    assert context["open_review_items"] == 1
+    assert context["pending_proposals"] == 1
+    assert context["target_intent"] == "SAP"
+    assert context["runtime_level"] == "ready"
+
+
+def test_workspace_copilot_output_result_reports_codegen_blocker() -> None:
+    result = _workspace_copilot_output_result(
+        {
+            "mapping_ready": True,
+        },
+        [{"source": "phone", "status": "needs_review"}],
+        "pandas",
+    )
+
+    assert result["level"] == "warning"
+    assert "blocked until all active mapping decisions are accepted" in result["answer"]
+    assert any("Accept or close remaining review statuses" in item for item in result["next_actions"])
+
+
+def test_workspace_copilot_decisions_result_reports_open_items() -> None:
+    result = _workspace_copilot_decisions_result(
+        {
+            "mapping_ready": True,
+            "open_review_items": 2,
+            "pending_proposals": 1,
+        }
+    )
+
+    assert result["level"] == "warning"
+    assert "2 review item(s) and 1 pending proposal(s)" in result["answer"]
+    assert result["handoff_actions"][0]["target_section"] == "Review"
+
+
+def test_workspace_copilot_setup_result_offers_review_handoff_when_mapping_ready() -> None:
+    result = _workspace_copilot_setup_result({"has_upload": True, "mapping_ready": True})
+
+    assert result["level"] == "success"
+    assert result["handoff_actions"][0]["target_section"] == "Review"
+
+
+def test_workspace_copilot_handoff_sets_workspace_pending_state(monkeypatch: pytest.MonkeyPatch) -> None:
+    from streamlit_ui import workspace_views
+
+    rerun_called = {"value": False}
+
+    monkeypatch.setattr(
+        workspace_views,
+        "st",
+        SimpleNamespace(
+            session_state={},
+            rerun=lambda: rerun_called.__setitem__("value", True),
+        ),
+    )
+
+    _workspace_copilot_handoff(
+        workspace_views.st.session_state,
+        target_section="Decisions",
+        message="Workspace Copilot handoff -> Decisions.",
+    )
+
+    assert workspace_views.st.session_state["pending_top_level_area"] == "Workspace"
+    assert workspace_views.st.session_state["pending_workspace_section"] == "Decisions"
+    assert workspace_views.st.session_state["active_workspace_section"] == "Decisions"
+    assert rerun_called["value"] is True
+
+
+def test_workspace_copilot_review_result_reuses_existing_summary_request() -> None:
+    session_state = {"mapping_response": {"mappings": []}}
+
+    result = _workspace_copilot_review_result(
+        session_state,
+        lambda: {
+            "overall_mapping_health": {
+                "accepted_count": 3,
+                "needs_review_count": 1,
+                "unmatched_count": 0,
+                "summary": "Most mappings are stable, with one field still needing review.",
+            }
+        },
+    )
+
+    assert result["level"] == "success"
+    assert result["answer"] == "Most mappings are stable, with one field still needing review."
+    assert session_state["mapping_analysis_summary"]["overall_mapping_health"]["accepted_count"] == 3
 
 
 def test_poll_mapping_job_raises_on_canceled_status() -> None:

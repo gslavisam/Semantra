@@ -354,11 +354,16 @@ def test_auto_map_job_reports_progress_activity() -> None:
             "source_dataset_id": payload["source"]["dataset_id"],
             "target_dataset_id": payload["target"]["dataset_id"],
             "use_llm": False,
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
         },
     )
 
     assert start_response.status_code == 200
-    job_id = start_response.json()["job_id"]
+    start_payload = start_response.json()
+    job_id = start_payload["job_id"]
+    assert start_payload["created_by"] == "qa-user"
+    assert start_payload["workspace_id"] == "ws-customer-01"
 
     status_payload = None
     for _ in range(50):
@@ -371,6 +376,8 @@ def test_auto_map_job_reports_progress_activity() -> None:
 
     assert status_payload is not None
     assert status_payload["status"] == "completed"
+    assert status_payload["created_by"] == "qa-user"
+    assert status_payload["workspace_id"] == "ws-customer-01"
     assert any("Ranking 1/2: client_mail" in line for line in status_payload["activity"])
     assert any("Selected 1/2: client_mail" in line for line in status_payload["activity"])
     mappings = {item["source"]: item["target"] for item in status_payload["response"]["mappings"]}
@@ -447,20 +454,56 @@ def test_auto_map_job_returns_429_when_job_capacity_is_reached() -> None:
 
 def test_cancel_mapping_job_endpoint_returns_cancel_requested_status() -> None:
     with patch(
+        "app.api.routes.mapping.mapping_job_store.get_status",
+        return_value=MappingJobStatusResponse(
+            job_id="job-123",
+            status="running",
+            created_by="qa-user",
+            workspace_id="ws-customer-01",
+            activity=[],
+            response=None,
+            error=None,
+        ),
+    ), patch(
         "app.api.routes.mapping.mapping_job_store.cancel",
         return_value=MappingJobStatusResponse(
             job_id="job-123",
             status="cancel_requested",
+            created_by="qa-user",
+            workspace_id="ws-customer-01",
             activity=["12:00:00 | Cancellation requested; the current step will stop at the next progress checkpoint."],
             response=None,
             error=None,
         ),
     ):
-        response = client.post("/mapping/jobs/job-123/cancel")
+        response = client.post("/mapping/jobs/job-123/cancel", json={"created_by": "qa-user", "workspace_id": "ws-customer-01"})
 
     assert response.status_code == 200
     assert response.json()["status"] == "cancel_requested"
     assert "Cancellation requested" in response.json()["activity"][0]
+
+
+def test_cancel_mapping_job_endpoint_rejects_cross_workspace_cancel_requests() -> None:
+    with patch(
+        "app.api.routes.mapping.mapping_job_store.get_status",
+        return_value=MappingJobStatusResponse(
+            job_id="job-123",
+            status="running",
+            created_by="qa-user",
+            workspace_id="ws-customer-01",
+            activity=[],
+            response=None,
+            error=None,
+        ),
+    ), patch("app.api.routes.mapping.mapping_job_store.cancel") as cancel_mock:
+        response = client.post("/mapping/jobs/job-123/cancel", json={"created_by": "qa-user", "workspace_id": "ws-other-02"})
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "Mapping job job-123 belongs to workspace 'ws-customer-01' and cannot be canceled from workspace 'ws-other-02'."
+    )
+    cancel_mock.assert_not_called()
 
 
 def test_mapping_job_runtime_status_endpoint_reports_capacity_contract() -> None:
@@ -469,7 +512,7 @@ def test_mapping_job_runtime_status_endpoint_reports_capacity_contract() -> None
     assert response.status_code == 200
     payload = response.json()
     assert payload["storage_mode"] == "sqlite_status"
-    assert payload["restart_safe"] is False
+    assert payload["restart_safe"] is True
     assert payload["cross_process_safe"] is False
     assert payload["max_active_jobs"] == 4
     assert payload["max_finished_jobs"] == 32
@@ -2775,6 +2818,7 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
                 {"source": "phone", "target": "phone_number", "status": "needs_review"},
             ],
             "created_by": "demo-user",
+            "workspace_id": "ws-customer-01",
             "note": "Initial draft",
             "owner": "governance-team",
             "assignee": "analyst-1",
@@ -2788,6 +2832,7 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     mapping_set_id = created["mapping_set_id"]
     assert created["status"] == "draft"
     assert created["version"] == 1
+    assert created["workspace_id"] == "ws-customer-01"
 
     list_response = client.get("/mapping/sets", headers=admin_headers())
     detail_response = client.get(f"/mapping/sets/{mapping_set_id}", headers=admin_headers())
@@ -2823,12 +2868,14 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     audits = audit_response.json()
 
     assert listed[0]["mapping_set_id"] == mapping_set_id
+    assert listed[0]["workspace_id"] == "ws-customer-01"
     assert detail["mapping_decisions"][0]["target"] == "customer_id"
     assert detail["decision_count"] == 2
     assert detail["integration_name"] == "Customer Master Sync"
     assert detail["artifact_type"] == "standard"
     assert detail["canonical_concepts"] == ["customer.id", "customer.phone"]
     assert detail["unmatched_sources"] == ["country_code"]
+    assert detail["workspace_id"] == "ws-customer-01"
     assert detail["owner"] == "governance-team"
     assert detail["assignee"] == "analyst-1"
     assert detail["review_note"] == "Prepared for governance review"
@@ -2836,10 +2883,60 @@ def test_mapping_set_endpoints_save_list_load_status_and_audit() -> None:
     assert updated["assignee"] == "analyst-2"
     assert updated["review_note"] == "Approved for reuse"
     assert applied["mapping_set_id"] == mapping_set_id
+    assert applied["workspace_id"] == "ws-customer-01"
     assert audits[0]["action"] == "apply"
+    assert audits[0]["workspace_id"] == "ws-customer-01"
     assert audits[0]["created_at"] is not None
     assert audits[1]["action"] == "status_change"
     assert audits[-1]["action"] == "create"
+    assert audits[-1]["workspace_id"] == "ws-customer-01"
+
+
+def test_apply_mapping_set_rejects_cross_workspace_apply_requests() -> None:
+    settings.admin_api_token = "secret-token"
+
+    create_response = client.post(
+        "/mapping/sets",
+        json={
+            "name": "vendor-master-approved",
+            "source_dataset_id": "source-1",
+            "target_dataset_id": "target-1",
+            "mapping_decisions": [
+                {"source": "vendor_id", "target": "supplier.id", "status": "accepted"},
+            ],
+            "created_by": "demo-user",
+            "workspace_id": "ws-owner-01",
+            "note": "Approved mapping set",
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    mapping_set_id = create_response.json()["mapping_set_id"]
+
+    status_response = client.post(
+        f"/mapping/sets/{mapping_set_id}/status",
+        json={
+            "status": "approved",
+            "changed_by": "demo-user",
+            "note": "Approved for workspace reuse",
+        },
+        headers=admin_headers(),
+    )
+    apply_response = client.post(
+        f"/mapping/sets/{mapping_set_id}/apply",
+        json={"changed_by": "demo-user", "workspace_id": "ws-other-02", "note": "Cross-workspace apply"},
+        headers=admin_headers(),
+    )
+    audit_response = client.get(f"/mapping/sets/{mapping_set_id}/audit", headers=admin_headers())
+
+    assert status_response.status_code == 200
+    assert apply_response.status_code == 409
+    assert (
+        apply_response.json()["detail"]
+        == f"Mapping set #{mapping_set_id} belongs to workspace 'ws-owner-01' and cannot be applied from workspace 'ws-other-02'."
+    )
+    assert [entry["action"] for entry in audit_response.json()] == ["status_change", "create"]
 
 
 def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
@@ -2861,6 +2958,8 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
         "/mapping/draft-sessions",
         json={
             "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
             "mapping_mode": "standard",
             "active_workspace_section": "Review",
             "source_handle": upload_payload["source"],
@@ -2909,7 +3008,11 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     created = create_response.json()
     draft_session_id = created["draft_session_id"]
     assert created["active_workspace_section"] == "Review"
+    assert created["created_by"] == "qa-user"
+    assert created["workspace_id"] == "ws-customer-01"
     assert created["decision_count"] == 2
+    assert created["version"] == 1
+    assert created["last_writer"] == "qa-user"
 
     list_response = client.get("/mapping/draft-sessions", headers=admin_headers())
     detail_response = client.get(f"/mapping/draft-sessions/{draft_session_id}", headers=admin_headers())
@@ -2921,12 +3024,397 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     detail = detail_response.json()
 
     assert listed[0]["draft_session_id"] == draft_session_id
+    assert listed[0]["created_by"] == "qa-user"
+    assert listed[0]["workspace_id"] == "ws-customer-01"
     assert listed[0]["source_dataset_name"] == upload_payload["source"]["dataset_name"]
+    assert listed[0]["workspace_target_context"]["target_projection_mode"] == "dataset_to_dataset"
+    assert detail["created_by"] == "qa-user"
+    assert detail["workspace_id"] == "ws-customer-01"
     assert detail["source_handle"]["dataset_name"] == upload_payload["source"]["dataset_name"]
     assert detail["target_handle"]["dataset_name"] == upload_payload["target"]["dataset_name"]
+    assert detail["workspace_target_context"]["artifact_type"] == "standard"
     assert detail["mapping_runtime"]["code_fingerprint"] == "draft-build-1"
     assert detail["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
     assert detail["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
+    assert detail["mapping_decision_audit"]["cust_id"]["created_by"] == "qa-user"
+    assert detail["mapping_decision_audit"]["cust_id"]["workspace_id"] == "ws-customer-01"
+    assert detail["version"] == 1
+    assert detail["last_writer"] == "qa-user"
+
+
+def test_canonical_draft_session_persists_workspace_target_context() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("kunnr,name1\nC001,Acme\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,customer_name\nC001,Acme\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "canonical-sap-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "canonical",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "canonical_target_system": "sap",
+            "workspace_target_context": {
+                "target_system": "sap",
+                "target_profile": "sap_customer_master",
+                "target_projection_mode": "target_aware_canonical",
+                "artifact_type": "canonical-only",
+            },
+            "mapping_runtime": {
+                "generated_at": "2026-05-28T10:00:00+00:00",
+                "app_version": "dev",
+                "scoring_profile": "balanced",
+                "description_priority": True,
+                "code_fingerprint": "draft-build-2",
+                "target_system": "sap",
+                "target_profile": "sap_customer_master",
+                "target_projection_mode": "target_aware_canonical",
+            },
+            "mapping_editor_state": {
+                "kunnr": {
+                    "target": "customer.id",
+                    "status": "accepted",
+                    "suggested_target": "customer.id",
+                    "manual_transformation_code": "",
+                    "suggested_transformation_code": "",
+                    "llm_transformation_instruction": "",
+                    "manual_apply_transformation": False,
+                    "manual": False,
+                }
+            },
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    list_response = client.get("/mapping/draft-sessions", headers=admin_headers())
+    detail_response = client.get(f"/mapping/draft-sessions/{draft_session_id}", headers=admin_headers())
+
+    assert list_response.status_code == 200
+    assert detail_response.status_code == 200
+
+    listed = list_response.json()
+    detail = detail_response.json()
+
+    assert listed[0]["canonical_target_system"] == "sap"
+    assert listed[0]["workspace_target_context"]["target_system"] == "sap"
+    assert listed[0]["workspace_target_context"]["target_projection_mode"] == "target_aware_canonical"
+    assert detail["workspace_target_context"]["target_system"] == "sap"
+    assert detail["workspace_target_context"]["target_profile"] == "sap_customer_master"
+    assert detail["workspace_target_context"]["artifact_type"] == "canonical-only"
+    assert detail["mapping_runtime"]["target_system"] == "sap"
+    assert detail["mapping_runtime"]["target_profile"] == "sap_customer_master"
+
+
+def test_update_draft_session_increments_version_and_sets_last_writer() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    update_response = client.put(
+        f"/mapping/draft-sessions/{draft_session_id}",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "last_writer": "qa-reviewer",
+            "expected_version": 1,
+            "mapping_mode": "standard",
+            "active_workspace_section": "Decisions",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {
+                "phone": {
+                    "target": "phone_number",
+                    "status": "accepted",
+                    "suggested_target": "phone_number",
+                    "manual_transformation_code": "value.strip()",
+                    "suggested_transformation_code": "",
+                    "llm_transformation_instruction": "trim spaces",
+                    "manual_apply_transformation": True,
+                    "manual": True,
+                }
+            },
+            "mapping_decision_audit": {
+                "phone": {
+                    "origin": "manual_mapping",
+                    "applied_at": "2026-05-27T11:00:00+00:00",
+                    "details": {"reason": "validated after review"},
+                }
+            },
+        },
+        headers=admin_headers(),
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["version"] == 2
+    assert payload["last_writer"] == "qa-reviewer"
+    assert payload["active_workspace_section"] == "Decisions"
+    assert payload["mapping_editor_state"]["phone"]["status"] == "accepted"
+    assert payload["mapping_decision_audit"]["phone"]["workspace_id"] == "ws-customer-01"
+
+
+def test_update_draft_session_rejects_stale_expected_version() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    first_update_response = client.put(
+        f"/mapping/draft-sessions/{draft_session_id}",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "last_writer": "qa-reviewer",
+            "expected_version": 1,
+            "mapping_mode": "standard",
+            "active_workspace_section": "Decisions",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {"phone": {"target": "phone_number", "status": "accepted"}},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert first_update_response.status_code == 200
+
+    stale_update_response = client.put(
+        f"/mapping/draft-sessions/{draft_session_id}",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "last_writer": "qa-reviewer-2",
+            "expected_version": 1,
+            "mapping_mode": "standard",
+            "active_workspace_section": "Output",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {"phone": {"target": "phone_number", "status": "accepted"}},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert stale_update_response.status_code == 409
+    detail = stale_update_response.json()["detail"]
+    assert detail["detail_code"] == "stale_write"
+    assert detail["workspace_id"] == "ws-customer-01"
+    assert detail["current_version"] == 2
+    assert detail["expected_version"] == 1
+    assert detail["last_writer"] == "qa-reviewer"
+
+
+def test_update_draft_session_decision_state_persists_shared_write_slice() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    update_response = client.put(
+        f"/mapping/draft-sessions/{draft_session_id}/decision-state",
+        json={
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "last_writer": "qa-reviewer",
+            "expected_version": 1,
+            "active_workspace_section": "Decisions",
+            "mapping_editor_state": {
+                "phone": {
+                    "target": "phone_number",
+                    "status": "accepted",
+                    "suggested_target": "phone_number",
+                    "manual_transformation_code": "value.strip()",
+                    "suggested_transformation_code": "",
+                    "llm_transformation_instruction": "trim spaces",
+                    "manual_apply_transformation": True,
+                    "manual": True,
+                }
+            },
+            "mapping_decision_audit": {
+                "phone": {
+                    "origin": "manual_mapping",
+                    "applied_at": "2026-05-27T11:00:00+00:00",
+                    "details": {"reason": "validated after review"},
+                }
+            },
+        },
+        headers=admin_headers(),
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["version"] == 2
+    assert payload["last_writer"] == "qa-reviewer"
+    assert payload["active_workspace_section"] == "Decisions"
+    assert payload["mapping_editor_state"]["phone"]["status"] == "accepted"
+    assert payload["mapping_decision_audit"]["phone"]["workspace_id"] == "ws-customer-01"
+
+
+def test_update_draft_session_review_state_persists_shared_write_slice() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    update_response = client.put(
+        f"/mapping/draft-sessions/{draft_session_id}/review-state",
+        json={
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "last_writer": "qa-reviewer",
+            "expected_version": 1,
+            "active_workspace_section": "Review",
+            "review_state": {
+                "status_filter": "needs_review",
+                "confidence_filter": "medium_confidence",
+                "source_filter": "phone",
+                "canonical_concept_filter": "All",
+            },
+        },
+        headers=admin_headers(),
+    )
+
+    assert update_response.status_code == 200
+    payload = update_response.json()
+    assert payload["version"] == 2
+    assert payload["last_writer"] == "qa-reviewer"
+    assert payload["active_workspace_section"] == "Review"
+    assert payload["review_state"]["status_filter"] == "needs_review"
+    assert payload["review_state"]["confidence_filter"] == "medium_confidence"
+    assert payload["review_state"]["source_filter"] == "phone"
 
 
 def test_apply_mapping_set_blocks_non_approved_versions() -> None:
@@ -2973,6 +3461,53 @@ def test_apply_mapping_set_blocks_non_approved_versions() -> None:
         == f"Mapping set #{mapping_set_id} is in status 'review' and cannot be applied. Only approved mapping sets can be used in workspace apply/reuse flows."
     )
     assert [entry["action"] for entry in audit_response.json()] == ["status_change", "create"]
+
+
+def test_get_draft_session_rejects_cross_workspace_resume_requests() -> None:
+    settings.admin_api_token = "secret-token"
+
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n"), "text/csv"),
+            "target_file": ("target.csv", csv_bytes("customer_id,phone_number\n1,0641234567\n"), "text/csv"),
+        },
+        data={"mapping_mode": "standard"},
+    )
+
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+
+    create_response = client.post(
+        "/mapping/draft-sessions",
+        json={
+            "name": "customer-draft-session",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+            "mapping_mode": "standard",
+            "active_workspace_section": "Review",
+            "source_handle": upload_payload["source"],
+            "target_handle": upload_payload["target"],
+            "mapping_editor_state": {},
+            "mapping_decision_audit": {},
+        },
+        headers=admin_headers(),
+    )
+
+    assert create_response.status_code == 200
+    draft_session_id = create_response.json()["draft_session_id"]
+
+    detail_response = client.get(
+        f"/mapping/draft-sessions/{draft_session_id}",
+        params={"created_by": "qa-user", "workspace_id": "ws-other-02"},
+        headers=admin_headers(),
+    )
+
+    assert detail_response.status_code == 409
+    assert (
+        detail_response.json()["detail"]
+        == f"Draft session {draft_session_id} belongs to workspace 'ws-customer-01' and cannot be resumed from workspace 'ws-other-02'."
+    )
 
 
 def test_catalog_integrations_endpoint_lists_queryable_mapping_summaries() -> None:
@@ -3022,6 +3557,7 @@ def test_catalog_integration_detail_endpoint_returns_versions_and_latest_approve
         json={
             "name": "customer-master",
             "integration_name": "Customer Master Sync",
+            "workspace_id": "ws-customer-01",
             "source_system": "SAP",
             "target_system": "Salesforce",
             "business_domain": "Customer",
@@ -3043,6 +3579,7 @@ def test_catalog_integration_detail_endpoint_returns_versions_and_latest_approve
         json={
             "name": "customer-master",
             "integration_name": "Customer Master Sync",
+            "workspace_id": "ws-customer-01",
             "source_system": "SAP",
             "target_system": "Salesforce",
             "business_domain": "Customer",
@@ -3067,6 +3604,10 @@ def test_catalog_integration_detail_endpoint_returns_versions_and_latest_approve
     assert payload["latest_approved_version"]["version"] == 1
     assert payload["canonical_concepts"] == ["customer.id", "customer.name"]
     assert payload["unmatched_sources"] == ["LAND1"]
+    assert payload["workspace_id"] == "ws-customer-01"
+    assert payload["latest_version"]["workspace_id"] == "ws-customer-01"
+    assert payload["latest_approved_version"]["workspace_id"] == "ws-customer-01"
+    assert [item["workspace_id"] for item in payload["versions"]] == ["ws-customer-01", "ws-customer-01"]
     assert [item["version"] for item in payload["versions"]] == [2, 1]
 
 
@@ -3788,6 +4329,8 @@ def test_decision_logs_endpoint_returns_mapping_run_logs() -> None:
         json={
             "source_dataset_id": upload_payload["source"]["dataset_id"],
             "target_dataset_id": upload_payload["target"]["dataset_id"],
+            "created_by": "qa-user",
+            "workspace_id": "ws-review-01",
         },
     )
 
@@ -3799,6 +4342,8 @@ def test_decision_logs_endpoint_returns_mapping_run_logs() -> None:
     payload = logs_response.json()
     assert len(payload) == 2
     assert payload[0]["source"] in {"cust_id", "phone"}
+    assert payload[0]["created_by"] == "qa-user"
+    assert payload[0]["workspace_id"] == "ws-review-01"
     assert "candidate_targets" in payload[0]
 
 
@@ -4081,6 +4626,8 @@ def test_benchmark_dataset_endpoints_save_list_and_run_custom_benchmark() -> Non
         "/evaluation/datasets",
         json={
             "name": "email-case",
+            "created_by": "qa-user",
+            "workspace_id": "ws-benchmark-01",
             "cases": [
                 {
                     "source_columns": [
@@ -4111,14 +4658,22 @@ def test_benchmark_dataset_endpoints_save_list_and_run_custom_benchmark() -> Non
     )
 
     assert create_response.status_code == 200
-    dataset_id = create_response.json()["dataset_id"]
+    create_payload = create_response.json()
+    dataset_id = create_payload["dataset_id"]
+    assert create_payload["created_by"] == "qa-user"
+    assert create_payload["workspace_id"] == "ws-benchmark-01"
 
     list_response = client.get("/evaluation/datasets", headers=admin_headers())
     assert list_response.status_code == 200
     assert len(list_response.json()) == 1
     assert list_response.json()[0]["version"] == 1
+    assert list_response.json()[0]["created_by"] == "qa-user"
+    assert list_response.json()[0]["workspace_id"] == "ws-benchmark-01"
 
-    run_response = client.post(f"/evaluation/datasets/{dataset_id}/run", headers=admin_headers())
+    run_response = client.post(
+        f"/evaluation/datasets/{dataset_id}/run?created_by=qa-user&workspace_id=ws-benchmark-01",
+        headers=admin_headers(),
+    )
     assert run_response.status_code == 200
     assert run_response.json()["accuracy"] == 1.0
 
@@ -4126,6 +4681,8 @@ def test_benchmark_dataset_endpoints_save_list_and_run_custom_benchmark() -> Non
     assert runs_response.status_code == 200
     assert len(runs_response.json()) == 1
     assert runs_response.json()[0]["dataset_id"] == dataset_id
+    assert runs_response.json()[0]["created_by"] == "qa-user"
+    assert runs_response.json()[0]["workspace_id"] == "ws-benchmark-01"
 
 
 def test_saved_benchmark_profile_comparison_returns_metrics_and_recommendation() -> None:

@@ -6,12 +6,18 @@ import httpx
 import streamlit as st
 import time
 
-from streamlit_ui.api import current_workspace_scope
+from streamlit_ui.api import current_workspace_scope, list_target_intents
 from streamlit_ui.governance import api_error_message, mapping_output_block_reason
 
 
 WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output")
 WORKSPACE_CODEGEN_MODES = ("pandas", "pyspark", "dbt")
+WORKSPACE_COPILOT_ACTIONS = {
+    "Setup": ("What unlocks Review?",),
+    "Review": ("Summarize current mapping state",),
+    "Decisions": ("What still needs a decision?",),
+    "Output": ("Why is codegen blocked?",),
+}
 
 
 def _set_active_mapping_job(job_id: str, *, start_path: str, payload: dict) -> None:
@@ -203,6 +209,66 @@ def companion_enrichment_message(result: dict | None, dataset_label: str = "Sour
     return f"{dataset_label} companion metadata enriched {matched_columns} columns; all companion fields matched."
 
 
+def _workspace_target_intent_label(mapping_mode: str, target_system: str | None) -> str:
+    normalized_mode = str(mapping_mode or "standard").strip().lower() or "standard"
+    normalized_target_system = str(target_system or "").strip().lower() or None
+    if normalized_mode != "canonical":
+        return "Uploaded target dataset"
+    if normalized_target_system == "sap":
+        return "SAP"
+    return "Canonical only"
+
+
+def _workspace_projection_label(projection_mode: str | None) -> str:
+    normalized = str(projection_mode or "").strip().lower()
+    if normalized == "canonical_only":
+        return "canonical-only"
+    if normalized == "target_aware_canonical":
+        return "target-aware canonical"
+    return "dataset-to-dataset"
+
+
+def _workspace_target_context(upload_response: dict | None, mapping_response: dict | None) -> dict | None:
+    upload = upload_response or {}
+    runtime = (mapping_response or {}).get("mapping_runtime") or {}
+    mapping_mode = str(upload.get("mapping_mode") or "standard").strip().lower() or "standard"
+    target_system = str(runtime.get("target_system") or upload.get("target_system") or "").strip().lower() or None
+    projection_mode = str(runtime.get("target_projection_mode") or "").strip().lower()
+    if not projection_mode:
+        if mapping_mode == "canonical":
+            projection_mode = "canonical_only" if target_system in {None, "canonical"} else "target_aware_canonical"
+        else:
+            projection_mode = "dataset_to_dataset"
+
+    target_dataset_name = ""
+    if mapping_mode != "canonical":
+        target_dataset_name = str(((upload.get("target") or {}).get("dataset_name") or "")).strip()
+
+    return {
+        "mapping_mode": mapping_mode,
+        "intent_label": _workspace_target_intent_label(mapping_mode, target_system),
+        "target_system": target_system,
+        "projection_label": _workspace_projection_label(projection_mode),
+        "target_profile": str(runtime.get("target_profile") or "").strip() or None,
+        "target_dataset_name": target_dataset_name,
+    }
+
+
+def _workspace_target_context_message(upload_response: dict | None, mapping_response: dict | None) -> str:
+    context = _workspace_target_context(upload_response, mapping_response)
+    if not context:
+        return ""
+
+    if context["mapping_mode"] != "canonical":
+        dataset_name = context.get("target_dataset_name") or "uploaded target schema"
+        return f"Target context: {context['intent_label']} ({dataset_name}) | Projection: {context['projection_label']}"
+
+    message = f"Target context: {context['intent_label']} | Projection: {context['projection_label']}"
+    if context.get("target_profile"):
+        message += f" | Profile: {context['target_profile']}"
+    return message
+
+
 def _reset_workspace_mapping_state(session_state: dict) -> None:
     session_state.pop("mapping_response", None)
     session_state.pop("mapping_analysis_summary", None)
@@ -221,6 +287,8 @@ def _reset_workspace_mapping_state(session_state: dict) -> None:
     session_state.pop("codegen_response", None)
     session_state.pop("codegen_refinement_response", None)
     session_state.pop("mapping_editor_state", None)
+    session_state.pop("active_draft_session", None)
+    session_state.pop("workspace_copilot_result", None)
 
 
 def default_llm_validation_enabled(session_state: dict | None = None) -> bool:
@@ -242,15 +310,448 @@ def resolve_active_workspace_section(session_state: dict) -> str:
     return str(session_state.get("active_workspace_section") or WORKSPACE_SECTIONS[0])
 
 
-def render_workspace_tab(
+def _workspace_copilot_runtime_status(session_state: dict) -> tuple[str, str]:
+    config = session_state.get("runtime_config_snapshot") or {}
+    provider = str(config.get("llm_provider", "none")).strip() or "none"
+    status = str(config.get("llm_status", "configured")).strip().lower() or "configured"
+    resolved_model = str(config.get("llm_resolved_model", "")).strip() or str(config.get("llm_model", "")).strip() or "n/a"
+
+    if provider.lower() == "none":
+        return "unavailable", "LLM unavailable"
+    if status == "reachable":
+        return "ready", f"LLM ready: {provider} / {resolved_model}"
+    if status == "unreachable":
+        return "error", f"LLM unreachable: {provider} / {resolved_model}"
+    if status == "misconfigured":
+        return "error", f"LLM misconfigured: {provider} / {resolved_model}"
+    if status == "disabled":
+        return "unavailable", "LLM disabled"
+    return "info", f"LLM configured: {provider} / {resolved_model}"
+
+
+def _workspace_copilot_context(
+    session_state: dict,
     *,
+    selected_workspace_section: str,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    preview_response: dict | None,
+    codegen_response: dict | None,
+) -> dict:
+    mapping_editor_state = session_state.get("mapping_editor_state") or {}
+    active_decisions = 0
+    open_review_items = 0
+    accepted_items = 0
+    for entry in mapping_editor_state.values():
+        target = str((entry or {}).get("target") or "").strip()
+        if not target:
+            continue
+        active_decisions += 1
+        status = str((entry or {}).get("status") or "needs_review").strip().lower() or "needs_review"
+        if status == "accepted":
+            accepted_items += 1
+        else:
+            open_review_items += 1
+
+    runtime_level, runtime_message = _workspace_copilot_runtime_status(session_state)
+    target_context = _workspace_target_context(upload_response, mapping_response) or {}
+
+    return {
+        "section": selected_workspace_section,
+        "has_upload": bool(upload_response),
+        "mapping_ready": bool(mapping_response),
+        "preview_ready": bool(preview_response),
+        "codegen_ready": bool(codegen_response),
+        "active_decisions": active_decisions,
+        "accepted_items": accepted_items,
+        "open_review_items": open_review_items,
+        "pending_proposals": len(session_state.get("llm_decision_proposals") or []),
+        "target_intent": str(target_context.get("intent_label") or "No target context yet"),
+        "projection_label": str(target_context.get("projection_label") or "n/a"),
+        "runtime_level": runtime_level,
+        "runtime_message": runtime_message,
+    }
+
+
+def _workspace_copilot_focus_message(context: dict, *, codegen_mode: str) -> str:
+    section = str(context.get("section") or "Setup")
+    if section == "Setup":
+        if not context.get("has_upload"):
+            return "Start by uploading the active dataset context so Workspace can compute a real review surface."
+        if not context.get("mapping_ready"):
+            return "Your upload is ready; the next meaningful step is generating mapping so Review becomes real."
+        return "Setup is complete enough. Move into Review and inspect the rows that still need attention."
+    if section == "Review":
+        open_review_items = int(context.get("open_review_items") or 0)
+        if not context.get("mapping_ready"):
+            return "Review has nothing to guide yet because there is no active mapping result."
+        if open_review_items:
+            return f"Focus on the {open_review_items} row(s) that are not fully closed before widening into Decisions or Output."
+        return "Review is clean right now; use this surface to summarize state or move forward into Decisions/Output."
+    if section == "Decisions":
+        pending_proposals = int(context.get("pending_proposals") or 0)
+        open_review_items = int(context.get("open_review_items") or 0)
+        if pending_proposals or open_review_items:
+            return "This is the decision-closing step: resolve pending proposals and any still-open review outcomes before treating output as finalized."
+        return "Decision state looks closed. Output is the next operational step."
+    if not context.get("mapping_ready"):
+        return "Output is locked because there is no active mapping state yet."
+    if context.get("open_review_items"):
+        return f"Output is still governance-sensitive: close remaining review statuses before relying on {_workspace_codegen_action_label(codegen_mode).lower()}."
+    return f"Output is ready for {_workspace_codegen_action_label(codegen_mode).lower()} if you want to materialize the current decisions."
+
+
+def _workspace_copilot_handoff(
+    session_state: dict,
+    *,
+    target_section: str,
+    message: str,
+    focus_sources: list[str] | None = None,
+) -> None:
+    session_state["pending_top_level_area"] = "Workspace"
+    session_state["active_top_level_area"] = "Workspace"
+    session_state["pending_workspace_section"] = target_section
+    session_state["active_workspace_section"] = target_section
+    if target_section == "Review" and focus_sources:
+        session_state["review_focus_sources"] = list(focus_sources)
+    elif target_section != "Review":
+        session_state.pop("review_focus_sources", None)
+    session_state["last_action"] = {
+        "level": "info",
+        "message": message,
+    }
+    st.rerun()
+
+
+def _workspace_copilot_setup_result(context: dict) -> dict:
+    if not context["has_upload"]:
+        return {
+            "section": "Setup",
+            "level": "info",
+            "title": "Setup status",
+            "answer": "Review stays locked until you upload the source dataset and establish the workspace context.",
+            "why": "There is no active upload payload yet, so Semantra has nothing to map or review.",
+            "next_actions": ["Upload and profile the current dataset pair or canonical source.", "Generate mapping results from Setup."],
+        }
+    if not context["mapping_ready"]:
+        return {
+            "section": "Setup",
+            "level": "info",
+            "title": "Setup status",
+            "answer": "Review unlocks after you generate mapping results from the current upload context.",
+            "why": "The upload exists, but there is no active mapping response yet.",
+            "next_actions": ["Confirm LLM validation preference if needed.", "Run Generate mapping or Generate canonical mapping."],
+        }
+    return {
+        "section": "Setup",
+        "level": "success",
+        "title": "Setup status",
+        "answer": "Setup is complete enough for review.",
+        "why": "The workspace already has an active mapping response bound to the current upload context.",
+        "next_actions": ["Switch to Review to inspect trust evidence and row-level candidates."],
+        "handoff_actions": [
+            {
+                "label": "Open Review",
+                "target_section": "Review",
+                "message": "Workspace Copilot handoff -> Review.",
+            }
+        ],
+    }
+
+
+def _workspace_copilot_decisions_result(context: dict) -> dict:
+    pending_proposals = int(context.get("pending_proposals") or 0)
+    open_review_items = int(context.get("open_review_items") or 0)
+    if not context["mapping_ready"]:
+        return {
+            "section": "Decisions",
+            "level": "info",
+            "title": "Decision status",
+            "answer": "There are no active decisions yet because mapping has not been generated.",
+            "why": "Decisions depends on the current mapping state.",
+            "next_actions": ["Generate mapping from Setup first."],
+            "handoff_actions": [
+                {
+                    "label": "Return to Setup",
+                    "target_section": "Setup",
+                    "message": "Workspace Copilot handoff -> Setup.",
+                }
+            ],
+        }
+    if open_review_items == 0 and pending_proposals == 0:
+        return {
+            "section": "Decisions",
+            "level": "success",
+            "title": "Decision status",
+            "answer": "No open decision blockers are visible right now.",
+            "why": "All active mapping decisions are already accepted and there are no pending LLM proposals.",
+            "next_actions": ["Move to Output for preview or code generation."],
+            "handoff_actions": [
+                {
+                    "label": "Open Output",
+                    "target_section": "Output",
+                    "message": "Workspace Copilot handoff -> Output.",
+                }
+            ],
+        }
+    next_actions = []
+    handoff_actions = []
+    if open_review_items:
+        next_actions.append(f"Close {open_review_items} review item(s) before treating output as fully approved.")
+        handoff_actions.append(
+            {
+                "label": "Open Review",
+                "target_section": "Review",
+                "message": "Workspace Copilot handoff -> Review.",
+            }
+        )
+    if pending_proposals:
+        next_actions.append(f"Inspect {pending_proposals} pending LLM proposal(s) in Decisions.")
+    return {
+        "section": "Decisions",
+        "level": "warning",
+        "title": "Decision status",
+        "answer": f"{open_review_items} review item(s) and {pending_proposals} pending proposal(s) still need decision attention.",
+        "why": "Workspace decisions are not fully closed yet.",
+        "next_actions": next_actions,
+        "handoff_actions": handoff_actions,
+    }
+
+
+def _workspace_copilot_output_result(context: dict, mapping_decisions: list[dict], codegen_mode: str) -> dict:
+    if not context["mapping_ready"]:
+        return {
+            "section": "Output",
+            "level": "info",
+            "title": "Output status",
+            "answer": "Code generation is unavailable until mapping exists.",
+            "why": "Output depends on the active mapping decisions.",
+            "next_actions": ["Generate mapping from Setup first."],
+            "handoff_actions": [
+                {
+                    "label": "Return to Setup",
+                    "target_section": "Setup",
+                    "message": "Workspace Copilot handoff -> Setup.",
+                }
+            ],
+        }
+
+    codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions, codegen_mode)
+    preview_advisory_message = _workspace_preview_advisory_message(mapping_decisions)
+    if codegen_block_reason:
+        next_actions = ["Accept or close remaining review statuses before generating code."]
+        if preview_advisory_message:
+            next_actions.append("Use preview only as an inspection aid until those review statuses are closed.")
+        return {
+            "section": "Output",
+            "level": "warning",
+            "title": "Output status",
+            "answer": codegen_block_reason,
+            "why": preview_advisory_message or "Output gating follows active review status governance.",
+            "next_actions": next_actions,
+            "handoff_actions": [
+                {
+                    "label": "Open Decisions",
+                    "target_section": "Decisions",
+                    "message": "Workspace Copilot handoff -> Decisions.",
+                }
+            ],
+        }
+
+    return {
+        "section": "Output",
+        "level": "success",
+        "title": "Output status",
+        "answer": f"{_workspace_codegen_action_label(codegen_mode)} is currently unblocked.",
+        "why": "All active mapping decisions are in a codegen-compatible state.",
+        "next_actions": [f"Run {_workspace_codegen_button_label(codegen_mode)} when you are ready."],
+        "handoff_actions": [],
+    }
+
+
+def _workspace_copilot_review_result(session_state: dict, request_mapping_analysis_summary) -> dict:
+    if not session_state.get("mapping_response"):
+        return {
+            "section": "Review",
+            "level": "info",
+            "title": "Review status",
+            "answer": "Review summary is unavailable until mapping exists.",
+            "why": "The analysis summary reuses the current mapping response.",
+            "next_actions": ["Generate mapping from Setup first."],
+            "handoff_actions": [
+                {
+                    "label": "Return to Setup",
+                    "target_section": "Setup",
+                    "message": "Workspace Copilot handoff -> Setup.",
+                }
+            ],
+        }
+    try:
+        summary = request_mapping_analysis_summary()
+    except (ValueError, httpx.HTTPError) as error:
+        return {
+            "section": "Review",
+            "level": "error",
+            "title": "Review status",
+            "answer": f"Mapping overview failed: {error}",
+            "why": "The bounded review summary request did not complete successfully.",
+            "next_actions": ["Check runtime availability and retry from Review."],
+            "handoff_actions": [],
+        }
+
+    session_state["mapping_analysis_summary"] = summary
+    session_state.pop("mapping_analysis_error", None)
+    health = summary.get("overall_mapping_health") or {}
+    accepted_count = int(health.get("accepted_count") or 0)
+    needs_review_count = int(health.get("needs_review_count") or 0)
+    unmatched_count = int(health.get("unmatched_count") or 0)
+    answer = str(health.get("summary") or "Generated a read-only summary of the current mapping state.")
+    next_actions = []
+    if needs_review_count:
+        next_actions.append(f"Review {needs_review_count} field(s) still marked for attention.")
+    if unmatched_count:
+        next_actions.append(f"Resolve {unmatched_count} unmatched field(s) before final output.")
+    handoff_actions = []
+    if not next_actions:
+        next_actions.append("Use Decisions or Output for the next bounded step.")
+        handoff_actions.append(
+            {
+                "label": "Open Decisions",
+                "target_section": "Decisions",
+                "message": "Workspace Copilot handoff -> Decisions.",
+            }
+        )
+    return {
+        "section": "Review",
+        "level": "success",
+        "title": "Review status",
+        "answer": answer,
+        "why": f"Accepted: {accepted_count} | Needs review: {needs_review_count} | Unmatched: {unmatched_count}",
+        "next_actions": next_actions,
+        "handoff_actions": handoff_actions,
+    }
+
+
+def _render_workspace_copilot_result(result: dict | None) -> None:
+    if not result:
+        return
+
+    level = str(result.get("level") or "info").strip().lower() or "info"
+    answer = str(result.get("answer") or "").strip()
+    why = str(result.get("why") or "").strip()
+    next_actions = [str(item).strip() for item in (result.get("next_actions") or []) if str(item).strip()]
+    handoff_actions = [item for item in (result.get("handoff_actions") or []) if isinstance(item, dict)]
+
+    if level == "error":
+        st.error(answer)
+    elif level == "warning":
+        st.warning(answer)
+    elif level == "success":
+        st.success(answer)
+    else:
+        st.info(answer)
+
+    if why:
+        st.caption(why)
+    if next_actions:
+        st.caption("Next actions")
+        for item in next_actions:
+            st.write(f"- {item}")
+
+    if handoff_actions:
+        st.caption("Do this now")
+        action_columns = st.columns(len(handoff_actions))
+        for idx, action in enumerate(handoff_actions):
+            if action_columns[idx].button(
+                str(action.get("label") or f"Open {action.get('target_section') or 'section'}"),
+                key=f"workspace_copilot_handoff_{idx}_{str(action.get('target_section') or 'workspace').lower()}",
+                width="stretch",
+            ):
+                _workspace_copilot_handoff(
+                    st.session_state,
+                    target_section=str(action.get("target_section") or "Setup"),
+                    message=str(action.get("message") or "Workspace Copilot handoff."),
+                    focus_sources=action.get("focus_sources"),
+                )
+
+
+def _render_workspace_copilot_shell(
+    *,
+    session_state: dict,
+    selected_workspace_section: str,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    preview_response: dict | None,
+    codegen_response: dict | None,
+    build_mapping_decisions,
+    request_mapping_analysis_summary,
+) -> None:
+    context = _workspace_copilot_context(
+        session_state,
+        selected_workspace_section=selected_workspace_section,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        preview_response=preview_response,
+        codegen_response=codegen_response,
+    )
+    mapping_decisions = build_mapping_decisions() if mapping_response else []
+    codegen_mode = str(session_state.get("output_codegen_mode", "pandas") or "pandas")
+    focus_message = _workspace_copilot_focus_message(context, codegen_mode=codegen_mode)
+    result = session_state.get("workspace_copilot_result")
+    if isinstance(result, dict) and str(result.get("section") or "").strip() != selected_workspace_section:
+        result = None
+
+    with st.container():
+        title_col, signal_col = st.columns([3, 2])
+        with title_col:
+            st.subheader("Workspace Copilot")
+            st.caption("Bounded, workflow-aware guidance for the current Workspace state.")
+        with signal_col:
+            st.caption(
+                f"Section: {context['section']} | Decisions: {int(context['active_decisions'])} | Open review: {int(context['open_review_items'])} | Proposals: {int(context['pending_proposals'])}"
+            )
+            st.caption(f"Target: {context['target_intent']} | {context['runtime_message']}")
+
+        st.info(focus_message)
+
+        action_labels = WORKSPACE_COPILOT_ACTIONS.get(selected_workspace_section, ())
+        if action_labels:
+            action_columns = st.columns(len(action_labels))
+            for idx, action_label in enumerate(action_labels):
+                if action_columns[idx].button(action_label, key=f"workspace_copilot_action_{selected_workspace_section}_{idx}", width="stretch"):
+                    if selected_workspace_section == "Setup":
+                        session_state["workspace_copilot_result"] = _workspace_copilot_setup_result(context)
+                    elif selected_workspace_section == "Review":
+                        session_state["workspace_copilot_result"] = _workspace_copilot_review_result(
+                            session_state,
+                            request_mapping_analysis_summary,
+                        )
+                    elif selected_workspace_section == "Decisions":
+                        session_state["workspace_copilot_result"] = _workspace_copilot_decisions_result(context)
+                    elif selected_workspace_section == "Output":
+                        session_state["workspace_copilot_result"] = _workspace_copilot_output_result(
+                            context,
+                            mapping_decisions,
+                            codegen_mode,
+                        )
+                    result = session_state.get("workspace_copilot_result")
+
+        if result:
+            st.caption("Latest answer")
+            _render_workspace_copilot_result(result)
+        else:
+            st.caption("Latest answer")
+            st.write("No action has been run yet for this section.")
+
+
+def _render_workspace_section_content(
+    *,
+    selected_workspace_section: str,
     all_upload_types,
     detect_spec_hint_for_upload,
-    sql_tables_for_upload,
     api_request,
     upload_dataset_handle,
     enrich_dataset_metadata,
-    uploaded_file_bytes,
     render_dataset_summary,
     initialize_mapping_editor_state,
     render_mapping_analysis_panel,
@@ -259,47 +760,27 @@ def render_workspace_tab(
     render_mapping_editor,
     render_canonical_gap_assistant,
     render_canonical_concept_summary,
+    render_active_draft_review_state_panel,
+    render_active_draft_decision_state_panel,
     render_manual_mapping_panel,
     render_mapping_decision_summary,
     render_mapping_io_panel,
     render_mapping_set_versions_panel,
     render_correction_panel,
     build_mapping_decisions,
+    source_file,
+    target_file,
+    source_tables: list[str],
+    target_tables: list[str],
+    source_spec_hint,
+    target_spec_hint,
+    inspection_error: str | None,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    preview_response: dict | None,
+    codegen_response: dict | None,
+    codegen_refinement_response: dict | None,
 ) -> None:
-    """Render the full Workspace surface from setup through review, decisions, and output."""
-
-    resolve_active_workspace_section(st.session_state)
-    selected_workspace_section = st.radio(
-        "Workspace section",
-        WORKSPACE_SECTIONS,
-        key="active_workspace_section",
-        horizontal=True,
-        label_visibility="collapsed",
-    )
-
-    active_mapping_mode = st.session_state.get("mapping_mode", "Standard")
-    source_file = st.session_state.get("source_file")
-    target_file = st.session_state.get("target_file") if active_mapping_mode == "Standard" else None
-    source_tables: list[str] = []
-    target_tables: list[str] = []
-    source_spec_hint = None
-    target_spec_hint = None
-    inspection_error = None
-    if source_file is not None or target_file is not None:
-        try:
-            source_tables = sql_tables_for_upload(source_file, "source")
-            target_tables = sql_tables_for_upload(target_file, "target")
-            source_spec_hint = detect_spec_hint_for_upload(source_file, "source")
-            target_spec_hint = detect_spec_hint_for_upload(target_file, "target")
-        except httpx.HTTPError as error:
-            inspection_error = str(error)
-
-    upload_response = st.session_state.get("upload_response")
-    mapping_response = st.session_state.get("mapping_response")
-    preview_response = st.session_state.get("preview_response")
-    codegen_response = st.session_state.get("codegen_response")
-    codegen_refinement_response = st.session_state.get("codegen_refinement_response")
-
     if selected_workspace_section == "Setup":
         st.subheader("1. Upload")
         st.caption("Any row-based format can map to any other row-based format across CSV, JSON, XML, and XLSX.")
@@ -316,11 +797,52 @@ def render_workspace_tab(
             )
         source_file = st.file_uploader("Source file", type=all_upload_types, key="source_file")
         if canonical_mode:
+            try:
+                target_intent_options = list_target_intents()
+            except httpx.HTTPError as error:
+                target_intent_options = [
+                    {
+                        "target_system": "canonical",
+                        "label": "Canonical only",
+                        "description": "Canonical-first mapping with no system-specific projection bias.",
+                        "target_profile": "canonical_core",
+                        "projection_mode": "canonical_only",
+                    }
+                ]
+                st.warning(f"Target intent options could not be loaded from the backend. Falling back to Canonical only. Details: {error}")
+
+            target_intent_map = {
+                option["target_system"]: option
+                for option in target_intent_options
+                if option.get("target_system")
+            }
+            if not target_intent_map:
+                target_intent_map = {
+                    "canonical": {
+                        "target_system": "canonical",
+                        "label": "Canonical only",
+                        "description": "Canonical-first mapping with no system-specific projection bias.",
+                        "target_profile": "canonical_core",
+                        "projection_mode": "canonical_only",
+                    }
+                }
+            target_intent_keys = list(target_intent_map.keys())
+            current_target_intent = str(st.session_state.get("canonical_target_system") or "canonical").strip().lower() or "canonical"
+            if current_target_intent not in target_intent_map:
+                st.session_state["canonical_target_system"] = target_intent_keys[0]
             st.selectbox(
-                "Canonical target",
-                options=["canonical"],
+                "Canonical target intent",
+                options=target_intent_keys,
                 key="canonical_target_system",
-                help="Epic 12A is system-neutral and maps source fields only to canonical glossary concepts.",
+                format_func=lambda option_key: target_intent_map[option_key]["label"],
+                help="Canonical-first mapping keeps the canonical layer as source of truth, while target intent adds system-aware projection hints.",
+            )
+            selected_target_intent = target_intent_map.get(
+                str(st.session_state.get("canonical_target_system") or "canonical").strip().lower() or "canonical",
+                target_intent_map[target_intent_keys[0]],
+            )
+            st.caption(
+                f"{selected_target_intent['description']} Profile: {selected_target_intent.get('target_profile') or '-'} | Projection: {selected_target_intent.get('projection_mode') or '-'}"
             )
             target_file = None
         else:
@@ -438,7 +960,13 @@ def render_workspace_tab(
 
         target_table = None
         if canonical_mode:
-            st.info("Canonical mode builds a virtual target from canonical_glossary.csv when you generate mapping.")
+            active_target_intent = str(st.session_state.get("canonical_target_system") or "canonical").strip().lower() or "canonical"
+            if active_target_intent == "canonical":
+                st.info("Canonical mode builds a virtual target from canonical_glossary.csv when you generate mapping.")
+            else:
+                st.info(
+                    f"Canonical mode builds a target-aware canonical projection for {active_target_intent.upper()} when you generate mapping. The canonical layer remains the source of truth."
+                )
         elif should_show_table_selector(target_tables, target_mode, is_sql=target_is_sql):
             target_table = st.selectbox("Target table", target_tables, key="target_table")
         elif target_mode == "Schema spec":
@@ -458,7 +986,7 @@ def render_workspace_tab(
                         name_col=source_spec_hint.get("name_col") if source_spec_hint else (st.session_state.get("source_spec_manual_name_col") or None),
                         description_col=source_spec_hint.get("description_col") if source_spec_hint else (st.session_state.get("source_spec_manual_desc_col") or None),
                         type_col=source_spec_hint.get("type_col") if source_spec_hint else (st.session_state.get("source_spec_manual_type_col") or None),
-                            sample_values_col=source_spec_hint.get("sample_values_col") if source_spec_hint else (st.session_state.get("source_spec_manual_sample_col") or None),
+                        sample_values_col=source_spec_hint.get("sample_values_col") if source_spec_hint else (st.session_state.get("source_spec_manual_sample_col") or None),
                     ),
                 }
                 if canonical_mode:
@@ -480,7 +1008,7 @@ def render_workspace_tab(
                 st.session_state["last_action"] = {
                     "level": "success",
                     "message": (
-                        "Uploaded source file and prepared canonical-only mapping context."
+                        f"Uploaded source file and prepared canonical mapping context for {str(payload.get('target_system') or 'canonical').strip()}."
                         if canonical_mode
                         else "Uploaded files and built source/target schema profiles."
                     ),
@@ -501,6 +1029,7 @@ def render_workspace_tab(
                     render_dataset_summary("Source", upload_response["source"])
                 with right:
                     render_dataset_summary("Target", upload_response["target"])
+            st.caption(_workspace_target_context_message(upload_response, mapping_response))
 
             st.subheader("Source Companion Metadata")
             st.caption(
@@ -535,52 +1064,20 @@ def render_workspace_tab(
                     "Enter the spec header names manually."
                 )
                 _cmp_cols = st.columns(4)
-                _cmp_cols[0].text_input(
-                    "Companion name column",
-                    key="source_companion_manual_name_col",
-                    placeholder="e.g. Column",
-                )
-                _cmp_cols[1].text_input(
-                    "Companion description column",
-                    key="source_companion_manual_desc_col",
-                    placeholder="e.g. Description",
-                )
-                _cmp_cols[2].text_input(
-                    "Companion type column",
-                    key="source_companion_manual_type_col",
-                    placeholder="e.g. Type",
-                )
-                _cmp_cols[3].text_input(
-                    "Companion sample values column",
-                    key="source_companion_manual_sample_col",
-                    placeholder="e.g. Sample Values",
-                )
+                _cmp_cols[0].text_input("Companion name column", key="source_companion_manual_name_col", placeholder="e.g. Column")
+                _cmp_cols[1].text_input("Companion description column", key="source_companion_manual_desc_col", placeholder="e.g. Description")
+                _cmp_cols[2].text_input("Companion type column", key="source_companion_manual_type_col", placeholder="e.g. Type")
+                _cmp_cols[3].text_input("Companion sample values column", key="source_companion_manual_sample_col", placeholder="e.g. Sample Values")
 
             if st.button("Apply source companion metadata", key="apply_source_companion_metadata"):
                 try:
                     enrichment_result = enrich_dataset_metadata(
                         upload_response["source"]["dataset_id"],
                         source_companion_file,
-                        name_col=(
-                            source_companion_hint.get("name_col")
-                            if source_companion_hint
-                            else (st.session_state.get("source_companion_manual_name_col") or None)
-                        ),
-                        description_col=(
-                            source_companion_hint.get("description_col")
-                            if source_companion_hint
-                            else (st.session_state.get("source_companion_manual_desc_col") or None)
-                        ),
-                        type_col=(
-                            source_companion_hint.get("type_col")
-                            if source_companion_hint
-                            else (st.session_state.get("source_companion_manual_type_col") or None)
-                        ),
-                        sample_values_col=(
-                            source_companion_hint.get("sample_values_col")
-                            if source_companion_hint
-                            else (st.session_state.get("source_companion_manual_sample_col") or None)
-                        ),
+                        name_col=(source_companion_hint.get("name_col") if source_companion_hint else (st.session_state.get("source_companion_manual_name_col") or None)),
+                        description_col=(source_companion_hint.get("description_col") if source_companion_hint else (st.session_state.get("source_companion_manual_desc_col") or None)),
+                        type_col=(source_companion_hint.get("type_col") if source_companion_hint else (st.session_state.get("source_companion_manual_type_col") or None)),
+                        sample_values_col=(source_companion_hint.get("sample_values_col") if source_companion_hint else (st.session_state.get("source_companion_manual_sample_col") or None)),
                     )
                     st.session_state["upload_response"]["source"] = enrichment_result["dataset"]
                     st.session_state["source_companion_metadata_result"] = {
@@ -635,52 +1132,20 @@ def render_workspace_tab(
                         "Enter the spec header names manually."
                     )
                     _target_cmp_cols = st.columns(4)
-                    _target_cmp_cols[0].text_input(
-                        "Target companion name column",
-                        key="target_companion_manual_name_col",
-                        placeholder="e.g. Column",
-                    )
-                    _target_cmp_cols[1].text_input(
-                        "Target companion description column",
-                        key="target_companion_manual_desc_col",
-                        placeholder="e.g. Description",
-                    )
-                    _target_cmp_cols[2].text_input(
-                        "Target companion type column",
-                        key="target_companion_manual_type_col",
-                        placeholder="e.g. Type",
-                    )
-                    _target_cmp_cols[3].text_input(
-                        "Target companion sample values column",
-                        key="target_companion_manual_sample_col",
-                        placeholder="e.g. Sample Values",
-                    )
+                    _target_cmp_cols[0].text_input("Target companion name column", key="target_companion_manual_name_col", placeholder="e.g. Column")
+                    _target_cmp_cols[1].text_input("Target companion description column", key="target_companion_manual_desc_col", placeholder="e.g. Description")
+                    _target_cmp_cols[2].text_input("Target companion type column", key="target_companion_manual_type_col", placeholder="e.g. Type")
+                    _target_cmp_cols[3].text_input("Target companion sample values column", key="target_companion_manual_sample_col", placeholder="e.g. Sample Values")
 
                 if st.button("Apply target companion metadata", key="apply_target_companion_metadata"):
                     try:
                         enrichment_result = enrich_dataset_metadata(
                             upload_response["target"]["dataset_id"],
                             target_companion_file,
-                            name_col=(
-                                target_companion_hint.get("name_col")
-                                if target_companion_hint
-                                else (st.session_state.get("target_companion_manual_name_col") or None)
-                            ),
-                            description_col=(
-                                target_companion_hint.get("description_col")
-                                if target_companion_hint
-                                else (st.session_state.get("target_companion_manual_desc_col") or None)
-                            ),
-                            type_col=(
-                                target_companion_hint.get("type_col")
-                                if target_companion_hint
-                                else (st.session_state.get("target_companion_manual_type_col") or None)
-                            ),
-                            sample_values_col=(
-                                target_companion_hint.get("sample_values_col")
-                                if target_companion_hint
-                                else (st.session_state.get("target_companion_manual_sample_col") or None)
-                            ),
+                            name_col=(target_companion_hint.get("name_col") if target_companion_hint else (st.session_state.get("target_companion_manual_name_col") or None)),
+                            description_col=(target_companion_hint.get("description_col") if target_companion_hint else (st.session_state.get("target_companion_manual_desc_col") or None)),
+                            type_col=(target_companion_hint.get("type_col") if target_companion_hint else (st.session_state.get("target_companion_manual_type_col") or None)),
+                            sample_values_col=(target_companion_hint.get("sample_values_col") if target_companion_hint else (st.session_state.get("target_companion_manual_sample_col") or None)),
                         )
                         st.session_state["upload_response"]["target"] = enrichment_result["dataset"]
                         st.session_state["target_companion_metadata_result"] = {
@@ -738,11 +1203,7 @@ def render_workspace_tab(
                 )
             button_label = "Generate canonical mapping" if upload_mode == "canonical" else "Generate mapping"
             button_key = "generate_canonical_mapping" if upload_mode == "canonical" else "generate_mapping"
-            activity_label = (
-                "Canonical mapping activity"
-                if upload_mode == "canonical"
-                else "Mapping activity"
-            )
+            activity_label = "Canonical mapping activity" if upload_mode == "canonical" else "Mapping activity"
             activity_placeholder = st.empty()
 
             def _apply_mapping_response(mapping_response_payload: dict) -> None:
@@ -864,6 +1325,7 @@ def render_workspace_tab(
                         f"profile={runtime.get('scoring_profile') or 'n/a'} | "
                         f"description_priority={'on' if runtime.get('description_priority') else 'off'}"
                     )
+                    st.caption(_workspace_target_context_message(upload_response, mapping_response))
                 else:
                     st.warning(
                         "This mapping result does not include a runtime fingerprint. "
@@ -877,11 +1339,13 @@ def render_workspace_tab(
 
     if selected_workspace_section == "Review":
         if mapping_response:
+            st.caption(_workspace_target_context_message(upload_response, mapping_response))
             if (upload_response or {}).get("mapping_mode") == "canonical":
                 st.caption("Canonical-only review treats canonical concept IDs as virtual targets built from the glossary.")
             display_trust_layer(mapping_response)
             render_mapping_analysis_panel(mapping_response)
             render_mapping_review(mapping_response)
+            render_active_draft_review_state_panel()
             render_mapping_editor(mapping_response)
             render_canonical_gap_assistant(mapping_response)
             render_canonical_concept_summary(mapping_response)
@@ -893,8 +1357,10 @@ def render_workspace_tab(
 
     if selected_workspace_section == "Decisions":
         if mapping_response:
+            st.caption(_workspace_target_context_message(upload_response, mapping_response))
             render_mapping_decision_summary()
             render_manual_mapping_panel(mapping_response)
+            render_active_draft_decision_state_panel()
             render_mapping_io_panel()
             render_mapping_set_versions_panel()
             if (upload_response or {}).get("mapping_mode") != "canonical":
@@ -909,6 +1375,7 @@ def render_workspace_tab(
 
     if selected_workspace_section == "Output":
         if mapping_response:
+            st.caption(_workspace_target_context_message(upload_response, mapping_response))
             canonical_output_mode = (upload_response or {}).get("mapping_mode") == "canonical"
             mapping_decisions = build_mapping_decisions()
             if canonical_output_mode:
@@ -1081,9 +1548,7 @@ def render_workspace_tab(
                     if codegen_refinement_response is not None:
                         st.code(
                             codegen_refinement_response["code"],
-                            language=_workspace_generated_artifact_code_language(
-                                codegen_refinement_response.get("language")
-                            ),
+                            language=_workspace_generated_artifact_code_language(codegen_refinement_response.get("language")),
                         )
                         reasoning = codegen_refinement_response.get("reasoning") or []
                         if reasoning:
@@ -1147,12 +1612,7 @@ def render_workspace_tab(
                     key="output_refine_codegen",
                     disabled=(not _workspace_llm_refinement_enabled())
                     or (
-                        not str(
-                            (_workspace_refinement_source_response(codegen_response, codegen_refinement_response) or {}).get(
-                                "code",
-                                "",
-                            )
-                        ).strip()
+                        not str((_workspace_refinement_source_response(codegen_response, codegen_refinement_response) or {}).get("code", "")).strip()
                     ),
                 ):
                     if not refinement_instruction.strip():
@@ -1168,13 +1628,7 @@ def render_workspace_tab(
                             "/mapping/codegen/refine",
                             json={
                                 "mapping_decisions": build_mapping_decisions(),
-                                "mode": (
-                                    "pyspark"
-                                    if refinement_source.get("language") == "python-pyspark"
-                                    else "dbt"
-                                    if refinement_source.get("language") == "sql-dbt"
-                                    else "pandas"
-                                ),
+                                "mode": "pyspark" if refinement_source.get("language") == "python-pyspark" else "dbt" if refinement_source.get("language") == "sql-dbt" else "pandas",
                                 "allow_unaccepted": canonical_output_mode,
                                 "current_code": refinement_source["code"],
                                 "instruction": refinement_instruction.strip(),
@@ -1196,3 +1650,101 @@ def render_workspace_tab(
                         st.rerun()
                 if not _workspace_llm_refinement_enabled():
                     st.caption("LLM refinement is unavailable until a reachable runtime provider is configured.")
+
+
+def render_workspace_tab(
+    *,
+    all_upload_types,
+    detect_spec_hint_for_upload,
+    sql_tables_for_upload,
+    api_request,
+    upload_dataset_handle,
+    enrich_dataset_metadata,
+    uploaded_file_bytes,
+    render_dataset_summary,
+    initialize_mapping_editor_state,
+    render_mapping_analysis_panel,
+    display_trust_layer,
+    render_mapping_review,
+    render_mapping_editor,
+    render_canonical_gap_assistant,
+    render_canonical_concept_summary,
+    render_active_draft_review_state_panel,
+    render_active_draft_decision_state_panel,
+    render_manual_mapping_panel,
+    render_mapping_decision_summary,
+    render_mapping_io_panel,
+    render_mapping_set_versions_panel,
+    render_correction_panel,
+    build_mapping_decisions,
+    request_mapping_analysis_summary,
+) -> None:
+    """Render the full Workspace surface from setup through review, decisions, and output."""
+
+    resolve_active_workspace_section(st.session_state)
+    selected_workspace_section = st.radio(
+        "Workspace section",
+        WORKSPACE_SECTIONS,
+        key="active_workspace_section",
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    active_mapping_mode = st.session_state.get("mapping_mode", "Standard")
+    source_file = st.session_state.get("source_file")
+    target_file = st.session_state.get("target_file") if active_mapping_mode == "Standard" else None
+    source_tables: list[str] = []
+    target_tables: list[str] = []
+    source_spec_hint = None
+    target_spec_hint = None
+    inspection_error = None
+    if source_file is not None or target_file is not None:
+        try:
+            source_tables = sql_tables_for_upload(source_file, "source")
+            target_tables = sql_tables_for_upload(target_file, "target")
+            source_spec_hint = detect_spec_hint_for_upload(source_file, "source")
+            target_spec_hint = detect_spec_hint_for_upload(target_file, "target")
+        except httpx.HTTPError as error:
+            inspection_error = str(error)
+
+    upload_response = st.session_state.get("upload_response")
+    mapping_response = st.session_state.get("mapping_response")
+    preview_response = st.session_state.get("preview_response")
+    codegen_response = st.session_state.get("codegen_response")
+    codegen_refinement_response = st.session_state.get("codegen_refinement_response")
+    _render_workspace_section_content(
+        selected_workspace_section=selected_workspace_section,
+        all_upload_types=all_upload_types,
+        detect_spec_hint_for_upload=detect_spec_hint_for_upload,
+        api_request=api_request,
+        upload_dataset_handle=upload_dataset_handle,
+        enrich_dataset_metadata=enrich_dataset_metadata,
+        render_dataset_summary=render_dataset_summary,
+        initialize_mapping_editor_state=initialize_mapping_editor_state,
+        render_mapping_analysis_panel=render_mapping_analysis_panel,
+        display_trust_layer=display_trust_layer,
+        render_mapping_review=render_mapping_review,
+        render_mapping_editor=render_mapping_editor,
+        render_canonical_gap_assistant=render_canonical_gap_assistant,
+        render_canonical_concept_summary=render_canonical_concept_summary,
+        render_active_draft_review_state_panel=render_active_draft_review_state_panel,
+        render_active_draft_decision_state_panel=render_active_draft_decision_state_panel,
+        render_manual_mapping_panel=render_manual_mapping_panel,
+        render_mapping_decision_summary=render_mapping_decision_summary,
+        render_mapping_io_panel=render_mapping_io_panel,
+        render_mapping_set_versions_panel=render_mapping_set_versions_panel,
+        render_correction_panel=render_correction_panel,
+        build_mapping_decisions=build_mapping_decisions,
+        source_file=source_file,
+        target_file=target_file,
+        source_tables=source_tables,
+        target_tables=target_tables,
+        source_spec_hint=source_spec_hint,
+        target_spec_hint=target_spec_hint,
+        inspection_error=inspection_error,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        preview_response=preview_response,
+        codegen_response=codegen_response,
+        codegen_refinement_response=codegen_refinement_response,
+    )

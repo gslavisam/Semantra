@@ -366,6 +366,26 @@ def list_canonical_target_fields(target_system: str = "canonical") -> list[str]:
     return [str(item or "").strip() for item in response or [] if str(item or "").strip()]
 
 
+def list_target_intents() -> list[dict[str, str]]:
+    """Load supported canonical-first target-intent options for the Workspace setup flow."""
+
+    response = api_request(
+        "GET",
+        "/mapping/target-intents",
+    )
+    return [
+        {
+            "target_system": str(item.get("target_system") or "").strip().lower(),
+            "label": str(item.get("label") or item.get("target_system") or "").strip(),
+            "description": str(item.get("description") or "").strip(),
+            "target_profile": str(item.get("target_profile") or "").strip(),
+            "projection_mode": str(item.get("projection_mode") or "").strip(),
+        }
+        for item in (response or [])
+        if str(item.get("target_system") or "").strip()
+    ]
+
+
 def current_workspace_scope() -> dict[str, str | None]:
     """Return the current source-system, business-domain, and integration scope from session state."""
 

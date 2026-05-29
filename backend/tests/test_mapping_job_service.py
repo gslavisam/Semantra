@@ -163,9 +163,51 @@ def test_sqlite_mapping_job_state_store_recovers_interrupted_active_jobs() -> No
     status = store.get_status("job-1")
 
     assert store.runtime_status().storage_mode == "sqlite_status"
+    assert store.runtime_status().restart_safe is True
     assert status.status == "failed"
     assert status.error == "Mapping job interrupted before completion because the local worker runtime restarted."
+    assert status.recovery_signal == "worker_runtime_restarted"
+    assert status.lease_expires_at is None
     assert any("worker runtime restarted" in line for line in status.activity)
+
+
+def test_mapping_job_store_claims_worker_and_exposes_lease_metadata() -> None:
+    store = MappingJobStore()
+    release_worker = threading.Event()
+
+    def worker(progress_callback):
+        progress_callback("checkpoint 1")
+        release_worker.wait(timeout=1)
+        return AutoMappingResponse()
+
+    job = store.start(worker, created_by="qa-user", workspace_id="ws-jobs-01")
+
+    deadline = time.monotonic() + 1
+    claimed_status = None
+    while time.monotonic() < deadline:
+        claimed_status = store.get_status(job.job_id)
+        if claimed_status.worker_id and claimed_status.claimed_at and claimed_status.heartbeat_at and claimed_status.lease_expires_at:
+            break
+        time.sleep(0.01)
+
+    release_worker.set()
+
+    assert claimed_status is not None
+    assert claimed_status.worker_id is not None
+    assert claimed_status.claimed_at is not None
+    assert claimed_status.heartbeat_at is not None
+    assert claimed_status.lease_expires_at is not None
+
+
+def test_sqlite_persistence_records_named_mapping_job_runtime_migration(tmp_path) -> None:
+    persistence = SQLitePersistenceService(str(tmp_path / "mapping_jobs.sqlite3"))
+
+    with persistence.connection() as connection:
+        rows = connection.execute(
+            "SELECT migration_name FROM schema_migrations ORDER BY migration_name ASC"
+        ).fetchall()
+
+    assert [str(row[0]) for row in rows] == ["20260528_mapping_jobs_runtime_metadata"]
 
 
 def test_sqlite_persistence_lists_latest_mapping_job_events_in_chronological_order(tmp_path) -> None:

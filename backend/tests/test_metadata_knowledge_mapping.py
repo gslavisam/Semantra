@@ -89,6 +89,34 @@ def test_metadata_dictionary_prefers_sap_customer_alias_to_customer_id() -> None
     assert any("Internal metadata dictionary aligns" in line for line in result.mappings[0].explanation)
 
 
+def test_name1_does_not_bleed_canonical_name_concepts_into_phone_number_target() -> None:
+    source_schema = SchemaProfile(
+        dataset_id="source",
+        dataset_name="source.csv",
+        row_count=2,
+        columns=[make_column("NAME1", ["text"], ["Acme GmbH", "Contoso AG"])],
+    )
+    target_schema = SchemaProfile(
+        dataset_id="target",
+        dataset_name="target.csv",
+        row_count=2,
+        columns=[
+            make_column("customer_id", ["numeric_id"], ["1000", "2000"]),
+            make_column("customer_email", ["email"], ["ana@example.com", "bob@example.com"]),
+            make_column("phone_number", ["phone"], ["0641234567", "0659998888"]),
+        ],
+    )
+
+    result = generate_mapping_candidates(source_schema, target_schema, write_decision_log=False)
+    phone_candidate = next(candidate for candidate in result.ranked_mappings[0].candidates if candidate.target == "phone_number")
+
+    assert phone_candidate.signals.knowledge == 0.0
+    assert phone_candidate.signals.canonical == 0.0
+    assert all("Contact Name" not in line for line in phone_candidate.explanation)
+    assert all("Address City" not in line for line in phone_candidate.explanation)
+    assert phone_candidate.confidence < 0.5
+
+
 def test_canonical_glossary_import_avoids_full_metadata_reseed(tmp_path) -> None:
     service = MetadataKnowledgeService()
     service.canonical_glossary_path = tmp_path / "canonical_glossary.csv"

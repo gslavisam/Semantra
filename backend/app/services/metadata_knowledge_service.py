@@ -798,11 +798,15 @@ class MetadataKnowledgeService:
         # knowledge score incorrectly stays at zero.
         for kc_id, source_match in source_matches.items():
             for target_cc_id, target_cc_match in target_canonical_matches.items():
+                if not set(source_match.matched_aliases).intersection(target_cc_match.matched_aliases):
+                    continue
                 if target_cc_id in self._kc_to_cc.get(kc_id, set()):
                     candidate_scores.append(min(source_match.strength * 0.85, target_cc_match.strength))
 
         for kc_id, target_match in target_matches.items():
             for source_cc_id, source_cc_match in source_canonical_matches.items():
+                if not set(target_match.matched_aliases).intersection(source_cc_match.matched_aliases):
+                    continue
                 if source_cc_id in self._kc_to_cc.get(kc_id, set()):
                     candidate_scores.append(min(target_match.strength * 0.85, source_cc_match.strength))
 
@@ -1169,14 +1173,18 @@ class MetadataKnowledgeService:
         # (multilingual names, SAP/QAD/WD field names from metadata_dict.csv).
         for candidate_name in {normalized_name, normalized_profile_name}:
             for kc_id in self._alias_to_concepts.get(candidate_name, set()):
-                for cc_id in self._kc_to_cc.get(kc_id, set()):
+                for cc_id in self._kc_to_cc.get(kc_id, set()).intersection(
+                    self._canonical_alias_to_concepts.get(candidate_name, set())
+                ):
                     if cc_id not in strengths:  # don't downgrade a direct Phase-1 match
                         strengths[cc_id] = 0.8
                         matched_aliases.setdefault(cc_id, set()).add(candidate_name)
 
         for candidate_name in metadata_candidates:
             for kc_id in self._alias_to_concepts.get(candidate_name, set()):
-                for cc_id in self._kc_to_cc.get(kc_id, set()):
+                for cc_id in self._kc_to_cc.get(kc_id, set()).intersection(
+                    self._canonical_alias_to_concepts.get(candidate_name, set())
+                ):
                     if cc_id not in strengths:
                         strengths[cc_id] = canonical_bridge_metadata_strength
                         matched_aliases.setdefault(cc_id, set()).add(candidate_name)
@@ -1189,7 +1197,9 @@ class MetadataKnowledgeService:
                     continue
                 if alias_tokens.issubset(profile_tokens):
                     for kc_id in kc_ids:
-                        for cc_id in self._kc_to_cc.get(kc_id, set()):
+                        for cc_id in self._kc_to_cc.get(kc_id, set()).intersection(
+                            self._canonical_alias_to_concepts.get(alias, set())
+                        ):
                             if cc_id not in strengths:
                                 strengths[cc_id] = 0.6
                                 matched_aliases.setdefault(cc_id, set()).add(alias)
@@ -1201,7 +1211,9 @@ class MetadataKnowledgeService:
                     continue
                 if alias_tokens.issubset(metadata_tokens):
                     for kc_id in kc_ids:
-                        for cc_id in self._kc_to_cc.get(kc_id, set()):
+                        for cc_id in self._kc_to_cc.get(kc_id, set()).intersection(
+                            self._canonical_alias_to_concepts.get(alias, set())
+                        ):
                             if cc_id not in strengths:
                                 strengths[cc_id] = 0.5
                                 matched_aliases.setdefault(cc_id, set()).add(alias)

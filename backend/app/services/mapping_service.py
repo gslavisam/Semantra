@@ -185,6 +185,8 @@ def generate_mapping_candidates(
     progress_callback: ProgressCallback | None = None,
     description_priority: bool = False,
     candidate_pool_size: int | None = None,
+    created_by: str | None = None,
+    workspace_id: str | None = None,
 ) -> AutoMappingResponse:
     """Generate the full Semantra mapping response for one source-target schema pair.
 
@@ -293,7 +295,14 @@ def generate_mapping_candidates(
             selected_mappings.append(selected)
             _emit_progress(progress_callback, f"Selected {index}/{len(source_columns)}: {source_column.name} -> no_match by LLM.")
             if write_decision_log:
-                log_decision(source_column.name, rankings[: settings.top_k_candidates], llm_result, selected)
+                log_decision(
+                    source_column.name,
+                    rankings[: settings.top_k_candidates],
+                    llm_result,
+                    selected,
+                    created_by=created_by,
+                    workspace_id=workspace_id,
+                )
             continue
 
         if selected_score is None:
@@ -313,6 +322,41 @@ def generate_mapping_candidates(
                 considered_targets=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
             )
         else:
+            if should_fallback_to_closed_set_no_match(
+                rankings,
+                selected_score,
+                source=source_column,
+                llm_result=llm_result,
+            ):
+                selected = build_closed_set_no_match_mapping(
+                    source_column.name,
+                    selected_score,
+                    alternatives=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
+                )
+                ranked_results.append(
+                    SourceMappingResult(
+                        source=source_column.name,
+                        selected=selected,
+                        candidates=candidate_options,
+                    )
+                )
+                selected_mappings.append(selected)
+                if write_decision_log:
+                    log_decision(
+                        source_column.name,
+                        rankings[: settings.top_k_candidates],
+                        llm_result,
+                        selected,
+                        created_by=created_by,
+                        workspace_id=workspace_id,
+                    )
+                _emit_progress(
+                    progress_callback,
+                    f"Selected {index}/{len(source_columns)}: {source_column.name} -> no_match "
+                    f"({selected_score.score:.0%}, heuristic closed-set fallback).",
+                )
+                continue
+
             extra_explanation: list[str] = []
             if llm_result and llm_result.selected_target != "no_match" and llm_result.selected_target != selected_score.target.name:
                 extra_explanation.append(
@@ -340,7 +384,14 @@ def generate_mapping_candidates(
             selected.transformation_code = transformation_code
 
         if write_decision_log:
-            log_decision(source_column.name, rankings[: settings.top_k_candidates], llm_result, selected)
+            log_decision(
+                source_column.name,
+                rankings[: settings.top_k_candidates],
+                llm_result,
+                selected,
+                created_by=created_by,
+                workspace_id=workspace_id,
+            )
 
         ranked_results.append(
             SourceMappingResult(
@@ -963,6 +1014,7 @@ def compute_final_score(
             source_sap_profile = build_source_sap_context_profile(source)
         adjusted_score = clamp_score(adjusted_score + compute_sap_confidence_boost(signals, source_sap_profile))
         adjusted_score = max(adjusted_score, sap_business_anchor_floor(source, signals))
+        adjusted_score = max(adjusted_score, canonical_core_identifier_floor(source, target, signals))
     return round(clamp_score(adjusted_score), 4)
 
 
@@ -1144,6 +1196,31 @@ def has_strong_identifier_consensus(
     return has_business_consensus and has_value_consensus and has_pattern_consensus and has_llm_consensus
 
 
+def canonical_core_identifier_floor(
+    source: ColumnProfile,
+    target: ColumnProfile,
+    signals: ScoringSignals,
+) -> float:
+    """Preserve core canonical .id concepts when the source behaves like an identifier and bridges strongly by knowledge.
+
+    This is intentionally narrow: it only applies to canonical core identifiers such as
+    `customer.id`, not to more specialized party-specific ids. It keeps canonical-only
+    mode anchored on the stable entity id when a source field has a strong knowledge
+    bridge but weaker lexical similarity than more verbose canonical variants.
+    """
+
+    resolved_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(target.name)
+    if resolved_concept_id != target.name:
+        return 0.0
+    if not target.name.endswith(".id"):
+        return 0.0
+    if signals.knowledge < 0.85:
+        return 0.0
+    if source.unique_ratio < 0.9 or source.null_ratio > 0.2:
+        return 0.0
+    return clamp_score(signals.knowledge - 0.45)
+
+
 def sample_overlap_score(source_values: set[str], target_values: set[str]) -> float:
     """Compute simple sample-value overlap between source and target distinct values."""
 
@@ -1301,6 +1378,32 @@ def build_candidate_option(score: CandidateScore) -> CandidateOption:
     )
 
 
+def build_closed_set_no_match_mapping(
+    source_name: str,
+    best_score: CandidateScore,
+    *,
+    alternatives: list[str],
+) -> MappingCandidate:
+    """Build an unresolved mapping when the closed candidate set never clears low confidence."""
+
+    return MappingCandidate(
+        source=source_name,
+        target=None,
+        confidence=0.0,
+        confidence_label="low_confidence",
+        status="needs_review",
+        method="closed_set_no_match",
+        signals=best_score.signals,
+        explanation=list(best_score.explanation)
+        + [
+            "No candidate in the closed target set cleared the minimum confidence gate; leaving this source field unresolved.",
+            f"Best heuristic candidate '{best_score.target.name}' remained in the low-confidence band ({best_score.score:.0%}).",
+        ],
+        canonical_details=best_score.canonical_details,
+        alternatives=alternatives,
+    )
+
+
 def build_selected_mapping(
     source_name: str,
     score: CandidateScore,
@@ -1331,6 +1434,38 @@ def build_selected_mapping(
             considered_targets=considered_targets or [score.target.name],
         ),
     )
+
+
+def should_fallback_to_closed_set_no_match(
+    rankings: list[CandidateScore],
+    selected_score: CandidateScore | None,
+    *,
+    source: ColumnProfile,
+    llm_result: LLMValidationResult | None,
+) -> bool:
+    """Return whether the closed candidate set is too weak to auto-select any target."""
+
+    if selected_score is None or llm_result is not None:
+        return False
+
+    candidate_scores = rankings[: settings.top_k_candidates]
+    if not candidate_scores:
+        return False
+
+    has_strong_selection_evidence = (
+        selected_score.signals.name >= 0.75
+        or selected_score.signals.semantic >= 0.6
+        or selected_score.signals.knowledge >= 0.6
+        or selected_score.signals.canonical >= 0.6
+        or selected_score.signals.pattern >= 0.8
+        or selected_score.signals.overlap >= 0.5
+        or selected_score.signals.embedding >= 0.65
+        or selected_score.signals.correction > 0
+    )
+    if has_strong_selection_evidence:
+        return False
+
+    return all(score_to_label(candidate.score, source=source) == "low_confidence" for candidate in candidate_scores)
 
 
 def build_llm_decision_proposition(
@@ -1380,12 +1515,17 @@ def log_decision(
     rankings: list[CandidateScore],
     llm_result: LLMValidationResult | None,
     selected: MappingCandidate,
+    *,
+    created_by: str | None = None,
+    workspace_id: str | None = None,
 ) -> None:
     """Append one decision-log record for an evaluated source field."""
 
     decision_log_store.append(
         DecisionLogEntry(
             source=source_name,
+            created_by=created_by,
+            workspace_id=workspace_id,
             candidate_targets=[candidate.target.name for candidate in rankings],
             heuristic_scores={candidate.target.name: candidate.score for candidate in rankings},
             llm_result=llm_result,

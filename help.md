@@ -27,10 +27,26 @@ Ako prvi put ulaziš u aplikaciju, kreni ovim redom:
 
 ## Sidebar kontrole
 
-Sidebar sada uključuje i operativni mini panel sa:
+Levi sidebar je sada multi-view support surface kojim upravlja `Sidebar view`.
 
-- `Operations` KPI grid-om (`Active decisions`, `Open review items`, `Pending LLM proposals`, `Canonical concepts`, `Knowledge concepts`)
-- `Unified Status Legend` (accepted, needs_review, rejected, llm_proposal)
+Dostupni sidebar prikazi:
+
+- `System` za connection settings, runtime status, KPI metrike i status legendu
+- `WS Copilot` za read-only Workspace context plus bounded pitanje/odgovor i conversation history
+- `WS Brief` za kratak `Now / Risks / Next actions` prikaz trenutnog Workspace stanja
+- `Help` za ovaj in-app English reference guide
+- `Reference` za dublje tehničke reference učitane iz `docs/reference` plus izabranih presentation dokumenata
+
+### `System`
+
+`System` je operativni sidebar view. U njemu su:
+
+- `API Base URL`
+- `Admin Token`
+- `Runtime`
+- `Operations`
+- `Unified Status Legend`
+- `Reset flow`
 
 ### `API Base URL`
 
@@ -40,9 +56,36 @@ Koristi kada backend nije na podrazumevanoj lokalnoj adresi.
 
 Koristi za zaštićene governance, benchmark, catalog i knowledge tokove kada backend traži token.
 
+### `WS Copilot`
+
+Koristi ovaj sidebar mod kada želiš bounded pomoć za:
+
+- to šta radi koja Semantra area ili Workspace sekcija
+- to šta trenutno blokira napredak u Workspace-u
+- to koji je sledeći preporučeni korak
+- trenutno mapping stanje, kada mapping rezultat već postoji
+
+Ovo je guidance surface, ne freeform autonomous agent. Odgovori su ograničeni na app/workflow guidance i aktivni Workspace context.
+
+### `WS Brief`
+
+Koristi ovaj mod kada želiš najkraći operativni readout trenutne Workspace sesije:
+
+- `Now`
+- `Risks`
+- `Next actions`
+
+### `Help`
+
+Ovaj sidebar mod prikazuje aktuelni English help vodič direktno u aplikaciji, tako da dokumentacija ostane dostupna dok radiš.
+
+### `Reference`
+
+Ovaj sidebar mod ti omogućava da iz padajućeg menija izabereš dostupan dokument iz `docs/reference` i pročitaš ga direktno u aplikaciji. Uključuje i izabrane presentation-side reference dokumente kao što je `docs/presentation/Conceptualization.md`. Koristi ga za dublje tehničke reference kao što su scoring, preview/codegen warning ponašanje, benchmark metrike, canonical stewardship, catalog reuse, workflows i product framing.
+
 ### `Reset flow`
 
-Briše aktivni Workspace session state i vraća UI u početno stanje. Koristi kada želiš novi scenario bez ostatka starog review state-a.
+Ova akcija je dostupna samo u `System` sidebar view-u. Briše aktivni Workspace session state i vraća UI u početno stanje. Resetuje tranzijentne Workspace podatke kao što su uploadi, mapping rezultati, analize, generisani artefakti i sidebar copilot chat history. Ne briše backend podatke i ne menja konekciju.
 
 ## Workspace
 
@@ -58,26 +101,30 @@ Briše aktivni Workspace session state i vraća UI u početno stanje. Koristi ka
 Ovde radiš:
 
 - izbor moda `Standard` ili `Canonical`
+- izbor `Canonical target intent` u canonical modu kada želiš canonical-only ponašanje ili target-aware projection hint
 - upload source i target fajlova kada radiš standardni mapping
 - source-only upload kada radiš canonical-only mapping
 - izbor `Row data` ili `Schema spec` kada fajl liči na field-per-row specifikaciju
 - izbor tabela kada SQL snapshot sadrži više tabela
 - opciono source companion metadata enrichment
 - opciono target companion metadata enrichment kada radiš standard source + target tok
+- uključivanje `Use LLM validation` kada želiš bounded validaciju u ambiguity band-u
+- uključivanje `Prioritize source descriptions` kada source description/type metadata treba da ima veći heuristički uticaj
 - podešavanje `Canonical candidate pool size` u canonical modu
 
 Kada koristiš `Standard`:
 
 - imaš realan source i realan target
 - možeš dodati odvojene companion fajlove za source i target kada su row-data uploadi ili SQL DDL nema dovoljno opisa
-- kasnije možeš da radiš preview, Pandas/PySpark code generation i artifact refinement
+- kasnije možeš da radiš preview, Pandas/PySpark/dbt generation i artifact refinement
 
 Kada koristiš `Canonical`:
 
 - nemaš još realan target ili želiš prvo semantic normalization pass
 - rezultat je source -> canonical concept mapping
+- i dalje možeš birati target intent tako da canonical-first mapping ostane canonical-only ili dobije system-aware projection hint
 - preview nije dostupan jer nema realnog target dataseta
-- codegen i artifact refinement su i dalje dostupni nad trenutnim source -> canonical odlukama
+- codegen i artifact refinement su i dalje dostupni nad trenutnim source -> canonical odlukama, uključujući Pandas, PySpark i dbt-style outpute
 
 ### `Review`
 
@@ -85,6 +132,7 @@ Ovde vidiš:
 
 - trust-layer objašnjenja za izabrane predloge
 - confidence i signal breakdown
+- repeated-attention grupisanje za šumovite ili ponavljane review paterne
 - LLM napomene kada je validator korišćen
 - per-row `LLM refine` unos za trenutno polje, uključujući meaning/negative/sample/refinement instruction kontekst
 - batch low-confidence LLM refine za review red
@@ -97,8 +145,7 @@ Ovde vidiš:
 - `Mapping Analysis Overview` za tehnički sažetak trenutnog mapping stanja
 - opcioni audio narativ za generated mapping analysis
 - `Review Queue Plan` za grupisanje review reda po prioritetima i obrascima
-- `Source -> Concept View`
-- `Concept -> Target View`
+- `Selected Mapping Details`, uključujući canonical mismatch detalje, source-side concept redove i target-side concept redove
 - canonical gap suggestion tok za slučajeve gde mapping izgleda dobar, ali canonical path nije popunjen
 - `Gap Queue Summary` za queue-level pregled ponavljanih canonical gap familija
 
@@ -109,6 +156,7 @@ Važna razlika:
 - `Mapping Analysis Overview` opisuje trenutno stanje mapping-a kao tehnički readout
 - `Review Queue Plan` ne objašnjava mapping globalno, već predlaže kojim redom da rešavaš current review queue
 - `Gap Queue Summary` radi isto to, ali samo za canonical gap candidate red
+- `Selected Mapping Details` je mesto gde se pojavljuju source-side i target-side concept tabele; nisu zasebni top-level review tabovi
 - `LLM Decision Proposals` ostaju advisory dok ih eksplicitno ne apply-uješ u `Decisions`
 
 ### `Decisions`
@@ -118,7 +166,8 @@ Ovde radiš:
 - ručne izmene target izbora
 - ručno mapiranje i u canonical modu, prema virtual canonical target opcijama
 - import/export mapping odluka kao JSON ili Excel
-- apply/dismiss tok za `LLM Decision Proposals` (`Apply selected` i `Apply safe`)
+- apply/dismiss tok za `LLM Decision Proposals` kroz `Apply safe proposals`, `Proposal source`, `Apply selected proposal` i `Dismiss selected proposal`
+- kreiranje, nastavljanje i ažuriranje draft session tokova za shared review/decision persistence
 - čuvanje mapping set verzija
 - učitavanje i primenu prethodno sačuvanih mapping setova
 - corrections tok i reusable learning tok
@@ -127,16 +176,18 @@ Važna pravila:
 
 - mapping set reuse nazad u Workspace radi samo za `approved` mapping setove
 - corrections se čuvaju samo kada je review ishod zatvoren, ne dok je odluka još nerešena
-- `Apply safe` je konzervativni batch mode za proposal apply, ne široko automatsko prihvatanje AI predloga
+- `Apply safe proposals` je konzervativni batch mode za proposal apply, ne široko automatsko prihvatanje AI predloga
+- `Apply selected proposal` je single-proposal akcija za trenutno izabrani `Proposal source`
 - `Active Decisions` sada prikazuje i decision-origin metadata (`manual_mapping`, `llm_proposal`) kada je dostupna
 - decision-origin audit metadata je uključena i u decision JSON export/import tok
+- draft session-i ti omogućavaju da sačuvaš review filtere, aktivne odluke i section context pre povratka kasnije
 
 ### `Output`
 
 Ovde radiš:
 
 - `Generate preview`
-- `Generate Pandas code` ili `Generate PySpark code`
+- `Generate Pandas code`, `Generate PySpark code` ili `Generate dbt model`
 - `Refine with LLM` nad već generisanim artefaktom
 - save/list/run transformation test set tokove kada su odluke accepted
 
@@ -314,7 +365,7 @@ Važno:
 4. Klikni `Generate mapping`.
 5. U `Review` po potrebi generiši `Mapping Analysis Overview`, koristi per-row ili batch `LLM refine`, zatim proveri trust layer, canonical path i eventualne canonical gap predloge.
 6. Ako review red deluje velik ili šumovit, koristi `Review Queue Plan` i po potrebi `Gap Queue Summary`.
-7. U `Decisions` unesi ručne izmene, po potrebi apply-uj `LLM Decision Proposals`, eksportuj checkpoint ili sačuvaj mapping set.
+7. U `Decisions` unesi ručne izmene, po potrebi apply-uj `LLM Decision Proposals`, sačuvaj draft session ako želiš da pauziraš ili podeliš stanje, eksportuj checkpoint ili sačuvaj mapping set.
 8. U `Output` koristi preview, zatim codegen kada su odluke accepted, a po potrebi i transformation test set tok.
 9. Ako generated artifact treba poliranje, koristi `Refine with LLM`, pa onda `Accept refined version` ili `Discard refinement`.
 
@@ -342,10 +393,12 @@ Važno:
 - Score `>= 0.75` trenutno auto-prihvata mapping iako confidence label može ostati `medium_confidence`.
 - Preview je namerno advisory; ne znači da je mapping finalno odobren.
 - Durable i execution-like površine su strože governed od samog preview-a.
-- Nove bounded AI sekcije u Review, Benchmarks i Catalog ne rade automatske write operacije; služe za objašnjenje, trijažu i pripremu ljudske odluke.
-- Ako UI stanje deluje čudno posle više eksperimenata, `Reset flow` je često najbrži oporavak.
+- Sidebar `WS Copilot` i `WS Brief` surface-i su guidance layer-i; ne rade automatske durable write operacije.
+- Nove bounded AI sekcije u Review, Benchmarks i Catalog takođe ne rade automatske write operacije; služe za objašnjenje, trijažu i pripremu ljudske odluke.
+- Ako UI stanje deluje čudno posle više eksperimenata, `Reset flow` u `System` sidebar view-u je često najbrži oporavak.
+- In-app `Help` sidebar view prikazuje ovaj English vodič direktno iz repository help fajla.
 - `Dismiss` dugme na onboarding hint-u samo sakriva hint za tekuću sesiju i ne menja podatke.
-- Zatvaranje browsera ne vraća automatski ceo Workspace state sledećeg dana; nastavak rada ide kroz sačuvan mapping set ili import checkpoint-a.
+- Zatvaranje browsera ne vraća automatski ceo Workspace state sledećeg dana; nastavak rada ide kroz draft session, sačuvan mapping set ili import checkpoint-a.
 
 Za detaljan opis signala, score formule, confidence pragova i bounded LLM slučajeva pogledaj `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 

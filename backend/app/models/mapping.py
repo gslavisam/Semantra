@@ -17,6 +17,7 @@ MappingSetStatus = Literal["draft", "review", "approved", "archived"]
 WorkspaceMappingMode = Literal["standard", "canonical"]
 WorkspaceSection = Literal["Setup", "Review", "Decisions", "Output"]
 CatalogArtifactType = Literal["standard", "canonical-only"]
+TargetProjectionMode = Literal["dataset_to_dataset", "canonical_only", "target_aware_canonical"]
 TransformationPreviewMode = Literal["direct", "custom"]
 TransformationPreviewStatus = Literal["direct", "validated", "fallback"]
 TransformationPreviewClassification = Literal["direct", "safe", "risky", "custom"]
@@ -149,9 +150,22 @@ class AutoMappingRequest(BaseModel):
     source_system: str | None = None
     business_domain: str | None = None
     integration_name: str | None = None
+    created_by: str | None = None
+    workspace_id: str | None = None
 
 
-TargetSystem = Literal["canonical"]
+TargetSystem = Literal["canonical", "sap"]
+
+
+class TargetIntentOption(BaseModel):
+    """One supported target-intent option exposed to workspace and mapping flows."""
+
+    target_system: TargetSystem
+    label: str
+    description: str
+    projection_mode: TargetProjectionMode
+    artifact_type: CatalogArtifactType = "canonical-only"
+    target_profile: str | None = None
 
 
 class CanonicalMappingRequest(BaseModel):
@@ -165,6 +179,8 @@ class CanonicalMappingRequest(BaseModel):
     source_system: str | None = None
     business_domain: str | None = None
     integration_name: str | None = None
+    created_by: str | None = None
+    workspace_id: str | None = None
 
 
 class MappingRefinementRequest(BaseModel):
@@ -234,6 +250,9 @@ class MappingRuntimeFingerprint(BaseModel):
     scoring_profile: str = ""
     description_priority: bool = False
     code_fingerprint: str = ""
+    target_system: str | None = None
+    target_profile: str | None = None
+    target_projection_mode: TargetProjectionMode = "dataset_to_dataset"
 
 
 class AutoMappingResponse(BaseModel):
@@ -467,6 +486,8 @@ class MappingJobStartResponse(BaseModel):
 
     job_id: str
     status: MappingJobStatus
+    created_by: str | None = None
+    workspace_id: str | None = None
 
 
 class MappingJobStatusResponse(BaseModel):
@@ -474,9 +495,23 @@ class MappingJobStatusResponse(BaseModel):
 
     job_id: str
     status: MappingJobStatus
+    created_by: str | None = None
+    workspace_id: str | None = None
+    worker_id: str | None = None
+    claimed_at: str | None = None
+    heartbeat_at: str | None = None
+    lease_expires_at: str | None = None
+    recovery_signal: str | None = None
     activity: list[str] = Field(default_factory=list)
     response: AutoMappingResponse | None = None
     error: str | None = None
+
+
+class MappingJobCancelRequest(BaseModel):
+    """Optional caller context used to guard background job cancellation."""
+
+    created_by: str | None = None
+    workspace_id: str | None = None
 
 
 class MappingJobRuntimeStatusResponse(BaseModel):
@@ -644,6 +679,8 @@ class DecisionLogEntry(BaseModel):
     """Observed decision log entry capturing heuristics, LLM output, and the final choice."""
 
     source: str
+    created_by: str | None = None
+    workspace_id: str | None = None
     candidate_targets: list[str] = Field(default_factory=list)
     heuristic_scores: dict[str, float] = Field(default_factory=dict)
     llm_result: LLMValidationResult | None = None
@@ -722,6 +759,7 @@ class MappingSetCreateRequest(BaseModel):
     canonical_concepts: list[str] = Field(default_factory=list)
     unmatched_sources: list[str] = Field(default_factory=list)
     created_by: str | None = None
+    workspace_id: str | None = None
     note: str | None = None
     owner: str | None = None
     assignee: str | None = None
@@ -748,6 +786,7 @@ class MappingSetRecord(BaseModel):
     canonical_concepts: list[str] = Field(default_factory=list)
     unmatched_sources: list[str] = Field(default_factory=list)
     created_by: str | None = None
+    workspace_id: str | None = None
     note: str | None = None
     owner: str | None = None
     assignee: str | None = None
@@ -779,22 +818,76 @@ class DraftSessionDecisionAuditEntry(BaseModel):
 
     origin: str = "manual_or_imported"
     applied_at: str = ""
+    created_by: str | None = None
+    workspace_id: str | None = None
     details: dict[str, Any] = Field(default_factory=dict)
+
+
+class DraftSessionTargetContext(BaseModel):
+    """Stable target/projection context needed to resume the same workspace intent later."""
+
+    target_system: str | None = None
+    target_profile: str | None = None
+    target_projection_mode: TargetProjectionMode = "dataset_to_dataset"
+    artifact_type: CatalogArtifactType = "standard"
+
+
+class DraftSessionReviewState(BaseModel):
+    """Minimal durable review-state snapshot that can be safely restored across sessions."""
+
+    status_filter: str = "All"
+    confidence_filter: str = "All"
+    source_filter: str = "All"
+    canonical_concept_filter: str = "All"
 
 
 class DraftSessionCreateRequest(BaseModel):
     """Request payload for saving one durable draft workspace session snapshot."""
 
     name: str
+    created_by: str | None = None
+    workspace_id: str | None = None
     api_base_url: str = ""
     mapping_mode: WorkspaceMappingMode = "standard"
     active_workspace_section: WorkspaceSection = "Review"
     source_handle: DatasetHandle
     target_handle: DatasetHandle | None = None
     canonical_target_system: str | None = None
+    workspace_target_context: DraftSessionTargetContext = Field(default_factory=DraftSessionTargetContext)
+    review_state: DraftSessionReviewState = Field(default_factory=DraftSessionReviewState)
     mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+
+
+class DraftSessionUpdateRequest(DraftSessionCreateRequest):
+    """Request payload for updating one durable draft workspace snapshot."""
+
+    expected_version: int = Field(..., ge=1)
+    last_writer: str | None = None
+
+
+class DraftSessionDecisionStateUpdateRequest(BaseModel):
+    """Request payload for persisting durable decision state against an existing draft session."""
+
+    created_by: str | None = None
+    workspace_id: str | None = None
+    expected_version: int = Field(..., ge=1)
+    last_writer: str | None = None
+    active_workspace_section: WorkspaceSection = "Decisions"
+    mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
+    mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+
+
+class DraftSessionReviewStateUpdateRequest(BaseModel):
+    """Request payload for persisting durable review-state filters against an existing draft session."""
+
+    created_by: str | None = None
+    workspace_id: str | None = None
+    expected_version: int = Field(..., ge=1)
+    last_writer: str | None = None
+    active_workspace_section: WorkspaceSection = "Review"
+    review_state: DraftSessionReviewState = Field(default_factory=DraftSessionReviewState)
 
 
 class DraftSessionRecord(BaseModel):
@@ -802,13 +895,19 @@ class DraftSessionRecord(BaseModel):
 
     draft_session_id: int
     name: str
+    created_by: str | None = None
+    workspace_id: str | None = None
     api_base_url: str = ""
     mapping_mode: WorkspaceMappingMode = "standard"
     active_workspace_section: WorkspaceSection = "Review"
     source_dataset_name: str = ""
     target_dataset_name: str = ""
     canonical_target_system: str | None = None
+    workspace_target_context: DraftSessionTargetContext = Field(default_factory=DraftSessionTargetContext)
+    review_state: DraftSessionReviewState = Field(default_factory=DraftSessionReviewState)
     decision_count: int = 0
+    version: int = 1
+    last_writer: str | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -843,6 +942,7 @@ class CatalogIntegrationRecord(BaseModel):
     canonical_concepts: list[str] = Field(default_factory=list)
     unmatched_sources: list[str] = Field(default_factory=list)
     created_by: str | None = None
+    workspace_id: str | None = None
     owner: str | None = None
     assignee: str | None = None
     created_at: str | None = None
@@ -859,6 +959,7 @@ class CatalogIntegrationDetail(BaseModel):
     description: str | None = None
     canonical_concepts: list[str] = Field(default_factory=list)
     unmatched_sources: list[str] = Field(default_factory=list)
+    workspace_id: str | None = None
     latest_version: CatalogIntegrationRecord
     latest_approved_version: CatalogIntegrationRecord | None = None
     versions: list[CatalogIntegrationRecord] = Field(default_factory=list)
@@ -1084,6 +1185,7 @@ class MappingSetApplyRequest(BaseModel):
     """Request payload for marking a mapping set as applied in workspace flows."""
 
     changed_by: str | None = None
+    workspace_id: str | None = None
     note: str | None = None
 
 
@@ -1097,6 +1199,7 @@ class MappingSetAuditEntry(BaseModel):
     action: str
     status: MappingSetStatus
     changed_by: str | None = None
+    workspace_id: str | None = None
     note: str | None = None
     created_at: str | None = None
 
@@ -1176,6 +1279,8 @@ class BenchmarkDatasetCreateRequest(BaseModel):
 
     name: str
     cases: list[dict[str, Any]] = Field(default_factory=list)
+    created_by: str | None = None
+    workspace_id: str | None = None
 
 
 class BenchmarkDatasetRecord(BaseModel):
@@ -1185,6 +1290,8 @@ class BenchmarkDatasetRecord(BaseModel):
     name: str
     case_count: int
     version: int = 1
+    created_by: str | None = None
+    workspace_id: str | None = None
     created_at: str | None = None
 
 
@@ -1267,6 +1374,8 @@ class EvaluationRunRecord(BaseModel):
     dataset_id: int | None = None
     dataset_name: str | None = None
     provider_name: str = "none"
+    created_by: str | None = None
+    workspace_id: str | None = None
     total_cases: int
     total_fields: int
     correct_matches: int

@@ -39,6 +39,184 @@ def _normalized_api_base_url(value: str | None) -> str:
     return str(value or "").strip().rstrip("/")
 
 
+def _active_draft_session() -> dict:
+    current = st.session_state.get("active_draft_session") or {}
+    return current if isinstance(current, dict) else {}
+
+
+def _set_active_draft_session(draft_session: dict | None) -> None:
+    current = dict(draft_session or {})
+    draft_session_id = int(current.get("draft_session_id") or 0)
+    if not draft_session_id:
+        st.session_state.pop("active_draft_session", None)
+        st.session_state.pop("selected_draft_session_id", None)
+        return
+    st.session_state["active_draft_session"] = {
+        "draft_session_id": draft_session_id,
+        "name": str(current.get("name") or "draft-session").strip() or "draft-session",
+        "created_by": current.get("created_by"),
+        "workspace_id": current.get("workspace_id"),
+        "version": int(current.get("version") or 1),
+        "last_writer": current.get("last_writer"),
+        "updated_at": current.get("updated_at"),
+        "active_workspace_section": current.get("active_workspace_section") or "Decisions",
+    }
+    st.session_state["selected_draft_session_id"] = draft_session_id
+
+
+def _draft_session_option_label(draft_session: dict) -> str:
+    return (
+        f"#{draft_session['draft_session_id']} | {draft_session['name']} | "
+        f"{draft_session['active_workspace_section']} | {draft_session['source_dataset_name']}"
+    )
+
+
+def _resolve_selected_draft_session_id(saved_draft_sessions: list[dict]) -> int:
+    option_ids = [int(item.get("draft_session_id") or 0) for item in saved_draft_sessions if int(item.get("draft_session_id") or 0)]
+    if not option_ids:
+        return 0
+
+    current_selected_id = int(st.session_state.get("selected_draft_session_id") or 0)
+    if current_selected_id in option_ids:
+        return current_selected_id
+
+    active_draft_id = int((_active_draft_session().get("draft_session_id") or 0))
+    if active_draft_id in option_ids:
+        st.session_state["selected_draft_session_id"] = active_draft_id
+        return active_draft_id
+
+    st.session_state["selected_draft_session_id"] = option_ids[0]
+    return option_ids[0]
+
+
+def _serialized_mapping_editor_state() -> dict[str, dict]:
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    return {
+        str(source): {
+            "target": str(entry.get("target") or ""),
+            "status": str(entry.get("status") or "needs_review"),
+            "suggested_target": str(entry.get("suggested_target") or ""),
+            "suggested_transformation_code": str(entry.get("suggested_transformation_code") or ""),
+            "manual_transformation_code": str(entry.get("manual_transformation_code") or ""),
+            "llm_transformation_instruction": str(entry.get("llm_transformation_instruction") or ""),
+            "manual_apply_transformation": bool(entry.get("manual_apply_transformation", False)),
+            "manual": bool(entry.get("manual", False)),
+        }
+        for source, entry in editor_state.items()
+        if str(source or "").strip()
+    }
+
+
+def _current_review_state() -> dict:
+    return {
+        "status_filter": str(st.session_state.get("filter_status") or "All").strip() or "All",
+        "confidence_filter": str(st.session_state.get("filter_confidence") or "All").strip() or "All",
+        "source_filter": str(st.session_state.get("filter_source") or "All").strip() or "All",
+        "canonical_concept_filter": str(st.session_state.get("filter_canonical_concept") or "All").strip() or "All",
+    }
+
+
+def _workspace_target_context_for_save(upload_response: dict, mapping_response: dict, mapping_mode: str) -> dict:
+    runtime = dict(mapping_response.get("mapping_runtime") or {})
+    target_system = str(upload_response.get("target_system") or runtime.get("target_system") or "").strip().lower() or None
+    if mapping_mode == "canonical" and not target_system:
+        target_system = "canonical"
+
+    target_projection_mode = str(runtime.get("target_projection_mode") or "").strip() or "dataset_to_dataset"
+    if mapping_mode == "canonical" and target_projection_mode == "dataset_to_dataset":
+        target_projection_mode = "canonical_only" if target_system == "canonical" else "target_aware_canonical"
+
+    return {
+        "target_system": target_system,
+        "target_profile": str(runtime.get("target_profile") or "").strip() or None,
+        "target_projection_mode": target_projection_mode,
+        "artifact_type": "canonical-only" if mapping_mode == "canonical" else "standard",
+    }
+
+
+def _draft_session_target_context(draft_session_detail: dict) -> dict:
+    saved_context = dict(draft_session_detail.get("workspace_target_context") or {})
+    runtime = dict(draft_session_detail.get("mapping_runtime") or {})
+    target_system = (
+        str(
+            saved_context.get("target_system")
+            or draft_session_detail.get("canonical_target_system")
+            or runtime.get("target_system")
+            or ""
+        ).strip().lower()
+        or None
+    )
+    target_projection_mode = str(
+        saved_context.get("target_projection_mode") or runtime.get("target_projection_mode") or ""
+    ).strip() or "dataset_to_dataset"
+    if str(draft_session_detail.get("mapping_mode") or "standard").strip().lower() == "canonical" and target_projection_mode == "dataset_to_dataset":
+        target_projection_mode = "canonical_only" if target_system in (None, "canonical") else "target_aware_canonical"
+
+    return {
+        "target_system": target_system,
+        "target_profile": str(saved_context.get("target_profile") or runtime.get("target_profile") or "").strip() or None,
+        "target_projection_mode": target_projection_mode,
+        "artifact_type": str(saved_context.get("artifact_type") or ("canonical-only" if target_system else "standard")).strip() or "standard",
+    }
+
+
+def _draft_session_identity_query_params(draft_session: dict | None = None) -> dict[str, str]:
+    current = draft_session or _active_draft_session()
+    params: dict[str, str] = {}
+    if str(current.get("created_by") or "").strip():
+        params["created_by"] = str(current.get("created_by")).strip()
+    if str(current.get("workspace_id") or "").strip():
+        params["workspace_id"] = str(current.get("workspace_id")).strip()
+    return params
+
+
+def _draft_session_stale_write_detail(error: httpx.HTTPError) -> dict | None:
+    response = getattr(error, "response", None)
+    if response is None or response.status_code != 409:
+        return None
+    try:
+        detail = response.json().get("detail")
+    except Exception:
+        return None
+    return detail if isinstance(detail, dict) and detail.get("detail_code") == "stale_write" else None
+
+
+def _active_draft_session_caption() -> str:
+    active_draft = _active_draft_session()
+    if not active_draft:
+        return "No active draft session. Save or resume a draft session first to persist shared review/decision state."
+    return (
+        f"Active draft session: #{active_draft['draft_session_id']} | {active_draft['name']} | "
+        f"v{active_draft['version']} | last_writer={active_draft.get('last_writer') or 'n/a'}"
+    )
+
+
+def _reload_active_draft_after_stale(api_request, *, stale_detail: dict | None) -> tuple[dict, str]:
+    active_draft = _active_draft_session()
+    draft_session_id = int(active_draft.get("draft_session_id") or 0)
+    if not draft_session_id:
+        raise ValueError("No active draft session is selected for stale reload.")
+
+    latest_detail = api_request(
+        "GET",
+        f"/mapping/draft-sessions/{draft_session_id}",
+        params=_draft_session_identity_query_params(active_draft),
+    )
+    restored_section = _apply_draft_session_detail_to_workspace(latest_detail)
+    _set_active_draft_session(latest_detail)
+    st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
+    st.session_state["last_action"] = {
+        "level": "warning",
+        "message": (
+            f"Draft session '{latest_detail['name']}' changed on the backend "
+            f"(expected v{(stale_detail or {}).get('expected_version') or active_draft.get('version')}, "
+            f"current v{latest_detail.get('version')}). Reloaded latest backend state into Workspace {restored_section}; "
+            "re-apply your local changes before saving again."
+        ),
+    }
+    return latest_detail, restored_section
+
+
 def _schema_column_names_from_handle(handle: dict | None) -> list[str]:
     return [
         str((column or {}).get("name") or "").strip()
@@ -77,7 +255,7 @@ def _draft_session_restore_conflict_reason(draft_session_detail: dict) -> str:
 
     if saved_mode == "canonical":
         current_target_system = str(current_upload.get("target_system") or "canonical").strip().lower() or "canonical"
-        saved_target_system = str(draft_session_detail.get("canonical_target_system") or "canonical").strip().lower() or "canonical"
+        saved_target_system = _draft_session_target_context(draft_session_detail).get("target_system") or "canonical"
         if current_target_system != saved_target_system:
             return (
                 f"Draft session targets canonical system {saved_target_system}, but the active workspace uses {current_target_system}. "
@@ -122,21 +300,10 @@ def _build_draft_session_request_payload(name: str) -> dict:
         "source_handle": upload_response["source"],
         "target_handle": target_handle,
         "canonical_target_system": upload_response.get("target_system") if mapping_mode == "canonical" else None,
+        "workspace_target_context": _workspace_target_context_for_save(upload_response, mapping_response, mapping_mode),
+        "review_state": _current_review_state(),
         "mapping_runtime": dict(mapping_response.get("mapping_runtime") or {}),
-        "mapping_editor_state": {
-            str(source): {
-                "target": str(entry.get("target") or ""),
-                "status": str(entry.get("status") or "needs_review"),
-                "suggested_target": str(entry.get("suggested_target") or ""),
-                "suggested_transformation_code": str(entry.get("suggested_transformation_code") or ""),
-                "manual_transformation_code": str(entry.get("manual_transformation_code") or ""),
-                "llm_transformation_instruction": str(entry.get("llm_transformation_instruction") or ""),
-                "manual_apply_transformation": bool(entry.get("manual_apply_transformation", False)),
-                "manual": bool(entry.get("manual", False)),
-            }
-            for source, entry in editor_state.items()
-            if str(source or "").strip()
-        },
+        "mapping_editor_state": _serialized_mapping_editor_state(),
         "mapping_decision_audit": _decision_audit_map(),
     }
 
@@ -146,6 +313,14 @@ def _build_draft_session_mapping_response(draft_session_detail: dict) -> dict:
     target_handle = draft_session_detail.get("target_handle") or {}
     mapping_mode = str(draft_session_detail.get("mapping_mode") or "standard").strip().lower() or "standard"
     editor_state = draft_session_detail.get("mapping_editor_state") or {}
+    mapping_runtime = dict(draft_session_detail.get("mapping_runtime") or {})
+    target_context = _draft_session_target_context(draft_session_detail)
+    if target_context.get("target_system") and not mapping_runtime.get("target_system"):
+        mapping_runtime["target_system"] = target_context["target_system"]
+    if target_context.get("target_profile") and not mapping_runtime.get("target_profile"):
+        mapping_runtime["target_profile"] = target_context["target_profile"]
+    if target_context.get("target_projection_mode") and not mapping_runtime.get("target_projection_mode"):
+        mapping_runtime["target_projection_mode"] = target_context["target_projection_mode"]
 
     mappings: list[dict] = []
     ranked_mappings: list[dict] = []
@@ -208,7 +383,7 @@ def _build_draft_session_mapping_response(draft_session_detail: dict) -> dict:
     return {
         "mappings": mappings,
         "ranked_mappings": ranked_mappings,
-        "mapping_runtime": dict(draft_session_detail.get("mapping_runtime") or {}),
+        "mapping_runtime": mapping_runtime,
         "canonical_coverage": {
             "source": {
                 "coverage_ratio": source_ratio,
@@ -257,6 +432,14 @@ def _reset_draft_session_transient_outputs() -> None:
         st.session_state.pop(key, None)
 
 
+def _apply_draft_session_review_state(draft_session_detail: dict) -> None:
+    review_state = dict(draft_session_detail.get("review_state") or {})
+    st.session_state["filter_status"] = str(review_state.get("status_filter") or "All").strip() or "All"
+    st.session_state["filter_confidence"] = str(review_state.get("confidence_filter") or "All").strip() or "All"
+    st.session_state["filter_source"] = str(review_state.get("source_filter") or "All").strip() or "All"
+    st.session_state["filter_canonical_concept"] = str(review_state.get("canonical_concept_filter") or "All").strip() or "All"
+
+
 def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
     conflict_reason = _draft_session_restore_conflict_reason(draft_session_detail)
     if conflict_reason:
@@ -272,7 +455,7 @@ def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
         "mapping_mode": mapping_mode,
     }
     if mapping_mode == "canonical":
-        upload_response["target_system"] = draft_session_detail.get("canonical_target_system") or "canonical"
+        upload_response["target_system"] = _draft_session_target_context(draft_session_detail).get("target_system") or "canonical"
     else:
         target_handle = draft_session_detail.get("target_handle")
         if not target_handle:
@@ -286,6 +469,8 @@ def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
     st.session_state["mapping_response"] = _build_draft_session_mapping_response(draft_session_detail)
     st.session_state["mapping_editor_state"] = dict(draft_session_detail.get("mapping_editor_state") or {})
     st.session_state["mapping_decision_audit"] = dict(draft_session_detail.get("mapping_decision_audit") or {})
+    _apply_draft_session_review_state(draft_session_detail)
+    _set_active_draft_session(draft_session_detail)
     restore_section = _draft_session_restore_section(
         draft_session_detail.get("active_workspace_section"),
         draft_session_detail,
@@ -314,6 +499,125 @@ def _record_decision_audit(source: str, *, origin: str, details: dict | None = N
         "details": dict(details or {}),
     }
     st.session_state["mapping_decision_audit"] = audit_map
+
+
+def _build_draft_session_decision_state_payload() -> dict:
+    active_draft = _active_draft_session()
+    if not active_draft:
+        raise ValueError("Save or resume a draft session before persisting decisions.")
+    return {
+        "created_by": active_draft.get("created_by"),
+        "workspace_id": active_draft.get("workspace_id"),
+        "expected_version": int(active_draft.get("version") or 1),
+        "last_writer": active_draft.get("created_by") or active_draft.get("last_writer"),
+        "active_workspace_section": "Decisions",
+        "mapping_editor_state": _serialized_mapping_editor_state(),
+        "mapping_decision_audit": _decision_audit_map(),
+    }
+
+
+def _build_draft_session_review_state_payload() -> dict:
+    active_draft = _active_draft_session()
+    if not active_draft:
+        raise ValueError("Save or resume a draft session before persisting review state.")
+    return {
+        "created_by": active_draft.get("created_by"),
+        "workspace_id": active_draft.get("workspace_id"),
+        "expected_version": int(active_draft.get("version") or 1),
+        "last_writer": active_draft.get("created_by") or active_draft.get("last_writer"),
+        "active_workspace_section": "Review",
+        "review_state": _current_review_state(),
+    }
+
+
+def render_active_draft_review_state_panel(*, api_request) -> None:
+    with st.expander(_section_label("Draft Review State", "shared persistence"), expanded=False):
+        st.caption(_active_draft_session_caption())
+        active_draft = _active_draft_session()
+        if not active_draft:
+            st.info("Create or resume a draft session in Decisions before saving review filters and section context.")
+            return
+        if st.button("Save review state to active draft", width="stretch", key="save_review_state_to_active_draft"):
+            try:
+                updated_detail = api_request(
+                    "PUT",
+                    f"/mapping/draft-sessions/{active_draft['draft_session_id']}/review-state",
+                    json=_build_draft_session_review_state_payload(),
+                )
+                _set_active_draft_session(updated_detail)
+                st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": (
+                        f"Saved review state to draft session '{updated_detail['name']}' "
+                        f"(v{updated_detail['version']})."
+                    ),
+                }
+                st.rerun()
+            except ValueError as error:
+                st.session_state["last_action"] = {"level": "error", "message": str(error)}
+                st.rerun()
+            except httpx.HTTPError as error:
+                stale_detail = _draft_session_stale_write_detail(error)
+                if stale_detail:
+                    try:
+                        _reload_active_draft_after_stale(api_request, stale_detail=stale_detail)
+                    except (ValueError, httpx.HTTPError) as reload_error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": api_error_message(reload_error, default_prefix="Reloading stale draft session failed"),
+                        }
+                    st.rerun()
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Saving review state failed"),
+                }
+                st.rerun()
+
+
+def render_active_draft_decision_state_panel(*, api_request) -> None:
+    with st.expander(_section_label("Draft Decision State", "shared persistence"), expanded=False):
+        st.caption(_active_draft_session_caption())
+        active_draft = _active_draft_session()
+        if not active_draft:
+            st.info("Create or resume a draft session below before saving active decisions back to the backend.")
+            return
+        if st.button("Save decisions to active draft", width="stretch", key="save_decisions_to_active_draft"):
+            try:
+                updated_detail = api_request(
+                    "PUT",
+                    f"/mapping/draft-sessions/{active_draft['draft_session_id']}/decision-state",
+                    json=_build_draft_session_decision_state_payload(),
+                )
+                _set_active_draft_session(updated_detail)
+                st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": (
+                        f"Saved active decisions to draft session '{updated_detail['name']}' "
+                        f"(v{updated_detail['version']})."
+                    ),
+                }
+                st.rerun()
+            except ValueError as error:
+                st.session_state["last_action"] = {"level": "error", "message": str(error)}
+                st.rerun()
+            except httpx.HTTPError as error:
+                stale_detail = _draft_session_stale_write_detail(error)
+                if stale_detail:
+                    try:
+                        _reload_active_draft_after_stale(api_request, stale_detail=stale_detail)
+                    except (ValueError, httpx.HTTPError) as reload_error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": api_error_message(reload_error, default_prefix="Reloading stale draft session failed"),
+                        }
+                    st.rerun()
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Saving decision state failed"),
+                }
+                st.rerun()
 
 
 def _active_decision_rows_with_audit(decisions: list[dict]) -> list[dict]:
@@ -968,6 +1272,7 @@ def render_mapping_set_versions_panel(
                     "/mapping/draft-sessions",
                     json=_build_draft_session_request_payload(draft_session_name),
                 )
+                _set_active_draft_session(saved_draft_session)
                 st.session_state["saved_draft_sessions"] = api_request("GET", "/mapping/draft-sessions")
                 st.session_state["last_action"] = {
                     "level": "success",
@@ -1013,16 +1318,20 @@ def render_mapping_set_versions_panel(
         if saved_draft_sessions:
             st.caption("Saved draft sessions")
             st.dataframe(saved_draft_sessions, width="stretch", hide_index=True)
-            draft_session_labels = [
-                f"#{item['draft_session_id']} | {item['name']} | {item['active_workspace_section']} | {item['source_dataset_name']}"
+            draft_session_by_id = {
+                int(item["draft_session_id"]): item
                 for item in saved_draft_sessions
-            ]
-            selected_draft_session_label = st.selectbox(
+                if int(item.get("draft_session_id") or 0)
+            }
+            selected_draft_session_id = _resolve_selected_draft_session_id(saved_draft_sessions)
+            selected_draft_session_id = st.selectbox(
                 "Select draft session",
-                draft_session_labels,
-                key="selected_draft_session_label",
+                options=list(draft_session_by_id),
+                key="selected_draft_session_id",
+                index=list(draft_session_by_id).index(selected_draft_session_id),
+                format_func=lambda draft_session_id: _draft_session_option_label(draft_session_by_id[draft_session_id]),
             )
-            selected_draft_session = saved_draft_sessions[draft_session_labels.index(selected_draft_session_label)]
+            selected_draft_session = draft_session_by_id[selected_draft_session_id]
             if st.button(
                 "Resume draft session",
                 width="stretch",
@@ -1032,6 +1341,7 @@ def render_mapping_set_versions_panel(
                     draft_session_detail = api_request(
                         "GET",
                         f"/mapping/draft-sessions/{selected_draft_session['draft_session_id']}",
+                        params=_draft_session_identity_query_params(selected_draft_session),
                     )
                     restored_section = _apply_draft_session_detail_to_workspace(draft_session_detail)
                     st.session_state["last_action"] = {

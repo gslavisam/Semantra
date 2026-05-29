@@ -21,8 +21,11 @@ from app.models.mapping import (
     CanonicalMappingRequest,
     CodegenRequest,
     DraftSessionCreateRequest,
+    DraftSessionDecisionStateUpdateRequest,
     DraftSessionDetail,
     DraftSessionRecord,
+    DraftSessionReviewStateUpdateRequest,
+    DraftSessionUpdateRequest,
     GeneratedArtifact,
     MappingRefinementRequest,
     MappingDecision,
@@ -35,11 +38,13 @@ from app.models.mapping import (
     MappingSetStatusUpdateRequest,
     MappingJobStartResponse,
     MappingJobStatusResponse,
+    MappingJobCancelRequest,
     PreviewRequest,
     PreviewResponse,
     ReviewPlanRequest,
     ReviewPlanResponse,
     SourceMappingResult,
+    TargetIntentOption,
     TransformationGenerationRequest,
     TransformationGenerationResponse,
     TransformationTestSetCreateRequest,
@@ -57,13 +62,19 @@ from app.services.mapping_job_service import MappingJobCapacityError, mapping_jo
 from app.services.mapping_governance_repository import mapping_governance_repository
 from app.services.review_plan_service import build_review_plan
 from app.services.mapping_service import generate_mapping_candidates, refine_mapping_for_source
-from app.services.persistence_service import persistence_service
+from app.services.persistence_service import DraftSessionStaleWriteError, persistence_service
 from app.services.preview_service import build_preview
 from app.services.source_field_hint_service import apply_inline_source_field_hint, apply_source_field_hints
 from app.services.transformation_test_service import run_transformation_test_set
 from app.services.transformation_template_service import list_transformation_templates
 from app.services.upload_store import dataset_store
-from app.services.virtual_target_service import build_virtual_target_schema
+from app.services.virtual_target_service import (
+    build_virtual_target_schema,
+    get_target_intent_option,
+    list_supported_target_intents,
+    target_intent_profile,
+    target_intent_projection_mode,
+)
 
 
 router = APIRouter(prefix="/mapping", tags=["mapping"])
@@ -106,6 +117,7 @@ def append_mapping_set_audit(
     mapping_set: MappingSetRecord,
     *,
     changed_by: str | None = None,
+    workspace_id: str | None = None,
     note: str | None = None,
 ) -> MappingSetAuditEntry:
     """Append one audit entry for a mapping-set lifecycle action."""
@@ -118,10 +130,64 @@ def append_mapping_set_audit(
             action=action,
             status=mapping_set.status,
             changed_by=changed_by,
+            workspace_id=workspace_id,
             note=note,
             created_at=datetime.now(UTC).isoformat(),
         )
     )
+
+
+def _require_workspace_context_match(
+    *,
+    resource_ref: str,
+    current_workspace_id: str | None,
+    requested_workspace_id: str | None,
+    action: str,
+) -> None:
+    if current_workspace_id and requested_workspace_id and requested_workspace_id != current_workspace_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{resource_ref} belongs to workspace '{current_workspace_id}' and cannot be {action} from "
+                f"workspace '{requested_workspace_id}'."
+            ),
+        )
+
+
+def _require_actor_context_match(
+    *,
+    resource_ref: str,
+    current_actor: str | None,
+    requested_actor: str | None,
+    action: str,
+) -> None:
+    if current_actor and requested_actor and requested_actor != current_actor:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{resource_ref} belongs to actor '{current_actor}' and cannot be {action} by "
+                f"actor '{requested_actor}'."
+            ),
+        )
+
+
+def _stale_write_detail(*, resource_ref: str, expected_version: int, current_detail) -> dict[str, object]:
+    return {
+        "detail_code": "stale_write",
+        "message": f"{resource_ref} expected version {expected_version} no longer matches the current backend state.",
+        "workspace_id": current_detail.workspace_id,
+        "current_version": current_detail.version,
+        "expected_version": expected_version,
+        "updated_at": current_detail.updated_at,
+        "last_writer": current_detail.last_writer,
+    }
+
+
+def _draft_session_update_request(current_detail: DraftSessionDetail, **changes) -> DraftSessionUpdateRequest:
+    payload = current_detail.model_dump(mode="json")
+    payload.pop("draft_session_id", None)
+    payload.update(changes)
+    return DraftSessionUpdateRequest.model_validate(payload)
 
 
 def _prepare_source_schema_with_persistent_hints(
@@ -149,6 +215,28 @@ def _attach_applied_source_field_hints(
     return response.model_copy(
         update={
             "applied_source_field_hints": [hint.model_dump(mode="json") for hint in applied_hints],
+        }
+    )
+
+
+def _attach_target_intent_metadata(
+    response: AutoMappingResponse,
+    *,
+    target_system: str | None,
+) -> AutoMappingResponse:
+    if not target_system:
+        return response
+
+    option = get_target_intent_option(target_system)
+    return response.model_copy(
+        update={
+            "mapping_runtime": response.mapping_runtime.model_copy(
+                update={
+                    "target_system": option.target_system,
+                    "target_profile": target_intent_profile(option.target_system),
+                    "target_projection_mode": target_intent_projection_mode(option.target_system),
+                }
+            )
         }
     )
 
@@ -204,6 +292,8 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
         target.handle.schema_profile,
         llm_provider=build_provider_from_settings() if request.use_llm else None,
         description_priority=request.description_priority or bool(applied_persistent_hints),
+        created_by=request.created_by,
+        workspace_id=request.workspace_id,
     )
     return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
@@ -232,18 +322,25 @@ async def start_auto_map_job(request: AutoMappingRequest) -> MappingJobStartResp
             llm_provider=build_provider_from_settings() if request.use_llm else None,
             progress_callback=progress_callback,
             description_priority=request.description_priority or bool(applied_persistent_hints),
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
         )
         return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
     try:
-        job = mapping_job_store.start(worker)
+        job = mapping_job_store.start(worker, created_by=request.created_by, workspace_id=request.workspace_id)
     except MappingJobCapacityError as error:
         raise HTTPException(
             status_code=429,
             detail=str(error),
             headers={"Retry-After": "5"},
         ) from error
-    return MappingJobStartResponse(job_id=job.job_id, status=job.status)
+    return MappingJobStartResponse(
+        job_id=job.job_id,
+        status=job.status,
+        created_by=job.created_by,
+        workspace_id=job.workspace_id,
+    )
 
 
 @router.post("/canonical", response_model=AutoMappingResponse)
@@ -272,8 +369,11 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
         llm_provider=build_provider_from_settings() if request.use_llm else None,
         description_priority=request.description_priority or bool(applied_persistent_hints),
         candidate_pool_size=request.candidate_pool_size,
+        created_by=request.created_by,
+        workspace_id=request.workspace_id,
     )
-    return _attach_applied_source_field_hints(response, applied_persistent_hints)
+    response = _attach_applied_source_field_hints(response, applied_persistent_hints)
+    return _attach_target_intent_metadata(response, target_system=request.target_system)
 
 
 @router.get("/target-fields", response_model=list[str])
@@ -282,14 +382,22 @@ async def list_mapping_target_fields(target_system: str | None = Query(default=N
 
     normalized_target_system = str(target_system or "").strip().lower()
     if normalized_target_system:
-        if normalized_target_system != "canonical":
+        supported_target_systems = {option.target_system for option in list_supported_target_intents()}
+        if normalized_target_system not in supported_target_systems:
             raise HTTPException(status_code=400, detail=f"Unsupported target_system: {target_system}")
-        target_schema = build_virtual_target_schema("canonical")
+        target_schema = build_virtual_target_schema(normalized_target_system)
         if not target_schema.columns:
             raise HTTPException(status_code=400, detail="Canonical glossary is empty; cannot build virtual canonical target.")
         return [column.name for column in target_schema.columns]
 
     raise HTTPException(status_code=400, detail="Provide target_system to list mapping target fields.")
+
+
+@router.get("/target-intents", response_model=list[TargetIntentOption])
+async def list_mapping_target_intents() -> list[TargetIntentOption]:
+    """List supported canonical-first target-intent options for workspace setup and mapping flows."""
+
+    return list_supported_target_intents()
 
 
 @router.post("/refine", response_model=SourceMappingResult)
@@ -368,18 +476,26 @@ async def start_canonical_map_job(request: CanonicalMappingRequest) -> MappingJo
             progress_callback=progress_callback,
             description_priority=request.description_priority or bool(applied_persistent_hints),
             candidate_pool_size=request.candidate_pool_size,
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
         )
-        return _attach_applied_source_field_hints(response, applied_persistent_hints)
+        response = _attach_applied_source_field_hints(response, applied_persistent_hints)
+        return _attach_target_intent_metadata(response, target_system=request.target_system)
 
     try:
-        job = mapping_job_store.start(worker)
+        job = mapping_job_store.start(worker, created_by=request.created_by, workspace_id=request.workspace_id)
     except MappingJobCapacityError as error:
         raise HTTPException(
             status_code=429,
             detail=str(error),
             headers={"Retry-After": "5"},
         ) from error
-    return MappingJobStartResponse(job_id=job.job_id, status=job.status)
+    return MappingJobStartResponse(
+        job_id=job.job_id,
+        status=job.status,
+        created_by=job.created_by,
+        workspace_id=job.workspace_id,
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=MappingJobStatusResponse)
@@ -393,10 +509,24 @@ async def get_mapping_job_status(job_id: str) -> MappingJobStatusResponse:
 
 
 @router.post("/jobs/{job_id}/cancel", response_model=MappingJobStatusResponse)
-async def cancel_mapping_job(job_id: str) -> MappingJobStatusResponse:
+async def cancel_mapping_job(job_id: str, request: MappingJobCancelRequest | None = None) -> MappingJobStatusResponse:
     """Cancel one background mapping job if it is still running."""
 
     try:
+        current_status = mapping_job_store.get_status(job_id)
+        if request is not None:
+            _require_workspace_context_match(
+                resource_ref=f"Mapping job {job_id}",
+                current_workspace_id=current_status.workspace_id,
+                requested_workspace_id=request.workspace_id,
+                action="canceled",
+            )
+            _require_actor_context_match(
+                resource_ref=f"Mapping job {job_id}",
+                current_actor=current_status.created_by,
+                requested_actor=request.created_by,
+                action="canceled",
+            )
         return mapping_job_store.cancel(job_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=f"Mapping job not found: {job_id}") from error
@@ -552,12 +682,13 @@ async def create_mapping_set(request: MappingSetCreateRequest) -> MappingSetReco
         canonical_concepts=request.canonical_concepts,
         unmatched_sources=request.unmatched_sources,
         created_by=request.created_by,
+        workspace_id=request.workspace_id,
         note=request.note,
         owner=request.owner,
         assignee=request.assignee,
         review_note=request.review_note,
     )
-    append_mapping_set_audit("create", saved, changed_by=request.created_by, note=request.note)
+    append_mapping_set_audit("create", saved, changed_by=request.created_by, workspace_id=request.workspace_id, note=request.note)
     return saved
 
 
@@ -578,13 +709,156 @@ async def list_draft_sessions() -> list[DraftSessionRecord]:
 
 
 @router.get("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
-async def get_draft_session(draft_session_id: int) -> DraftSessionDetail:
+async def get_draft_session(
+    draft_session_id: int,
+    created_by: str | None = Query(default=None),
+    workspace_id: str | None = Query(default=None),
+) -> DraftSessionDetail:
     """Return one saved durable workspace snapshot with its restore payload."""
 
     try:
-        return draft_session_repository.get_draft_session(draft_session_id)
+        draft_session = draft_session_repository.get_draft_session(draft_session_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    _require_workspace_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_workspace_id=draft_session.workspace_id,
+        requested_workspace_id=workspace_id,
+        action="resumed",
+    )
+    _require_actor_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_actor=draft_session.created_by,
+        requested_actor=created_by,
+        action="resumed",
+    )
+    return draft_session
+
+
+@router.put("/draft-sessions/{draft_session_id}", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+async def update_draft_session(draft_session_id: int, request: DraftSessionUpdateRequest) -> DraftSessionDetail:
+    """Update one durable draft workspace snapshot with optimistic concurrency semantics."""
+
+    if request.mapping_mode == "standard" and request.target_handle is None:
+        raise HTTPException(status_code=400, detail="Standard draft sessions require a target_handle snapshot.")
+    try:
+        current_detail = draft_session_repository.get_draft_session(draft_session_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    _require_workspace_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_workspace_id=current_detail.workspace_id,
+        requested_workspace_id=request.workspace_id,
+        action="saved",
+    )
+    _require_actor_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_actor=current_detail.created_by,
+        requested_actor=request.created_by,
+        action="saved",
+    )
+    try:
+        return draft_session_repository.update_draft_session(draft_session_id, request)
+    except DraftSessionStaleWriteError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=_stale_write_detail(
+                resource_ref=f"Draft session {draft_session_id}",
+                expected_version=error.expected_version,
+                current_detail=error.current_detail,
+            ),
+        ) from error
+
+
+@router.put("/draft-sessions/{draft_session_id}/decision-state", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+async def update_draft_session_decision_state(
+    draft_session_id: int,
+    request: DraftSessionDecisionStateUpdateRequest,
+) -> DraftSessionDetail:
+    """Persist durable decision-state changes for an existing draft session."""
+
+    try:
+        current_detail = draft_session_repository.get_draft_session(draft_session_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    _require_workspace_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_workspace_id=current_detail.workspace_id,
+        requested_workspace_id=request.workspace_id,
+        action="saved",
+    )
+    _require_actor_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_actor=current_detail.created_by,
+        requested_actor=request.created_by,
+        action="saved",
+    )
+
+    merged_request = _draft_session_update_request(
+        current_detail,
+        expected_version=request.expected_version,
+        last_writer=request.last_writer,
+        active_workspace_section=request.active_workspace_section,
+        mapping_editor_state=request.mapping_editor_state,
+        mapping_decision_audit=request.mapping_decision_audit,
+    )
+    try:
+        return draft_session_repository.update_draft_session(draft_session_id, merged_request)
+    except DraftSessionStaleWriteError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=_stale_write_detail(
+                resource_ref=f"Draft session {draft_session_id}",
+                expected_version=error.expected_version,
+                current_detail=error.current_detail,
+            ),
+        ) from error
+
+
+@router.put("/draft-sessions/{draft_session_id}/review-state", response_model=DraftSessionDetail, dependencies=[Depends(require_admin)])
+async def update_draft_session_review_state(
+    draft_session_id: int,
+    request: DraftSessionReviewStateUpdateRequest,
+) -> DraftSessionDetail:
+    """Persist durable review-state changes for an existing draft session."""
+
+    try:
+        current_detail = draft_session_repository.get_draft_session(draft_session_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    _require_workspace_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_workspace_id=current_detail.workspace_id,
+        requested_workspace_id=request.workspace_id,
+        action="saved",
+    )
+    _require_actor_context_match(
+        resource_ref=f"Draft session {draft_session_id}",
+        current_actor=current_detail.created_by,
+        requested_actor=request.created_by,
+        action="saved",
+    )
+
+    merged_request = _draft_session_update_request(
+        current_detail,
+        expected_version=request.expected_version,
+        last_writer=request.last_writer,
+        active_workspace_section=request.active_workspace_section,
+        review_state=request.review_state,
+    )
+    try:
+        return draft_session_repository.update_draft_session(draft_session_id, merged_request)
+    except DraftSessionStaleWriteError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=_stale_write_detail(
+                resource_ref=f"Draft session {draft_session_id}",
+                expected_version=error.expected_version,
+                current_detail=error.current_detail,
+            ),
+        ) from error
 
 
 @router.get("/sets", response_model=list[MappingSetRecord], dependencies=[Depends(require_admin)])
@@ -644,7 +918,20 @@ async def apply_mapping_set(
                 "Only approved mapping sets can be used in workspace apply/reuse flows."
             ),
         )
-    append_mapping_set_audit("apply", mapping_set, changed_by=request.changed_by, note=request.note)
+    _require_workspace_context_match(
+        resource_ref=f"Mapping set #{mapping_set_id}",
+        current_workspace_id=mapping_set.workspace_id,
+        requested_workspace_id=request.workspace_id,
+        action="applied",
+    )
+    effective_workspace_id = request.workspace_id or mapping_set.workspace_id
+    append_mapping_set_audit(
+        "apply",
+        mapping_set,
+        changed_by=request.changed_by,
+        workspace_id=effective_workspace_id,
+        note=request.note,
+    )
     return mapping_set
 
 

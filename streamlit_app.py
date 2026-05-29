@@ -23,12 +23,16 @@ from streamlit_ui.api import (
 )
 from streamlit_ui.shared_views import (
     render_dataset_summary,
+    render_sidebar_help,
+    render_sidebar_reference,
     render_last_action_status,
     render_llm_runtime_status,
     render_onboarding_hint,
     render_operation_strip,
     render_status_badge_legend,
     render_step_status,
+    render_workspace_copilot_sidebar_brief,
+    render_workspace_copilot_sidebar_context,
 )
 
 
@@ -285,6 +289,8 @@ def reset_flow_state() -> None:
         "preview_response",
         "codegen_response",
         "codegen_refinement_response",
+        "workspace_copilot_chat_history",
+        "workspace_copilot_chat_last_response",
         "saved_corrections",
         "mapping_editor_state",
         "transformation_templates",
@@ -300,6 +306,7 @@ def reset_flow_state() -> None:
         "target_table",
         "mapping_mode",
         "canonical_target_system",
+        "active_draft_session",
         "source_upload_mode",
         "target_upload_mode",
     ):
@@ -339,6 +346,8 @@ def handle_api_base_url_change() -> None:
         st.session_state.pop(key, None)
 
     st.session_state["active_api_base_url"] = normalized_base_url
+    st.session_state["pending_top_level_area"] = "Workspace"
+    st.session_state["pending_workspace_section"] = "Setup"
     st.session_state["active_top_level_area"] = "Workspace"
     st.session_state["active_workspace_section"] = "Setup"
     st.session_state["last_action"] = {
@@ -612,6 +621,18 @@ def render_mapping_decision_summary() -> None:
     return _impl(build_mapping_decisions=build_mapping_decisions)
 
 
+def render_active_draft_review_state_panel() -> None:
+    from streamlit_ui.workspace_decision_views import render_active_draft_review_state_panel as _impl
+
+    return _impl(api_request=api_request)
+
+
+def render_active_draft_decision_state_panel() -> None:
+    from streamlit_ui.workspace_decision_views import render_active_draft_decision_state_panel as _impl
+
+    return _impl(api_request=api_request)
+
+
 def render_mapping_io_panel() -> None:
     from streamlit_ui.workspace_decision_views import render_mapping_io_panel as _impl
 
@@ -717,12 +738,15 @@ def render_workspace_tab() -> None:
         render_mapping_editor=render_mapping_editor,
         render_canonical_gap_assistant=render_canonical_gap_assistant,
         render_canonical_concept_summary=render_canonical_concept_summary,
+        render_active_draft_review_state_panel=render_active_draft_review_state_panel,
+        render_active_draft_decision_state_panel=render_active_draft_decision_state_panel,
         render_manual_mapping_panel=render_manual_mapping_panel,
         render_mapping_decision_summary=render_mapping_decision_summary,
         render_mapping_io_panel=render_mapping_io_panel,
         render_mapping_set_versions_panel=render_mapping_set_versions_panel,
         render_correction_panel=render_correction_panel,
         build_mapping_decisions=build_mapping_decisions,
+        request_mapping_analysis_summary=request_mapping_analysis_summary,
     )
 
 
@@ -741,20 +765,37 @@ def main() -> None:
         st.session_state["active_top_level_area"] = pending_top_level_area
 
     with st.sidebar:
-        st.header("Connection")
-        st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url", on_change=handle_api_base_url_change)
-        st.text_input("Admin Token", value="", key="admin_token", type="password")
-        st.markdown(
-            "This UI talks to the Semantra FastAPI backend. LLM and TTS provider endpoints are configured behind that backend and shown below in Runtime."
+        sidebar_view = st.radio(
+            "Sidebar view",
+            ("System", "WS Copilot", "WS Brief", "Help", "Reference"),
+            key="sidebar_view_mode",
+            horizontal=True,
+            label_visibility="collapsed",
         )
-        render_llm_runtime_status()
         st.divider()
-        render_operation_strip(compact=True)
-        render_status_badge_legend(title="Unified Status Legend", compact=True)
-        if st.button("Reset flow"):
-            reset_flow_state()
-            st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
-            st.rerun()
+        if sidebar_view == "System":
+            st.header("Connection")
+            st.text_input("API Base URL", value=DEFAULT_API_BASE_URL, key="api_base_url", on_change=handle_api_base_url_change)
+            st.text_input("Admin Token", value="", key="admin_token", type="password")
+            st.markdown(
+                "This UI talks to the Semantra FastAPI backend. LLM and TTS provider endpoints are configured behind that backend and shown below in Runtime."
+            )
+            render_llm_runtime_status()
+            st.divider()
+            render_operation_strip(compact=True)
+            render_status_badge_legend(title="Unified Status Legend", compact=True)
+            if st.button("Reset flow"):
+                reset_flow_state()
+                st.session_state["last_action"] = {"level": "info", "message": "Flow state was reset."}
+                st.rerun()
+        elif sidebar_view == "WS Copilot":
+            render_workspace_copilot_sidebar_context()
+        elif sidebar_view == "WS Brief":
+            render_workspace_copilot_sidebar_brief()
+        elif sidebar_view == "Help":
+            render_sidebar_help()
+        else:
+            render_sidebar_reference()
 
     selected_top_level_area = st.radio(
         "Navigation",

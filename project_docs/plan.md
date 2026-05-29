@@ -75,14 +75,30 @@ Fokus:
 
 ### 5. Operational hardening nad postojećim pilot površinama
 
-Ovo ostaje stalni paralelni fokus pre većeg feature širenja.
+Ovo ostaje stalni paralelni fokus pre većeg feature širenja, ali sa jasnim Workspace-first prioritetom.
+
+Operativna odluka za naredni period:
+
+- `Workspace` je glavni end-user proizvodni sloj i praktično čini oko 80% onoga što krajnji korisnik vidi kao samu aplikaciju
+- `Governance` nije paralelni korisnički centar težišta, nego veza ka upravljačkim dimenzijama organizacije (`EA`, `MDM`, integration dev team, data governance)` koje usmeravaju, odobravaju ili promovišu rezultate Workspace rada
+- ostale površine (`Catalog`, `Benchmarks`, `Governance`, `System`) tretirati prvenstveno kao podršku, handoff ili nadzor nad istim Workspace životnim ciklusom
+- kada postoji izbor između novog cross-surface polish-a i jačeg `Workspace > Setup -> Review -> Decisions -> Output` toka, prednost ima Workspace
 
 Fokus:
 
-- stabilniji regression subset za glavne product surface-ove
-- browser-level proveru najvažnijih pilot tokova, ne samo helper testove
-- dalji governance enforcement tamo gde još postoje advisory ili implicitni prolazi
-- UX poliranje zasnovano na realnim pilot prolazima
+- stabilniji regression subset za `Workspace` happy-path i njegove glavne failure/gate slučajeve
+- browser-level proveru najvažnijih Workspace tokova, ne samo helper testove
+- dalji governance enforcement tamo gde `Workspace` i dalje ima advisory ili implicitne prolaze
+- UX poliranje zasnovano na realnim Workspace pilot prolazima
+- session continuity, draft resume, reuse handoff i output generation tretirati kao produžetke Workspace toka, ne kao odvojene UX ostrvske površine
+
+Workspace copilot smer za sledeći UX/productization slice:
+
+- ne dodavati novi generički chat koji živi pored proizvoda, nego objediniti postojeće bounded `LLM` / `Fallback` capability-je u jedan stalno dostupan `Workspace Copilot` sloj unutar glavnog analyst toka
+- primarni cilj nije više capability coverage, jer su `LLM refine`, guidance summary, decision proposals i output refinement već prisutni; cilj je da korisnik više ne mora da zna koji panel otvara za koju vrstu pitanja ili provere
+- prvi slice treba da ostane bez većeg backend refaktora: desni sidebar ili ekvivalentni stalni shell treba da orkestrira postojeće `Review`, `Decisions` i `Output` capability-je nad aktivnim Workspace kontekstom
+- copilot mora da ostane bounded, audit-friendly i bez auto-apply ponašanja; njegov posao je da skrati put do postojećih akcija i da objasni trenutno stanje bez izbacivanja korisnika u eksterni LLM interfejs
+- detaljniji UX model i tehnička mapa za ovaj smer su u `project_docs/workspace_copilot_concept.md`
 
 ### 6. Persistence i runtime separation hardening
 
@@ -151,6 +167,24 @@ Potrebno je odvojiti:
 ### Persistence hardening bez napuštanja SQLite-a
 
 SQLite ostaje prihvatljiv za trenutnu fazu, ali treba postepeno normalizovati queryable read/write modele tamo gde listing, governance i discovery to već traže.
+
+Sledeći korak ovde treba formulisati preciznije: cilj nije da "sve iz UI-ja završava u bazi", nego da svi domenski entiteti koji nose ownership, audit, resume, collaboration ili lifecycle semantiku imaju backend identitet i DB model.
+
+DB-first target za sledeću fazu:
+
+- workspace kao trajni backend entitet, ne samo skup session-local upload/mapping objekata
+- upload dataset handle i schema-profile lineage kao persistirani workspace resursi
+- review queue / proposal queue / decision workspace kao persistiran radni kontekst, ne samo `st.session_state` projekcija
+- transformation artifact drafts i accepted outputs kao versioned backend artefakti
+- canonical and knowledge authoring kao DB-native write path, dok file import postaje samo ingest mehanizam, ne source-of-truth authoring surface
+- overlay lifecycle, stewardship, catalog, benchmarks, mapping sets i jobs ostaju u DB modelu i dalje se produbljuju, ne vraćaju se u file/session obrasce
+
+Šta može legitimno da ostane van baze i kasnije:
+
+- čisto UI izbori kao otvoren tab, lokalni filter toggle, privremeno proširen expander, trenutno selektovan red u tabeli
+- tehnički connection convenience state kao lokalni API URL i kratkotrajni reachability cache
+
+Drugim rečima: treba prebaciti sve business-grade entitete u bazu, ali ne treba nasilno persitirati svaki prolazni UI signal.
 
 ### Background job hardening
 

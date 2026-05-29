@@ -225,6 +225,8 @@ def test_handle_api_base_url_change_clears_transient_backend_state() -> None:
 
     assert fake_streamlit.session_state["api_base_url"] == "http://127.0.0.1:8001"
     assert fake_streamlit.session_state["active_api_base_url"] == "http://127.0.0.1:8001"
+    assert fake_streamlit.session_state["pending_top_level_area"] == "Workspace"
+    assert fake_streamlit.session_state["pending_workspace_section"] == "Setup"
     assert fake_streamlit.session_state["active_top_level_area"] == "Workspace"
     assert fake_streamlit.session_state["active_workspace_section"] == "Setup"
     assert "upload_response" not in fake_streamlit.session_state

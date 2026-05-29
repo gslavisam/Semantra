@@ -47,7 +47,12 @@ async def explain_benchmark_results(request: BenchmarkExplanationRequest) -> Ben
 async def create_benchmark_dataset(request: BenchmarkDatasetCreateRequest) -> BenchmarkDatasetRecord:
     """Persist a reusable benchmark dataset for later comparison and reporting."""
 
-    return persistence_service.save_benchmark_dataset(request.name, request.cases)
+    return persistence_service.save_benchmark_dataset(
+        request.name,
+        request.cases,
+        created_by=request.created_by,
+        workspace_id=request.workspace_id,
+    )
 
 
 @router.get("/datasets", response_model=list[BenchmarkDatasetRecord], dependencies=[Depends(require_admin)])
@@ -58,7 +63,12 @@ async def list_benchmark_datasets() -> list[BenchmarkDatasetRecord]:
 
 
 @router.post("/datasets/{dataset_id}/run", response_model=EvaluationMetrics, dependencies=[Depends(require_admin)])
-async def run_saved_benchmark(dataset_id: int, with_configured_llm: bool = Query(default=False)) -> EvaluationMetrics:
+async def run_saved_benchmark(
+    dataset_id: int,
+    with_configured_llm: bool = Query(default=False),
+    created_by: str | None = Query(default=None),
+    workspace_id: str | None = Query(default=None),
+) -> EvaluationMetrics:
     """Run one saved benchmark dataset, optionally with the configured LLM enabled."""
 
     try:
@@ -73,6 +83,8 @@ async def run_saved_benchmark(dataset_id: int, with_configured_llm: bool = Query
         dataset_name=dataset.name if dataset else None,
         provider_name=settings.llm_provider if with_configured_llm else "none",
         metrics=metrics,
+        created_by=(created_by or "").strip() or None,
+        workspace_id=(workspace_id or "").strip() or None,
     )
     return metrics
 

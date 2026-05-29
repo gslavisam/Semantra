@@ -155,12 +155,20 @@ class SQLitePersistenceService:
                     canonical_concepts_json TEXT NOT NULL,
                     unmatched_sources_json TEXT NOT NULL,
                     created_by TEXT,
+                    workspace_id TEXT,
                     owner TEXT,
                     assignee TEXT,
                     created_at TEXT,
                     FOREIGN KEY(mapping_set_id) REFERENCES mapping_sets(id)
                 )
                 """
+            )
+            self._ensure_columns(
+                connection,
+                "mapping_catalog_entries",
+                {
+                    "workspace_id": "TEXT",
+                },
             )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mapping_catalog_integration_name ON mapping_catalog_entries (integration_name)"
@@ -208,9 +216,24 @@ class SQLitePersistenceService:
             )
             connection.execute(
                 """
+                CREATE TABLE IF NOT EXISTS schema_migrations (
+                    migration_name TEXT PRIMARY KEY,
+                    applied_at TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
                 CREATE TABLE IF NOT EXISTS mapping_jobs (
                     job_id TEXT PRIMARY KEY,
+                    created_by TEXT,
+                    workspace_id TEXT,
+                    worker_id TEXT,
                     status TEXT NOT NULL,
+                    claimed_at TEXT,
+                    heartbeat_at TEXT,
+                    lease_expires_at TEXT,
+                    recovery_signal TEXT,
                     created_at TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     created_at_monotonic REAL NOT NULL,
@@ -223,6 +246,15 @@ class SQLitePersistenceService:
                 )
                 """
             )
+            self._ensure_columns(
+                connection,
+                "mapping_jobs",
+                {
+                    "created_by": "TEXT",
+                    "workspace_id": "TEXT",
+                },
+            )
+            self._apply_named_migrations(connection)
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mapping_jobs_status_updated ON mapping_jobs (status, updated_at_monotonic)"
             )
@@ -458,7 +490,14 @@ class SQLitePersistenceService:
         self,
         *,
         job_id: str,
+        created_by: str | None = None,
+        workspace_id: str | None = None,
+        worker_id: str | None = None,
         status: str,
+        claimed_at: str | None = None,
+        heartbeat_at: str | None = None,
+        lease_expires_at: str | None = None,
+        recovery_signal: str | None = None,
         created_at: str,
         updated_at: str,
         created_at_monotonic: float,
@@ -475,7 +514,14 @@ class SQLitePersistenceService:
                 """
                 INSERT INTO mapping_jobs (
                     job_id,
+                    created_by,
+                    workspace_id,
+                    worker_id,
                     status,
+                    claimed_at,
+                    heartbeat_at,
+                    lease_expires_at,
+                    recovery_signal,
                     created_at,
                     updated_at,
                     created_at_monotonic,
@@ -486,9 +532,16 @@ class SQLitePersistenceService:
                     response_payload,
                     error
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(job_id) DO UPDATE SET
+                    created_by = excluded.created_by,
+                    workspace_id = excluded.workspace_id,
+                    worker_id = excluded.worker_id,
                     status = excluded.status,
+                    claimed_at = excluded.claimed_at,
+                    heartbeat_at = excluded.heartbeat_at,
+                    lease_expires_at = excluded.lease_expires_at,
+                    recovery_signal = excluded.recovery_signal,
                     created_at = excluded.created_at,
                     updated_at = excluded.updated_at,
                     created_at_monotonic = excluded.created_at_monotonic,
@@ -501,7 +554,14 @@ class SQLitePersistenceService:
                 """,
                 (
                     job_id,
+                    created_by,
+                    workspace_id,
+                    worker_id,
                     status,
+                    claimed_at,
+                    heartbeat_at,
+                    lease_expires_at,
+                    recovery_signal,
                     created_at,
                     updated_at,
                     created_at_monotonic,
@@ -520,7 +580,14 @@ class SQLitePersistenceService:
                 """
                 SELECT
                     job_id,
+                    created_by,
+                    workspace_id,
+                    worker_id,
                     status,
+                    claimed_at,
+                    heartbeat_at,
+                    lease_expires_at,
+                    recovery_signal,
                     created_at,
                     updated_at,
                     created_at_monotonic,
@@ -545,7 +612,14 @@ class SQLitePersistenceService:
                 """
                 SELECT
                     job_id,
+                    created_by,
+                    workspace_id,
+                    worker_id,
                     status,
+                    claimed_at,
+                    heartbeat_at,
+                    lease_expires_at,
+                    recovery_signal,
                     created_at,
                     updated_at,
                     created_at_monotonic,
@@ -636,6 +710,8 @@ class SQLitePersistenceService:
                     """
                     UPDATE mapping_jobs
                     SET status = 'failed',
+                        lease_expires_at = NULL,
+                        recovery_signal = 'worker_runtime_restarted',
                         updated_at = ?,
                         updated_at_monotonic = ?,
                         error = ?,
@@ -647,20 +723,72 @@ class SQLitePersistenceService:
         return len(job_ids)
 
     def _mapping_job_from_row(self, row: sqlite3.Row | tuple[object, ...]) -> dict:
-        response_payload = row[9]
+        response_payload = row[16]
         return {
             "job_id": str(row[0]),
-            "status": str(row[1]),
-            "created_at": str(row[2]),
-            "updated_at": str(row[3]),
-            "created_at_monotonic": float(row[4]),
-            "updated_at_monotonic": float(row[5]),
-            "retry_count": int(row[6]),
-            "cancel_requested": bool(row[7]),
-            "canceled_at": row[8],
+            "created_by": row[1],
+            "workspace_id": row[2],
+            "worker_id": row[3],
+            "status": str(row[4]),
+            "claimed_at": row[5],
+            "heartbeat_at": row[6],
+            "lease_expires_at": row[7],
+            "recovery_signal": row[8],
+            "created_at": str(row[9]),
+            "updated_at": str(row[10]),
+            "created_at_monotonic": float(row[11]),
+            "updated_at_monotonic": float(row[12]),
+            "retry_count": int(row[13]),
+            "cancel_requested": bool(row[14]),
+            "canceled_at": row[15],
             "response": AutoMappingResponse.model_validate(json.loads(response_payload)) if response_payload else None,
-            "error": row[10],
+            "error": row[17],
         }
+
+    def _apply_named_migrations(self, connection: sqlite3.Connection) -> None:
+        applied = {
+            str(row[0])
+            for row in connection.execute("SELECT migration_name FROM schema_migrations").fetchall()
+        }
+        migrations: list[tuple[str, callable]] = [
+            ("20260528_mapping_jobs_runtime_metadata", self._migrate_mapping_jobs_runtime_metadata),
+        ]
+        for migration_name, migration in migrations:
+            if migration_name in applied:
+                continue
+            migration(connection)
+            connection.execute(
+                "INSERT INTO schema_migrations (migration_name, applied_at) VALUES (?, ?)",
+                (migration_name, datetime.now(UTC).isoformat()),
+            )
+
+    def _migrate_mapping_jobs_runtime_metadata(self, connection: sqlite3.Connection) -> None:
+        self._ensure_columns(
+            connection,
+            "mapping_jobs",
+            {
+                "worker_id": "TEXT",
+                "claimed_at": "TEXT",
+                "heartbeat_at": "TEXT",
+                "lease_expires_at": "TEXT",
+                "recovery_signal": "TEXT",
+            },
+        )
+
+    def _ensure_columns(
+        self,
+        connection: sqlite3.Connection,
+        table_name: str,
+        columns: dict[str, str],
+    ) -> None:
+        existing = {
+            str(row[1])
+            for row in connection.execute(f"PRAGMA table_info({table_name})").fetchall()
+        }
+        for column_name, column_type in columns.items():
+            if column_name in existing:
+                continue
+            connection.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}")
 
     def _time_only(self, timestamp: str) -> str:
         try:
@@ -832,6 +960,7 @@ class SQLitePersistenceService:
         canonical_concepts: list[str] | None = None,
         unmatched_sources: list[str] | None = None,
         created_by: str | None = None,
+        workspace_id: str | None = None,
         note: str | None = None,
         owner: str | None = None,
         assignee: str | None = None,
@@ -879,6 +1008,7 @@ class SQLitePersistenceService:
                 "canonical_concepts": normalized_canonical_concepts,
                 "unmatched_sources": normalized_unmatched_sources,
                 "created_by": created_by,
+                "workspace_id": workspace_id,
                 "note": note,
                 "owner": owner,
                 "assignee": assignee,
@@ -913,10 +1043,11 @@ class SQLitePersistenceService:
                     canonical_concepts_json,
                     unmatched_sources_json,
                     created_by,
+                    workspace_id,
                     owner,
                     assignee,
                     created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     mapping_set_id,
@@ -936,6 +1067,7 @@ class SQLitePersistenceService:
                     json.dumps(normalized_canonical_concepts),
                     json.dumps(normalized_unmatched_sources),
                     created_by,
+                    workspace_id,
                     owner,
                     assignee,
                     created_at,
@@ -974,6 +1106,7 @@ class SQLitePersistenceService:
             canonical_concepts=normalized_canonical_concepts,
             unmatched_sources=normalized_unmatched_sources,
             created_by=created_by,
+            workspace_id=workspace_id,
             note=note,
             owner=owner,
             assignee=assignee,
@@ -1020,6 +1153,7 @@ class SQLitePersistenceService:
                         fallback=self._infer_unmatched_sources(payload.get("mapping_decisions", [])),
                     ),
                     created_by=payload.get("created_by"),
+                    workspace_id=payload.get("workspace_id"),
                     note=payload.get("note"),
                     owner=payload.get("owner"),
                     assignee=payload.get("assignee"),
@@ -1068,6 +1202,7 @@ class SQLitePersistenceService:
                 fallback=self._infer_unmatched_sources(payload.get("mapping_decisions", [])),
             ),
             created_by=payload.get("created_by"),
+            workspace_id=payload.get("workspace_id"),
             note=payload.get("note"),
             owner=payload.get("owner"),
             assignee=payload.get("assignee"),
@@ -1142,7 +1277,7 @@ class SQLitePersistenceService:
         query = (
             "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, decision_count, "
             "source_dataset_id, target_dataset_id, source_system, target_system, business_domain, interface_type, "
-            "description, canonical_concepts_json, unmatched_sources_json, created_by, owner, assignee, created_at "
+            "description, canonical_concepts_json, unmatched_sources_json, created_by, workspace_id, owner, assignee, created_at "
             "FROM mapping_catalog_entries"
         )
         clauses: list[str] = []
@@ -1205,7 +1340,7 @@ class SQLitePersistenceService:
         query = (
             "SELECT mapping_set_id, name, integration_name, version, status, artifact_type, decision_count, "
             "source_dataset_id, target_dataset_id, source_system, target_system, business_domain, interface_type, "
-            "description, canonical_concepts_json, unmatched_sources_json, created_by, owner, assignee, created_at "
+            "description, canonical_concepts_json, unmatched_sources_json, created_by, workspace_id, owner, assignee, created_at "
             "FROM mapping_catalog_entries WHERE ("
             "integration_name LIKE ? OR name LIKE ? OR COALESCE(source_system, '') LIKE ? OR COALESCE(target_system, '') LIKE ? "
             "OR COALESCE(business_domain, '') LIKE ? OR COALESCE(interface_type, '') LIKE ? OR COALESCE(owner, '') LIKE ? "
@@ -1275,6 +1410,7 @@ class SQLitePersistenceService:
             description=latest_version.description,
             canonical_concepts=canonical_concepts,
             unmatched_sources=unmatched_sources,
+            workspace_id=latest_version.workspace_id,
             latest_version=latest_version,
             latest_approved_version=latest_approved_version,
             versions=exact_matches,
@@ -1497,23 +1633,34 @@ class SQLitePersistenceService:
 
         created_at = datetime.now(UTC).isoformat()
         decision_count = len(request.mapping_editor_state)
+        normalized_decision_audit = self._normalize_draft_session_decision_audit(
+            request.mapping_decision_audit,
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
+        )
         payload = DraftSessionDetail(
             draft_session_id=0,
             name=request.name,
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
             api_base_url=request.api_base_url,
             mapping_mode=request.mapping_mode,
             active_workspace_section=request.active_workspace_section,
             source_dataset_name=request.source_handle.dataset_name,
             target_dataset_name=request.target_handle.dataset_name if request.target_handle else "",
             canonical_target_system=request.canonical_target_system,
+            workspace_target_context=request.workspace_target_context,
+            review_state=request.review_state,
             decision_count=decision_count,
+            version=1,
+            last_writer=request.created_by,
             created_at=created_at,
             updated_at=created_at,
             source_handle=request.source_handle,
             target_handle=request.target_handle,
             mapping_runtime=request.mapping_runtime,
             mapping_editor_state=request.mapping_editor_state,
-            mapping_decision_audit=request.mapping_decision_audit,
+            mapping_decision_audit=normalized_decision_audit,
         )
         with self.connection() as connection:
             cursor = connection.execute(
@@ -1522,6 +1669,83 @@ class SQLitePersistenceService:
             )
             draft_session_id = int(cursor.lastrowid)
         return payload.model_copy(update={"draft_session_id": draft_session_id})
+
+    def update_draft_session(self, draft_session_id: int, request) -> DraftSessionDetail:
+        """Update one durable draft workspace snapshot with optimistic concurrency."""
+
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT payload FROM draft_sessions WHERE id = ?",
+                (draft_session_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(f"Unknown draft session id: {draft_session_id}")
+
+            payload = json.loads(row[0])
+            current_detail = DraftSessionDetail.model_validate({**payload, "draft_session_id": draft_session_id})
+            if int(current_detail.version or 1) != int(request.expected_version):
+                raise DraftSessionStaleWriteError(current_detail, int(request.expected_version))
+
+            normalized_decision_audit = self._normalize_draft_session_decision_audit(
+                request.mapping_decision_audit,
+                created_by=current_detail.created_by or request.created_by,
+                workspace_id=current_detail.workspace_id or request.workspace_id,
+            )
+            decision_count = len(request.mapping_editor_state)
+            durable_state_changed = any(
+                [
+                    current_detail.name != request.name,
+                    current_detail.api_base_url != request.api_base_url,
+                    current_detail.mapping_mode != request.mapping_mode,
+                    current_detail.active_workspace_section != request.active_workspace_section,
+                    current_detail.canonical_target_system != request.canonical_target_system,
+                    current_detail.workspace_target_context != request.workspace_target_context,
+                    current_detail.review_state != request.review_state,
+                    current_detail.source_handle.model_dump(mode="json") != request.source_handle.model_dump(mode="json"),
+                    (current_detail.target_handle.model_dump(mode="json") if current_detail.target_handle else None)
+                    != (request.target_handle.model_dump(mode="json") if request.target_handle else None),
+                    current_detail.mapping_runtime.model_dump(mode="json") != request.mapping_runtime.model_dump(mode="json"),
+                    current_detail.mapping_editor_state != request.mapping_editor_state,
+                    current_detail.mapping_decision_audit != normalized_decision_audit,
+                ]
+            )
+            if not durable_state_changed:
+                return current_detail
+
+            updated_at = datetime.now(UTC).isoformat()
+            updated_detail = DraftSessionDetail(
+                draft_session_id=draft_session_id,
+                name=request.name,
+                created_by=current_detail.created_by or request.created_by,
+                workspace_id=current_detail.workspace_id or request.workspace_id,
+                api_base_url=request.api_base_url,
+                mapping_mode=request.mapping_mode,
+                active_workspace_section=request.active_workspace_section,
+                source_dataset_name=request.source_handle.dataset_name,
+                target_dataset_name=request.target_handle.dataset_name if request.target_handle else "",
+                canonical_target_system=request.canonical_target_system,
+                workspace_target_context=request.workspace_target_context,
+                review_state=request.review_state,
+                decision_count=decision_count,
+                version=int(current_detail.version or 1) + 1,
+                last_writer=(request.last_writer or request.created_by or current_detail.last_writer),
+                created_at=current_detail.created_at,
+                updated_at=updated_at,
+                source_handle=request.source_handle,
+                target_handle=request.target_handle,
+                mapping_runtime=request.mapping_runtime,
+                mapping_editor_state=request.mapping_editor_state,
+                mapping_decision_audit=normalized_decision_audit,
+            )
+            connection.execute(
+                "UPDATE draft_sessions SET name = ?, payload = ? WHERE id = ?",
+                (
+                    request.name,
+                    updated_detail.model_dump_json(exclude={"draft_session_id"}),
+                    draft_session_id,
+                ),
+            )
+        return updated_detail
 
     def list_draft_sessions(self) -> list[DraftSessionRecord]:
         with self.connection() as connection:
@@ -1535,13 +1759,19 @@ class SQLitePersistenceService:
                 DraftSessionRecord(
                     draft_session_id=int(row[0]),
                     name=row[1],
+                    created_by=payload.get("created_by"),
+                    workspace_id=payload.get("workspace_id"),
                     api_base_url=payload.get("api_base_url", ""),
                     mapping_mode=payload.get("mapping_mode", "standard"),
                     active_workspace_section=payload.get("active_workspace_section", "Review"),
                     source_dataset_name=payload.get("source_dataset_name", ""),
                     target_dataset_name=payload.get("target_dataset_name", ""),
                     canonical_target_system=payload.get("canonical_target_system"),
+                    workspace_target_context=payload.get("workspace_target_context") or {},
+                    review_state=payload.get("review_state") or {},
                     decision_count=payload.get("decision_count", len(payload.get("mapping_editor_state", {}))),
+                    version=payload.get("version", 1),
+                    last_writer=payload.get("last_writer") or payload.get("created_by"),
                     created_at=payload.get("created_at"),
                     updated_at=payload.get("updated_at"),
                 )
@@ -1558,6 +1788,23 @@ class SQLitePersistenceService:
             raise KeyError(f"Unknown draft session id: {draft_session_id}")
         payload = json.loads(row[0])
         return DraftSessionDetail.model_validate({**payload, "draft_session_id": draft_session_id})
+
+    def _normalize_draft_session_decision_audit(
+        self,
+        mapping_decision_audit: dict,
+        *,
+        created_by: str | None,
+        workspace_id: str | None,
+    ) -> dict:
+        return {
+            source_name: audit_entry.model_copy(
+                update={
+                    "created_by": audit_entry.created_by or created_by,
+                    "workspace_id": audit_entry.workspace_id or workspace_id,
+                }
+            )
+            for source_name, audit_entry in mapping_decision_audit.items()
+        }
 
     def clear_draft_sessions(self) -> None:
         with self.connection() as connection:
@@ -1582,9 +1829,10 @@ class SQLitePersistenceService:
             canonical_concepts=json.loads(row[14] or "[]"),
             unmatched_sources=json.loads(row[15] or "[]"),
             created_by=row[16],
-            owner=row[17],
-            assignee=row[18],
-            created_at=row[19],
+            workspace_id=row[17],
+            owner=row[18],
+            assignee=row[19],
+            created_at=row[20],
         )
 
     def _list_similar_catalog_integrations(
@@ -1811,10 +2059,11 @@ class SQLitePersistenceService:
                         canonical_concepts_json,
                         unmatched_sources_json,
                         created_by,
+                        workspace_id,
                         owner,
                         assignee,
                         created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         detail.mapping_set_id,
@@ -1834,6 +2083,7 @@ class SQLitePersistenceService:
                         json.dumps(detail.canonical_concepts),
                         json.dumps(detail.unmatched_sources),
                         detail.created_by,
+                        detail.workspace_id,
                         detail.owner,
                         detail.assignee,
                         detail.created_at,
@@ -1929,7 +2179,14 @@ class SQLitePersistenceService:
         with self.connection() as connection:
             connection.execute("DELETE FROM reusable_correction_rules")
 
-    def save_benchmark_dataset(self, name: str, cases: list[dict]) -> BenchmarkDatasetRecord:
+    def save_benchmark_dataset(
+        self,
+        name: str,
+        cases: list[dict],
+        *,
+        created_by: str | None = None,
+        workspace_id: str | None = None,
+    ) -> BenchmarkDatasetRecord:
         """Persist a reusable benchmark dataset for later evaluation runs."""
 
         version = 1 + max(
@@ -1941,6 +2198,8 @@ class SQLitePersistenceService:
             {
                 "cases": cases,
                 "version": version,
+                "created_by": created_by,
+                "workspace_id": workspace_id,
                 "created_at": created_at,
                 "case_count": len(cases),
             }
@@ -1956,6 +2215,8 @@ class SQLitePersistenceService:
             name=name,
             case_count=len(cases),
             version=version,
+            created_by=created_by,
+            workspace_id=workspace_id,
             created_at=created_at,
         )
 
@@ -1973,6 +2234,8 @@ class SQLitePersistenceService:
                     name=row[1],
                     case_count=payload.get("case_count", len(payload.get("cases", []))),
                     version=payload.get("version", 1),
+                    created_by=payload.get("created_by"),
+                    workspace_id=payload.get("workspace_id"),
                     created_at=payload.get("created_at"),
                 )
             )
@@ -1999,12 +2262,17 @@ class SQLitePersistenceService:
         dataset_name: str | None,
         provider_name: str,
         metrics: EvaluationMetrics,
+        *,
+        created_by: str | None = None,
+        workspace_id: str | None = None,
     ) -> EvaluationRunRecord:
         created_at = datetime.now(UTC).isoformat()
         payload = {
             "dataset_id": dataset_id,
             "dataset_name": dataset_name,
             "provider_name": provider_name,
+            "created_by": created_by,
+            "workspace_id": workspace_id,
             "total_cases": metrics.total_cases,
             "total_fields": metrics.total_fields,
             "correct_matches": metrics.correct_matches,
@@ -2748,3 +3016,14 @@ class SQLitePersistenceService:
 
 
 persistence_service = SQLitePersistenceService(settings.sqlite_path)
+
+
+class DraftSessionStaleWriteError(RuntimeError):
+    """Raised when a draft session update uses an outdated expected version."""
+
+    def __init__(self, current_detail: DraftSessionDetail, expected_version: int) -> None:
+        self.current_detail = current_detail
+        self.expected_version = expected_version
+        super().__init__(
+            f"Draft session {current_detail.draft_session_id} expected version {expected_version} does not match current version {current_detail.version}."
+        )

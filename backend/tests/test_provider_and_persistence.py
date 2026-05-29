@@ -171,6 +171,8 @@ def test_openai_compatible_provider_omits_authorization_when_api_key_is_empty() 
 def test_decision_logs_and_corrections_roundtrip_through_persistence() -> None:
     decision_entry = DecisionLogEntry(
         source="cust_ref",
+        created_by="qa-user",
+        workspace_id="ws-persistence-01",
         candidate_targets=["customer_id", "phone_number"],
         heuristic_scores={"customer_id": 0.42, "phone_number": 0.77},
         final_target="phone_number",
@@ -188,6 +190,8 @@ def test_decision_logs_and_corrections_roundtrip_through_persistence() -> None:
     correction_store.append(correction_entry)
 
     assert decision_log_store.list_entries()[0].final_target == "phone_number"
+    assert decision_log_store.list_entries()[0].created_by == "qa-user"
+    assert decision_log_store.list_entries()[0].workspace_id == "ws-persistence-01"
     assert correction_store.list_entries()[0].corrected_target == "phone_number"
     assert correction_store.list_entries()[0].status == "overridden"
     assert correction_store.list_entries()[0].version == 1
@@ -197,6 +201,8 @@ def test_decision_logs_and_corrections_roundtrip_through_persistence() -> None:
 def test_store_reads_refresh_from_persistence_even_when_memory_cache_is_stale() -> None:
     decision_entry = DecisionLogEntry(
         source="cust_ref",
+        created_by="qa-user",
+        workspace_id="ws-persistence-02",
         candidate_targets=["customer_id"],
         heuristic_scores={"customer_id": 0.42},
         final_target="customer_id",

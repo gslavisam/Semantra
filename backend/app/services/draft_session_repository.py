@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from app.models.mapping import DraftSessionCreateRequest, DraftSessionDetail, DraftSessionRecord
-from app.services.persistence_service import SQLitePersistenceService, persistence_service
+from app.models.mapping import DraftSessionCreateRequest, DraftSessionDetail, DraftSessionRecord, DraftSessionUpdateRequest
+from app.services.persistence_service import DraftSessionStaleWriteError, SQLitePersistenceService, persistence_service
 
 
 class DraftSessionRepository:
@@ -16,6 +16,11 @@ class DraftSessionRepository:
         """Persist one durable draft workspace snapshot."""
 
         return self._storage.save_draft_session(request)
+
+    def update_draft_session(self, draft_session_id: int, request: DraftSessionUpdateRequest) -> DraftSessionDetail:
+        """Update one durable draft workspace snapshot."""
+
+        return self._storage.update_draft_session(draft_session_id, request)
 
     def list_draft_sessions(self) -> list[DraftSessionRecord]:
         """List saved draft workspace snapshots."""

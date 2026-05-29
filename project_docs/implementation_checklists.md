@@ -16,11 +16,12 @@ Za to služe `completed_slices.md`, `epics.md` i `current_state.md`.
 
 Poslednji završeni execution wave-ovi i stariji delivery detalji prate se u `completed_slices.md`.
 
-Ovaj dokument sada služi kao operativni tracker za aktuelnih 7 otvorenih pravaca.
+Ovaj dokument sada služi kao operativni tracker za aktuelnih 10 otvorenih pravaca.
 
 Trenutno izabrani naredni portfolio fokus:
 
-- `Session continuity / draft session model` kao sledeći discovery/design wave
+- `Minimal identity + durable jobs` kao sledeći execution wave
+- `Workspace ownership + conflict semantics` kao sledeći design-to-execution wave odmah posle toga
 - `Operational hardening nad ključnim pilot tokovima` kao stalni paralelni execution tok
 
 ## Operativni protokol po pravcu
@@ -200,7 +201,44 @@ Napomena:
 
 Izabrani sledeći aktivni slice:
 
-- loaded-review `Catalog -> Workspace Review` tvrdnja je sada browser-potvrđena; sledeći operational-hardening slice treba birati na drugoj pilot površini, a ne više na ovoj zatvorenoj proveri
+- sledeći glavni operational-hardening fokus je `Workspace` kao primarni radni tok; ostale površine se proveravaju prvenstveno kroz njihove handoff-e u isti tok ili iz njega
+
+### 5A. Workspace-first operational focus
+
+Status: active and now treated as the primary pilot hardening surface.
+
+Operativna odluka:
+
+- `Workspace` nosi glavni analyst workflow i predstavlja glavni end-user proizvodni sloj; treba da dobije oko 80% praktične validacije pažnje
+- `Governance` ostaje važan, ali primarno kao organizacioni link ka `EA`, `MDM`, integration dev i srodnim upravljačkim funkcijama koje prate ili usmeravaju Workspace rezultate
+- `Catalog`, `Benchmarks`, `Governance` i `System` proveravati pre svega kao ulaze, izlaze ili nadzor nad Workspace životnim ciklusom
+
+Već browser-potvrđeni Workspace slučajevi:
+
+- [x] `Workspace > Setup` standard two-file row-data upload/profile tok radi na malom smoke paru (`smoke_source.csv` -> `smoke_target.csv`).
+- [x] `Workspace > Setup -> Generate mapping` daje stabilan heuristic mapping rezultat bez obaveznog LLM validaion sloja.
+- [x] `Workspace > Review` prikazuje trust layer, canonical coverage, ranked candidates, review queue i manual review površinu nad istim mapping rezultatom.
+- [x] `Workspace > Decisions` više ne puca na draft-state panelima; `Draft Decision State` i `Draft Review State` renderuju se u live browser prolazu.
+- [x] Upload-based `Workspace` tok sada može da sačuva draft session, zatim posebno `decision-state` i `review-state` nad istim aktivnim draft anchor-om.
+- [x] `Workspace > Output` je browser-potvrđen za advisory preview i Pandas starter generation nad istim upload-based mapping stanjem.
+- [x] `Workspace > Output` accepted-only/advisory gate matrix je browser-potvrđen: preview ostaje dozvoljen uz advisory poruku na `needs_review`, dok Pandas, PySpark i dbt generation ostaju striktno blokirani do punog `accepted` stanja.
+- [x] `Catalog -> Reuse in Workspace` handoff vraća odobreni mapping set nazad u Workspace review/decisions tok.
+- [x] `Resume draft session` više vraća čist review state bez stale guidance/output tragova.
+
+Workspace slučajevi koji sada nose glavni sledeći fokus:
+
+- [x] Canonical-mode `Workspace > Setup -> Review -> Decisions -> Output` je browser-potvrđen end-to-end na `smoke_source.csv` uz `Canonical target intent = SAP`; `Target context: SAP | Projection: target-aware canonical | Profile: sap_customer_master` ostaje stabilan kroz Review, Decisions i Output, preview ostaje nedostupan, a Pandas code generation prolazi nad source-to-canonical odlukama.
+- [x] `Workspace > Decisions -> Save mapping set version -> approve -> Catalog -> Reuse in Workspace` je browser-potvrđen kao puni governance/reuse povratni krug iz jednog glavnog workspace rada; live prolaz je sačuvao `workspace-reuse-1780002617742`, prebacio ga u `approved`, našao ga u `Catalog` i vratio isti approved artefakt nazad u Workspace review state.
+- [x] `Workspace` ponašanje posle `Reset flow` i posle promene `API Base URL` je browser-potvrđeno; `Reset flow` vraća čist `Workspace > Setup`, a promena `API Base URL` sada eksplicitno čisti transient backend-bound state i vraća UI na `Workspace > Setup` čak i kada je korisnik prethodno bio u `Catalog`.
+- [ ] Browser-potvrditi da draft resume iz upload-based toka vraća ispravan `Review` ili `Decisions` section i odgovarajući `workspace_target_context` bez mešanja starog local state-a.
+- [x] Prošao je jači manual-review/override scenario: `phone` je ručno prebačen sa `phone_number` na `customer_id`, prvo ostavljen u `needs_review` pa zatvoren kao `accepted`; browser-potvrđeno je da `Output` tada prvo ostaje advisory/codegen-blocked, zatim posle zatvaranja odluke otključava codegen, dok `Save Corrections` prvo blokira otvoreni override a zatim uspešno persisituje 1 correction entry kada override dobije zatvoren status.
+- [ ] Proveriti output refinement putanje (`Pandas`/`dbt` refine with LLM`) kao deo istog Workspace toka, ne samo kao odvojeni output smoke.
+
+Workspace UX/stability zapažanja koja su već zatvorena:
+
+- [x] Review/Decisions draft-state panel adapter mismatch (`unexpected keyword argument 'api_request'`) je popravljen i browser-potvrđen.
+- [x] Saved draft-session picker više ne ostaje zalepljen za stariji entry sa istim imenom; selector sada prati aktivni `draft_session_id`.
+- [x] `API Base URL` switch više ne ostavlja UI zalepljen na starom top-level tabu; reset sada ide i kroz `pending_top_level_area` / `pending_workspace_section` handoff pa se live UI vraća na `Workspace > Setup` umesto da zadrži stari `Catalog` radio izbor.
 
 - [x] Dopuniti `docs/pilot/PILOT_REGRESSION_SUBSET.md` konkretnim browser smoke koracima za `Catalog -> Workspace Review` i `Catalog -> Governance` handoff tokove.
 - [x] Zabeležiti jedan live prolaz kroz novi `Catalog` handoff regression subset u pilot execution log-u.
@@ -231,7 +269,255 @@ Napomena:
 - [x] Uvesti uske repository slojeve za stewardship queue, catalog discovery, mapping-set governance i knowledge runtime snapshot pristup.
 - [ ] Širiti normalizaciju dalje samo kada nove discovery/governance površine pokažu da je to stvarno potrebno.
 
-### 7. Epic 14A/14B: performance and signal precomputation
+### 7. Minimal identity + durable jobs
+
+Status: closed as the first backend identity + durable-jobs wave.
+
+Napomena:
+
+- cilj ovog wave-a nije puni enterprise auth/RBAC/SSO program, nego minimalni identity i ownership model koji omogućava durable jobs i kasniji workspace ownership
+- posao ovde nije više `da li imamo bazu`, nego da svaki job i svaki radni kontekst dobije stabilan actor/workspace anchor
+- durable job runtime treba rešavati prvo za `mapping` i `benchmark` execution, uz zadržavanje postojećeg `start / poll / cancel` API surface-a koliko god je moguće
+
+Minimalni ciljni scope za ovaj wave:
+
+- uvesti backend `user_id`, `workspace_id` i po potrebi tanki `org_id` model dovoljan za ownership, audit i job attribution
+- ne uvoditi širok permissions matrix u prvom slice-u; dovoljno je da backend zna ko je pokrenuo job, kome pripada workspace i ko sme da nastavi/otkaže execution
+- prebaciti job execution sa local thread-centric implicitnog ownership-a na durable DB-backed lifecycle sa worker claim / heartbeat / recovery semantikom
+
+Operativni redosled za prvi slice:
+
+- prvi isporučeni pod-slice ovog wave-a je namerno uzak: uvedeni su `created_by` i `workspace_id` anchor-i za async `mapping` job status, `draft session` persistence, benchmark dataset persistence i evaluation run history, bez otvaranja punog auth/RBAC ili punog `workspace` entiteta
+- postojeći fokusirani smoke testovi sada potvrđuju da se ti anchor-i zaista čuvaju i vraćaju kroz `mapping/auto/jobs`, `mapping/draft-sessions`, `evaluation/datasets` i `evaluation/runs`
+- zatvarajući pod-slice ovog wave-a dopunio je `mapping_jobs` runtime metapodacima za `worker_id`, `claimed_at`, `heartbeat_at`, `lease_expires_at` i `recovery_signal`, plus named migration hook za taj runtime sloj; restart sada ostavlja durable failed/recovery trag umesto implicitnog gubitka aktivnog execution konteksta
+
+- [x] Potvrditi minimalni identity model potreban za `mapping job`, `benchmark run`, `draft session` i budući `workspace` ownership bez otvaranja punog auth/RBAC wave-a.
+- [x] Definisati backend entitete i ključeve za prvi identity slice (`user`, `workspace`, job `created_by`, job `workspace_id`, draft `workspace_id`).
+Prva-wave odluka: nema posebnog `user` ni `workspace` DB modela; authoritative identity ključevi su za sada tanki string anchor-i `created_by` i `workspace_id`, a durable backend ključevi ostaju `mapping_jobs.job_id`, `draft_sessions.id`, `benchmark_datasets.id` i `evaluation_runs.id`.
+- [x] Odlučiti da li prvi korak koristi lokalni/dev identity bootstrap ili jednostavan token-to-actor mapping bez uvođenja spoljnog identity provajdera.
+Prva-wave odluka: koristi se lokalni/dev bootstrap kroz eksplicitno prosleđene `created_by` i `workspace_id` vrednosti uz postojeći admin-guard; spoljašnji identity provider i puni token-to-user mapping nisu otvoreni u ovom wave-u.
+- [x] Uvesti migracioni sloj za nove identity i job-runtime tabele umesto daljeg ručnog SQLite schema drift-a.
+- [x] Proširiti `mapping_jobs` model tako da čuva actor/workspace ownership, worker lease/claim stanje, heartbeat, retry, cancel metadata i recovery signal.
+- [x] Dodati append-only event/progress log dovoljan da UI i dalje može da radi `poll status`, ali sada nad durable execution zapisom.
+- [x] Isporučiti prvi identity-anchor pod-slice za `mapping` async job status kroz `created_by` i `workspace_id` metadata round-trip.
+- [x] Isporučiti isti identity-anchor obrazac za `draft session` persistence i restore payload.
+- [x] Isporučiti isti identity-anchor obrazac za benchmark dataset persistence i evaluation run history.
+- [x] Razdvojiti API contract od execution implementacije tako da `mapping` i `benchmark` route-ovi ne zavise od in-process memorijskog owner-a.
+Prva-wave odluka: `mapping` `start / poll / cancel` API ostaje stabilan, ali lifecycle ide preko `MappingJobStateStore` + SQLite runtime store-a; `benchmark` ostaje sync request/response tok i nema poseban in-process owner-dependent async runtime.
+- [x] Isporučiti prvi durable execution slice za `mapping` jobove uz restart/recovery scenarije i fokusirane backend testove.
+- [x] Zatvoriti benchmark execution granicu u prvom wave-u bez razbijanja postojećeg UX flow-a.
+Prva-wave odluka: benchmark execution ne dobija poseban async durable worker runtime; durable backend sloj u ovom wave-u pokriva benchmark dataset identity i evaluation run history, dok benchmark run ostaje sinhroni tok.
+- [x] Dokumentovati granicu prvog wave-a: minimal identity i durable jobs jesu uvedeni, ali puni user management i collaboration UX još nisu otvoreni.
+Granica zatvorenog wave-a: uvedeni su minimalni actor/workspace anchor-i, durable mapping job status + recovery metadata i ownership-aware cancel/readout guard-ovi; nisu otvoreni puni user management, org model, async benchmark workers, niti collaboration UX preko više korisnika.
+
+### 8. Workspace ownership + conflict semantics
+
+Status: closed as the first backend workspace-ownership + conflict-contract wave.
+
+Napomena:
+
+- ovaj wave ne treba otvarati pre nego što postoji bar minimalni actor/workspace anchor iz prethodnog pravca
+- cilj nije da svaki `st.session_state` ključ postane DB red, nego da svaki business-grade workspace entitet dobije ownership, version i konflikt semantiku
+- najvažniji rezultat ovog pravca je da Semantra prestane da tretira aktivni workspace kao implicitni browser-local kontekst bez jasnog vlasnika i pravila prepisivanja
+
+Minimalni ciljni scope za ovaj wave:
+
+- `workspace` postaje backend entitet sa owner-om, statusom i stabilnim restore anchor-om
+- `draft session`, `review state`, `decision workspace` i relevantni output draft-ovi dobijaju jasnu vezu ka workspace-u
+- uvode se pravila za parallel open, stale restore, overwrite, optimistic version check i explicit handoff/resume ponašanje
+
+Operativni redosled za prvi slice:
+
+- prvi isporučeni pod-slice ovog wave-a je backend-only i namerno uzak: `workspace_id` sada prolazi kroz `mapping set` create/list/detail payload i kroz `apply` audit zapis, tako da reuse tok više nije potpuno odsečen od workspace konteksta
+- sledeći isporučeni pod-slice proširio je isti anchor u `catalog` projekciju i `Catalog integration detail` odgovor, tako da `mapping set -> catalog handoff` više ne odbacuje `workspace_id` na read-model granici
+- naredni isporučeni pod-slice uvodi isti anchor u `decision log` observability artifact: sync `auto/canonical` mapping putanje sada prosleđuju `created_by` i `workspace_id` u persisted decision logs, pa backend review/decision readout više nije potpuno anoniman i van workspace konteksta
+- sledeći isporučeni pod-slice uvodi actor/workspace anchor i u prvi pravi `save decisions` artifact: persisted `draft session` sada backfill-uje `created_by` i `workspace_id` u svaki `mapping_decision_audit` entry, pa restore payload više ne čuva decision audit potpuno bez per-entry konteksta
+- sledeći isporučeni pod-slice uvodi i prvi backend ownership reject na reuse putanji: `mapping set apply` sada odbija cross-workspace apply kada request workspace ne odgovara persisted `mapping_set.workspace_id`, a `apply` audit nasleđuje stored workspace anchor i kada ga request ne pošalje
+- sledeći isporučeni pod-slice prenosi isti ownership guard i na job-control mutaciju: `mapping job cancel` sada opciono prima caller `created_by/workspace_id` context i odbija cross-workspace ili cross-actor cancel kada se ne poklapa sa persisted job metadata
+- sledeći isporučeni pod-slice prenosi isti ownership guard i u prvi konkretan `resume draft` backend readout: `draft session detail` sada opciono proverava caller `created_by/workspace_id` context i odbija cross-workspace ili cross-actor resume kada se ne poklapa sa persisted draft metadata
+- zatvarajući pod-slice ovog wave-a zaključuje backend granicu: current persisted reuse/review/restore artifacts sada imaju workspace anchor, prvi ownership reject radi na `apply reuse`, `cancel job` i `resume draft`, a konflikt contract je eksplicitno definisan pre budućih write-slice-ova sa `expected_version`
+
+- [x] Potvrditi koji današnji Workspace entiteti moraju postati durable backend modeli (`workspace`, upload lineage, review queue state, decision state, transformation draft, selected mapping context).
+Prva-wave odluka: durable backend modeli u sadašnjem scope-u su `mapping_jobs`, `draft_sessions`, `mapping_sets` + `catalog` projekcije, `benchmark_datasets` i `evaluation_runs`; budući standalone `workspace` entitet ostaje sledeći wave, ali današnji business-grade restore/reuse/audit artefakti više nisu samo browser-local.
+- [x] Definisati šta je authoritative `workspace` snapshot, a šta ostaje legitimno session-local UI state.
+Prva-wave odluka: authoritative backend snapshot za restore/review je `draft session detail` sa `source_handle`, `target_handle`, `mapping_runtime`, `mapping_editor_state` i `mapping_decision_audit`; session-local UI state ostaju navigacioni fokus, privremeni filteri, otvoreni paneli i drugi transient affordance-i koji ne nose ownership/audit semantiku.
+- [x] Uvesti `workspace_id` kroz postojeće `draft session`, `mapping set reuse`, `catalog handoff` i `review/decisions` putanje.
+- [x] Isporučiti prvi workspace-anchor pod-slice kroz `mapping set` create/list/detail persistence i `apply` audit trail.
+- [x] Isporučiti sledeći workspace-anchor pod-slice kroz `mapping set -> catalog` projekciju i `Catalog integration detail` read model.
+- [x] Isporučiti prvi workspace-anchor pod-slice u `review/decision` readout putanji kroz persisted `decision log` metadata (`created_by`, `workspace_id`).
+- [x] Isporučiti prvi workspace-anchor pod-slice u `save decisions` snapshot putanji kroz `draft session mapping_decision_audit` metadata (`created_by`, `workspace_id`).
+- [x] Isporučiti prvi backend ownership check na `apply reuse` putanji kroz reject za cross-workspace `mapping set apply` zahteve.
+- [x] Isporučiti sledeći backend ownership check na `cancel job` putanji kroz reject za cross-workspace ili cross-actor cancel zahteve kada caller context postoji.
+- [x] Isporučiti sledeći backend ownership check na `resume draft` putanji kroz reject za cross-workspace ili cross-actor draft-session resume zahteve kada caller context postoji.
+- [x] Definisati optimistic concurrency contract (`version`, `updated_at`, `last_writer`, `stale_write` odgovor) za workspace-level izmene.
+Prvi isporučeni `expected_version` implementation slice:
+- `draft session update` sada koristi `version`, `last_writer` i `expected_version` contract; successful write podiže verziju, no-op write ne pravi lažni drift, a stale update vraća `409` sa `detail_code = stale_write` i current backend metadata
+Radni contract za naredne implementation slice-ove:
+- svaki durable workspace-like write model (`workspace`, `draft session`, `review state`, `decision state`, job control mutacije koje menjaju shared state) dobija monotono `version` polje, `updated_at` UTC timestamp i `last_writer` actor identifikator
+- svaki mutating request koji menja postojeći shared workspace state treba da nosi `expected_version`; read-only i create tokovi ga ne zahtevaju, a legacy mutacije bez te vrednosti mogu ostati privremeno dozvoljene samo dok nisu prebačene na novi contract
+- uspešan write inkrementira `version` za `+1` samo kada se payload zaista promeni; `updated_at` i `last_writer` prate poslednju stvarnu izmenu, dok idempotentni/no-op save ne treba da pravi lažni konflikt drift
+- conflict odgovor je `409` sa stabilnim `detail_code = stale_write` i payload-om koji nosi bar `workspace_id`, `current_version`, `expected_version`, `updated_at`, `last_writer` i kratku poruku da je potreban reload pre overwrite-a
+- [x] Definisati konflikt pravila za paralelni rad: isti owner u dve sesije, drugi korisnik nad istim workspace-om, restore starog draft-a preko novijeg workspace stanja, i cancel/close tokom aktivnog job-a.
+Radna konflikt pravila za naredne ownership/concurrency slice-ove:
+- isti owner u dve sesije nad istim workspace-om je dozvoljen, ali drugi write sa starim `expected_version` dobija `409 stale_write`; read-only resume/status tokovi ostaju dozvoljeni
+- drugi korisnik nad istim workspace-om može da čita samo ako ownership policy to eksplicitno dozvoli, ali shared mutacije (`save decisions`, `apply reuse`, `cancel job`, budući `workspace save`) moraju biti odbijene čim caller `created_by` ili `workspace_id` ne odgovara authoritative backend zapisu
+- restore starog draft-a preko novijeg workspace stanja ne sme tiho da overwrite-uje backend stanje: dozvoljen je read-only resume payload, ali prvi naredni write mora da prođe kroz `expected_version` proveru ili da vrati `stale_write` sa current metadata za reload/rebase
+- cancel ili close tokom aktivnog job-a ne sme da menja ownership anchor: `cancel job` je dozvoljen samo matching owner/workspace caller-u, a kasniji restore/close tokovi moraju da vide final job status umesto da implicitno resetuju workspace state
+- [x] Zatvoriti ownership scope za današnje shared backend mutacije i readout putanje.
+Prva-wave odluka: current shared backend putanje koje postoje danas (`draft session` save/resume snapshot, `mapping set apply`, `mapping job cancel`, persisted `decision log` readout i `mapping_decision_audit` snapshot) imaju anchor ili ownership guard; buduće dedicated `save decisions` mutation rute moraju naslediti isti contract kada budu uvedene.
+- [x] Zatvoriti backend handoff scope za `Catalog`, `Governance` i `Benchmarks` workspace context.
+Prva-wave odluka: persisted backend artefakti za `Catalog`/`Governance`/`Benchmarks` sada nose `workspace_id` gde imaju business-grade reuse/audit smisao; browser-local navigation handoff ostaje eksplicitno UI-local i nije deo ovog backend wave-a.
+- [x] Isporučiti prvi backend restore/conflict slice sa fokusiranim backend testovima.
+Prva-wave odluka: backend restore/conflict foundation zatvara se kroz ownership-aware `resume draft`, `apply reuse`, `cancel job` guard-ove i eksplicitni `stale_write` contract; browser smoke za budući UI stale-rebase tok prelazi u sledeći UI hardening wave.
+- [x] Dokumentovati koja ponašanja postaju eksplicitna: ko je owner, kada je stanje stale, kada je potreban reload, i kada sistem odbija overwrite.
+Eksplicitna ponašanja posle zatvaranja wave-a:
+- owner je onaj actor/workspace anchor koji je persisted uz job, draft ili mapping-set artifact; backend više ne pretpostavlja implicitni lokalni owner za shared read/write tokove
+- stanje je stale kada caller radi write sa starim `expected_version` ili pokušava resume/apply/cancel iz nepoklopljenog owner/workspace konteksta
+- reload je potreban kada backend vrati `409 stale_write` ili ownership mismatch detalj koji pokazuje da je authoritative stanje promenjeno ili pripada drugom anchor-u
+- overwrite se odbija kada shared mutacija nema matching ownership context ili kada sledeći concurrency slice aktivira `expected_version` proveru nad novijim authoritative snapshot-om
+
+Napomena o granici zatvorenog scope-a:
+
+- poglavlja `7` i `8` su završena u okviru svog backend wave scope-a i ne nose više otvorene obavezne stavke za početak poglavlja `9`
+- sve dalje aktivnosti na istoj temi vode se kao zaseban nastavak ispod i predstavljaju sledeći collaboration/write-hardening wave, ne dokaz da `7` ili `8` nisu bili kompletirani
+
+### 8A. Follow-on wave: shared workspace writes and collaboration readiness
+
+Status: completed for the first draft-session anchored shared-write wave.
+
+Svrha:
+
+- odvojiti budući rad na multi-user write contract-ima, stale/rebase UX-u i eventualnom pravom `workspace` agregatu od već zatvorenih backend foundation wave-ova u `7` i `8`
+- omogućiti da `9` krene nezavisno, dok se ovaj wave otvara samo kada želimo dalje da širimo collaboration i shared-write semantiku
+
+Šta je već rešeno pre ovog wave-a:
+
+- minimalni actor/workspace anchor postoji kroz `created_by` i `workspace_id`
+- durable `mapping job` runtime i recovery metadata postoje
+- prvi ownership guard-ovi postoje za `apply reuse`, `cancel job` i `resume draft`
+- prvi `expected_version` write path postoji kroz `draft session update`
+
+Šta je isporučeno u ovom wave-u:
+
+- ownership + stale guard logika više ne ostaje ručno kopirana samo po starim putanjama, već koristi prvi zajednički helper/policy obrazac kroz `job cancel`, `draft resume/update` i `mapping set apply`
+- `draft session` je potvrđen kao prvi authoritative shared-write anchor za Workspace continuity i collaboration-readiness, bez otvaranja novog `workspace` agregata prerano
+- uveden je prvi pravi `save decisions` API surface kroz dedicated `draft session decision-state` write putanju sa `expected_version`, `last_writer`, `updated_at` i `stale_write` contract-om
+- uveden je i odvojeni `review state` write surface nad istim `draft session` anchor-om, tako da filteri/section context mogu da se čuvaju bez punog snapshot overwrite-a
+- Streamlit UI sada prati aktivni draft session i na `stale_write` reaguje konzistentno: reload-uje latest backend draft state umesto da tiho nastavi sa zastarelim lokalnim anchor-om
+- `mapping set status/apply` u ovom wave-u ostaju ownership-only mutacije; puni optimistic concurrency nije nametnut governance verzijama koje već imaju sopstvenu version-lineage semantiku
+
+Operativni pregled aktivnosti:
+
+- [x] Uvesti prvi ponovljiv helper obrazac za ownership + stale guard-ove na postojećim shared write/read putanjama (`job cancel`, `draft resume/update`, `mapping set apply`) pre nego što krene novi write surface.
+- [x] Proširiti `expected_version`, `version`, `updated_at` i `last_writer` contract na prve naredne shared write putanje posle `draft session update`, kroz dedicated `decision-state` i `review-state` write surface-e.
+- [x] Definisati da `draft session decision-state/review-state` dobijaju isti optimistic concurrency contract, dok `mapping set status/apply` u ovom wave-u ostaju ownership-only mutacije.
+- [x] Potvrditi da `draft session` ostaje dovoljan authoritative restore/write anchor za prvi collaboration-readiness wave; poseban `workspace` agregat se odlaže dok shared write surface ne preraste ovaj scope.
+- [x] Proširiti uvedeni helper/policy layer za ownership + stale checks na prve nove shared route-ove, umesto da se guard logika dalje širi ručno po svakom route-u.
+- [x] Isporučiti prvi pravi `save decisions` API surface koji ne zavisi od implicitnog browser-local stanja i koji direktno piše durable backend decision state.
+- [x] Dodati backend read/write model za `review state` i `decision state` kroz draft-session partial update contract, bez preuranjenog uvodjenja novog agregata.
+- [x] Definisati i isporučiti prvi UI odgovor na `stale_write`: reload current backend state za aktivni draft session.
+- [x] Potvrditi da `Catalog`, `Governance`, `Benchmarks` i `target intent` tokovi i dalje smeju da koriste UI-local navigacioni handoff kada nema durable write semantike, dok shared writes koriste backend anchor.
+- [x] Odvojiti sledeći auth/collaboration wave od ovog scope-a: puni user management, org model, assignee inbox, live collaboration i lock indicators nisu deo zatvorenog 8A wave-a.
+
+Kriterijum za zatvaranje ovog follow-on wave-a:
+
+- najmanje dva do tri glavna shared write path-a koriste isti optimistic concurrency contract
+- stale/reload ponašanje je konzistentno između backend odgovora i UI reakcije
+- ownership i concurrency guard-ovi više ne nastaju ad hoc po ruti, nego kroz jasan ponovljiv obrazac
+- i dalje ostaje legitimno da se posle toga otvori zaseban auth/collaboration epic, umesto da se ova tema beskonačno produžava
+
+Operativni pregled zatvorenog scope-a:
+
+- [x] Tri glavna shared write path-a sada koriste isti draft-session optimistic concurrency contract: `draft session update`, `decision-state save`, `review-state save`.
+- [x] UI stale/reload ponašanje je usklađeno sa backend `stale_write` odgovorom kroz reload latest draft-state tok.
+- [x] Ownership i concurrency guard-ovi više ne nastaju ad hoc po prvim ključnim mapping rutama.
+- [x] Dalji multi-user collaboration i auth scope ostaju legitimno izdvojeni u sledeći epic.
+
+### 8B. Follow-on wave: broader collaboration UX and shared artifact concurrency
+
+Status: future follow-on after closed `8A`.
+
+Šta sledeće ostaje izvan zatvorenog 8A scope-a:
+
+- browser smoke pokrivenost za stale resume/rebase tokove kada UI dobije pun compare/rebase affordance
+- odluka da li dodatni shared artifact write-ovi van draft-session anchor-a treba da dobiju isti optimistic concurrency contract ili posebnu semantiku
+- eventualni standalone `workspace` agregat ako shared write surface preraste draft-session anchor
+- auth/org/live-collaboration sloj: user management, lock indicators, assignee inbox i slični multi-user workflow elementi
+
+### 9. Target platform intent and system-specific target profiles
+
+Status: completed for the first canonical-first target-intent wave.
+
+Napomena:
+
+- ovaj pravac ne menja canonical-first osnovu proizvoda
+- cilj nije da korisnik bira vendor umesto canonical sloja, nego da eksplicitno kaže ka kom velikom target sistemu želi da ide
+- taj izbor radi kao `target intent` signal koji pojačava canonical target projection i explainability, bez preskakanja canonical sloja
+- zatvoreni scope ovog wave-a ostaje `Source -> Canonical -> Target-aware canonical projection`, ne puni vendor-specific output generation matrix
+
+Minimalni produktni cilj:
+
+- u `Workspace` setup toku korisnik može da odabere `integration target family`
+- `Canonical only` ostaje validna i prva opcija
+- izbor konkretnog target sistema ne preskače canonical mapiranje, nego aktivira system-aware target profile i relevantnije output/reuse tokove
+
+Šta je isporučeno u ovom wave-u:
+
+- podržani `target intent` izbori su formalizovani kroz backend contract za `canonical` i `sap`
+- uveden je `/mapping/target-intents` endpoint kao izvor podržanih opcija za workspace/setup i canonical mapping tokove
+- `build_virtual_target_schema()` više nije canonical-only: sada gradi canonical projection sa target-aware alias hintovima za `sap`
+- `GET /mapping/target-fields` koristi isti target-intent contract i radi za podržane target profile opcije, ne samo za `canonical`
+- canonical mapping response sada eksplicitno vraća `mapping_runtime.target_system`, `mapping_runtime.target_profile` i `mapping_runtime.target_projection_mode`
+- prvi realni vendor vertical slice pokriven je kroz `sap_customer_master` target profile, sa fokusiranom runtime validacijom bez regressije canonical-only contract-a
+
+Produktna pravila koja treba očuvati:
+
+- canonical ostaje stabilan semantički sloj i glavni reuse anchor
+- vendor-specific target profile služi kao accelerator i implementacioni izlazni sloj, ne kao nova source-of-truth semantika
+- system-specific knowledge ne sme automatski da postane global canonical registry bez stewardship/promocije
+
+Operativni pregled zatvorenog scope-a:
+
+- [x] Potvrđen je backend tok `source upload + target intent + canonical/system-aware canonical izlaz` bez narušavanja postojećeg `canonical-only` toka.
+- [x] Definisan je prvi isporučeni skup `integration target family` opcija za `Canonical only` i `SAP`, uz canonical-first pravilo.
+- [x] `target intent` je postao deo mapping request konteksta i response explainability contract-a, a ne samo prolazni UI filter.
+- [x] `target intent` utiče na virtual target izbor i candidate narrowing kroz target-aware canonical alias projection.
+- [x] Uveden je prvi uski `system-specific target profile` slice za SAP, bez otvaranja preširokog vendor matrix-a.
+- [x] Za ovaj wave storage/reuse contract ostaje na postojećem `target_system` + `artifact_type` modelu, bez otvaranja novog persistence sloja samo zbog target intent-a.
+- [x] Explainability ostaje jasna kroz runtime metadata contract koji razlikuje `canonical_only` i `target_aware_canonical` projekciju.
+- [x] Isporučen je prvi uski vertical slice sa fokusiranom runtime validacijom nad realnim SAP use case-om i bez regressije canonical-only putanje.
+- [x] Dokumentovana je granica proizvoda: target platform dropdown ostaje intent/projection layer, ne zamena za canonical model.
+
+Napomena o granici zatvorenog scope-a:
+
+- ovaj wave ne uvodi puni vendor-specific output generation niti širi target matrix preko prva dva podržana izbora
+- ovaj wave ne uvodi poseban persisted `target_profile` read/write model u `mapping set`, `catalog` ili budući `workspace` agregat
+- buduće širenje ove teme treba voditi kao zaseban nastavak ispod, ne kao dokaz da `9` nije kompletirana
+
+### 9A. Follow-on wave: broader target profile matrix and workspace continuity persistence
+
+Status: started with first continuity slice; broader matrix/reuse persistence still follow-on.
+
+Šta ovaj nastavak otvara tek kada zatreba:
+
+- širenje target-intent opcija na dodatne sisteme kao što su `Salesforce`, `Workday`, `Coupa` ili drugi sistemi sa dovoljno jakim knowledge signalom
+- proširenje postojećeg `draft session` / `workspace reuse` continuity contract-a tako da `target_system` i eventualni `target_profile` postanu deo stabilnog workspace identiteta, a ne samo runtime metadata jednog mapping request-a
+- odvajanje explicitnog `target_profile` persistence contract-a u `mapping set`, `catalog`, `workspace reuse` i eventualni budući `workspace` agregat tek kada to stvarno postane potrebno za reuse i ownership semantiku
+- target-aware output artifact generation posle canonical mapiranja, umesto današnjeg canonical/system-aware canonical projection scope-a
+- dodatnu explainability i catalog/reuse logiku koja razlikuje canonical projection, target-specific output i eventualne profile-specific transform templates
+
+Prvi isporučeni continuity slice u ovom nastavku:
+
+- `draft session` payload sada čuva opšti `workspace_target_context` snapshot (`target_system`, `target_profile`, `target_projection_mode`, `artifact_type`), umesto da target intent ostane samo uski canonical-specific izuzetak
+- restore/conflict logika koristi taj novi workspace target context uz backward-compatible fallback na stariji `canonical_target_system` payload
+- fokusirana backend smoke validacija potvrđuje da canonical draft session može da sačuva, izlista i vrati isti target-intent/projection režim
+
+Strateška napomena:
+
+- ovo nije zaseban persistence sloj samo za `target intent`, već nastavak globalne strategije da isti workspace može bezbedno da se vrati, nastavi i reuse-uje sa istim operativnim kontekstom
+- prvi cilj tog nastavka nije novi vendor matrix, nego da restore/runtime kontinuitet dosledno pamti u kom intent/projection režimu je workspace radio
+
+### 10. Epic 14A/14B: performance and signal precomputation
 
 Status: queued after discovery/hardening stabilization.
 

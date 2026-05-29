@@ -21,6 +21,73 @@ What Semantra is not yet:
 - a full graph or ontology management product
 - a resume-by-design workspace with durable `draft session` restore across reloads or runtime switches
 
+## Persistence And State Placement Today
+
+The product already persists a substantial part of its governed domain model in SQLite. The important distinction is not "DB or no DB", but rather which slices are:
+
+- DB-backed and authoritative for runtime/listing/governance behavior
+- DB-backed as a runtime snapshot while source authoring still remains file-seeded or reseed-driven
+- session-local Streamlit orchestration state that is intentionally transient today
+
+### A. DB-backed governed entities today
+
+These slices already live in SQLite and are part of the current durable backend model:
+
+- mapping-set governance records and version payloads (`mapping_sets`)
+- catalog discovery projections and concept usage read models (`mapping_catalog_entries`, `mapping_catalog_concepts`)
+- draft-session persistence for the current minimal save/list/load flow (`draft_sessions`)
+- benchmark datasets and evaluation runs
+- async mapping job status, progress, cancel metadata, and event log (`mapping_jobs`, `mapping_job_events`)
+- corrections and reusable correction rules
+- knowledge overlay versions and entries
+- knowledge audit log and stewardship items
+- source-field hints
+
+In the current live pilot database this is observable directly: catalog rows, mapping-set rows, draft-session rows, job rows, and the canonical/knowledge runtime tables are physically present in `backend/semantra.sqlite3`.
+
+### B. DB-backed runtime snapshots with file-backed authoring still present
+
+These slices are stored in SQLite and loaded from SQLite during normal runtime when the persisted seed hash matches, but authoring is not yet fully DB-only:
+
+- base knowledge concept registry (`knowledge_concepts`, `knowledge_field_contexts`)
+- canonical concept registry (`canonical_concepts`, `canonical_field_contexts`)
+- knowledge seed metadata (`knowledge_seed_meta`)
+
+Current behavior:
+
+- runtime loading is DB-first when the cached SQLite snapshot is current
+- source-file changes still trigger reseed from canonical glossary / metadata source files back into the DB snapshot
+- canonical authoring still retains file-backed reseed paths and is therefore not yet a pure DB-native authoring lifecycle
+
+This is why the current product should be described as `DB-first runtime` rather than `DB-only knowledge authoring`.
+
+### C. Session-local or browser-local orchestration state today
+
+These slices still rely heavily on `st.session_state` and are not yet modeled as durable collaborative domain entities:
+
+- active upload response and current profiled dataset handles in the browser session
+- current mapping response, review filters, queue focus, and editor selections
+- generated explanation, preview, codegen, and refinement panels that are intentionally rebuilt or cleared
+- API base URL, admin token, backend reachability snapshot, and similar UI connection state
+- debug-console selections, currently loaded details, and one-session operator context
+
+Some of this can remain transient permanently because it is UI choreography rather than business state. The gap is not that every widget value must be persisted, but that any domain entity a user expects to resume, share, audit, or govern should have a backend identity and persistence model.
+
+### D. Practical bottom line
+
+The current state is:
+
+- Catalog is in the DB.
+- Mapping sets are in the DB.
+- Draft sessions are in the DB, but resume semantics are still minimal.
+- Mapping job state is in the DB, but execution is still local/thread-backed.
+- Overlay lifecycle is in the DB.
+- Canonical and knowledge runtime snapshots are in the DB.
+- Canonical and base knowledge authoring are not yet fully DB-only because file-backed reseed inputs still exist.
+- Workspace interaction state is still largely session-local.
+
+So the next architecture step is not "introduce persistence from scratch". It is to finish the move from `pilot DB-backed runtime plus session orchestration` to `DB-first domain model with clear boundaries for what may remain ephemeral UI state`.
+
 ## Implemented User-Facing Capabilities
 
 ### 1. Data Ingestion and Schema Profiling
