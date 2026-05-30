@@ -160,6 +160,7 @@ ENGLISH_HELP_PATH = APP_ROOT / "help.en.md"
 REFERENCE_DOCS_PATH = APP_ROOT / "docs" / "reference"
 REFERENCE_EXTRA_DOCS = (
     APP_ROOT / "docs" / "presentation" / "Conceptualization.md",
+    APP_ROOT / "docs" / "pilot" / "REAL_LIFE_PILOT_TEST_PLAN.md",
 )
 REFERENCE_KROKI_BASE_URL = os.getenv("SEMANTRA_KROKI_BASE_URL", "https://kroki.io")
 MERMAID_FENCE_PATTERN = re.compile(r"```mermaid\s*\n(.*?)\n```", re.IGNORECASE | re.DOTALL)
@@ -1685,7 +1686,20 @@ def mermaid_svg_markup(diagram_source: str, kroki_base_url: str | None = None) -
 def reference_document_label(reference_path: Path) -> str:
     """Format a reference filename into a readable sidebar label."""
 
-    return reference_path.stem.replace("_", " ").replace("-", " ").title()
+    base_label = reference_path.stem.replace("_", " ").replace("-", " ").title()
+    try:
+        relative_parts = reference_path.resolve().relative_to(APP_ROOT).parts
+    except ValueError:
+        relative_parts = ()
+
+    if len(relative_parts) >= 2 and relative_parts[0] == "docs":
+        section = relative_parts[1]
+        if section == "pilot":
+            return f"Pilot: {base_label}"
+        if section == "presentation":
+            return f"Presentation: {base_label}"
+
+    return base_label
 
 
 def reference_document_display_path(reference_path: Path) -> str:
