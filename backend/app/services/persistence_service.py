@@ -386,6 +386,10 @@ class SQLitePersistenceService:
                     display_name TEXT NOT NULL,
                     description  TEXT NOT NULL DEFAULT '',
                     data_type    TEXT NOT NULL DEFAULT '',
+                    is_pii       INTEGER NOT NULL DEFAULT 0,
+                    is_gdpr_special_category INTEGER NOT NULL DEFAULT 0,
+                    pii_categories_json TEXT NOT NULL DEFAULT '[]',
+                    data_subject_types_json TEXT NOT NULL DEFAULT '[]',
                     aliases_json TEXT NOT NULL DEFAULT '[]'
                 )
                 """
@@ -752,6 +756,7 @@ class SQLitePersistenceService:
         }
         migrations: list[tuple[str, callable]] = [
             ("20260528_mapping_jobs_runtime_metadata", self._migrate_mapping_jobs_runtime_metadata),
+            ("20260530_canonical_privacy_metadata", self._migrate_canonical_privacy_metadata),
         ]
         for migration_name, migration in migrations:
             if migration_name in applied:
@@ -772,6 +777,18 @@ class SQLitePersistenceService:
                 "heartbeat_at": "TEXT",
                 "lease_expires_at": "TEXT",
                 "recovery_signal": "TEXT",
+            },
+        )
+
+    def _migrate_canonical_privacy_metadata(self, connection: sqlite3.Connection) -> None:
+        self._ensure_columns(
+            connection,
+            "canonical_concepts",
+            {
+                "is_pii": "INTEGER NOT NULL DEFAULT 0",
+                "is_gdpr_special_category": "INTEGER NOT NULL DEFAULT 0",
+                "pii_categories_json": "TEXT NOT NULL DEFAULT '[]'",
+                "data_subject_types_json": "TEXT NOT NULL DEFAULT '[]'",
             },
         )
 
@@ -2849,8 +2866,20 @@ class SQLitePersistenceService:
                 connection.execute(
                     """
                     INSERT INTO canonical_concepts
-                        (concept_id, entity, attribute, display_name, description, data_type, aliases_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                        (
+                            concept_id,
+                            entity,
+                            attribute,
+                            display_name,
+                            description,
+                            data_type,
+                            is_pii,
+                            is_gdpr_special_category,
+                            pii_categories_json,
+                            data_subject_types_json,
+                            aliases_json
+                        )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         cc.concept_id,
@@ -2859,6 +2888,10 @@ class SQLitePersistenceService:
                         cc.display_name,
                         cc.description,
                         cc.data_type,
+                        int(getattr(cc.privacy, "is_pii", False)),
+                        int(getattr(cc.privacy, "is_gdpr_special_category", False)),
+                        json.dumps(list(getattr(cc.privacy, "pii_categories", ()))),
+                        json.dumps(list(getattr(cc.privacy, "data_subject_types", ()))),
                         json.dumps(sorted(cc.aliases)),
                     ),
                 )
@@ -2902,8 +2935,20 @@ class SQLitePersistenceService:
                 connection.execute(
                     """
                     INSERT INTO canonical_concepts
-                        (concept_id, entity, attribute, display_name, description, data_type, aliases_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                        (
+                            concept_id,
+                            entity,
+                            attribute,
+                            display_name,
+                            description,
+                            data_type,
+                            is_pii,
+                            is_gdpr_special_category,
+                            pii_categories_json,
+                            data_subject_types_json,
+                            aliases_json
+                        )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         cc.concept_id,
@@ -2912,6 +2957,10 @@ class SQLitePersistenceService:
                         cc.display_name,
                         cc.description,
                         cc.data_type,
+                        int(getattr(cc.privacy, "is_pii", False)),
+                        int(getattr(cc.privacy, "is_gdpr_special_category", False)),
+                        json.dumps(list(getattr(cc.privacy, "pii_categories", ()))),
+                        json.dumps(list(getattr(cc.privacy, "data_subject_types", ()))),
                         json.dumps(sorted(cc.aliases)),
                     ),
                 )
@@ -2957,7 +3006,11 @@ class SQLitePersistenceService:
                 """
             ).fetchall()
             cc_rows = connection.execute(
-                "SELECT concept_id, entity, attribute, display_name, description, data_type, aliases_json FROM canonical_concepts"
+                """
+                SELECT concept_id, entity, attribute, display_name, description, data_type,
+                       is_pii, is_gdpr_special_category, pii_categories_json, data_subject_types_json, aliases_json
+                FROM canonical_concepts
+                """
             ).fetchall()
             canonical_ctx_rows = connection.execute(
                 """
@@ -2995,7 +3048,11 @@ class SQLitePersistenceService:
                 "display_name": row[3],
                 "description":  row[4],
                 "data_type":    row[5],
-                "aliases":      json.loads(row[6]),
+                "is_pii":       bool(row[6]),
+                "is_gdpr_special_category": bool(row[7]),
+                "pii_categories": json.loads(row[8]),
+                "data_subject_types": json.loads(row[9]),
+                "aliases":      json.loads(row[10]),
             }
             for row in cc_rows
         ]

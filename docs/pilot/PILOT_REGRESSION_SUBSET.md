@@ -13,7 +13,15 @@ Potvrditi da glavni Semantra pilot tok ostaje stabilan na ključnim površinama:
 - Workspace output refinement i accepted-only artifact flow
 - Catalog reuse/discovery tok
 - Benchmarks explanation tok
-- Canonical Console stewardship tok
+- Governance > Canonical Console stewardship tok
+
+## UI orijentacija za ovaj subset
+
+Aktuelna UI organizacija za ovaj dokument je:
+
+- top-level area: `Workspace`, `Catalog`, `Benchmarks`, `System`, `Governance`
+- `Workspace` pod-tabovi: `Setup`, `Review`, `Decisions`, `Output`
+- `Canonical Console` i `Stewardship` su sekcije unutar `Governance`
 
 ## Stabilna pilot preporuka
 
@@ -28,7 +36,7 @@ Razlog:
 
 1. Pokreni lokalni stack.
 	Sačekaj da `start_semantra.ps1` prijavi `Backend is ready` i `Streamlit is ready` pre otvaranja UI-ja.
-2. Potvrdi da `Workspace`, `Catalog` i `Canonical Console` otvaraju bez runtime grešaka.
+2. Potvrdi da `Workspace`, `Catalog` i `Governance` otvaraju bez runtime grešaka, i da se `Canonical Console` sekcija unutar `Governance` normalno renderuje.
 3. Ako lokalni runtime nema potrebne smoke fixture podatke, pokreni `backend/scripts/bootstrap_operational_smoke.ps1` ili `backend/scripts/bootstrap_operational_smoke.py` da repeatable seeduje `browser-diff-focus`, `Stewardship Smoke Sync`, `approved-customer-reuse-smoke`, `customer-draft-session` i `operational-smoke-benchmark` kroz postojeće API-je.
 4. Za showcase quick demo koristi `ui_fixtures/showcase_customer_mapping/showcase_customer_source.csv` i `ui_fixtures/showcase_customer_mapping/showcase_customer_target.json`.
 
@@ -97,8 +105,8 @@ python -m pytest backend/tests/test_mapping_service.py backend/tests/test_spec_u
 - concept-centric reuse view
 - discovery overview matrix
 - reuse hint-ovi, stale-state recovery i mapping-set reuse guard
-- version diff -> `Workspace Review` handoff sa changed-source scope signalom
-- `Canonical review` / `Stewardship` governance handoff sa section-aware landing-om
+- version diff -> `Workspace > Review` handoff sa changed-source scope signalom
+- `Governance > Canonical Console` / `Governance > Stewardship` handoff sa section-aware landing-om
 
 ### Benchmarks
 
@@ -106,7 +114,7 @@ python -m pytest backend/tests/test_mapping_service.py backend/tests/test_spec_u
 - benchmark governance gate za `Save current mapping as benchmark`
 - saved dataset / profile-comparison helper tok
 
-### Canonical Console
+### Governance > Canonical Console
 
 - stewardship queue helper-i
 - repeated canonical gap surfacing
@@ -140,7 +148,7 @@ Ovaj smoke proverava da output artefakti ostanu governance-sensitive i da refine
 Koristi aktivni workspace showcase snapshot i bar jedan `approved` saved mapping set:
 
 1. U `Catalog` osveži rezultate sa `Load all integrations` i potvrdi da discovery overview prikazuje broj approved integracija za trenutni skup.
-2. Učitaj jedan `approved` integration detail, pa potvrdi da `Mapping Set Drilldown` prikazuje compare baseline i handoff CTA ka `Workspace` ili `Canonical Console`.
+2. Učitaj jedan `approved` integration detail, pa potvrdi da `Mapping Set Drilldown` prikazuje compare baseline i handoff CTA ka `Workspace` ili `Governance > Canonical Console`.
 3. Otvori `Workspace Reuse Fit`, generiši bounded reuse procenu i potvrdi da surface prikazuje workspace context, fit/risk summary i sledeće akcije bez automatskog apply ponašanja.
 4. Klikni `Reuse in Workspace` samo za `approved` version i potvrdi da se pojavi success status poruka za apply/reuse tok.
 5. Klikni `Open workspace review handoff` i potvrdi da top-level navigacija zaista pređe u `Workspace` umesto da ostane u `Catalog` ili padne na Streamlit grešku.
@@ -155,9 +163,9 @@ Ako lokalni runtime krene bez catalog podataka, prvo seeduj minimalni `browser-d
 1. U `Catalog` učitaj `browser-diff-focus` detail i otvori najnoviji draft version sa dostupnim baseline diff-om.
 2. Klikni `Open current diff review focus` i potvrdi da UI prelazi u `Workspace > Review`, a status poruka jasno signalizuje multi-source diff scope (`source_scope=... diff fields`).
 3. Ako aktivni Workspace već ima učitan review set, potvrdi i da `Filter by source` ostaje na `All` dok review caption nosi multi-source diff fokus umesto tvrdog source filtera.
-4. Vrati se u isti `Catalog` diff readout, klikni `Open current diff Canonical review` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Canonical`, uz očišćen stale `Canonical concept search` ili drugi prethodni governance filter.
+4. Vrati se u isti `Catalog` diff readout, klikni `Open current diff Canonical review` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Canonical Console`, uz očišćen stale `Canonical concept search` ili drugi prethodni governance filter.
 5. Učitaj unmatched-source draft mapping set (na primer `Stewardship Smoke Sync`), otvori `Mapping Set Drilldown` i potvrdi da glavni Governance CTA eksplicitno glasi `Open Stewardship`.
-6. Klikni `Open Stewardship` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Stewardship`, umesto da ostane na generičkom canonical landing-u.
+6. Klikni `Open Stewardship` i potvrdi da UI prelazi u `Governance` sa aktivnom sekcijom `Stewardship`, umesto da ostane na generičkom governance landing-u.
 
 Ovaj smoke proverava da noviji `Catalog` handoff CTA-e nisu samo helper-level signal, već da stvarno prebacuju korisnika na tačan top-level area, odgovarajuću sekciju i očekivani filter/focus scope.
 

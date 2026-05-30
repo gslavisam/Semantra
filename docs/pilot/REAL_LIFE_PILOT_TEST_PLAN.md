@@ -7,10 +7,17 @@ This document defines a practical pilot-validation sprint for the current Semant
 It is aligned to the product shape as of 2026-05-29:
 
 - `Workspace`
-- `Canonical Console`
 - `Catalog`
 - `Benchmarks`
-- `Admin / Debug`
+- `System`
+- `Governance`
+
+Current UI orientation for this plan:
+
+- `Workspace` is the main analyst flow and is organized into `Setup`, `Review`, `Decisions`, and `Output`
+- `Governance` is the top-level area for canonical and knowledge governance
+- `Canonical Console` remains a core governance surface, but now lives inside `Governance` rather than as a separate top-level tab
+- `System` is the operational successor to the older `Admin / Debug` wording
 
 The goal is not to add new scope during the sprint. The goal is to validate whether the implemented product behaves correctly on realistic, sanitized project inputs, whether the current governance and reuse model is usable in real analyst work, and whether the current product already demonstrates value worth presenting to the organization.
 
@@ -22,7 +29,7 @@ At the end of the sprint, the team should be able to answer:
 2. Does the review loop remain trustworthy when data is ambiguous or incomplete?
 3. Do governance gates behave correctly on saved artifacts?
 4. Is the Catalog useful as a reuse surface, not just as a metadata list?
-5. Does the Canonical Console support a practical stewardship loop on real findings?
+5. Does `Governance`, especially `Canonical Console` and `Stewardship`, support a practical stewardship loop on real findings?
 6. Which flows are strong enough today to become the primary proof-of-concept and live-demo story?
 
 ## Recommended Mode
@@ -305,8 +312,8 @@ Validate:
 - integration detail drilldown
 - similar integrations
 - `Reuse in Workspace`
-- version diff handoff into `Workspace Review`
-- governance handoff into `Canonical` and `Stewardship`
+- version diff handoff into `Workspace > Review`
+- governance handoff into `Governance > Canonical Console` and `Governance > Stewardship`
 
 Expected outcomes:
 
@@ -315,9 +322,9 @@ Expected outcomes:
 - concept-centric lookup exposes real reuse evidence
 - similarity signals are plausible, not random
 - review handoff lands on the intended `Workspace` section and preserves diff-source scope without forcing a narrow source filter
-- governance handoff lands on the intended `Canonical` or `Stewardship` surface and does not inherit stale governance filters
+- governance handoff lands on the intended `Governance` subsection (`Canonical Console` or `Stewardship`) and does not inherit stale governance filters
 
-### Track E. Canonical Console and stewardship
+### Track E. Governance: Canonical Console and stewardship
 
 Validate:
 
@@ -372,7 +379,7 @@ Use one record per executed scenario.
 - Selected tables if applicable:
 - Input type: row-data | schema-spec | sql-snapshot | canonical-only
 - LLM enabled: yes | no
-- Area: Workspace | Canonical Console | Catalog | Benchmarks | Admin / Debug
+- Area: Workspace > Setup | Workspace > Review | Workspace > Decisions | Workspace > Output | Catalog | Benchmarks | Governance > Canonical Console | Governance > Stewardship | System
 - Outcome: pass | pass-with-issues | fail
 - Severity if failed: blocker | important | nice-to-have
 - Observed behavior:
@@ -401,7 +408,7 @@ Treat the sprint as successful when all of the following are true:
 2. both Standard and Canonical flows complete on realistic inputs
 3. mapping-set save/version/apply/audit/diff work on real saved artifacts
 4. Catalog search/detail/reuse works on real saved artifacts
-5. Canonical Console stewardship actions are understandable and operable on real findings
+5. Governance stewardship actions, especially in `Canonical Console` and `Stewardship`, are understandable and operable on real findings
 6. remaining open issues are mostly `important` or `nice-to-have`, not `blocker`
 7. at least one stable end-to-end story is strong enough to be reused in presentation and live-demo form without improvisation
 8. if the sprint goal includes broader capability validation rather than only the main proof-of-value loop, at least three additional scenarios from `G1` through `G6` have been executed, including one operational state-lifecycle scenario (`G2` or `G6`) and one bounded-AI comparison (`A5` or `G5`)

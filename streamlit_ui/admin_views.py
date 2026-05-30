@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import csv
 from datetime import datetime
-from io import StringIO
+from io import BytesIO, StringIO
 from collections.abc import Callable
 from typing import Any
 
 import httpx
 import streamlit as st
+from openpyxl import load_workbook
 
 from streamlit_ui.shared_views import render_status_badge_legend
 
@@ -284,6 +285,7 @@ def _canonical_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
     for concept in concepts or []:
         base_aliases = [str(alias).strip() for alias in concept.get("base_aliases", []) if str(alias).strip()]
         overlay_aliases = [str(alias).strip() for alias in concept.get("active_overlay_aliases", []) if str(alias).strip()]
+        privacy = concept.get("privacy") or {}
         rows.append(
             {
                 "concept_id": concept.get("concept_id"),
@@ -291,6 +293,12 @@ def _canonical_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
                 "entity": concept.get("entity") or "",
                 "attribute": concept.get("attribute") or "",
                 "data_type": concept.get("data_type") or "",
+                "pii": "yes" if privacy.get("is_pii") else "no",
+                "gdpr_special": "yes" if privacy.get("is_gdpr_special_category") else "no",
+                "pii_tags": ", ".join(str(value).strip() for value in privacy.get("pii_categories", []) if str(value).strip()),
+                "data_subjects": ", ".join(
+                    str(value).strip() for value in privacy.get("data_subject_types", []) if str(value).strip()
+                ),
                 "source": concept.get("source") or "base",
                 "usage_count": concept.get("usage_count", 0),
                 "field_context_count": concept.get("field_context_count", 0),
@@ -307,6 +315,7 @@ def _canonical_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
 def _knowledge_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
     rows: list[dict] = []
     for concept in concepts or []:
+        linked_privacy = concept.get("linked_privacy") or {}
         rows.append(
             {
                 "concept_id": concept.get("concept_id"),
@@ -314,6 +323,14 @@ def _knowledge_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
                 "domain": concept.get("domain") or "",
                 "source": concept.get("source") or "derived_runtime",
                 "editable": "yes" if concept.get("editable") else "no",
+                "linked_pii": "yes" if linked_privacy.get("is_pii") else "no",
+                "linked_gdpr_special": "yes" if linked_privacy.get("is_gdpr_special_category") else "no",
+                "linked_pii_tags": ", ".join(
+                    str(value).strip() for value in linked_privacy.get("pii_categories", []) if str(value).strip()
+                ),
+                "linked_data_subjects": ", ".join(
+                    str(value).strip() for value in linked_privacy.get("data_subject_types", []) if str(value).strip()
+                ),
                 "alias_count": concept.get("alias_count", 0),
                 "field_context_count": concept.get("field_context_count", 0),
                 "linked_canonical_concept_count": concept.get("linked_canonical_concept_count", 0),
@@ -540,6 +557,195 @@ def _canonical_gap_stewardship_item_map(records: list[dict] | None = None) -> di
             continue
         items[item_key] = record
     return items
+
+
+def _concept_governance_item_key(concept_id: str | None) -> str:
+    normalized_concept_id = _normalized_text(concept_id) or "unknown"
+    return f"concept_governance_{normalized_concept_id}".replace(" ", "_")
+
+
+def _concept_governance_item_map(records: list[dict] | None = None) -> dict[str, dict]:
+    items: dict[str, dict] = {}
+    for record in records or []:
+        if _normalized_text(record.get("item_type")) != "concept_governance":
+            continue
+        concept_id = _normalized_text(record.get("concept_id") or record.get("target"))
+        if not concept_id:
+            continue
+        items[concept_id] = record
+    return items
+
+
+def _concept_governance_item_request(
+    concept: dict,
+    *,
+    owner: str | None = None,
+    assignee: str | None = None,
+    review_note: str | None = None,
+    changed_by: str | None = None,
+) -> dict:
+    concept_id = _normalized_text(concept.get("concept_id")) or None
+    source_systems = [
+        _normalized_text(value)
+        for value in concept.get("source_systems", [])
+        if _normalized_text(value)
+    ]
+    business_domains = [
+        _normalized_text(value)
+        for value in concept.get("business_domains", [])
+        if _normalized_text(value)
+    ]
+    has_metadata = any(
+        _normalized_text(value)
+        for value in (owner, assignee, review_note)
+    )
+    return {
+        "item_type": "concept_governance",
+        "item_key": _concept_governance_item_key(concept_id),
+        "title": f"Concept governance profile for '{concept_id or 'unknown'}'",
+        "status": "approved" if has_metadata else "new",
+        "concept_id": concept_id,
+        "target": concept_id,
+        "source_system": source_systems[0] if len(source_systems) == 1 else None,
+        "business_domain": business_domains[0] if len(business_domains) == 1 else None,
+        "owner": _normalized_text(owner) or None,
+        "assignee": _normalized_text(assignee) or None,
+        "review_note": _normalized_text(review_note) or None,
+        "created_by": _normalized_text(changed_by) or None,
+        "changed_by": _normalized_text(changed_by) or None,
+    }
+
+
+def _concept_governance_rows(records: list[dict] | None = None) -> list[dict]:
+    rows: list[dict] = []
+    for concept_id, item in _concept_governance_item_map(records).items():
+        rows.append(
+            {
+                "concept_id": concept_id,
+                "business_owner": _normalized_text(item.get("owner")),
+                "data_steward": _normalized_text(item.get("assignee")),
+                "status": _normalized_text(item.get("status")) or "new",
+                "governance_note": _normalized_text(item.get("review_note")),
+                "updated_at": _normalized_text(item.get("updated_at") or item.get("created_at")),
+            }
+        )
+    return sorted(rows, key=lambda item: (_normalized_text(item.get("concept_id")).lower(),))
+
+
+def _concept_governance_option_label(item: dict | None = None) -> str:
+    concept_id = _normalized_text((item or {}).get("concept_id") or (item or {}).get("target")) or "unknown"
+    owner = _normalized_text((item or {}).get("owner")) or "unassigned"
+    assignee = _normalized_text((item or {}).get("assignee")) or "unassigned"
+    return f"{concept_id} | owner={owner} | steward={assignee}"
+
+
+def _normalized_governance_import_header(value: object) -> str:
+    return _normalized_text(value).lower().replace(" ", "_")
+
+
+def _concept_governance_import_rows(uploaded_file) -> list[dict[str, str]]:
+    if uploaded_file is None:
+        return []
+    file_name = _normalized_text(getattr(uploaded_file, "name", "")).lower()
+    file_bytes = uploaded_file.getvalue()
+    rows: list[dict[str, str]] = []
+    if file_name.endswith(".csv"):
+        decoded = file_bytes.decode("utf-8-sig")
+        reader = csv.DictReader(StringIO(decoded))
+        for row in reader:
+            rows.append({
+                _normalized_governance_import_header(key): _normalized_text(value)
+                for key, value in (row or {}).items()
+                if _normalized_governance_import_header(key)
+            })
+        return rows
+    if file_name.endswith(".xlsx"):
+        workbook = load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+        worksheet = workbook.active
+        header_cells = next(worksheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+        if not header_cells:
+            return []
+        headers = [_normalized_governance_import_header(value) for value in header_cells]
+        for row_values in worksheet.iter_rows(min_row=2, values_only=True):
+            row: dict[str, str] = {}
+            for index, cell_value in enumerate(row_values):
+                header = headers[index] if index < len(headers) else ""
+                if not header:
+                    continue
+                row[header] = _normalized_text(cell_value)
+            rows.append(row)
+        return rows
+    raise ValueError("Supported concept governance import formats are CSV and XLSX.")
+
+
+def _concept_governance_import_payloads(rows: list[dict[str, str]] | None) -> list[dict[str, str]]:
+    payloads: list[dict[str, str]] = []
+    for row in rows or []:
+        concept_id = _normalized_text(
+            row.get("concept_id")
+            or row.get("canonical_concept_id")
+            or row.get("canonical_term")
+        )
+        owner = _normalized_text(
+            row.get("external_business_owner")
+            or row.get("business_owner")
+            or row.get("owner")
+        )
+        assignee = _normalized_text(
+            row.get("external_data_steward")
+            or row.get("data_steward")
+            or row.get("assignee")
+        )
+        review_note = _normalized_text(
+            row.get("external_governance_note")
+            or row.get("governance_note")
+            or row.get("review_note")
+            or row.get("note")
+        )
+        if not concept_id:
+            continue
+        if not any((owner, assignee, review_note)):
+            continue
+        payloads.append(
+            {
+                "concept_id": concept_id,
+                "owner": owner,
+                "assignee": assignee,
+                "review_note": review_note,
+            }
+        )
+    return payloads
+
+
+def _concept_governance_template_csv_bytes() -> bytes:
+    buffer = StringIO()
+    writer = csv.DictWriter(
+        buffer,
+        fieldnames=[
+            "concept_id",
+            "external_business_owner",
+            "external_data_steward",
+            "external_governance_note",
+        ],
+    )
+    writer.writeheader()
+    writer.writerow(
+        {
+            "concept_id": "sales.order",
+            "external_business_owner": "order-to-cash lead",
+            "external_data_steward": "semantic-model steward",
+            "external_governance_note": "Mirrored from external governance register.",
+        }
+    )
+    writer.writerow(
+        {
+            "concept_id": "finance.invoice",
+            "external_business_owner": "finance controller",
+            "external_data_steward": "finance data steward",
+            "external_governance_note": "Owned in ERP master data council.",
+        }
+    )
+    return buffer.getvalue().encode("utf-8")
 
 
 def _overlay_promotion_item_key(entry: dict, overlay_version: dict | None = None) -> str:
@@ -1946,7 +2152,7 @@ def render_canonical_console_panel(
                     concept_source_system,
                     concept_source,
                 )
-                summary_columns = st.columns(4)
+                summary_columns = st.columns(6)
                 summary_columns[0].metric("Filtered", len(filtered_knowledge_concepts))
                 summary_columns[1].metric(
                     "Editable",
@@ -1959,6 +2165,18 @@ def render_canonical_console_panel(
                 summary_columns[3].metric(
                     "With context",
                     sum(1 for item in filtered_knowledge_concepts if int(item.get("field_context_count", 0) or 0) > 0),
+                )
+                summary_columns[4].metric(
+                    "Linked PII",
+                    sum(1 for item in filtered_knowledge_concepts if bool((item.get("linked_privacy") or {}).get("is_pii"))),
+                )
+                summary_columns[5].metric(
+                    "Linked GDPR special",
+                    sum(
+                        1
+                        for item in filtered_knowledge_concepts
+                        if bool((item.get("linked_privacy") or {}).get("is_gdpr_special_category"))
+                    ),
                 )
                 st.dataframe(_knowledge_concept_registry_rows(filtered_knowledge_concepts), width="stretch", hide_index=True)
 
@@ -2101,6 +2319,18 @@ def render_canonical_console_panel(
                     f"domain={concept.get('domain') or '-'} | source={concept.get('source') or 'derived_runtime'} | "
                     f"editable={'yes' if concept.get('editable') else 'no'}"
                 )
+                linked_privacy = concept.get("linked_privacy") or {}
+                linked_privacy_parts = [
+                    f"linked PII={'yes' if linked_privacy.get('is_pii') else 'no'}",
+                    f"linked GDPR special={'yes' if linked_privacy.get('is_gdpr_special_category') else 'no'}",
+                ]
+                if linked_privacy.get("pii_categories"):
+                    linked_privacy_parts.append("linked PII tags=" + ", ".join(linked_privacy.get("pii_categories") or []))
+                if linked_privacy.get("data_subject_types"):
+                    linked_privacy_parts.append(
+                        "linked data subjects=" + ", ".join(linked_privacy.get("data_subject_types") or [])
+                    )
+                st.caption("Linked privacy: " + " | ".join(linked_privacy_parts))
                 aliases = concept.get("aliases") or []
             if aliases:
                 st.caption("Aliases: " + ", ".join(str(value).strip() for value in aliases if str(value).strip()))
@@ -2386,7 +2616,7 @@ def render_canonical_console_panel(
                 concept_source_system,
                 concept_business_domain,
             )
-            summary_columns = st.columns(4)
+            summary_columns = st.columns(6)
             summary_columns[0].metric("Filtered", len(filtered_concepts))
             summary_columns[1].metric("Total", len(canonical_concepts))
             summary_columns[2].metric(
@@ -2396,6 +2626,14 @@ def render_canonical_console_panel(
             summary_columns[3].metric(
                 "With context",
                 sum(1 for item in filtered_concepts if int(item.get("field_context_count", 0) or 0) > 0),
+            )
+            summary_columns[4].metric(
+                "PII",
+                sum(1 for item in filtered_concepts if bool((item.get("privacy") or {}).get("is_pii"))),
+            )
+            summary_columns[5].metric(
+                "GDPR special",
+                sum(1 for item in filtered_concepts if bool((item.get("privacy") or {}).get("is_gdpr_special_category"))),
             )
             st.dataframe(_canonical_concept_registry_rows(filtered_concepts), width="stretch", hide_index=True)
 
@@ -2495,6 +2733,16 @@ def render_canonical_console_panel(
                 )
                 if concept.get("description"):
                     st.write(concept.get("description"))
+                privacy = concept.get("privacy") or {}
+                privacy_parts = [
+                    f"PII={'yes' if privacy.get('is_pii') else 'no'}",
+                    f"GDPR special={'yes' if privacy.get('is_gdpr_special_category') else 'no'}",
+                ]
+                if privacy.get("pii_categories"):
+                    privacy_parts.append("PII tags=" + ", ".join(privacy.get("pii_categories") or []))
+                if privacy.get("data_subject_types"):
+                    privacy_parts.append("Data subjects=" + ", ".join(privacy.get("data_subject_types") or []))
+                st.caption("Privacy: " + " | ".join(privacy_parts))
                 if concept.get("base_aliases") or concept.get("active_overlay_aliases"):
                     st.caption(
                         "Aliases: "
@@ -2536,6 +2784,88 @@ def render_canonical_console_panel(
                         )
                     )
                 st.caption(f"Alias count: {int(concept.get('alias_count', 0) or 0)}")
+
+                concept_id = _normalized_text(concept.get("concept_id")) or "unknown"
+                concept_governance_item = _concept_governance_item_map(
+                    st.session_state.get("debug_knowledge_stewardship_items")
+                ).get(concept_id) or {}
+                concept_governance_item_id = concept_governance_item.get("item_id")
+                st.write("**Concept governance profile**")
+                st.caption(
+                    "Thin ownership metadata attached to the canonical concept. External governance systems remain the process source of truth; Semantra stores the current business owner and data steward for reference."
+                )
+                governance_columns = st.columns(2)
+                governance_owner = governance_columns[0].text_input(
+                    "External business owner",
+                    value=_normalized_text(concept_governance_item.get("owner")),
+                    key=f"debug_concept_governance_owner_{concept_id}",
+                    placeholder="Example: order-to-cash lead",
+                )
+                governance_assignee = governance_columns[1].text_input(
+                    "External data steward",
+                    value=_normalized_text(concept_governance_item.get("assignee")),
+                    key=f"debug_concept_governance_assignee_{concept_id}",
+                    placeholder="Example: semantic-model steward",
+                )
+                governance_note = st.text_input(
+                    "External governance note",
+                    value=_normalized_text(concept_governance_item.get("review_note")),
+                    key=f"debug_concept_governance_note_{concept_id}",
+                    placeholder="Optional note copied from the external governance process.",
+                )
+                desired_governance_status = (
+                    "approved"
+                    if any(_normalized_text(value) for value in (governance_owner, governance_assignee, governance_note))
+                    else "new"
+                )
+                save_governance_disabled = (
+                    not concept_governance_item_id
+                    and not any(_normalized_text(value) for value in (governance_owner, governance_assignee, governance_note))
+                ) or (
+                    _normalized_text(concept_governance_item.get("owner")) == _normalized_text(governance_owner)
+                    and _normalized_text(concept_governance_item.get("assignee")) == _normalized_text(governance_assignee)
+                    and _normalized_text(concept_governance_item.get("review_note")) == _normalized_text(governance_note)
+                    and (_normalized_text(concept_governance_item.get("status")) or "new") == desired_governance_status
+                )
+                if st.button(
+                    "Save governance metadata",
+                    width="stretch",
+                    key=f"debug_save_concept_governance_{concept_id}",
+                    disabled=save_governance_disabled,
+                ):
+                    try:
+                        api_request(
+                            "POST",
+                            "/knowledge/stewardship-items",
+                            json=_concept_governance_item_request(
+                                concept,
+                                owner=governance_owner,
+                                assignee=governance_assignee,
+                                review_note=governance_note,
+                                changed_by=st.session_state.get("admin_token"),
+                            ),
+                        )
+                        st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                        st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                        st.session_state["last_action"] = {
+                            "level": "info",
+                            "message": (
+                                f"Saved concept governance metadata for {_normalized_text(concept.get('concept_id')) or 'selected concept'} "
+                                "using the existing stewardship store."
+                            ),
+                        }
+                    except httpx.HTTPError as error:
+                        st.session_state["last_action"] = {
+                            "level": "error",
+                            "message": f"Saving concept governance metadata failed: {error}",
+                        }
+                    st.rerun()
+                if concept_governance_item_id:
+                    st.caption(
+                        "Current governance record: "
+                        f"status={_normalized_text(concept_governance_item.get('status')) or 'new'} | "
+                        f"updated_at={_normalized_text(concept_governance_item.get('updated_at') or concept_governance_item.get('created_at')) or 'n/a'}"
+                    )
 
                 st.write("**Quick link correction patch (overlay)**")
                 st.caption(
@@ -2909,6 +3239,137 @@ def render_canonical_console_panel(
             st.session_state["debug_canonical_console_manual_clear"] = True
             st.session_state["last_action"] = {"level": "info", "message": "Cleared canonical console state."}
             st.rerun()
+
+        concept_governance_items = _concept_governance_item_map(st.session_state.get("debug_knowledge_stewardship_items"))
+        st.write("**Concept governance assignments**")
+        st.caption(
+            "Reference-only ownership metadata attached to canonical concepts. These records mirror who owns and stewards a concept without moving approval workflows into Semantra."
+        )
+        with st.expander("Bulk import concept governance", expanded=False):
+            st.download_button(
+                "Download concept governance CSV template",
+                data=_concept_governance_template_csv_bytes(),
+                file_name="concept_governance_template.csv",
+                mime="text/csv",
+                width="stretch",
+            )
+            governance_import_file = st.file_uploader(
+                "Concept governance CSV or XLSX",
+                type=["csv", "xlsx"],
+                key="concept_governance_import_file",
+                help=(
+                    "Accepted columns: concept_id plus any of business_owner/external_business_owner, "
+                    "data_steward/external_data_steward, governance_note/external_governance_note."
+                ),
+            )
+            st.caption(
+                "Use this to mirror core ownership metadata from an external governance system. Rows without concept_id or without any ownership metadata are skipped."
+            )
+            if governance_import_file is not None:
+                try:
+                    governance_import_rows = _concept_governance_import_payloads(
+                        _concept_governance_import_rows(governance_import_file)
+                    )
+                    st.caption(f"Parsed {len(governance_import_rows)} import-ready governance rows.")
+                    if governance_import_rows:
+                        st.dataframe(governance_import_rows[:25], width="stretch", hide_index=True)
+                        if len(governance_import_rows) > 25:
+                            st.caption(f"Showing first 25 of {len(governance_import_rows)} rows.")
+                    import_disabled = not governance_import_rows
+                except Exception as error:
+                    governance_import_rows = []
+                    import_disabled = True
+                    st.error(f"Parsing concept governance import failed: {error}")
+            else:
+                governance_import_rows = []
+                import_disabled = True
+            if st.button(
+                "Import concept governance metadata",
+                width="stretch",
+                key="debug_import_concept_governance_metadata",
+                disabled=import_disabled,
+            ):
+                saved_count = 0
+                failed_rows: list[str] = []
+                for row in governance_import_rows:
+                    try:
+                        api_request(
+                            "POST",
+                            "/knowledge/stewardship-items",
+                            json=_concept_governance_item_request(
+                                {"concept_id": row.get("concept_id")},
+                                owner=row.get("owner"),
+                                assignee=row.get("assignee"),
+                                review_note=row.get("review_note"),
+                                changed_by=st.session_state.get("admin_token"),
+                            ),
+                        )
+                        saved_count += 1
+                    except httpx.HTTPError as error:
+                        failed_rows.append(f"{row.get('concept_id')}: {error}")
+                try:
+                    st.session_state["debug_knowledge_stewardship_items"] = api_request("GET", "/knowledge/stewardship-items")
+                    st.session_state["debug_knowledge_audit_logs"] = api_request("GET", "/knowledge/audit")
+                except httpx.HTTPError:
+                    pass
+                if failed_rows:
+                    st.session_state["last_action"] = {
+                        "level": "warning",
+                        "message": (
+                            f"Imported {saved_count} concept governance rows; {len(failed_rows)} failed. "
+                            f"First failure: {failed_rows[0]}"
+                        ),
+                    }
+                else:
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": f"Imported {saved_count} concept governance rows from external metadata file.",
+                    }
+                st.rerun()
+        if concept_governance_items:
+            governance_rows = _concept_governance_rows(st.session_state.get("debug_knowledge_stewardship_items"))
+            governance_metric_columns = st.columns(4)
+            governance_metric_columns[0].metric("Governed concepts", len(governance_rows))
+            governance_metric_columns[1].metric(
+                "With external owner",
+                sum(1 for row in governance_rows if _normalized_text(row.get("business_owner"))),
+            )
+            governance_metric_columns[2].metric(
+                "With external steward",
+                sum(1 for row in governance_rows if _normalized_text(row.get("data_steward"))),
+            )
+            governance_metric_columns[3].metric(
+                "With note",
+                sum(1 for row in governance_rows if _normalized_text(row.get("governance_note"))),
+            )
+            st.dataframe(governance_rows, width="stretch", hide_index=True)
+            governance_options = {
+                _concept_governance_option_label(item): item for item in concept_governance_items.values()
+            }
+            selected_governance_label = st.selectbox(
+                "Concept governance detail",
+                list(governance_options.keys()),
+                key="debug_selected_concept_governance_label",
+            )
+            selected_governance_item = governance_options[selected_governance_label]
+            st.caption(
+                f"Selected concept={_normalized_text(selected_governance_item.get('concept_id')) or 'unknown'} | "
+                f"status={_normalized_text(selected_governance_item.get('status')) or 'new'}"
+            )
+            if _normalized_text(selected_governance_item.get("review_note")):
+                st.caption(f"Governance note: {_normalized_text(selected_governance_item.get('review_note'))}")
+            if st.button(
+                "Open concept in Canonical",
+                width="stretch",
+                key=f"debug_open_concept_governance_{_normalized_text(selected_governance_item.get('concept_id')) or 'unknown'}",
+            ):
+                st.session_state["pending_governance_section"] = "Canonical"
+                st.session_state["pending_governance_canonical_concept_id"] = _normalized_text(
+                    selected_governance_item.get("concept_id")
+                )
+                st.rerun()
+        else:
+            st.caption("No concept governance assignments have been recorded yet.")
 
         st.write("**Canonical gap review queue**")
         st.caption(

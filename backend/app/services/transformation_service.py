@@ -7,6 +7,9 @@ from typing import Any
 import pandas as pd
 
 from app.models.mapping import MappingDecision, TransformationPreviewResult, TransformationPreviewWarning
+from app.models.schema import ColumnProfile
+from app.services.metadata_knowledge_service import metadata_knowledge_service
+from app.utils.normalization import normalize_name, tokenize_name
 
 
 SAFE_BUILTINS = {
@@ -54,6 +57,72 @@ def build_transformation_statement(decision: MappingDecision) -> str:
     if "df_target[" in code:
         return code
     return f'df_target["{decision.target}"] = {code}'
+
+
+def _lightweight_column_profile(column_name: str) -> ColumnProfile:
+    return ColumnProfile(
+        name=column_name,
+        normalized_name=normalize_name(column_name),
+        description="",
+        declared_type="",
+        dtype="string",
+        null_ratio=0.0,
+        unique_ratio=0.0,
+        avg_length=0.0,
+        non_null_count=0,
+        sample_values=[],
+        distinct_sample_values=[],
+        detected_patterns=[],
+        tokenized_name=tokenize_name(column_name),
+    )
+
+
+def build_mapping_privacy_warnings(
+    decision: MappingDecision,
+    *,
+    stage: str = "preview",
+) -> list[TransformationPreviewWarning]:
+    """Emit a warning when a mapping pair shares privacy-tagged canonical meaning."""
+
+    privacy_concepts = metadata_knowledge_service.canonical_privacy_concepts_for_mapping(
+        _lightweight_column_profile(decision.source),
+        _lightweight_column_profile(decision.target),
+    )
+    if not privacy_concepts:
+        return []
+
+    concept_labels: list[str] = []
+    for concept in privacy_concepts[:3]:
+        tags: list[str] = []
+        if concept.get("is_pii"):
+            tags.append("PII")
+        if concept.get("is_gdpr_special_category"):
+            tags.append("GDPR special")
+        pii_categories = concept.get("pii_categories") or []
+        if pii_categories:
+            tags.append("tags=" + ", ".join(str(value) for value in pii_categories))
+        data_subject_types = concept.get("data_subject_types") or []
+        if data_subject_types:
+            tags.append("subjects=" + ", ".join(str(value) for value in data_subject_types))
+        concept_labels.append(f"{concept.get('concept_id')} ({'; '.join(tags)})")
+
+    overflow = len(privacy_concepts) - len(concept_labels)
+    overflow_suffix = f" (+{overflow} more)" if overflow > 0 else ""
+    return [
+        build_transformation_warning(
+            code="privacy_classification",
+            message=(
+                "Shared privacy-tagged canonical concept detected for this mapping: "
+                + "; ".join(concept_labels)
+                + overflow_suffix
+                + ". Review masking, minimization, and downstream handling before production use."
+            ),
+            source=decision.source,
+            target=decision.target,
+            stage=stage,
+            details={"privacy_concepts": privacy_concepts},
+        )
+    ]
 
 
 def sample_series_values(series: pd.Series) -> list[str]:
@@ -136,7 +205,7 @@ def build_transformed_target_frame(
         custom_code = (decision.transformation_code or "").strip()
         mode = "custom" if custom_code else "direct"
         status = "direct" if not custom_code else "validated"
-        warnings: list[TransformationPreviewWarning] = []
+        warnings: list[TransformationPreviewWarning] = build_mapping_privacy_warnings(decision, stage="preview")
 
         if not custom_code:
             execution_locals["df_target"][decision.target] = source_series

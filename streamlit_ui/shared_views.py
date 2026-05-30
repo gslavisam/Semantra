@@ -160,6 +160,7 @@ ENGLISH_HELP_PATH = APP_ROOT / "help.en.md"
 REFERENCE_DOCS_PATH = APP_ROOT / "docs" / "reference"
 REFERENCE_EXTRA_DOCS = (
     APP_ROOT / "docs" / "presentation" / "Conceptualization.md",
+    APP_ROOT / "docs" / "presentation" / "LIVE_DEMO_RUNBOOK.md",
     APP_ROOT / "docs" / "pilot" / "REAL_LIFE_PILOT_TEST_PLAN.md",
 )
 REFERENCE_KROKI_BASE_URL = os.getenv("SEMANTRA_KROKI_BASE_URL", "https://kroki.io")

@@ -29,6 +29,7 @@ TransformationWarningCode = Literal[
     "runtime_error",
     "missing_source_column",
     "null_expansion",
+    "privacy_classification",
     "type_coercion",
     "row_count_mismatch",
     "skipped_rejected_mapping",

@@ -6,7 +6,11 @@ import re
 
 from app.models.mapping import GeneratedArtifact, MappingDecision
 from app.services.dbt_codegen_profile import current_dbt_codegen_profile, dbt_identifier, dbt_source_relation
-from app.services.transformation_service import build_transformation_statement, build_transformation_warning
+from app.services.transformation_service import (
+    build_mapping_privacy_warnings,
+    build_transformation_statement,
+    build_transformation_warning,
+)
 
 
 def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
@@ -59,6 +63,7 @@ def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedA
             )
             statement = f'df_target["{decision.target}"] = df_source["{decision.source}"]'
 
+        warnings.extend(build_mapping_privacy_warnings(decision, stage="codegen"))
         lines.extend(statement.splitlines())
 
     return GeneratedArtifact(code="\n".join(lines), warnings=warnings)
@@ -120,6 +125,7 @@ def generate_pyspark_code(mapping_decisions: list[MappingDecision]) -> Generated
             )
             continue
 
+        warnings.extend(build_mapping_privacy_warnings(decision, stage="codegen"))
         expression, decision_warnings = _pyspark_column_expression(decision)
         warnings.extend(decision_warnings)
         select_lines.append(f"    {expression},")
@@ -196,6 +202,7 @@ def generate_dbt_code(mapping_decisions: list[MappingDecision]) -> GeneratedArti
             )
             continue
 
+        warnings.extend(build_mapping_privacy_warnings(decision, stage="codegen"))
         expression, decision_warnings = _dbt_select_expression(decision)
         warnings.extend(decision_warnings)
         select_lines.append(f"    {expression},")

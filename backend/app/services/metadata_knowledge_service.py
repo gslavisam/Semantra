@@ -15,6 +15,7 @@ from openpyxl import load_workbook
 from app.models.knowledge import (
     CanonicalGlossaryEntry,
     CanonicalGlossaryImportResponse,
+    CanonicalPrivacyMetadata,
     KnowledgeConceptBaseRecord,
     KnowledgeConceptDetailResponse,
     KnowledgeConceptFieldContext,
@@ -63,7 +64,10 @@ BASE_KNOWLEDGE_INLINE_EDIT_HEADERS = {
     "typical_length": "Tipicna duzina",
     "example_value": "Primer vrednosti",
 }
-CANONICAL_GLOSSARY_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
+CANONICAL_GLOSSARY_REQUIRED_HEADERS = ("concept_id", "entity", "attribute", "display_name", "description", "data_type", "aliases")
+CANONICAL_GLOSSARY_PRIVACY_HEADERS = ("is_pii", "is_gdpr_special_category", "pii_categories", "data_subject_types")
+CANONICAL_GLOSSARY_HEADERS = CANONICAL_GLOSSARY_REQUIRED_HEADERS + CANONICAL_GLOSSARY_PRIVACY_HEADERS
+CANONICAL_PRIVACY_CLASSIFIER_VERSION = "20260530_whole_set_v3"
 DEFAULT_METADATA_EXACT_MATCH_STRENGTH = 0.75
 PRIORITY_METADATA_EXACT_MATCH_STRENGTH = 0.9
 DEFAULT_METADATA_TOKEN_MATCH_STRENGTH = 0.45
@@ -90,6 +94,52 @@ ALIAS_FIELDS = (
     "Odoo style",
     "MS Dynamics style",
 )
+PERSON_LIKE_CANONICAL_ENTITIES = {"employee", "contact", "candidate", "applicant", "person", "user"}
+EMPLOYMENT_RELATED_CANONICAL_ENTITIES = {"absence", "compensation", "payroll", "benefit_enrollment"}
+FINANCIAL_ACCOUNT_CANONICAL_ENTITIES = {"bank_account", "supplier_bank_account"}
+ENTITY_DEFAULT_DATA_SUBJECT_TYPES = {
+    "employee": "employee",
+    "contact": "contact",
+    "candidate": "candidate",
+    "applicant": "candidate",
+    "person": "person",
+    "user": "user",
+    "customer": "customer",
+    "supplier": "supplier",
+    "vendor": "supplier",
+    "absence": "employee",
+    "compensation": "employee",
+    "payroll": "employee",
+    "benefit_enrollment": "employee",
+    "bank_account": "party",
+    "supplier_bank_account": "supplier",
+    "approval": "employee",
+    "audit": "employee",
+}
+PERSON_NAME_ATTRIBUTES = {"name", "full_name", "first_name", "last_name", "middle_name"}
+CONTACT_ATTRIBUTES = {"email", "phone", "mobile_phone", "commercial_contact_email"}
+IDENTIFIER_ATTRIBUTES = {
+    "id",
+    "employee_id",
+    "manager_id",
+    "approver_id",
+    "created_by",
+    "changed_by",
+    "owner_employee_id",
+    "national_id",
+    "passport_id",
+}
+DEMOGRAPHIC_ATTRIBUTES = {"gender", "marital_status", "nationality"}
+SPECIAL_CATEGORY_TOKENS = {
+    "biometric": "biometric",
+    "disability": "health",
+    "ethnic": "ethnicity",
+    "genetic": "genetic",
+    "health": "health",
+    "medical": "health",
+    "religion": "religion",
+    "union": "union_membership",
+}
 
 
 def _normalize_alias(value: str) -> str:
@@ -102,6 +152,183 @@ def _normalize_canonical_alias(value: str) -> str:
 
 def _split_values(value: str) -> list[str]:
     return split_csv_values(value)
+
+
+def _parse_boolean_flag(value: object) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _normalize_privacy_tag(value: object) -> str:
+    normalized = re.sub(r"\s+", "_", str(value or "").strip().lower())
+    return normalized.strip("_")
+
+
+def _parse_privacy_tags(value: object) -> tuple[str, ...]:
+    tags = {
+        normalized
+        for normalized in (_normalize_privacy_tag(segment) for segment in _split_values(str(value or "")))
+        if normalized
+    }
+    return tuple(sorted(tags))
+
+
+def _merge_privacy_metadata(*records: CanonicalPrivacyMetadataRecord) -> CanonicalPrivacyMetadataRecord:
+    pii_categories = {
+        tag
+        for record in records
+        for tag in record.pii_categories
+        if str(tag).strip()
+    }
+    data_subject_types = {
+        tag
+        for record in records
+        for tag in record.data_subject_types
+        if str(tag).strip()
+    }
+    is_gdpr_special_category = any(record.is_gdpr_special_category for record in records)
+    is_pii = any(
+        record.is_pii or record.is_gdpr_special_category or record.pii_categories or record.data_subject_types
+        for record in records
+    )
+    return CanonicalPrivacyMetadataRecord(
+        is_pii=is_pii or is_gdpr_special_category,
+        is_gdpr_special_category=is_gdpr_special_category,
+        pii_categories=tuple(sorted(pii_categories)),
+        data_subject_types=tuple(sorted(data_subject_types)),
+    )
+
+
+def _canonical_privacy_metadata_model(record: CanonicalPrivacyMetadataRecord) -> CanonicalPrivacyMetadata:
+    return CanonicalPrivacyMetadata(
+        is_pii=record.is_pii,
+        is_gdpr_special_category=record.is_gdpr_special_category,
+        pii_categories=list(record.pii_categories),
+        data_subject_types=list(record.data_subject_types),
+    )
+
+
+def _infer_canonical_privacy_metadata(
+    *,
+    concept_id: str,
+    entity: str,
+    attribute: str,
+    display_name: str,
+    description: str,
+    aliases: Iterable[str],
+) -> CanonicalPrivacyMetadataRecord:
+    normalized_entity = _normalize_privacy_tag(entity)
+    normalized_attribute = _normalize_privacy_tag(attribute)
+    stable_text = " ".join(
+        part
+        for part in [concept_id, entity, attribute, display_name, description]
+        if str(part).strip()
+    )
+    stable_tokens = semantic_token_set(stable_text)
+    pii_categories: set[str] = set()
+    data_subject_types: set[str] = set()
+    is_pii = False
+    is_gdpr_special_category = False
+
+    default_subject = ENTITY_DEFAULT_DATA_SUBJECT_TYPES.get(normalized_entity)
+
+    if normalized_entity in PERSON_LIKE_CANONICAL_ENTITIES:
+        is_pii = True
+        if default_subject:
+            data_subject_types.add(default_subject)
+        if normalized_entity == "employee":
+            pii_categories.add("employment")
+
+    if normalized_entity in EMPLOYMENT_RELATED_CANONICAL_ENTITIES:
+        is_pii = True
+        pii_categories.add("employment")
+        data_subject_types.add("employee")
+
+    if normalized_entity in FINANCIAL_ACCOUNT_CANONICAL_ENTITIES:
+        is_pii = True
+        pii_categories.add("financial_account")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_attribute in PERSON_NAME_ATTRIBUTES and normalized_entity in PERSON_LIKE_CANONICAL_ENTITIES:
+        is_pii = True
+        pii_categories.add("person_name")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_attribute in CONTACT_ATTRIBUTES:
+        if not (normalized_entity == "supplier_bank_account" and normalized_attribute == "bank_phone"):
+            is_pii = True
+            pii_categories.add("contact")
+            if normalized_attribute == "commercial_contact_email":
+                data_subject_types.add("supplier_contact")
+            elif default_subject:
+                data_subject_types.add(default_subject)
+
+    if normalized_attribute in IDENTIFIER_ATTRIBUTES:
+        if normalized_entity in PERSON_LIKE_CANONICAL_ENTITIES or normalized_attribute in {"approver_id", "created_by", "changed_by", "owner_employee_id"}:
+            is_pii = True
+            pii_categories.update({"direct_identifier", "employment"} if default_subject == "employee" else {"direct_identifier"})
+            if default_subject:
+                data_subject_types.add(default_subject)
+
+    if normalized_attribute in {"birth_date", "date_of_birth"} or ({"birth", "date"} <= stable_tokens) or "birthdate" in stable_tokens:
+        is_pii = True
+        pii_categories.add("date_of_birth")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_attribute in {"national_id", "passport_id"}:
+        is_pii = True
+        pii_categories.update({"direct_identifier", "government_identifier"})
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_attribute in DEMOGRAPHIC_ATTRIBUTES:
+        is_pii = True
+        pii_categories.add("demographic")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_attribute in {"account_number", "iban", "routing_number"}:
+        is_pii = True
+        pii_categories.add("financial_account")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_entity in {"customer", "supplier", "vendor"} and normalized_attribute in {"email", "phone", "commercial_contact_email"}:
+        is_pii = True
+        pii_categories.add("contact")
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if normalized_entity == "vendor" and normalized_attribute == "email":
+        data_subject_types.add("supplier")
+
+    special_category_tokens = semantic_token_set(
+        " ".join(
+            part
+            for part in [concept_id, attribute, display_name, description]
+            if str(part).strip()
+        )
+    )
+    for token, category in SPECIAL_CATEGORY_TOKENS.items():
+        if token not in special_category_tokens:
+            continue
+        is_pii = True
+        is_gdpr_special_category = True
+        pii_categories.add(category)
+        if default_subject:
+            data_subject_types.add(default_subject)
+
+    if not is_pii and (pii_categories or data_subject_types or is_gdpr_special_category):
+        is_pii = True
+
+    return CanonicalPrivacyMetadataRecord(
+        is_pii=is_pii or is_gdpr_special_category,
+        is_gdpr_special_category=is_gdpr_special_category,
+        pii_categories=tuple(sorted(pii_categories)),
+        data_subject_types=tuple(sorted(data_subject_types)),
+    )
 
 
 def _parse_context_patch_note(value: str) -> dict[str, str] | None:
@@ -171,6 +398,17 @@ class CanonicalBusinessConcept:
     description: str = ""
     data_type: str = ""
     aliases: frozenset[str] = field(default_factory=frozenset)
+    privacy: CanonicalPrivacyMetadataRecord = field(default_factory=lambda: CanonicalPrivacyMetadataRecord())
+
+
+@dataclass(frozen=True)
+class CanonicalPrivacyMetadataRecord:
+    """Normalized privacy metadata attached to one canonical concept."""
+
+    is_pii: bool = False
+    is_gdpr_special_category: bool = False
+    pii_categories: tuple[str, ...] = ()
+    data_subject_types: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -267,6 +505,52 @@ class MetadataKnowledgeService:
         payload = self.csv_path.read_text(encoding="utf-8-sig")
         return payload if payload.endswith("\n") else payload + "\n"
 
+    def canonical_privacy_concepts_for_mapping(
+        self,
+        source: ColumnProfile,
+        target: ColumnProfile,
+        *,
+        prefer_metadata_text: bool = False,
+    ) -> list[dict[str, object]]:
+        """Return shared canonical concepts that carry privacy metadata for one mapping pair."""
+
+        details = self.canonical_mapping_details(source, target, prefer_metadata_text=prefer_metadata_text)
+        privacy_concepts: list[dict[str, object]] = []
+        for match in details.shared_concepts:
+            concept = self._canonical_concepts_by_id.get(match.concept_id)
+            if concept is None:
+                continue
+            privacy = concept.privacy
+            if not (
+                privacy.is_pii
+                or privacy.is_gdpr_special_category
+                or privacy.pii_categories
+                or privacy.data_subject_types
+            ):
+                continue
+            privacy_concepts.append(
+                {
+                    "concept_id": concept.concept_id,
+                    "display_name": concept.display_name,
+                    "strength": match.strength,
+                    "is_pii": privacy.is_pii,
+                    "is_gdpr_special_category": privacy.is_gdpr_special_category,
+                    "pii_categories": list(privacy.pii_categories),
+                    "data_subject_types": list(privacy.data_subject_types),
+                }
+            )
+        return privacy_concepts
+
+    def _linked_canonical_privacy(self, concept_ids: Iterable[str]) -> CanonicalPrivacyMetadata:
+        records = [
+            self._canonical_concepts_by_id[concept_id].privacy
+            for concept_id in concept_ids
+            if concept_id in self._canonical_concepts_by_id
+        ]
+        if not records:
+            return CanonicalPrivacyMetadata()
+        return _canonical_privacy_metadata_model(_merge_privacy_metadata(*records))
+
     def list_knowledge_concepts(self) -> list[KnowledgeConceptSummary]:
         base_concept_ids = self._base_knowledge_concept_ids()
         concepts: list[KnowledgeConceptSummary] = []
@@ -286,6 +570,7 @@ class MetadataKnowledgeService:
                     linked_canonical_concept_count=len(linked_canonical_concepts),
                     source_systems=source_systems,
                     linked_canonical_concepts=linked_canonical_concepts,
+                    linked_privacy=self._linked_canonical_privacy(linked_canonical_concepts),
                     aliases=sorted(concept.aliases),
                 )
             )
@@ -311,6 +596,7 @@ class MetadataKnowledgeService:
             linked_canonical_concept_count=len(linked_canonical_concepts),
             source_systems=sorted({context.system.strip() for context in concept.contexts if context.system.strip()}),
             linked_canonical_concepts=linked_canonical_concepts,
+            linked_privacy=self._linked_canonical_privacy(linked_canonical_concepts),
             aliases=sorted(concept.aliases),
         )
         return KnowledgeConceptDetailResponse(
@@ -506,6 +792,7 @@ class MetadataKnowledgeService:
                 description=concept.description,
                 data_type=concept.data_type,
                 aliases=sorted(concept.aliases),
+                privacy=_canonical_privacy_metadata_model(concept.privacy),
             )
             for concept in sorted(self._canonical_concepts_by_id.values(), key=lambda item: item.concept_id)
         ]
@@ -523,7 +810,7 @@ class MetadataKnowledgeService:
         if not reader.fieldnames:
             raise ValueError("Canonical glossary CSV must include a header row.")
 
-        missing_headers = [header for header in CANONICAL_GLOSSARY_HEADERS if header not in reader.fieldnames]
+        missing_headers = [header for header in CANONICAL_GLOSSARY_REQUIRED_HEADERS if header not in reader.fieldnames]
         if missing_headers:
             missing_label = ", ".join(missing_headers)
             raise ValueError(f"Canonical glossary CSV is missing required columns: {missing_label}.")
@@ -538,6 +825,10 @@ class MetadataKnowledgeService:
                 raise ValueError(f"Canonical glossary row {row_number} is missing display_name.")
             parsed_row = {header: str(row.get(header) or "").strip() for header in CANONICAL_GLOSSARY_HEADERS}
             parsed_row["aliases"] = ", ".join(filter_canonical_aliases(_split_values(parsed_row.get("aliases") or "")))
+            parsed_row["is_pii"] = "true" if _parse_boolean_flag(parsed_row.get("is_pii")) else ""
+            parsed_row["is_gdpr_special_category"] = "true" if _parse_boolean_flag(parsed_row.get("is_gdpr_special_category")) else ""
+            parsed_row["pii_categories"] = ", ".join(_parse_privacy_tags(parsed_row.get("pii_categories")))
+            parsed_row["data_subject_types"] = ", ".join(_parse_privacy_tags(parsed_row.get("data_subject_types")))
             parsed_rows.append(parsed_row)
 
         with self.canonical_glossary_path.open("w", encoding="utf-8", newline="") as handle:
@@ -624,6 +915,10 @@ class MetadataKnowledgeService:
                 "description": str(description or "").strip(),
                 "data_type": str(data_type or "").strip(),
                 "aliases": "",
+                "is_pii": "",
+                "is_gdpr_special_category": "",
+                "pii_categories": "",
+                "data_subject_types": "",
             }
             rows.append(matching_row)
 
@@ -655,6 +950,7 @@ class MetadataKnowledgeService:
                 description=concept.description,
                 data_type=concept.data_type,
                 aliases=sorted(concept.aliases),
+                privacy=_canonical_privacy_metadata_model(concept.privacy),
             ),
             alias_added,
             concept_created,
@@ -1323,6 +1619,7 @@ class MetadataKnowledgeService:
         """
         import hashlib as _hl
         h = _hl.md5(usedforsecurity=False)
+        h.update(f"privacy_classifier:{CANONICAL_PRIVACY_CLASSIFIER_VERSION}".encode())
         import sys
         module = sys.modules[__name__]
         for attr_name in self._SOURCE_PATHS:
@@ -1482,6 +1779,12 @@ class MetadataKnowledgeService:
                 description=d["description"],
                 data_type=d["data_type"],
                 aliases=canonical_aliases,
+                privacy=CanonicalPrivacyMetadataRecord(
+                    is_pii=bool(d.get("is_pii")),
+                    is_gdpr_special_category=bool(d.get("is_gdpr_special_category")),
+                    pii_categories=tuple(str(value) for value in d.get("pii_categories", [])),
+                    data_subject_types=tuple(str(value) for value in d.get("data_subject_types", [])),
+                ),
             )
 
     def _load_persisted_knowledge_concepts(self, knowledge_dicts: list[dict]) -> None:
@@ -1590,6 +1893,22 @@ class MetadataKnowledgeService:
                     description=str(row.get("description") or "").strip(),
                     data_type=str(row.get("data_type") or "").strip(),
                     aliases=aliases,
+                    privacy=_merge_privacy_metadata(
+                        CanonicalPrivacyMetadataRecord(
+                            is_pii=_parse_boolean_flag(row.get("is_pii")),
+                            is_gdpr_special_category=_parse_boolean_flag(row.get("is_gdpr_special_category")),
+                            pii_categories=_parse_privacy_tags(row.get("pii_categories")),
+                            data_subject_types=_parse_privacy_tags(row.get("data_subject_types")),
+                        ),
+                        _infer_canonical_privacy_metadata(
+                            concept_id=concept_id,
+                            entity=str(row.get("entity") or "general").strip() or "general",
+                            attribute=str(row.get("attribute") or concept_id.split(".")[-1]).strip() or concept_id.split(".")[-1],
+                            display_name=display_name,
+                            description=str(row.get("description") or "").strip(),
+                            aliases=aliases,
+                        ),
+                    ),
                 )
 
     def _load(self) -> None:
@@ -2155,6 +2474,7 @@ class MetadataKnowledgeService:
         description: str = "",
         data_type: str = "",
         aliases: Iterable[str] = (),
+        privacy: CanonicalPrivacyMetadataRecord | None = None,
     ) -> None:
         existing = self._canonical_concepts_by_id.get(concept_id)
         merged_aliases = set(existing.aliases if existing else ())
@@ -2167,6 +2487,7 @@ class MetadataKnowledgeService:
             description=existing.description if existing else description,
             data_type=existing.data_type if existing else data_type,
             aliases=frozenset(merged_aliases),
+            privacy=existing.privacy if existing else (privacy or CanonicalPrivacyMetadataRecord()),
         )
         self._canonical_concepts_by_id[concept_id] = concept
         for alias in concept.aliases:

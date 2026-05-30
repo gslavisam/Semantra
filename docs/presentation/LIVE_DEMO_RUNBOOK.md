@@ -4,6 +4,12 @@ Ovaj dokument je namenjen za glavni live demo u trenutnoj pilot fazi.
 
 Za ovu fazu proizvoda preporučeni demo nije "prođi kroz sve ekrane", nego jedan stabilan proof-of-value scenario koji se može ponavljati pred stakeholder-ima bez improvizacije.
 
+UI orijentacija za ovaj runbook:
+
+- top-level area: `Workspace`, `Catalog`, `Benchmarks`, `System`, `Governance`
+- `Workspace` je organizovan kroz `Setup`, `Review`, `Decisions`, `Output`
+- `Canonical Console` i `Stewardship` žive unutar `Governance`, a nisu zasebni top-level tabovi
+
 Primarni demo tok je:
 
 1. `Catalog` reuse
@@ -20,7 +26,7 @@ Pre pocetka uradi sledece:
 
 1. Pokreni aplikaciju kao i inace.
 2. U sidebar-u proveri da je `API Base URL` ispravan.
-3. Ako backend trazi admin token, unesi ga pre otvaranja `Catalog`, `Canonical Console` i `Benchmarks`.
+3. Ako backend trazi admin token, unesi ga pre otvaranja `Catalog`, `Governance` i `Benchmarks`.
 4. Za glavni tok koristi već potvrđene operational smoke fixture-e:
    - `approved-customer-reuse-smoke`
    - `customer-draft-session`
@@ -257,7 +263,7 @@ Sta da kazes dok radis ovaj korak:
 - Catalog nije live session view, nego reuse sloj nad sacuvanim artefaktima
 - Reuse vraca odobrenu verziju nazad u Workspace, ne rerun-uje mapper od nule
 
-## 11. Prošireni tehnički demo: Canonical Console: concept detail + stewardship action
+## 11. Prošireni tehnički demo: Governance > Canonical Console: concept detail + stewardship action
 
 Za ovaj deo koristi `ui_fixtures/knowledge_demo_overlay.csv`.
 
@@ -265,12 +271,13 @@ Ako backend trazi admin token, proveri da je unet pre ulaska u tab.
 
 ### 7A. Concept detail
 
-1. Otvori top-level tab `Canonical Console`.
-2. Klikni `Load canonical concept registry` ako vec nije ucitan.
-3. U polju `Canonical concept search` unesi `customer`.
-4. U `Canonical concept detail` izaberi concept koji zelis da pokazes.
-5. Klikni `Load canonical concept detail`.
-6. U detalju koncepta pokazi:
+1. Otvori top-level tab `Governance`.
+2. Ostani u sekciji `Canonical Console`.
+3. Klikni `Load canonical concept registry` ako vec nije ucitan.
+4. U polju `Canonical concept search` unesi `customer`.
+5. U `Canonical concept detail` izaberi concept koji zelis da pokazes.
+6. Klikni `Load canonical concept detail`.
+7. U detalju koncepta pokazi:
    - usage
    - field contexts
    - active overlay aliases
@@ -293,7 +300,7 @@ Ako backend trazi admin token, proveri da je unet pre ulaska u tab.
 
 Sta da kazes dok radis ovaj korak:
 
-- ovo nije debug-only povrsina, nego governance povrsina za canonical runtime
+- ovo nije debug-only povrsina, nego governance povrsina unutar `Governance` area za canonical runtime
 - promene nad knowledge slojem su eksplicitne i auditabilne
 
 ## 12. Prošireni tehnički demo: Benchmarks: run + correction-impact check
@@ -329,7 +336,7 @@ Ako zelis da sve ide glatko, drzi se ovog reda:
 4. `Workspace > Output`
 5. `Workspace > Decisions` za save + approve
 6. `Catalog`
-7. `Canonical Console`
+7. `Governance > Canonical Console`
 8. `Benchmarks`
 
 ## Brzi fallback ako vreme krene da curi

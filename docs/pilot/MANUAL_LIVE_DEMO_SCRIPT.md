@@ -14,6 +14,14 @@ Najstabilniji live-demo tok koristi već potvrđene operational smoke fixture-e:
 - `stewardship-smoke-sync`
 - `operational-smoke-benchmark`
 
+## UI orijentacija za ovaj dokument
+
+Aktuelna Semantra navigacija za ovaj demo je:
+
+- top-level area: `Workspace`, `Catalog`, `Benchmarks`, `System`, `Governance`
+- `Workspace` pod-tabovi: `Setup`, `Review`, `Decisions`, `Output`
+- `Canonical Console` i `Stewardship` sada žive unutar `Governance`, nisu zasebni top-level tabovi
+
 ## Cilj demoa
 
 Publika treba da razume tri stvari:
@@ -132,7 +140,7 @@ Napomena iz live smoke prolaza 2026-05-29:
 
 "Ovde ne dokazujemo samo navigaciju, nego continuity rada. To je važno kada analitičar prekine sesiju i mora da nastavi review bez rekonstrukcije konteksta."
 
-## 3. Catalog diff handoff u Workspace review
+## 3. Catalog diff handoff u Workspace > Review
 
 ### Šta kažeš
 
@@ -165,7 +173,7 @@ Publika treba da vidi sledeće:
 
 "Time katalog postaje aktivni ulaz u review rad, a ne samo read-only evidencija. To je posebno korisno kada želimo da pregledamo šta se promenilo između verzija i odmah nastavimo review u pravom kontekstu."
 
-## 4. Catalog stewardship handoff u Governance
+## 4. Catalog stewardship handoff u Governance > Stewardship
 
 ### Šta kažeš
 
@@ -185,7 +193,7 @@ Publika treba da vidi sledeće:
 
 Publika treba da vidi sledeće:
 
-- otvara se `Governance`
+- otvara se top-level area `Governance`
 - aktivna sekcija je `Stewardship`
 - vidi se da korisnik nije završio na pogrešnoj governance sekciji
 - handoff radi iz konkretnog Catalog konteksta, ne kao opšta navigacija

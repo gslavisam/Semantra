@@ -17,8 +17,17 @@ KnowledgeSeedState = Literal["current", "drifted", "missing"]
 KnowledgeAuditAction = Literal["create", "activate", "deactivate", "archive", "rollback", "reseed", "reject", "ignore", "triage", "stewardship"]
 CanonicalConceptSource = Literal["base", "overlay_only", "base_plus_active_overlay"]
 KnowledgeConceptSource = Literal["base_registry", "derived_runtime", "generated_runtime"]
-KnowledgeStewardshipItemType = Literal["canonical_gap", "overlay_promotion"]
+KnowledgeStewardshipItemType = Literal["canonical_gap", "overlay_promotion", "concept_governance"]
 KnowledgeStewardshipStatus = Literal["new", "needs_review", "ready_for_approval", "approved", "rejected", "ignored", "promoted"]
+
+
+class CanonicalPrivacyMetadata(BaseModel):
+    """Privacy tags attached to one canonical concept."""
+
+    is_pii: bool = False
+    is_gdpr_special_category: bool = False
+    pii_categories: list[str] = Field(default_factory=list)
+    data_subject_types: list[str] = Field(default_factory=list)
 
 
 class KnowledgeOverlayVersion(BaseModel):
@@ -130,6 +139,7 @@ class CanonicalGlossaryEntry(BaseModel):
     description: str = ""
     data_type: str = ""
     aliases: list[str] = Field(default_factory=list)
+    privacy: CanonicalPrivacyMetadata = Field(default_factory=CanonicalPrivacyMetadata)
 
 
 class CanonicalGlossaryImportResponse(BaseModel):
@@ -289,6 +299,7 @@ class CanonicalConceptSummary(BaseModel):
     active_overlay_entry_count: int = 0
     source_systems: list[str] = Field(default_factory=list)
     business_domains: list[str] = Field(default_factory=list)
+    privacy: CanonicalPrivacyMetadata = Field(default_factory=CanonicalPrivacyMetadata)
 
 
 class CanonicalConceptDetailResponse(BaseModel):
@@ -326,6 +337,7 @@ class KnowledgeConceptSummary(BaseModel):
     linked_canonical_concept_count: int = 0
     source_systems: list[str] = Field(default_factory=list)
     linked_canonical_concepts: list[str] = Field(default_factory=list)
+    linked_privacy: CanonicalPrivacyMetadata = Field(default_factory=CanonicalPrivacyMetadata)
     aliases: list[str] = Field(default_factory=list)
 
 
@@ -338,7 +350,7 @@ class KnowledgeConceptDetailResponse(BaseModel):
 
 
 class KnowledgeStewardshipItemRecord(BaseModel):
-    """Persisted stewardship queue item for canonical gaps or overlay promotions."""
+    """Persisted stewardship item for queue workflows or concept governance metadata."""
 
     item_id: int
     item_type: KnowledgeStewardshipItemType = "canonical_gap"
