@@ -44,17 +44,26 @@ from app.models.mapping import (
     PreviewResponse,
     ReviewPlanRequest,
     ReviewPlanResponse,
+    WorkspaceCopilotProblemStatementRequest,
+    WorkspaceCopilotProblemStatementResponse,
     SourceMappingResult,
     TargetIntentOption,
     TransformationGenerationRequest,
     TransformationGenerationResponse,
+    TransformationSpecProposalRequest,
+    TransformationSpecProposalResponse,
     TransformationTestSetCreateRequest,
     TransformationTestSetDetail,
     TransformationTestSetRecord,
     TransformationTestSetRunResponse,
     TransformationTemplate,
 )
-from app.services.llm_service import build_provider_from_settings, call_artifact_refinement, call_transformation_generator
+from app.services.llm_service import (
+    build_provider_from_settings,
+    call_artifact_refinement,
+    call_transformation_generator,
+    call_transformation_spec_generator,
+)
 from app.services.mapping_analysis_service import build_mapping_analysis_narration, build_mapping_analysis_summary
 from app.services.mapping_audio_service import synthesize_orpheus_wav
 from app.services.codegen_service import generate_dbt_code, generate_pandas_code, generate_pyspark_code
@@ -69,6 +78,7 @@ from app.services.source_field_hint_service import apply_inline_source_field_hin
 from app.services.transformation_test_service import run_transformation_test_set
 from app.services.transformation_template_service import list_transformation_templates
 from app.services.upload_store import dataset_store
+from app.services.workspace_copilot_service import build_workspace_problem_guidance
 from app.services.virtual_target_service import (
     build_virtual_target_schema,
     get_target_intent_option,
@@ -571,7 +581,7 @@ async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 
-    return build_preview(source.rows, request.mapping_decisions)
+    return build_preview(source.rows, request.mapping_decisions, transformation_spec=request.transformation_spec)
 
 
 @router.post("/analysis/summary", response_model=MappingAnalysisSummaryResponse)
@@ -621,6 +631,16 @@ async def summarize_review_plan(request: ReviewPlanRequest) -> ReviewPlanRespons
     return build_review_plan(request, provider=provider)
 
 
+@router.post("/workspace-guidance", response_model=WorkspaceCopilotProblemStatementResponse)
+async def summarize_workspace_problem_guidance(
+    request: WorkspaceCopilotProblemStatementRequest,
+) -> WorkspaceCopilotProblemStatementResponse:
+    """Turn one user-defined workspace problem into bounded product-aware next steps."""
+
+    provider = build_provider_from_settings()
+    return build_workspace_problem_guidance(request, provider=provider)
+
+
 @router.get("/source-field-hints", response_model=list[SourceFieldHintRecord])
 async def list_source_field_hints(
     source_system: str = Query(...),
@@ -660,10 +680,10 @@ async def codegen_mapping(request: CodegenRequest) -> GeneratedArtifact:
         allow_unaccepted=request.allow_unaccepted,
     )
     if request.mode == "pyspark":
-        return generate_pyspark_code(request.mapping_decisions)
+        return generate_pyspark_code(request.mapping_decisions, transformation_spec=request.transformation_spec)
     if request.mode == "dbt":
-        return generate_dbt_code(request.mapping_decisions)
-    return generate_pandas_code(request.mapping_decisions)
+        return generate_dbt_code(request.mapping_decisions, transformation_spec=request.transformation_spec)
+    return generate_pandas_code(request.mapping_decisions, transformation_spec=request.transformation_spec)
 
 
 @router.post("/codegen/refine", response_model=ArtifactRefinementResponse)
@@ -891,6 +911,7 @@ async def update_draft_session_decision_state(
         active_workspace_section=normalized_request.active_workspace_section,
         mapping_editor_state=normalized_request.mapping_editor_state,
         mapping_decision_audit=normalized_request.mapping_decision_audit,
+        transformation_spec=normalized_request.transformation_spec,
     )
     try:
         return draft_session_repository.update_draft_session(draft_session_id, merged_request)
@@ -1205,5 +1226,25 @@ async def generate_transformation(request: TransformationGenerationRequest) -> T
     )
     if result is None:
         raise HTTPException(status_code=502, detail="LLM did not return a valid transformation suggestion.")
+
+    return result
+
+
+@router.post("/transformation/spec/propose", response_model=TransformationSpecProposalResponse)
+async def propose_transformation_spec(request: TransformationSpecProposalRequest) -> TransformationSpecProposalResponse:
+    """Generate a bounded structured transformation spec proposal from natural-language guidance."""
+
+    provider = build_provider_from_settings()
+    if provider is None:
+        raise HTTPException(status_code=503, detail="LLM provider is not configured.")
+
+    result = call_transformation_spec_generator(
+        mapping_decisions=[decision.model_dump(mode="json") for decision in request.mapping_decisions],
+        instruction=request.instruction,
+        current_spec=request.current_spec.model_dump(mode="json") if request.current_spec else None,
+        provider=provider,
+    )
+    if result is None:
+        raise HTTPException(status_code=502, detail="LLM did not return a valid transformation spec proposal.")
 
     return result

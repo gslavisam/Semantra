@@ -2575,6 +2575,133 @@ def test_review_plan_returns_structured_clusters_when_llm_is_available() -> None
     assert payload["clusters"][0]["priority"] == "high"
 
 
+def test_workspace_problem_guidance_returns_fallback_actions() -> None:
+    response = client.post(
+        "/mapping/workspace-guidance",
+        json={
+            "problem_statement": (
+                "Goal: produce a customer-ready output. Current stage in app: Setup. "
+                "Available files or metadata: source csv, target csv, descriptions. "
+                "Expected output or artifact: transformation design and pandas code. "
+                "Constraints or business rules: trim whitespace and keep unmatched optional fields null."
+            ),
+            "workspace": {
+                "mapping_mode": "standard",
+                "source_dataset_name": "customer_source.csv",
+                "target_dataset_name": "customer_target.csv",
+            },
+            "capability_snapshot": {
+                "section": "Setup",
+                "has_upload": False,
+                "mapping_ready": False,
+                "pending_proposals": 0,
+                "transformation_state": "incomplete",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["disposition"] == "in_scope"
+    assert payload["recommended_sections"][:2] == ["Setup", "Output"]
+    assert payload["generation_metadata"]["fallback_used"] is True
+    assert payload["recommended_steps"][0].startswith("Open Setup")
+
+
+def test_workspace_problem_guidance_uses_llm_when_provider_returns_valid_json() -> None:
+    from app.services import llm_service
+
+    previous_provider = settings.llm_provider
+    settings.llm_provider = "lmstudio"
+    provider = llm_service.StaticLLMProvider(
+        json.dumps(
+            {
+                "title": "Workspace problem guidance",
+                "disposition": "in_scope",
+                "normalized_problem": "Need to finish a customer output with transformation rules.",
+                "scope_reason": "Matched capabilities: Review, Output.",
+                "answer": "This request belongs to Review first, then Output.",
+                "capability_hits": ["Review", "Output"],
+                "recommended_sections": ["Review", "Output"],
+                "recommended_steps": [
+                    "Open Review and close unresolved rows.",
+                    "Then open Output and define the Transformation Design before code generation.",
+                ],
+                "prompt_template": "Goal: ...",
+                "input_format_fields": ["Goal", "Current stage in app"],
+            }
+        )
+    )
+    try:
+        with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/mapping/workspace-guidance",
+                json={
+                    "problem_statement": "Need to finish a customer output with transformation rules.",
+                    "workspace": {
+                        "mapping_mode": "standard",
+                        "source_dataset_name": "customer_source.csv",
+                        "target_dataset_name": "customer_target.csv",
+                    },
+                    "capability_snapshot": {
+                        "section": "Review",
+                        "has_upload": True,
+                        "mapping_ready": True,
+                        "pending_proposals": 1,
+                        "transformation_state": "incomplete",
+                    },
+                },
+            )
+    finally:
+        settings.llm_provider = previous_provider
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["generation_metadata"]["used_llm"] is True
+    assert payload["recommended_sections"] == ["Review", "Output"]
+    assert payload["recommended_steps"][0] == "Open Review and close unresolved rows."
+
+
+def test_workspace_problem_guidance_fallback_mentions_active_draft_and_transformation_proposal() -> None:
+    response = client.post(
+        "/mapping/workspace-guidance",
+        json={
+            "problem_statement": (
+                "Goal: continue a saved draft and finish the governed output. Current stage in app: Decisions. "
+                "Available files or metadata: active draft session, pending proposals, transformation design. "
+                "Expected output or artifact: completed transformation design and codegen. "
+                "Constraints or business rules: review any pending transformation proposal first."
+            ),
+            "workspace": {
+                "mapping_mode": "standard",
+                "source_dataset_name": "customer_source.csv",
+                "target_dataset_name": "customer_target.csv",
+            },
+            "capability_snapshot": {
+                "section": "Decisions",
+                "has_upload": True,
+                "mapping_ready": True,
+                "artifact_ready": True,
+                "open_review_items": 0,
+                "pending_proposals": 2,
+                "transformation_state": "ready",
+                "transformation_title": "Ready for next output step",
+                "transformation_proposal_pending": True,
+                "active_draft_session_id": 57,
+                "active_draft_session_name": "customer-draft-session",
+                "active_draft_section": "Review",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "active draft session #57" in payload["answer"].lower()
+    assert payload["recommended_steps"][0].startswith("Resume from the active draft session #57")
+    assert any("pending proposal" in step.lower() for step in payload["recommended_steps"])
+    assert any("existing preview or generated artifact" in step.lower() for step in payload["recommended_steps"])
+
+
 def test_canonical_gap_triage_summary_returns_grouped_queue_when_llm_is_available() -> None:
     from app.services import llm_service
     from unittest.mock import patch
@@ -3003,6 +3130,14 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
                     "details": {"reason": "validated during review"},
                 }
             },
+            "transformation_spec": {
+                "target_grain": "One row per customer",
+                "global_rules": "Normalize country codes to ISO alpha-2.",
+                "defaults": "Keep unmatched optional fields as null.",
+                "examples": "N/A -> null",
+                "target_fields": ["customer_id", "phone_number"],
+                "field_rules": [{"target_field": "customer_id", "rule": "Cast cust_id to string."}],
+            },
         },
         headers=headers,
     )
@@ -3039,6 +3174,7 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     assert detail["mapping_runtime"]["code_fingerprint"] == "draft-build-1"
     assert detail["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
     assert detail["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
+    assert detail["transformation_spec"]["target_grain"] == "One row per customer"
     assert detail["mapping_decision_audit"]["cust_id"]["created_by"] == "qa-user"
     assert detail["mapping_decision_audit"]["cust_id"]["workspace_id"] == "ws-customer-01"
     assert detail["version"] == 1
@@ -3240,6 +3376,14 @@ def test_update_draft_session_increments_version_and_sets_last_writer() -> None:
                     "details": {"reason": "validated after review"},
                 }
             },
+            "transformation_spec": {
+                "target_grain": "One row per customer",
+                "global_rules": "Normalize phone formatting.",
+                "defaults": "Keep unmatched optional fields as null.",
+                "examples": "0641234567 -> +381641234567",
+                "target_fields": ["phone_number"],
+                "field_rules": [{"target_field": "phone_number", "rule": "Trim spaces and convert to E.164."}],
+            },
         },
         headers=admin_headers(),
     )
@@ -3251,6 +3395,7 @@ def test_update_draft_session_increments_version_and_sets_last_writer() -> None:
     assert payload["active_workspace_section"] == "Decisions"
     assert payload["mapping_editor_state"]["phone"]["status"] == "accepted"
     assert payload["mapping_decision_audit"]["phone"]["workspace_id"] == "ws-customer-01"
+    assert payload["transformation_spec"]["target_grain"] == "One row per customer"
 
 
 def test_update_draft_session_rejects_stale_expected_version() -> None:
@@ -4373,6 +4518,86 @@ def test_transformation_generation_endpoint_returns_llm_generated_code() -> None
     generated = response.json()
     assert 'df_source["email"]' in generated["transformation_code"]
     assert generated["reasoning"]
+
+
+def test_preview_and_codegen_echo_transformation_spec_summary_when_ready() -> None:
+    upload_payload = upload_example_datasets()
+    transformation_spec = {
+        "target_grain": "One row per customer",
+        "global_rules": "Normalize country codes to ISO alpha-2.",
+        "defaults": "Keep unmatched optional attributes as null.",
+        "examples": "N/A -> null",
+        "target_fields": ["customer_id", "customer_name"],
+        "field_rules": [
+            {"target_field": "customer_id", "rule": "Cast cust_id to string."},
+            {"target_field": "customer_name", "rule": "Prefer the normalized full-name source."},
+        ],
+    }
+
+    preview_response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": upload_payload["source"]["dataset_id"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "email", "target": "customer_name", "status": "accepted"},
+            ],
+            "transformation_spec": transformation_spec,
+        },
+    )
+    codegen_response = client.post(
+        "/mapping/codegen",
+        json={
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "email", "target": "customer_name", "status": "accepted"},
+            ],
+            "transformation_spec": transformation_spec,
+        },
+    )
+
+    assert preview_response.status_code == 200
+    assert preview_response.json()["transformation_spec_summary"]["state"] == "ready"
+    assert codegen_response.status_code == 200
+    assert codegen_response.json()["transformation_spec_summary"]["state"] == "ready"
+
+
+def test_transformation_spec_proposal_endpoint_returns_structured_spec() -> None:
+    provider = StaticLLMProvider(
+        json.dumps(
+            {
+                "transformation_spec": {
+                    "target_grain": "One row per customer",
+                    "global_rules": "Normalize country codes to ISO alpha-2.",
+                    "defaults": "Keep unmatched optional fields as null.",
+                    "examples": "N/A -> null",
+                    "field_rules": [
+                        {"target_field": "customer_id", "rule": "Cast KUNNR to string."},
+                        {"target_field": "country_code", "rule": "Map LAND1 to ISO alpha-2."},
+                    ],
+                },
+                "reasoning": ["Mapped the instruction to the active target fields only."],
+            }
+        )
+    )
+
+    with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+        response = client.post(
+            "/mapping/transformation/spec/propose",
+            json={
+                "mapping_decisions": [
+                    {"source": "KUNNR", "target": "customer_id", "status": "accepted"},
+                    {"source": "LAND1", "target": "country_code", "status": "accepted"},
+                ],
+                "instruction": "Create a customer-level transformation spec with ISO country normalization.",
+                "current_spec": {"target_grain": "One row per customer"},
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["transformation_spec"]["target_fields"] == ["customer_id", "country_code"]
+    assert payload["summary"]["state"] == "ready"
 
 
 def test_decision_logs_endpoint_returns_mapping_run_logs() -> None:

@@ -24,6 +24,7 @@ TransformationPreviewClassification = Literal["direct", "safe", "risky", "custom
 TransformationIssueStage = Literal["preview", "codegen"]
 TransformationIssueSeverity = Literal["warning", "error"]
 CodegenMode = Literal["pandas", "pyspark", "dbt"]
+TransformationSpecState = Literal["invalid", "incomplete", "ready"]
 TransformationWarningCode = Literal[
     "syntax_error",
     "runtime_error",
@@ -435,6 +436,7 @@ class MappingAnalysisAudioRequest(BaseModel):
 
 
 ReviewPlanPriority = Literal["high", "medium", "low"]
+WorkspaceCopilotProblemDisposition = Literal["in_scope", "partial", "out_of_scope"]
 
 
 class ReviewPlanGenerationMetadata(BaseModel):
@@ -476,6 +478,41 @@ class ReviewPlanResponse(BaseModel):
     risks: list[str] = Field(default_factory=list)
     next_actions: list[str] = Field(default_factory=list)
     generation_metadata: ReviewPlanGenerationMetadata = Field(default_factory=ReviewPlanGenerationMetadata)
+
+
+class WorkspaceCopilotProblemGuidanceGenerationMetadata(BaseModel):
+    """Generation metadata describing whether workspace problem guidance used the LLM or fallback logic."""
+
+    used_llm: bool = False
+    fallback_used: bool = True
+    llm_provider: str | None = None
+    llm_model: str | None = None
+
+
+class WorkspaceCopilotProblemStatementRequest(BaseModel):
+    """Request payload for turning a user-defined workspace problem into bounded app actions."""
+
+    problem_statement: str
+    workspace: MappingAnalysisWorkspaceContext = Field(default_factory=MappingAnalysisWorkspaceContext)
+    capability_snapshot: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkspaceCopilotProblemStatementResponse(BaseModel):
+    """Structured bounded guidance for one user-defined workspace problem statement."""
+
+    title: str = ""
+    disposition: WorkspaceCopilotProblemDisposition = "partial"
+    normalized_problem: str = ""
+    scope_reason: str = ""
+    answer: str = ""
+    capability_hits: list[str] = Field(default_factory=list)
+    recommended_sections: list[str] = Field(default_factory=list)
+    recommended_steps: list[str] = Field(default_factory=list)
+    prompt_template: str = ""
+    input_format_fields: list[str] = Field(default_factory=list)
+    generation_metadata: WorkspaceCopilotProblemGuidanceGenerationMetadata = Field(
+        default_factory=WorkspaceCopilotProblemGuidanceGenerationMetadata
+    )
 
 
 MappingJobStatus = Literal["queued", "running", "cancel_requested", "completed", "failed", "canceled"]
@@ -859,6 +896,7 @@ class DraftSessionCreateRequest(BaseModel):
     mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+    transformation_spec: dict[str, Any] = Field(default_factory=dict)
 
 
 class DraftSessionUpdateRequest(DraftSessionCreateRequest):
@@ -878,6 +916,7 @@ class DraftSessionDecisionStateUpdateRequest(BaseModel):
     active_workspace_section: WorkspaceSection = "Decisions"
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+    transformation_spec: dict[str, Any] = Field(default_factory=dict)
 
 
 class DraftSessionReviewStateUpdateRequest(BaseModel):
@@ -921,6 +960,7 @@ class DraftSessionDetail(DraftSessionRecord):
     mapping_runtime: MappingRuntimeFingerprint = Field(default_factory=MappingRuntimeFingerprint)
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
+    transformation_spec: dict[str, Any] = Field(default_factory=dict)
 
 
 class CatalogIntegrationRecord(BaseModel):
@@ -1395,11 +1435,41 @@ class EvaluationRunRequest(BaseModel):
     cases: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class TransformationSpecFieldRule(BaseModel):
+    """One field-level rule inside a structured transformation design spec."""
+
+    target_field: str
+    rule: str = ""
+
+
+class TransformationSpec(BaseModel):
+    """Structured, reviewable transformation design contract used ahead of preview/codegen."""
+
+    target_grain: str = ""
+    global_rules: str = ""
+    defaults: str = ""
+    examples: str = ""
+    target_fields: list[str] = Field(default_factory=list)
+    field_rules: list[TransformationSpecFieldRule] = Field(default_factory=list)
+
+
+class TransformationSpecSummary(BaseModel):
+    """Compact validation summary for a transformation design spec against active targets."""
+
+    state: TransformationSpecState = "invalid"
+    title: str = ""
+    message: str = ""
+    target_count: int = 0
+    described_count: int = 0
+    missing_fields: list[str] = Field(default_factory=list)
+
+
 class PreviewRequest(BaseModel):
     """Request payload for previewing mapping decisions against uploaded source rows."""
 
     source_dataset_id: str
     mapping_decisions: list[MappingDecision]
+    transformation_spec: TransformationSpec | None = None
 
 
 class PreviewRow(BaseModel):
@@ -1441,6 +1511,7 @@ class PreviewResponse(BaseModel):
     preview: list[PreviewRow] = Field(default_factory=list)
     unresolved_targets: list[str] = Field(default_factory=list)
     transformation_previews: list[TransformationPreviewResult] = Field(default_factory=list)
+    transformation_spec_summary: TransformationSpecSummary | None = None
 
 
 class TransformationTestAssertion(BaseModel):
@@ -1514,6 +1585,7 @@ class CodegenRequest(BaseModel):
     mapping_decisions: list[MappingDecision]
     mode: CodegenMode = "pandas"
     allow_unaccepted: bool = False
+    transformation_spec: TransformationSpec | None = None
 
 
 class GeneratedArtifact(BaseModel):
@@ -1522,6 +1594,7 @@ class GeneratedArtifact(BaseModel):
     language: Literal["python-pandas", "python-pyspark", "sql-dbt"] = "python-pandas"
     code: str
     warnings: list[TransformationPreviewWarning] = Field(default_factory=list)
+    transformation_spec_summary: TransformationSpecSummary | None = None
 
 
 class ArtifactRefinementRequest(BaseModel):
@@ -1559,6 +1632,23 @@ class TransformationGenerationResponse(BaseModel):
     """Response containing generated transformation code plus reasoning and warnings."""
 
     transformation_code: str
+    reasoning: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class TransformationSpecProposalRequest(BaseModel):
+    """Request payload for bounded natural-language to structured transformation spec proposals."""
+
+    mapping_decisions: list[MappingDecision] = Field(default_factory=list)
+    instruction: str = Field(min_length=1)
+    current_spec: TransformationSpec | None = None
+
+
+class TransformationSpecProposalResponse(BaseModel):
+    """Structured transformation spec proposal returned by the bounded LLM helper."""
+
+    transformation_spec: TransformationSpec
+    summary: TransformationSpecSummary
     reasoning: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
 

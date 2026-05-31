@@ -550,6 +550,83 @@ def request_review_plan_summary(
     )
 
 
+def request_workspace_problem_guidance(problem_statement: str) -> dict:
+    """Request bounded product-aware guidance for one free-form workspace problem statement."""
+
+    normalized_problem = str(problem_statement or "").strip()
+    if not normalized_problem:
+        raise ValueError("Enter a problem statement before requesting workspace guidance.")
+
+    upload_response = st.session_state.get("upload_response") or {}
+    mapping_response = st.session_state.get("mapping_response") or {}
+    preview_response = st.session_state.get("preview_response") or {}
+    codegen_response = st.session_state.get("codegen_refinement_response") or st.session_state.get("codegen_response") or {}
+    transformation_summary = st.session_state.get("workspace_transformation_spec_summary") or {}
+    transformation_proposal = st.session_state.get("workspace_transformation_spec_proposal") or {}
+    runtime_config = st.session_state.get("runtime_config_snapshot") or {}
+    active_draft_session = st.session_state.get("active_draft_session") or {}
+    source_handle = upload_response.get("source") or {}
+    target_handle = upload_response.get("target") or {}
+    mapping_mode = str(upload_response.get("mapping_mode") or "standard").strip().lower() or "standard"
+
+    mapping_editor_state = st.session_state.get("mapping_editor_state") or {}
+    active_decisions = 0
+    open_review_items = 0
+    for entry in mapping_editor_state.values():
+        target = str((entry or {}).get("target") or "").strip()
+        if not target:
+            continue
+        active_decisions += 1
+        if str((entry or {}).get("status") or "needs_review").strip().lower() != "accepted":
+            open_review_items += 1
+
+    workspace_payload = {
+        "mapping_mode": mapping_mode,
+        "source_dataset_name": source_handle.get("dataset_name") or "Source dataset",
+        "target_dataset_name": (
+            upload_response.get("target_system")
+            if mapping_mode == "canonical"
+            else (target_handle.get("dataset_name") or "Target dataset")
+        )
+        or "Target dataset",
+        "source_system": current_workspace_scope().get("source_system"),
+        "target_system": st.session_state.get("analysis_target_system") or None,
+        "business_domain": current_workspace_scope().get("business_domain"),
+        "integration_name": current_workspace_scope().get("integration_name"),
+    }
+    capability_snapshot = {
+        "active_area": str(st.session_state.get("active_top_level_area") or "Workspace").strip() or "Workspace",
+        "section": str(st.session_state.get("active_workspace_section") or "Setup").strip() or "Setup",
+        "has_upload": bool(upload_response),
+        "mapping_ready": bool(mapping_response),
+        "preview_ready": bool(preview_response),
+        "artifact_ready": bool(str(codegen_response.get("code") or "").strip()),
+        "active_decisions": active_decisions,
+        "open_review_items": open_review_items,
+        "pending_proposals": len(st.session_state.get("llm_decision_proposals") or []),
+        "transformation_state": str(transformation_summary.get("state") or "").strip(),
+        "transformation_title": str(transformation_summary.get("title") or "").strip(),
+        "transformation_proposal_pending": bool((transformation_proposal or {}).get("transformation_spec")),
+        "active_draft_session_id": int(active_draft_session.get("draft_session_id") or 0),
+        "active_draft_session_name": str(active_draft_session.get("name") or "").strip(),
+        "active_draft_section": str(active_draft_session.get("active_workspace_section") or "").strip(),
+        "llm_reachable": (
+            str(runtime_config.get("llm_provider") or "none").strip().lower() != "none"
+            and str(runtime_config.get("llm_status") or "configured").strip().lower() == "reachable"
+        ),
+    }
+    return api_request(
+        "POST",
+        "/mapping/workspace-guidance",
+        json={
+            "problem_statement": normalized_problem,
+            "workspace": workspace_payload,
+            "capability_snapshot": capability_snapshot,
+        },
+        timeout=90.0,
+    )
+
+
 def request_mapping_analysis_narration() -> dict:
     """Request a spoken narration script for the current mapping analysis summary."""
 

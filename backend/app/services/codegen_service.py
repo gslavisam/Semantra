@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import re
 
-from app.models.mapping import GeneratedArtifact, MappingDecision
+from app.models.mapping import GeneratedArtifact, MappingDecision, TransformationSpec
+from app.services.transformation_spec_service import summarize_transformation_spec
 from app.services.dbt_codegen_profile import current_dbt_codegen_profile, dbt_identifier, dbt_source_relation
 from app.services.transformation_service import (
     build_mapping_privacy_warnings,
@@ -13,7 +14,10 @@ from app.services.transformation_service import (
 )
 
 
-def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+def generate_pandas_code(
+    mapping_decisions: list[MappingDecision],
+    transformation_spec: TransformationSpec | None = None,
+) -> GeneratedArtifact:
     """Generate a Pandas starter artifact from reviewed mapping decisions."""
 
     lines = [
@@ -66,7 +70,13 @@ def generate_pandas_code(mapping_decisions: list[MappingDecision]) -> GeneratedA
         warnings.extend(build_mapping_privacy_warnings(decision, stage="codegen"))
         lines.extend(statement.splitlines())
 
-    return GeneratedArtifact(code="\n".join(lines), warnings=warnings)
+    return GeneratedArtifact(
+        code="\n".join(lines),
+        warnings=warnings,
+        transformation_spec_summary=summarize_transformation_spec(transformation_spec, mapping_decisions)
+        if transformation_spec
+        else None,
+    )
 
 
 def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
@@ -100,7 +110,10 @@ def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
     return f'F.col("{decision.source}").alias("{decision.target}")', warnings
 
 
-def generate_pyspark_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+def generate_pyspark_code(
+    mapping_decisions: list[MappingDecision],
+    transformation_spec: TransformationSpec | None = None,
+) -> GeneratedArtifact:
     """Generate a PySpark starter artifact from reviewed mapping decisions."""
 
     lines = [
@@ -134,7 +147,14 @@ def generate_pyspark_code(mapping_decisions: list[MappingDecision]) -> Generated
         lines.extend(select_lines)
     lines.append(")")
 
-    return GeneratedArtifact(language="python-pyspark", code="\n".join(lines), warnings=warnings)
+    return GeneratedArtifact(
+        language="python-pyspark",
+        code="\n".join(lines),
+        warnings=warnings,
+        transformation_spec_summary=summarize_transformation_spec(transformation_spec, mapping_decisions)
+        if transformation_spec
+        else None,
+    )
 
 
 def _dbt_select_expression(decision: MappingDecision) -> tuple[str, list]:
@@ -171,7 +191,10 @@ def _dbt_select_expression(decision: MappingDecision) -> tuple[str, list]:
     return f"{source_ref} as {target_ref}", warnings
 
 
-def generate_dbt_code(mapping_decisions: list[MappingDecision]) -> GeneratedArtifact:
+def generate_dbt_code(
+    mapping_decisions: list[MappingDecision],
+    transformation_spec: TransformationSpec | None = None,
+) -> GeneratedArtifact:
     """Generate a dbt starter model from reviewed mapping decisions."""
 
     profile = current_dbt_codegen_profile()
@@ -214,4 +237,11 @@ def generate_dbt_code(mapping_decisions: list[MappingDecision]) -> GeneratedArti
         lines.append("    *")
     lines.append(f"from {profile.source_cte_name}")
 
-    return GeneratedArtifact(language="sql-dbt", code="\n".join(lines), warnings=warnings)
+    return GeneratedArtifact(
+        language="sql-dbt",
+        code="\n".join(lines),
+        warnings=warnings,
+        transformation_spec_summary=summarize_transformation_spec(transformation_spec, mapping_decisions)
+        if transformation_spec
+        else None,
+    )

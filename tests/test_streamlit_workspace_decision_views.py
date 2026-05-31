@@ -113,6 +113,14 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
                 "details": {"reason": "validated"},
             }
         },
+        "workspace_transformation_spec": {
+            "target_grain": "One row per customer",
+            "global_rules": "Normalize country codes.",
+            "defaults": "Keep unmatched optional fields as null.",
+            "examples": "N/A -> null",
+            "target_fields": ["customer_id"],
+            "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
+        },
     }
 
     with patch.object(workspace_decision_views.st, "session_state", session_state):
@@ -127,6 +135,7 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
     assert payload["target_handle"]["dataset_name"] == "target.csv"
     assert payload["mapping_editor_state"]["cust_id"]["status"] == "accepted"
     assert payload["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
+    assert payload["transformation_spec"]["target_grain"] == "One row per customer"
 
 
 def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clears_outputs() -> None:
@@ -194,6 +203,14 @@ def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clear
         "mapping_decision_audit": {
             "cust_id": {"origin": "manual_mapping", "applied_at": "", "details": {}},
         },
+        "transformation_spec": {
+            "target_grain": "One row per customer",
+            "global_rules": "Normalize country codes.",
+            "defaults": "Keep unmatched optional fields as null.",
+            "examples": "N/A -> null",
+            "target_fields": ["customer_id", "phone_number"],
+            "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
+        },
     }
 
     with patch.object(workspace_decision_views.st, "session_state", session_state):
@@ -208,6 +225,10 @@ def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clear
     assert session_state["pending_workspace_section"] == "Review"
     assert session_state["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
     assert session_state["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
+    assert session_state["workspace_transformation_target_grain"] == "One row per customer"
+    assert session_state["workspace_transformation_rule::customer_id"] == "Cast source code to string."
+    assert session_state["workspace_transformation_spec_status"] == "ready"
+    assert session_state["workspace_transformation_spec_summary"]["title"] == "Ready for next output step"
     assert session_state["mapping_response"]["ranked_mappings"][0]["source"] == "cust_id"
     assert session_state["mapping_response"]["mapping_runtime"]["code_fingerprint"] == "draft-build-1"
     assert trust_rows[0]["source"] == "cust_id"
@@ -271,3 +292,20 @@ def test_apply_draft_session_detail_to_workspace_blocks_source_schema_mismatch()
             raise AssertionError("Expected draft-session restore to reject a source schema mismatch.")
 
     assert "source schema" in message
+
+
+def test_draft_session_resume_transformation_message_reports_restored_spec_status() -> None:
+    message = workspace_decision_views._draft_session_resume_transformation_message(
+        {
+            "transformation_spec": {
+                "target_grain": "One row per customer",
+                "global_rules": "Normalize country codes.",
+                "defaults": "Keep unmatched optional fields as null.",
+                "target_fields": ["customer_id", "phone_number"],
+                "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
+            }
+        }
+    )
+
+    assert "Transformation Design restored" in message
+    assert "Ready for next output step" in message

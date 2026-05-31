@@ -132,7 +132,7 @@ class BrowserSmokeRunner:
     def run(self) -> dict[str, Any]:
         self.page.set_default_timeout(15_000)
         self.page.goto(self.args.streamlit_url, wait_until="domcontentloaded")
-        self.wait_for_text("Semantra - Data Mapping Review and Benchmarking", timeout_ms=45_000)
+        self.wait_for_text("Semantra - Guided Data Mapping", timeout_ms=45_000)
         self.configure_connection()
         approved_reuse = self.run_catalog_approved_reuse_flow()
         workspace = self.run_workspace_draft_resume()
@@ -201,6 +201,18 @@ class BrowserSmokeRunner:
             self.page.wait_for_timeout(250)
         raise RuntimeError("Timed out waiting for expected page texts: " + ", ".join(texts))
 
+    def wait_for_workspace_section(self, label: str, *, timeout_ms: int = 15_000) -> None:
+        deadline = time.monotonic() + (timeout_ms / 1000.0)
+        radio = self.page.get_by_role("radio", name=label)
+        while time.monotonic() < deadline:
+            try:
+                if radio.is_checked():
+                    return
+            except Exception:
+                pass
+            self.page.wait_for_timeout(250)
+        raise RuntimeError(f"Timed out waiting for Workspace section '{label}' to become active.")
+
     def click_nav_label(self, group_name: str, label: str) -> None:
         group = self.page.get_by_role("radiogroup", name=group_name)
         group.locator("label").filter(has_text=re.compile(rf"^{re.escape(label)}$", re.IGNORECASE)).click()
@@ -233,7 +245,7 @@ class BrowserSmokeRunner:
         self.fill_textbox("API Base URL", self.args.base_url)
         if self.args.admin_token:
             self.fill_textbox("Admin Token", self.args.admin_token, press_enter=True)
-            self.wait_for_text("Semantra - Data Mapping Review and Benchmarking", timeout_ms=30_000)
+            self.wait_for_text("Semantra - Guided Data Mapping", timeout_ms=30_000)
 
     def run_workspace_draft_resume(self) -> dict[str, Any]:
         self.click_nav_label("Navigation", "Workspace")
@@ -244,17 +256,26 @@ class BrowserSmokeRunner:
         self.wait_for_text("Saved draft sessions", timeout_ms=30_000)
         selected_label = self.select_combobox_option("Select draft session", "customer-draft-session") or "customer-draft-session"
         self.click_button("Resume draft session")
-        restored_body = self.wait_for_all_texts(
+        self.wait_for_workspace_section("Review", timeout_ms=30_000)
+        restored_body = self.body_text()
+        self.click_nav_label("Workspace section", "Output")
+        output_body = self.wait_for_all_texts(
             [
-                "Filter by source",
-                "Review Queue Plan",
+                "Artifact Generation",
+                "Transformation Design · Ready for next output step",
             ],
             timeout_ms=30_000,
         )
+        self.page.get_by_text(re.compile(r"^Transformation Design .*Ready for next output step$", re.IGNORECASE)).click()
+        target_grain = self.page.get_by_role("textbox", name="Target grain").input_value().strip()
+        defaults = self.page.get_by_role("textbox", name="Defaults / fallback behavior").input_value().strip()
         return {
             "draft_session_label": selected_label,
             "review_focus_restored": "Review Queue Plan" in restored_body,
             "source_filter_visible": "Filter by source" in restored_body,
+            "output_transformation_ready": "Transformation Design · Ready for next output step" in output_body,
+            "target_grain_restored": target_grain,
+            "defaults_restored": defaults,
             "screenshots": self.capture_event(2, "workspace_resume"),
         }
 

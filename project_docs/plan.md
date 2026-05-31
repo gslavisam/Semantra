@@ -179,6 +179,34 @@ Workspace copilot smer za sledeći UX/productization slice:
 - copilot mora da ostane bounded, audit-friendly i bez auto-apply ponašanja; njegov posao je da skrati put do postojećih akcija i da objasni trenutno stanje bez izbacivanja korisnika u eksterni LLM interfejs
 - detaljniji UX model i tehnička mapa za ovaj smer su u `project_docs/workspace_copilot_concept.md`
 
+### 8A. Transformation Design kao strukturisani spec sloj
+
+Sledeći veliki `Workspace` capability wave treba da zatvori jaz između `mapping decisions` i stvarne poslovne transformacije koju korisnik želi da sprovede nad source -> target tokom.
+
+Pravac ne treba otvoriti kao slobodan prompt box koji direktno generiše kod. Vrednost Semantre ovde je da uvede kontrolisani, reviewable i kasnije reusable `Transformation Design` sloj.
+
+Fokus:
+
+- uvesti `Transformation Design` ili kraće `Transformation` sekciju kao strukturisani sloj između `Decisions` i `Output`, ili kao prvi veliki blok unutar `Workspace > Output`
+- modelovati target shape, target grain, per-field transformation pravila, globalna pravila, fallback/default ponašanje, validacije i primere kao eksplicitni spec, a ne samo kao slobodan tekst
+- dozvoliti bounded `LLM` pomoć samo za pretvaranje prirodnog jezika u predlog strukturisanog spec-a, nikada kao autoritativni prompt-to-code shortcut
+- učiniti da `preview`, `codegen`, warning surfaces i refinement rade nad potvrđenim transformation spec-om kada on postoji, umesto da se sva složena logika gura kroz razdvojene output helper-e
+- postepeno vezati transformation spec za `draft session`, `mapping set` i kasnije reusable transformation assets kada prvi slice pokaže vrednost
+
+Prvi minimalni slice treba da ostane uzak:
+
+- prvo ga uvesti u `Workspace > Output` umesto da odmah pravi novi top-level ili novi veliki workflow korak
+- podržati target structure + per-field rules + global rules pre širenja na širi orchestration model
+- imati jedan bounded pomoćni tok tipa `Convert rule to structured spec`, ali zadržati ručno potvrđivanje i editovanje kao autoritativni put
+- validirati spec pre preview/codegen koraka i jasno odvojiti invalid spec, incomplete spec i ready-for-generation stanje
+
+Granice koje treba držati od prvog dana:
+
+- ne uvoditi slobodan `describe anything -> generate final pipeline` tok
+- ne otvarati puni multi-step ETL orchestration, DAG editor ili scheduler u ovom wave-u
+- ne preskakati postojeći mapping/review/governance model tako što bi transformation design direktno nadjačavao aktivne odluke bez vidljivog audit traga
+- ne mešati u prvom slice-u transformation design, batch execution infrastrukturu i širi enterprise runtime redesign
+
 ### 9. Persistence i runtime separation hardening
 
 Prvi lokalni/pilot slice ovog fokusa je zatvoren. Sledeći rad ovde više nije osnovno razdvajanje, nego tek naredna faza kada se pojavi stvarna operativna potreba.

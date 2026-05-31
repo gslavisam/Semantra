@@ -152,6 +152,15 @@ def run_live_api_smoke(args: argparse.Namespace) -> dict[str, Any]:
         )
         require(customer_draft is not None, "Expected customer-draft-session in /mapping/draft-sessions.")
         require(customer_draft.get("active_workspace_section") == "Review", "Expected Review draft-session fixture.")
+        customer_draft_detail = get_json(
+            client,
+            f"{base_url}/mapping/draft-sessions/{int(customer_draft['draft_session_id'])}",
+            headers,
+        )
+        require(
+            (customer_draft_detail.get("transformation_spec") or {}).get("target_grain") == "One row per customer",
+            "Expected customer-draft-session to include a ready Transformation Design seed.",
+        )
 
         require(len(browser_diff_focus.get("versions", [])) >= 2, "Expected browser-diff-focus to have at least two versions.")
 

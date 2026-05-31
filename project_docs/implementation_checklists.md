@@ -21,6 +21,7 @@ Ovaj dokument sada služi kao operativni tracker za aktuelne otvorene pravce.
 Trenutno izabrani naredni portfolio fokus:
 
 - `Operational hardening nad ključnim pilot tokovima` kao stalni paralelni execution tok
+- `Transformation Design` kao sledeći planirani `Workspace` capability wave
 
 ## Operativni protokol po pravcu
 
@@ -539,3 +540,41 @@ Napomena:
 - [ ] Potvrditi koje signalne ili runtime putanje danas stvarno prave najveći latency/cost pressure.
 - [ ] Definisati prvi uski cache/precompute slice koji ne komplikuje explainability contract.
 - [ ] Isporučiti prvi performance slice sa benchmark-validacijom i bez regressions u ranking ponašanju.
+
+### 11. Transformation Design / structured transformation spec
+
+Status: first implementation slice delivered; docs and broader persistence follow-on remain open.
+
+Napomena:
+
+- današnji `Workspace > Output` već pokriva transformation generation, manual transformation editing, preview, starter codegen i refinement, ali nema jednu centralnu, business-readable transformation specifikaciju
+- ovaj pravac ne treba otvoriti kao slobodan `opiši transformaciju pa generiši kod` prompt box, nego kao kontrolisani `Transformation Design` sloj koji korisnik može da pregleda, menja, potvrdi i kasnije sačuva
+- prvi slice treba da ostane unutar `Workspace > Output` kako bismo izbegli prerani veliki workflow refactor; poseban `Transform` korak ima smisla tek ako prvi slice dokaže jasnu korisničku vrednost
+
+Predloženi prvi slice:
+
+- `Transformation Design` sekcija u `Workspace > Output`
+- strukturisani `TransformationSpec` model sa `target_grain`, `target_fields`, `field_rules`, `global_rules`, `defaults`, `validation_rules` i primerima kada postoje
+- bounded pomoćni tok koji pretvara prirodni jezik u predlog strukturisanog spec-a, bez direktnog prompt-to-code auto-apply ponašanja
+- `preview` i `codegen` koriste potvrđeni spec kada postoji; u suprotnom ostaju na današnjem output contract-u
+
+Operativne odluke za prvi talas:
+
+- authoritative put ostaje ručno potvrđen i vidljivo editovan transformation spec
+- `LLM` predlog je advisory, mora da vrati strukturisani odgovor i ne sme direktno da zameni aktivni generated artifact
+- prvi slice ne otvara multi-step orchestration, scheduler, batch runtime niti proizvoljni DAG model
+- prvi slice je sada stvarno isporučen kroz `Workspace > Output`, backend `TransformationSpec` contract, bounded proposal helper, spec-aware preview/codegen i draft-session restore/save tok
+- sidebar `Workspace Copilot` output readiness/explanation sada koristi `Transformation Design` summary i pending spec proposal stanje za warning prioritization
+- operativni browser E2E runner za `customer-draft-session` prosiren je da proverava i restored `Transformation Design` seed u `Workspace > Output`, ali live potvrda ostaje otvorena dok se ne zatvori trenutni `Resume draft session` browser timing issue
+
+- [x] Potvrditi tačnu granicu između današnjeg transformation authoring/output surface-a i novog `Transformation Design` sloja.
+- [x] Definisati minimalni `TransformationSpec` contract za prvi slice (`target_grain`, `target_fields`, `field_rules`, `global_rules`, `defaults`, `validation_rules`, `examples`).
+- [x] Odlučiti i dokumentovati da prvi slice živi u `Workspace > Output`, a ne kao novi top-level workflow korak.
+- [x] Dizajnirati `Transformation Design` UI shell za target structure, per-field rules i global rules bez velikog layout refaktora.
+- [x] Uvesti session-state model za transformation spec tako da može da živi uz postojeći output workflow bez konflikta sa današnjim transformation editor-om.
+- [x] Dodati bounded `natural language -> structured spec proposal` helper koji vraća striktno validiran predlog umesto generated code-a.
+- [x] Uvesti jasnu validaciju i state model za `invalid`, `incomplete` i `ready for preview/codegen` transformation spec stanja.
+- [x] Povezati potvrđeni transformation spec sa postojećim `preview` i `Pandas` / `PySpark` / `dbt` generation putanjama bez rušenja postojećeg fallback contract-a.
+- [x] Definisati kako prvi slice persistira ili namerno još ne persistira transformation spec kroz `draft session` i kasnije `mapping set` / output draft tok.
+- [x] Dodati fokusirane testove za spec state, proposal normalizaciju, validation gate i output integration.
+- [ ] Ažurirati `current_state.md`, `help`, `README` i relevantne reference kada prvi slice bude stvarno isporučen.

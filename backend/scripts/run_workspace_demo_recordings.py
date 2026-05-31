@@ -175,7 +175,7 @@ class WorkspaceRecordingRunner:
     def run(self) -> dict[str, Any]:
         self.page.set_default_timeout(20_000)
         self.page.goto(self.args.streamlit_url, wait_until="domcontentloaded")
-        self.wait_for_text("Semantra - Data Mapping Review and Benchmarking", timeout_ms=45_000)
+        self.wait_for_text("Semantra - Guided Data Mapping", timeout_ms=45_000)
         self.configure_connection()
         if self.scenario.key == "standard_two_file_mapping":
             return self.run_standard_two_file_mapping()
@@ -245,7 +245,7 @@ class WorkspaceRecordingRunner:
         self.fill_textbox("API Base URL", self.args.base_url)
         if self.args.admin_token:
             self.fill_textbox("Admin Token", self.args.admin_token, press_enter=True)
-            self.wait_for_text("Semantra - Data Mapping Review and Benchmarking", timeout_ms=30_000)
+            self.wait_for_text("Semantra - Guided Data Mapping", timeout_ms=30_000)
 
     def open_workspace_setup(self) -> None:
         self.click_nav_label("Navigation", "Workspace")
@@ -375,7 +375,7 @@ class WorkspaceRecordingRunner:
 
     def run_workspace_output_generation(self) -> dict[str, Any]:
         self.page.goto(self.args.streamlit_url, wait_until="domcontentloaded")
-        self.wait_for_text("Semantra - Data Mapping Review and Benchmarking", timeout_ms=45_000)
+        self.wait_for_text("Semantra - Guided Data Mapping", timeout_ms=45_000)
         self.configure_connection()
         self.run_catalog_approved_reuse()
         self.click_nav_label("Navigation", "Workspace")

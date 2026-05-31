@@ -133,6 +133,334 @@ def _workspace_output_section_label(title: str, detail: str | None = None) -> st
     return f"{title} · {detail_text}" if detail_text else title
 
 
+def _workspace_transformation_target_fields(mapping_decisions: list[dict]) -> list[str]:
+    targets: list[str] = []
+    seen_targets: set[str] = set()
+    for item in mapping_decisions:
+        target = str(item.get("target") or "").strip()
+        if not target or target in seen_targets:
+            continue
+        seen_targets.add(target)
+        targets.append(target)
+    return targets
+
+
+def _workspace_build_transformation_spec(mapping_decisions: list[dict], session_state: dict) -> dict:
+    target_fields = _workspace_transformation_target_fields(mapping_decisions)
+    field_rules = []
+    for target_field in target_fields:
+        field_rules.append(
+            {
+                "target_field": target_field,
+                "rule": str(session_state.get(f"workspace_transformation_rule::{target_field}") or "").strip(),
+            }
+        )
+    return {
+        "target_grain": str(session_state.get("workspace_transformation_target_grain") or "").strip(),
+        "global_rules": str(session_state.get("workspace_transformation_global_rules") or "").strip(),
+        "defaults": str(session_state.get("workspace_transformation_defaults") or "").strip(),
+        "examples": str(session_state.get("workspace_transformation_examples") or "").strip(),
+        "target_fields": target_fields,
+        "field_rules": field_rules,
+    }
+
+
+def _workspace_ready_transformation_spec(mapping_decisions: list[dict], session_state: dict) -> dict | None:
+    spec = _workspace_build_transformation_spec(mapping_decisions, session_state)
+    status = _workspace_transformation_spec_status(spec)
+    if status["state"] != "ready":
+        return None
+    return {
+        **spec,
+        "field_rules": [
+            item
+            for item in spec.get("field_rules", [])
+            if str((item or {}).get("target_field") or "").strip() and str((item or {}).get("rule") or "").strip()
+        ],
+    }
+
+
+def _workspace_apply_transformation_spec_to_state(session_state: dict, spec: dict) -> None:
+    session_state["workspace_transformation_target_grain"] = str(spec.get("target_grain") or "").strip()
+    session_state["workspace_transformation_global_rules"] = str(spec.get("global_rules") or "").strip()
+    session_state["workspace_transformation_defaults"] = str(spec.get("defaults") or "").strip()
+    session_state["workspace_transformation_examples"] = str(spec.get("examples") or "").strip()
+    valid_targets = {str(item).strip() for item in (spec.get("target_fields") or []) if str(item).strip()}
+    for key in list(session_state.keys()):
+        if str(key).startswith("workspace_transformation_rule::"):
+            session_state.pop(key, None)
+    for item in spec.get("field_rules") or []:
+        target_field = str((item or {}).get("target_field") or "").strip()
+        rule = str((item or {}).get("rule") or "").strip()
+        if target_field and target_field in valid_targets:
+            session_state[f"workspace_transformation_rule::{target_field}"] = rule
+
+
+def _workspace_transformation_summary_caption(summary: dict | None) -> str:
+    if not isinstance(summary, dict):
+        return ""
+    state = str(summary.get("state") or "").strip()
+    described_count = int(summary.get("described_count") or 0)
+    target_count = int(summary.get("target_count") or 0)
+    missing_fields = [str(item) for item in (summary.get("missing_fields") or []) if str(item).strip()]
+    detail = f"Spec state: {state} | described fields: {described_count}/{target_count}"
+    if missing_fields:
+        detail += f" | missing: {', '.join(missing_fields)}"
+    return detail
+
+
+def _workspace_transformation_spec_status(spec: dict) -> dict:
+    target_fields = [str(item).strip() for item in (spec.get("target_fields") or []) if str(item).strip()]
+    target_grain = str(spec.get("target_grain") or "").strip()
+    global_rules = str(spec.get("global_rules") or "").strip()
+    defaults = str(spec.get("defaults") or "").strip()
+    described_fields: list[str] = []
+    described_lookup: set[str] = set()
+    for item in spec.get("field_rules") or []:
+        target_field = str((item or {}).get("target_field") or "").strip()
+        rule = str((item or {}).get("rule") or "").strip()
+        if not target_field or not rule or target_field in described_lookup:
+            continue
+        described_lookup.add(target_field)
+        described_fields.append(target_field)
+    missing_fields = [target_field for target_field in target_fields if target_field not in described_lookup]
+
+    if not target_fields:
+        return {
+            "state": "invalid",
+            "level": "info",
+            "title": "No active target fields",
+            "message": "Add at least one active mapping decision before drafting a transformation spec.",
+            "missing_fields": [],
+            "described_count": 0,
+            "target_count": 0,
+        }
+    if not target_grain:
+        return {
+            "state": "incomplete",
+            "level": "warning",
+            "title": "Missing target grain",
+            "message": "Describe the target grain before using this transformation design as a governed output contract.",
+            "missing_fields": missing_fields,
+            "described_count": len(described_fields),
+            "target_count": len(target_fields),
+        }
+    if not described_fields and not global_rules and not defaults:
+        return {
+            "state": "incomplete",
+            "level": "warning",
+            "title": "Add transformation rules",
+            "message": "Define at least one field rule, global rule, or default behavior before this spec is ready.",
+            "missing_fields": missing_fields,
+            "described_count": 0,
+            "target_count": len(target_fields),
+        }
+    if missing_fields and not defaults:
+        return {
+            "state": "incomplete",
+            "level": "warning",
+            "title": "Field coverage is incomplete",
+            "message": "Add explicit rules for the remaining target fields or define default behavior.",
+            "missing_fields": missing_fields,
+            "described_count": len(described_fields),
+            "target_count": len(target_fields),
+        }
+    return {
+        "state": "ready",
+        "level": "success",
+        "title": "Ready for next output step",
+        "message": (
+            f"Structured spec covers {len(described_fields)} of {len(target_fields)} target field(s)"
+            + (" with explicit defaults for the rest." if missing_fields else ".")
+        ),
+        "missing_fields": missing_fields,
+        "described_count": len(described_fields),
+        "target_count": len(target_fields),
+    }
+
+
+def _workspace_reset_transformation_design_state(session_state: dict) -> None:
+    for key in (
+        "workspace_transformation_target_grain",
+        "workspace_transformation_global_rules",
+        "workspace_transformation_defaults",
+        "workspace_transformation_examples",
+        "workspace_transformation_proposal_instruction",
+        "workspace_transformation_spec_proposal",
+        "workspace_transformation_spec",
+        "workspace_transformation_spec_status",
+        "workspace_transformation_spec_summary",
+    ):
+        session_state.pop(key, None)
+    for key in list(session_state.keys()):
+        if str(key).startswith("workspace_transformation_rule::"):
+            session_state.pop(key, None)
+
+
+def _render_workspace_transformation_design(mapping_decisions: list[dict], *, api_request) -> None:
+    transformation_spec = _workspace_build_transformation_spec(mapping_decisions, st.session_state)
+    transformation_status = _workspace_transformation_spec_status(transformation_spec)
+    st.session_state["workspace_transformation_spec"] = transformation_spec
+    st.session_state["workspace_transformation_spec_status"] = transformation_status["state"]
+    st.session_state["workspace_transformation_spec_summary"] = transformation_status
+    target_fields = transformation_spec["target_fields"]
+
+    with st.expander(
+        _workspace_output_section_label("Transformation Design", transformation_status["title"]),
+        expanded=False,
+    ):
+        st.caption(
+            "Define target grain, field-level rules, and global transformation behavior as a bounded spec before preview or code generation."
+        )
+        if transformation_status["level"] == "success":
+            st.success(transformation_status["message"])
+        elif transformation_status["level"] == "warning":
+            st.warning(transformation_status["message"])
+        else:
+            st.info(transformation_status["message"])
+
+        st.caption(
+            "This first slice stores a reviewable structured spec in Workspace state. Preview and generated artifacts still use the current mapping/transformation contract until backend spec integration lands."
+        )
+
+        if not target_fields:
+            return
+
+        grain_col, defaults_col = st.columns(2)
+        with grain_col:
+            st.text_input(
+                "Target grain",
+                key="workspace_transformation_target_grain",
+                placeholder="One row per customer / order / invoice line",
+            )
+        with defaults_col:
+            st.text_area(
+                "Defaults / fallback behavior",
+                key="workspace_transformation_defaults",
+                placeholder="Trim whitespace, keep unknown codes as null, cast numeric blanks to 0",
+                height=104,
+            )
+
+        st.text_area(
+            "Global rules",
+            key="workspace_transformation_global_rules",
+            placeholder="Normalize country codes to ISO alpha-2. Deduplicate by customer_id and keep the newest record.",
+            height=120,
+        )
+        st.text_area(
+            "Examples / edge cases",
+            key="workspace_transformation_examples",
+            placeholder="If source value is N/A -> null. If multiple addresses exist, keep the primary billing address.",
+            height=104,
+        )
+        st.caption(f"Active target fields: {', '.join(target_fields)}")
+
+        for target_field in target_fields:
+            st.text_area(
+                f"Rule for {target_field}",
+                key=f"workspace_transformation_rule::{target_field}",
+                placeholder=f"Describe how {target_field} is derived from source fields, defaults, or global rules.",
+                height=88,
+            )
+
+        if transformation_status["missing_fields"]:
+            st.caption(f"Missing explicit field rules: {', '.join(transformation_status['missing_fields'])}")
+
+        st.text_area(
+            "Natural-language spec proposal",
+            key="workspace_transformation_proposal_instruction",
+            placeholder="Describe the target grain, business rules, and any important field-level transformations you want proposed as a structured spec.",
+            height=104,
+        )
+        proposal_left, proposal_right = st.columns([1, 2])
+        with proposal_left:
+            if st.button("Propose structured spec", key="workspace_propose_transformation_spec", width="stretch"):
+                instruction = str(st.session_state.get("workspace_transformation_proposal_instruction") or "").strip()
+                if not instruction:
+                    st.session_state["last_action"] = {
+                        "level": "warning",
+                        "message": "Add natural-language transformation guidance before requesting a structured spec proposal.",
+                    }
+                    st.rerun()
+                try:
+                    st.session_state["workspace_transformation_spec_proposal"] = api_request(
+                        "POST",
+                        "/mapping/transformation/spec/propose",
+                        json={
+                            "mapping_decisions": mapping_decisions,
+                            "instruction": instruction,
+                            "current_spec": transformation_spec,
+                        },
+                    )
+                    st.session_state["last_action"] = {
+                        "level": "success",
+                        "message": "Generated a bounded structured transformation spec proposal.",
+                    }
+                    st.rerun()
+                except httpx.HTTPError as error:
+                    st.session_state["last_action"] = {
+                        "level": "error",
+                        "message": api_error_message(error, default_prefix="Transformation spec proposal failed"),
+                    }
+                    st.rerun()
+        with proposal_right:
+            st.caption(
+                "The proposal helper may suggest a structured spec, but it never auto-applies changes. Use Apply proposal to copy the proposal into the editable form."
+            )
+
+        proposal = st.session_state.get("workspace_transformation_spec_proposal")
+        if isinstance(proposal, dict):
+            proposal_summary = proposal.get("summary") or {}
+            with st.expander(_workspace_output_section_label("Structured spec proposal", proposal_summary.get("title") or "Review proposal")):
+                summary_caption = _workspace_transformation_summary_caption(proposal_summary)
+                if summary_caption:
+                    st.caption(summary_caption)
+                reasoning = proposal.get("reasoning") or []
+                if reasoning:
+                    st.caption("Proposal reasoning")
+                    for line in reasoning:
+                        st.write(f"- {line}")
+                warnings = proposal.get("warnings") or []
+                if warnings:
+                    for warning in warnings:
+                        st.warning(str(warning))
+                st.json(proposal.get("transformation_spec") or {})
+                apply_col, discard_col = st.columns(2)
+                with apply_col:
+                    if st.button("Apply proposal", key="apply_transformation_spec_proposal", width="stretch"):
+                        _workspace_apply_transformation_spec_to_state(
+                            st.session_state,
+                            proposal.get("transformation_spec") or {},
+                        )
+                        st.session_state.pop("workspace_transformation_spec_proposal", None)
+                        st.session_state["last_action"] = {
+                            "level": "success",
+                            "message": "Applied the structured transformation spec proposal to the editable form.",
+                        }
+                        st.rerun()
+                with discard_col:
+                    if st.button("Discard proposal", key="discard_transformation_spec_proposal", width="stretch"):
+                        st.session_state.pop("workspace_transformation_spec_proposal", None)
+                        st.session_state["last_action"] = {
+                            "level": "info",
+                            "message": "Discarded the structured transformation spec proposal.",
+                        }
+                        st.rerun()
+
+        clear_col, snapshot_col = st.columns([1, 2])
+        with clear_col:
+            if st.button("Clear transformation design", key="clear_transformation_design", width="stretch"):
+                _workspace_reset_transformation_design_state(st.session_state)
+                st.rerun()
+        with snapshot_col:
+            st.caption(
+                f"Spec status: {transformation_status['state']} | described fields: {transformation_status['described_count']}/{transformation_status['target_count']}"
+            )
+
+        with st.expander("Structured spec snapshot"):
+            st.json(transformation_spec)
+
+
 def _workspace_llm_refinement_enabled() -> bool:
     config = st.session_state.get("runtime_config_snapshot") or {}
     provider = str(config.get("llm_provider", "none")).strip().lower() or "none"
@@ -1526,6 +1854,7 @@ def _render_workspace_section_content(
                 st.session_state.pop("preview_response", None)
                 st.session_state.pop("codegen_response", None)
                 st.session_state.pop("codegen_refinement_response", None)
+                _workspace_reset_transformation_design_state(st.session_state)
                 _clear_active_mapping_job()
 
             active_mapping_job = st.session_state.get("active_mapping_job") or {}
@@ -1684,6 +2013,7 @@ def _render_workspace_section_content(
                 st.caption(
                     "Canonical mode supports code generation against canonical concept IDs, but preview stays unavailable because there is no concrete target dataset to materialize against."
                 )
+            _render_workspace_transformation_design(mapping_decisions, api_request=api_request)
             st.subheader("Artifact Generation")
             codegen_mode = st.radio(
                 "Artifact format",
@@ -1718,12 +2048,14 @@ def _render_workspace_section_content(
                             }
                             st.rerun()
                         try:
+                            ready_transformation_spec = _workspace_ready_transformation_spec(mapping_decisions, st.session_state)
                             st.session_state["preview_response"] = api_request(
                                 "POST",
                                 "/mapping/preview",
                                 json={
                                     "source_dataset_id": st.session_state["upload_response"]["source"]["dataset_id"],
                                     "mapping_decisions": mapping_decisions,
+                                    "transformation_spec": ready_transformation_spec,
                                 },
                             )
                             st.session_state["last_action"] = {
@@ -1748,6 +2080,7 @@ def _render_workspace_section_content(
                         }
                         st.rerun()
                     try:
+                        ready_transformation_spec = _workspace_ready_transformation_spec(mapping_decisions, st.session_state)
                         st.session_state["codegen_response"] = api_request(
                             "POST",
                             "/mapping/codegen",
@@ -1755,6 +2088,7 @@ def _render_workspace_section_content(
                                 "mapping_decisions": mapping_decisions,
                                 "mode": codegen_mode,
                                 "allow_unaccepted": canonical_output_mode,
+                                "transformation_spec": ready_transformation_spec,
                             },
                         )
                         st.session_state.pop("codegen_refinement_response", None)
@@ -1782,6 +2116,10 @@ def _render_workspace_section_content(
             if unresolved_targets:
                 preview_detail += f", {len(unresolved_targets)} unresolved"
             with st.expander(_workspace_output_section_label("Preview Result", preview_detail), expanded=True):
+                preview_spec_summary = preview_response.get("transformation_spec_summary") or {}
+                preview_spec_caption = _workspace_transformation_summary_caption(preview_spec_summary)
+                if preview_spec_caption:
+                    st.caption(preview_spec_caption)
                 if preview_rows:
                     st.dataframe(preview_rows, width="stretch", hide_index=True)
                 else:
@@ -1827,6 +2165,10 @@ def _render_workspace_section_content(
             if codegen_refinement_response is not None:
                 artifact_detail = f"{artifact_detail}, refinement pending"
             with st.expander(_workspace_output_section_label(artifact_header, artifact_detail), expanded=True):
+                codegen_spec_summary = codegen_response.get("transformation_spec_summary") or {}
+                codegen_spec_caption = _workspace_transformation_summary_caption(codegen_spec_summary)
+                if codegen_spec_caption:
+                    st.caption(codegen_spec_caption)
                 original_col, refined_col = st.columns(2)
                 with original_col:
                     st.caption("Original generated code")
@@ -2015,16 +2357,6 @@ def render_workspace_tab(
     preview_response = st.session_state.get("preview_response")
     codegen_response = st.session_state.get("codegen_response")
     codegen_refinement_response = st.session_state.get("codegen_refinement_response")
-    _render_workspace_copilot_shell(
-        session_state=st.session_state,
-        selected_workspace_section=selected_workspace_section,
-        upload_response=upload_response,
-        mapping_response=mapping_response,
-        preview_response=preview_response,
-        codegen_response=codegen_response,
-        build_mapping_decisions=build_mapping_decisions,
-        request_mapping_analysis_summary=request_mapping_analysis_summary,
-    )
     _render_workspace_section_content(
         selected_workspace_section=selected_workspace_section,
         all_upload_types=all_upload_types,

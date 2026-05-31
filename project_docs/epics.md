@@ -300,6 +300,40 @@ Otvoreno ostaje:
 - trigger/schedule sloj
 - persistent background execution infrastruktura
 
+### Epic 16: Transformation Design and Structured Transformation Spec
+
+Status: active planning.
+
+Cilj:
+
+- uvesti jasan produktni sloj za kompleksnu poslovnu transformaciju između source i target strukture, umesto da se takva logika rasipa između ručnih transformacija, output helper-a i prompt-driven generation tokova
+
+Trenutno stanje:
+
+- `Workspace > Decisions` i `Workspace > Output` već pokrivaju mapping odluke, ručne transformacije, transformation generation, preview, starter codegen i artifact refinement
+- Semantra već ima korisne output surface-e, ali nema jedan eksplicitan, business-readable `Transformation Design` contract koji opisuje `šta se dešava sa svakim target poljem` i `koja globalna pravila važe za ceo tok`
+- složenije transformacije trenutno zahtevaju da korisnik mentalno spaja mapping odluke, transformation code, warning readout i refinement korake bez jedne centralne specifikacije
+
+Otvoreno:
+
+- gde prvi slice živi: kao nova sekcija u `Workspace > Output` ili kao poseban korak između `Decisions` i `Output`
+- kako izgleda minimalni `TransformationSpec` contract (`target_grain`, `target_fields`, `field_rules`, `global_rules`, `defaults`, `validation_rules`, `examples`)
+- kako bounded `LLM` može da pretvori prirodni jezik u strukturisani predlog bez uvođenja prompt-to-code anti-patterna
+- kako `preview`, `Pandas` / `PySpark` / `dbt` generation i refinement prelaze da rade nad potvrđenim spec-om kada on postoji
+- kako transformation spec postaje versioned i restore-friendly kroz `draft session`, `mapping set` ili poseban output draft model
+
+Prvi slice treba eksplicitno da zadrži ove granice:
+
+- ne uvoditi slobodan generički chat za transformacije
+- ne uvoditi puni orchestration engine, DAG editor ili job scheduler
+- ne raditi auto-apply iz `LLM` predloga u transformation spec ili generated artifact
+- ne širiti prvi slice istovremeno na full persistence redesign i novi output runtime
+
+Veza sa postojećim epicima:
+
+- ovo nadograđuje `Epic 4: Transformation Safety and Testing`, ne zamenjuje ga
+- ovo koristi postojeće output/generation surface-e iz `Epic 10`, ali im dodaje strukturisani design sloj ispred generation koraka
+
 ### Epic 15: Graph Projection, Lineage, and Reuse Analysis
 
 Status: proposed.

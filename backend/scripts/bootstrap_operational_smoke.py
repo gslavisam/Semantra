@@ -68,6 +68,28 @@ def post_json(client: httpx.Client, url: str, payload: dict[str, Any], headers: 
     return response.json()
 
 
+def put_json(client: httpx.Client, url: str, payload: dict[str, Any], headers: dict[str, str]) -> Any:
+    response = client.put(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
+def customer_draft_transformation_spec() -> dict[str, Any]:
+    return {
+        "target_grain": "One row per customer",
+        "global_rules": "",
+        "defaults": "Keep unmatched optional fields as null and trim surrounding whitespace.",
+        "examples": "",
+        "target_fields": ["customer_id", "phone_number", "customer_email"],
+        "field_rules": [
+            {
+                "target_field": "customer_email",
+                "rule": "Lowercase the source email value before writing the target field.",
+            }
+        ],
+    }
+
+
 def browser_diff_payload(version: int) -> dict[str, Any]:
     if version == 1:
         mapping_decisions = [
@@ -160,6 +182,8 @@ def draft_session_payload(upload_payload: dict[str, Any]) -> dict[str, Any]:
     timestamp = datetime.now(UTC).isoformat()
     return {
         "name": "customer-draft-session",
+        "created_by": "operational-smoke-bootstrap",
+        "workspace_id": "ws-operational-smoke",
         "mapping_mode": "standard",
         "active_workspace_section": "Review",
         "source_handle": upload_payload["source"],
@@ -210,6 +234,7 @@ def draft_session_payload(upload_payload: dict[str, Any]) -> dict[str, Any]:
                 "details": {"reason": "validated during smoke bootstrap"},
             }
         },
+        "transformation_spec": customer_draft_transformation_spec(),
     }
 
 
@@ -321,14 +346,57 @@ def ensure_approved_reuse_dbt_smoke(client: httpx.Client, base_url: str, headers
 def ensure_customer_draft_session(client: httpx.Client, base_url: str, headers: dict[str, str]) -> dict[str, Any]:
     draft_sessions = get_json(client, f"{base_url}/mapping/draft-sessions", headers)
     existing = [item for item in draft_sessions if str(item.get("name") or "").strip() == "customer-draft-session"]
+    expected_spec = customer_draft_transformation_spec()
     if existing:
         existing.sort(key=lambda item: int(item.get("draft_session_id") or 0), reverse=True)
         record = existing[0]
+        detail = get_json(client, f"{base_url}/mapping/draft-sessions/{int(record['draft_session_id'])}", headers)
+        current_spec = dict(detail.get("transformation_spec") or {})
+        spec_matches = (
+            str(current_spec.get("target_grain") or "").strip() == expected_spec["target_grain"]
+            and str(current_spec.get("defaults") or "").strip() == expected_spec["defaults"]
+            and list(current_spec.get("target_fields") or []) == expected_spec["target_fields"]
+        )
+        restore_section_matches = str(detail.get("active_workspace_section") or "").strip() == "Review"
+        if not spec_matches or not restore_section_matches:
+            updated = put_json(
+                client,
+                f"{base_url}/mapping/draft-sessions/{int(record['draft_session_id'])}",
+                {
+                    "name": detail["name"],
+                    "created_by": detail.get("created_by"),
+                    "workspace_id": detail.get("workspace_id"),
+                    "api_base_url": detail.get("api_base_url") or "",
+                    "expected_version": int(detail.get("version") or 1),
+                    "last_writer": "operational-smoke-bootstrap",
+                    "mapping_mode": detail["mapping_mode"],
+                    "active_workspace_section": "Review",
+                    "source_handle": detail["source_handle"],
+                    "target_handle": detail.get("target_handle"),
+                    "canonical_target_system": detail.get("canonical_target_system"),
+                    "workspace_target_context": detail.get("workspace_target_context") or {},
+                    "review_state": detail.get("review_state") or {},
+                    "mapping_runtime": detail.get("mapping_runtime") or {},
+                    "mapping_editor_state": detail.get("mapping_editor_state") or {},
+                    "mapping_decision_audit": detail.get("mapping_decision_audit") or {},
+                    "transformation_spec": expected_spec,
+                },
+                headers,
+            )
+            return {
+                "created": False,
+                "updated": True,
+                "draft_session_id": int(updated["draft_session_id"]),
+                "decision_count": int(updated.get("decision_count") or 0),
+                "active_workspace_section": updated.get("active_workspace_section"),
+                "transformation_spec_ready": True,
+            }
         return {
             "created": False,
             "draft_session_id": int(record["draft_session_id"]),
             "decision_count": int(record.get("decision_count") or 0),
             "active_workspace_section": record.get("active_workspace_section"),
+            "transformation_spec_ready": True,
         }
 
     with SOURCE_FIXTURE.open("rb") as source_file, TARGET_FIXTURE.open("rb") as target_file:
@@ -349,6 +417,7 @@ def ensure_customer_draft_session(client: httpx.Client, base_url: str, headers: 
         "draft_session_id": int(created["draft_session_id"]),
         "decision_count": int(created.get("decision_count") or 0),
         "active_workspace_section": created.get("active_workspace_section"),
+        "transformation_spec_ready": True,
     }
 
 

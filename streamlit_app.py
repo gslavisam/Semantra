@@ -765,8 +765,8 @@ def render_workspace_tab() -> None:
 TOP_LEVEL_AREAS = ["Workspace", "Catalog", "Benchmarks", "System", "Governance"]
 
 def main() -> None:
-    st.title("Semantra - Data Mapping Review and Benchmarking")
-    st.caption("Upload CSV / JSON / XML / XLSX / SQL -> Select Tables -> Review Mapping")
+    st.title("Semantra - Guided Data Mapping")
+    st.caption("Upload and profile data -> Review mappings -> Define transformations -> Generate governed outputs")
     render_step_status()
     render_last_action_status()
 

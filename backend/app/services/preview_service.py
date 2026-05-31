@@ -2,16 +2,27 @@
 
 from __future__ import annotations
 
-from app.models.mapping import MappingDecision, PreviewResponse, PreviewRow
+from app.models.mapping import MappingDecision, PreviewResponse, PreviewRow, TransformationSpec
+from app.services.transformation_spec_service import summarize_transformation_spec
 from app.services.transformation_service import build_transformed_target_frame
 
 
-def build_preview(rows: list[dict[str, object]], mapping_decisions: list[MappingDecision]) -> PreviewResponse:
+def build_preview(
+    rows: list[dict[str, object]],
+    mapping_decisions: list[MappingDecision],
+    transformation_spec: TransformationSpec | None = None,
+) -> PreviewResponse:
     """Build an advisory preview of target rows from the current mapping decisions."""
 
     accepted = [decision for decision in mapping_decisions if decision.status != "rejected"]
+    transformation_spec_summary = summarize_transformation_spec(transformation_spec, accepted) if transformation_spec else None
     if not accepted:
-        return PreviewResponse(preview=[], unresolved_targets=[], transformation_previews=[])
+        return PreviewResponse(
+            preview=[],
+            unresolved_targets=[],
+            transformation_previews=[],
+            transformation_spec_summary=transformation_spec_summary,
+        )
 
     transformed_rows, transformation_previews = build_transformed_target_frame(rows[:10], accepted)
     warnings_by_source: dict[str | None, list[str]] = {}
@@ -37,4 +48,5 @@ def build_preview(rows: list[dict[str, object]], mapping_decisions: list[Mapping
         preview=preview_rows,
         unresolved_targets=unresolved_targets,
         transformation_previews=transformation_previews,
+        transformation_spec_summary=transformation_spec_summary,
     )

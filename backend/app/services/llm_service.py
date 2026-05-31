@@ -12,9 +12,16 @@ from urllib.error import URLError
 from typing import Callable, Protocol
 
 from app.core.config import settings
-from app.models.mapping import ArtifactRefinementResponse, LLMValidationResult, TransformationGenerationResponse
+from app.models.mapping import (
+    ArtifactRefinementResponse,
+    LLMValidationResult,
+    TransformationGenerationResponse,
+    TransformationSpec,
+    TransformationSpecProposalResponse,
+)
 from app.models.mapping import CanonicalGapCandidate, CanonicalGapSuggestion
 from app.services.dbt_codegen_profile import dbt_profile_snapshot
+from app.services.transformation_spec_service import normalize_transformation_spec, summarize_transformation_spec
 
 
 logger = logging.getLogger(__name__)
@@ -698,6 +705,50 @@ def call_transformation_generator(
     return None
 
 
+def call_transformation_spec_generator(
+    *,
+    mapping_decisions: list[dict],
+    instruction: str,
+    current_spec: dict | None,
+    provider: LLMProvider | None,
+    max_retries: int | None = None,
+    timeout_seconds: float | None = None,
+) -> TransformationSpecProposalResponse | None:
+    """Request a bounded natural-language to structured transformation spec proposal."""
+
+    if provider is None or not instruction.strip():
+        return None
+
+    retries = max_retries if max_retries is not None else settings.llm_max_retries
+    timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
+    prompt = build_transformation_spec_prompt(
+        mapping_decisions=mapping_decisions,
+        instruction=instruction,
+        current_spec=current_spec,
+    )
+
+    response = request_llm_json(provider, prompt, timeout, retries, "transformation_spec")
+    if response is None:
+        return None
+
+    _raw_response, parsed = response
+    try:
+        raw_spec = parsed.get("transformation_spec") or parsed.get("spec") or parsed
+        proposed_spec = TransformationSpec.model_validate(raw_spec)
+        normalized_spec = normalize_transformation_spec(proposed_spec, mapping_decisions)
+        summary = summarize_transformation_spec(normalized_spec, mapping_decisions)
+        return TransformationSpecProposalResponse(
+            transformation_spec=normalized_spec,
+            summary=summary,
+            reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
+            warnings=normalize_llm_list_field(parsed.get("warnings") or []),
+        )
+    except Exception as error:
+        logger.warning("LLM transformation spec response rejected (%s): %s", classify_llm_error(error), error)
+
+    return None
+
+
 def call_artifact_refinement(
     *,
     mapping_decisions: list[dict],
@@ -958,6 +1009,65 @@ def build_transformation_generator_prompt(source_field: dict, target_field: dict
         "Return only valid JSON. Do not include markdown or code fences.\n"
         "Use only df_source, df_target, pd, and standard Python built-ins.\n"
         "The transformation_code may be either a full assignment like df_target[\"target\"] = ... or just the right-hand expression.\n\n"
+        f"{json.dumps(payload, ensure_ascii=True)}"
+    )
+
+
+def build_transformation_spec_prompt(
+    *,
+    mapping_decisions: list[dict],
+    instruction: str,
+    current_spec: dict | None,
+) -> str:
+    """Build the bounded prompt used to propose a structured transformation design spec."""
+
+    target_fields: list[str] = []
+    seen_targets: set[str] = set()
+    for item in mapping_decisions:
+        target = str(item.get("target") or "").strip()
+        if not target or target in seen_targets:
+            continue
+        seen_targets.add(target)
+        target_fields.append(target)
+
+    payload = {
+        "mapping_decisions": [
+            {
+                "source": str(item.get("source") or "").strip(),
+                "target": str(item.get("target") or "").strip(),
+                "status": str(item.get("status") or "accepted").strip(),
+                "has_transformation_code": bool(str(item.get("transformation_code") or "").strip()),
+            }
+            for item in mapping_decisions
+            if str(item.get("target") or "").strip()
+        ],
+        "allowed_target_fields": target_fields,
+        "instruction": instruction.strip(),
+        "current_spec": current_spec or {},
+        "rules": {
+            "json_only": True,
+            "closed_target_set": True,
+            "do_not_generate_code": True,
+            "do_not_invent_new_target_fields": True,
+            "return_reviewable_business_rules_only": True,
+        },
+        "response_format": {
+            "transformation_spec": {
+                "target_grain": "string",
+                "global_rules": "string",
+                "defaults": "string",
+                "examples": "string",
+                "field_rules": [{"target_field": "one of allowed_target_fields", "rule": "string"}],
+            },
+            "reasoning": ["short bullet points"],
+            "warnings": ["short bullet points"],
+        },
+    }
+    return (
+        "You convert natural-language transformation intent into a structured, reviewable transformation design spec.\n"
+        "Return JSON only. No markdown. No code fences. No executable code.\n"
+        "Use only the provided target fields. Do not invent new targets.\n"
+        "Prefer concise business-readable rules over implementation detail.\n\n"
         f"{json.dumps(payload, ensure_ascii=True)}"
     )
 

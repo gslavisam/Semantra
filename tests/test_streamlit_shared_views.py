@@ -375,6 +375,103 @@ def test_submit_workspace_copilot_chat_question_appends_history() -> None:
     assert "why" in history[0]
 
 
+def test_submit_workspace_copilot_problem_statement_returns_structured_actions() -> None:
+    state: dict[str, object] = {}
+
+    response = shared_views.submit_workspace_copilot_problem_statement(
+        "Goal: create a governed customer output. Current stage in app: Setup. Available files or metadata: source csv and target csv. Expected output or artifact: transformation design and pandas codegen. Constraints or business rules: keep unmatched optional fields null.",
+        state,
+        request_workspace_problem_guidance_func=lambda problem_statement: {
+            "disposition": "in_scope",
+            "scope_reason": "Matched capabilities: Setup, Output.",
+            "answer": "This problem starts in Setup and finishes in Output.",
+            "recommended_steps": [
+                "Open Setup and upload the source and target files.",
+                "In Output, define target grain and defaults before code generation.",
+            ],
+            "recommended_sections": ["Setup", "Output"],
+            "capability_hits": ["Setup", "Output"],
+            "prompt_template": "Goal: ...",
+            "input_format_fields": ["Goal", "Current stage in app"],
+        },
+    )
+
+    assert response["kind"] == "problem-guidance"
+    assert response["level"] == "success"
+    assert response["answer"] == "This problem starts in Setup and finishes in Output."
+    assert response["next_actions"][0] == "Open Setup and upload the source and target files."
+    assert response["action_buttons"] == [
+        {"label": "Open Setup", "action": "open_setup"},
+        {"label": "Open Output", "action": "open_output"},
+    ]
+    assert response["artifacts"]["capability_hits"] == ["Setup", "Output"]
+    history = state["workspace_copilot_chat_history"]
+    assert history[-1]["kind"] == "problem-guidance"
+
+
+def test_submit_workspace_copilot_problem_statement_handles_unavailable_guidance() -> None:
+    state: dict[str, object] = {}
+
+    response = shared_views.submit_workspace_copilot_problem_statement(
+        "Goal: stabilize runtime issues.",
+        state,
+        request_workspace_problem_guidance_func=lambda problem_statement: (_ for _ in ()).throw(ValueError("backend unavailable")),
+    )
+
+    assert response["kind"] == "problem-guidance-error"
+    assert response["level"] == "warning"
+    assert "backend unavailable" in response["why"]
+    assert "prompt_template" in response["artifacts"]
+
+
+def test_workspace_copilot_apply_problem_example_prefills_text_area() -> None:
+    state: dict[str, object] = {}
+
+    applied = shared_views._workspace_copilot_apply_problem_example("Goal: finish review queue.", state)
+
+    assert applied == "Goal: finish review queue."
+    assert state["workspace_copilot_problem_statement_input"] == "Goal: finish review queue."
+
+
+def test_workspace_copilot_problem_example_dropdown_prefills_text_area() -> None:
+    state: dict[str, object] = {
+        "workspace_copilot_problem_example_selection": (
+            "Workspace",
+            "Resume a saved draft",
+            "Goal: continue from a saved draft session.",
+        )
+    }
+
+    applied = shared_views._workspace_copilot_apply_selected_problem_example(
+        "workspace_copilot_problem_example_selection",
+        state,
+    )
+
+    assert applied == "Goal: continue from a saved draft session."
+    assert state["workspace_copilot_problem_statement_input"] == "Goal: continue from a saved draft session."
+
+
+def test_workspace_copilot_problem_example_label_includes_group_name() -> None:
+    label = shared_views._workspace_copilot_problem_example_label(
+        ("Catalog", "Search catalog reuse", "Goal: reuse this integration.")
+    )
+
+    assert label == "Catalog: Search catalog reuse"
+
+
+def test_workspace_copilot_problem_example_options_include_transformation_templates() -> None:
+    labels = [
+        shared_views._workspace_copilot_problem_example_label(option)
+        for option in shared_views._workspace_copilot_problem_example_options()
+    ]
+
+    assert "Output: Merge two source fields" in labels
+    assert "Output: Conditional outcome from multiple fields" in labels
+    assert "Output: Fallback between two source fields" in labels
+    assert "Output: Map code to business label" in labels
+    assert "Output: Split one field into multiple outputs" in labels
+
+
 def test_workspace_copilot_chat_response_unlocks_review_from_setup() -> None:
     response = shared_views.workspace_copilot_chat_response(
         "What unlocks Review?",
@@ -545,6 +642,36 @@ def test_workspace_copilot_chat_response_reports_output_readiness(monkeypatch: p
     assert response["action_buttons"] == [{"label": "Open Output", "action": "open_output"}]
 
 
+def test_workspace_copilot_chat_response_warns_when_transformation_design_is_incomplete(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shared_views, "_workspace_output_block_reason", lambda state: "")
+
+    response = shared_views.workspace_copilot_chat_response(
+        "Am I ready for Output?",
+        {
+            "active_top_level_area": "Workspace",
+            "active_workspace_section": "Output",
+            "upload_response": {"mapping_mode": "standard"},
+            "mapping_response": {"mapping_runtime": {}},
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+            "workspace_transformation_spec": {
+                "target_grain": "",
+                "global_rules": "Normalize country codes.",
+                "defaults": "",
+                "examples": "",
+                "target_fields": ["customer_id"],
+                "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
+            },
+        },
+    )
+
+    assert response["kind"] == "output-readiness"
+    assert response["level"] == "warning"
+    assert "Transformation Design is incomplete" in response["answer"]
+    assert "Describe the target grain" in response["next_actions"][0]
+
+
 def test_workspace_copilot_chat_response_prioritizes_output_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(shared_views, "_workspace_output_block_reason", lambda state: "")
 
@@ -581,6 +708,49 @@ def test_workspace_copilot_chat_response_prioritizes_output_warnings(monkeypatch
     assert response["next_actions"][1] == "Priority 2: current artifact -> W002: Verify type casting."
     assert response["next_actions"][2] == "Priority 3: refinement candidate -> RW01: Confirm downstream schema expectations."
     assert response["action_buttons"] == [{"label": "Open Output", "action": "open_output"}]
+
+
+def test_workspace_copilot_chat_response_prioritizes_transformation_design_proposal_before_artifact_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shared_views, "_workspace_output_block_reason", lambda state: "")
+
+    response = shared_views.workspace_copilot_chat_response(
+        "Explain output gating and warning priority",
+        {
+            "active_top_level_area": "Workspace",
+            "active_workspace_section": "Output",
+            "upload_response": {"mapping_mode": "standard"},
+            "mapping_response": {"mapping_runtime": {}},
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+            "workspace_transformation_spec": {
+                "target_grain": "One row per customer",
+                "global_rules": "Normalize country codes.",
+                "defaults": "",
+                "examples": "",
+                "target_fields": ["customer_id"],
+                "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
+            },
+            "workspace_transformation_spec_proposal": {
+                "summary": {"state": "ready", "title": "Ready for next output step", "message": "Spec proposal covers the active targets."},
+                "transformation_spec": {"target_grain": "One row per customer"},
+            },
+            "codegen_response": {
+                "code": "print('ok')",
+                "language": "python",
+                "warnings": [
+                    {"code": "W001", "message": "Review null handling."},
+                ],
+            },
+        },
+    )
+
+    assert response["kind"] == "output-explanation"
+    assert "Resolve Transformation Design drift before artifact warnings" in response["answer"]
+    assert response["next_actions"][0] == (
+        "Priority 1: Transformation Design proposal -> review and apply or discard the pending structured spec proposal."
+    )
+    assert response["next_actions"][1] == "Priority 2: current artifact -> W001: Review null handling."
 
 
 def test_workspace_copilot_chat_response_blocks_refinement_without_artifact() -> None:

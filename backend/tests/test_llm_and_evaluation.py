@@ -15,7 +15,9 @@ from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import compare_scoring_profiles, evaluate_cases, evaluate_cases_for_profile
 from app.services.llm_service import (
     StaticLLMProvider,
+    build_transformation_spec_prompt,
     build_transformation_generator_prompt,
+    call_transformation_spec_generator,
     build_validator_prompt,
     call_transformation_generator,
     call_validator,
@@ -186,6 +188,58 @@ def test_transformation_prompt_includes_description_aware_context() -> None:
     assert '"description": "SAP created-on date"' in prompt
     assert '"declared_type": "DATS"' in prompt
     assert '"name": "document.created_date"' in prompt
+
+
+def test_transformation_spec_prompt_uses_closed_target_set_rules() -> None:
+    prompt = build_transformation_spec_prompt(
+        mapping_decisions=[
+            {"source": "KUNNR", "target": "customer_id", "status": "accepted"},
+            {"source": "LAND1", "target": "country_code", "status": "accepted"},
+        ],
+        instruction="Create a customer-level spec with ISO country normalization.",
+        current_spec={"target_grain": "One row per customer"},
+    )
+
+    assert '"allowed_target_fields": ["customer_id", "country_code"]' in prompt
+    assert '"do_not_generate_code": true' in prompt
+    assert '"current_spec": {"target_grain": "One row per customer"}' in prompt
+
+
+def test_llm_transformation_spec_generator_normalizes_to_active_targets() -> None:
+    provider = StaticLLMProvider(
+        json.dumps(
+            {
+                "transformation_spec": {
+                    "target_grain": "One row per customer",
+                    "global_rules": "Normalize country codes to ISO alpha-2.",
+                    "defaults": "Keep unmatched optional attributes as null.",
+                    "examples": "N/A -> null",
+                    "field_rules": [
+                        {"target_field": "customer_id", "rule": "Cast KUNNR to string."},
+                        {"target_field": "invented_field", "rule": "Drop this hallucinated field."},
+                    ],
+                },
+                "reasoning": ["Derived the spec from the requested grain and allowed target set."],
+            }
+        )
+    )
+
+    result = call_transformation_spec_generator(
+        mapping_decisions=[
+            {"source": "KUNNR", "target": "customer_id", "status": "accepted"},
+            {"source": "LAND1", "target": "country_code", "status": "accepted"},
+        ],
+        instruction="Create a customer-level spec.",
+        current_spec=None,
+        provider=provider,
+        max_retries=1,
+    )
+
+    assert result is not None
+    assert result.transformation_spec.target_fields == ["customer_id", "country_code"]
+    assert len(result.transformation_spec.field_rules) == 1
+    assert result.transformation_spec.field_rules[0].target_field == "customer_id"
+    assert result.summary.state == "ready"
 
 
 def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -> None:

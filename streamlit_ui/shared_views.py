@@ -10,7 +10,14 @@ from pathlib import Path
 import httpx
 import streamlit as st
 
-from streamlit_ui.api import admin_token_required, api_request, backend_is_reachable, request_mapping_analysis_summary, request_review_plan_summary
+from streamlit_ui.api import (
+    admin_token_required,
+    api_request,
+    backend_is_reachable,
+    request_mapping_analysis_summary,
+    request_review_plan_summary,
+    request_workspace_problem_guidance,
+)
 from streamlit_ui.governance import mapping_output_block_reason
 
 
@@ -157,6 +164,115 @@ WORKSPACE_COPILOT_CHAT_QUICK_ASK_GROUPS = {
 WORKSPACE_COPILOT_QUICK_ASK_PLACEHOLDER = "Choose a suggested question"
 WORKSPACE_COPILOT_CHAT_INPUT_KEY = "workspace_copilot_chat_input"
 WORKSPACE_COPILOT_PENDING_RESET_KEY = "workspace_copilot_pending_widget_reset"
+WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER = "Choose a problem example"
+WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE = (
+    "Goal: <what outcome you need>\n"
+    "Current stage in app: <Setup | Review | Decisions | Output | Catalog | Governance | Benchmarks | System>\n"
+    "Available files or metadata: <source file, target file, descriptions, sample values, draft session, none>\n"
+    "Expected output or artifact: <mapping review, accepted decisions, transformation design, preview, codegen, reuse search, benchmark, runtime help>\n"
+    "Constraints or business rules: <required transformations, quality checks, missing context, downstream rules>"
+)
+WORKSPACE_COPILOT_PROBLEM_EXAMPLES = (
+    (
+        "Workspace",
+        "Start from raw files",
+        "Goal: produce a governed customer output from raw source and target files.\n"
+        "Current stage in app: Setup\n"
+        "Available files or metadata: source csv, target csv, source descriptions\n"
+        "Expected output or artifact: transformation design, preview, pandas codegen\n"
+        "Constraints or business rules: normalize phone numbers, keep unmatched optional fields null",
+    ),
+    (
+        "Workspace",
+        "Close review queue",
+        "Goal: finish the remaining review work and stabilize decisions.\n"
+        "Current stage in app: Review\n"
+        "Available files or metadata: active mapping result, low-confidence rows, pending proposals\n"
+        "Expected output or artifact: accepted decisions ready for Output\n"
+        "Constraints or business rules: avoid forcing low-confidence matches without stronger evidence",
+    ),
+    (
+        "Workspace",
+        "Resume a saved draft",
+        "Goal: continue from a saved draft session and finish the target artifact.\n"
+        "Current stage in app: Decisions\n"
+        "Available files or metadata: active draft session, transformation design, pending proposals\n"
+        "Expected output or artifact: completed transformation design and governed code artifact\n"
+        "Constraints or business rules: preserve the current draft decisions and review any pending transformation proposal first",
+    ),
+    (
+        "Output",
+        "Merge two source fields",
+        "Goal: build one target field by combining two source fields into a single output value.\n"
+        "Current stage in app: Output\n"
+        "Available files or metadata: active mapping result, transformation design, target field full_name\n"
+        "Expected output or artifact: transformation design, preview, governed code artifact\n"
+        "Constraints or business rules: join first_name and last_name with a single space, trim blanks, and keep null when both inputs are empty",
+    ),
+    (
+        "Output",
+        "Conditional outcome from multiple fields",
+        "Goal: generate one target outcome based on multiple source fields and business conditions.\n"
+        "Current stage in app: Output\n"
+        "Available files or metadata: active mapping result, transformation design, source fields status and amount\n"
+        "Expected output or artifact: transformation design with explicit rules and generated artifact\n"
+        "Constraints or business rules: if status is active and amount is above threshold then output Approved, otherwise output Review or Reject according to the condition set",
+    ),
+    (
+        "Output",
+        "Fallback between two source fields",
+        "Goal: populate one target field from two possible source fields with fallback behavior.\n"
+        "Current stage in app: Output\n"
+        "Available files or metadata: active mapping result, transformation design, source fields email_primary and email_secondary\n"
+        "Expected output or artifact: transformation design, preview, governed code artifact\n"
+        "Constraints or business rules: use email_primary when present, otherwise use email_secondary, trim whitespace, and keep null when both are empty",
+    ),
+    (
+        "Output",
+        "Map code to business label",
+        "Goal: transform one source code field into a business-readable target label.\n"
+        "Current stage in app: Output\n"
+        "Available files or metadata: active mapping result, transformation design, source field customer_type_code\n"
+        "Expected output or artifact: transformation design with explicit mapping rules and generated artifact\n"
+        "Constraints or business rules: if code is A then Retail, if B then Wholesale, otherwise Unknown",
+    ),
+    (
+        "Output",
+        "Split one field into multiple outputs",
+        "Goal: parse one source field and populate multiple target fields from it.\n"
+        "Current stage in app: Output\n"
+        "Available files or metadata: active mapping result, transformation design, source field full_name\n"
+        "Expected output or artifact: transformation design, preview, governed code artifact\n"
+        "Constraints or business rules: split full_name into first_name and last_name when possible, trim blanks, and keep unmatched remainder in last_name",
+    ),
+    (
+        "Catalog",
+        "Search catalog reuse",
+        "Goal: check whether this integration already exists and can be reused instead of rebuilt.\n"
+        "Current stage in app: Catalog\n"
+        "Available files or metadata: active mapping context, integration name, source system, target system\n"
+        "Expected output or artifact: reuse-fit explanation and candidate mapping set versions\n"
+        "Constraints or business rules: prefer approved reusable mapping sets over rebuilding from scratch",
+    ),
+    (
+        "Governance",
+        "Canonical/governance gap",
+        "Goal: determine whether missing matches come from canonical or knowledge coverage gaps.\n"
+        "Current stage in app: Governance\n"
+        "Available files or metadata: unmatched source fields, glossary context, overlay candidates\n"
+        "Expected output or artifact: governance next steps for canonical or knowledge updates\n"
+        "Constraints or business rules: do not force row-level targets before stewardship review when glossary coverage is missing",
+    ),
+    (
+        "Benchmarks",
+        "Benchmark quality check",
+        "Goal: validate whether the current mapping quality is stable enough for rollout.\n"
+        "Current stage in app: Benchmarks\n"
+        "Available files or metadata: benchmark dataset, current mapping set, prior quality expectations\n"
+        "Expected output or artifact: benchmark run and quality/drift interpretation\n"
+        "Constraints or business rules: flag regressions before promoting the mapping set",
+    ),
+)
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 ENGLISH_HELP_PATH = APP_ROOT / "help.en.md"
@@ -317,9 +433,86 @@ def _workspace_run_action(state: dict, action_key: str, *, focus_sources: list[s
         _workspace_copilot_handoff(state, target_section="Decisions", message=f"{origin} handoff -> Decisions.")
     elif normalized_key == "open_output":
         _workspace_copilot_handoff(state, target_section="Output", message=f"{origin} handoff -> Output.")
+    elif normalized_key == "open_catalog":
+        state["pending_top_level_area"] = "Catalog"
+        state.pop("pending_workspace_section", None)
+        state["last_action"] = {"level": "info", "message": f"{origin} handoff -> Catalog."}
+        st.rerun()
+    elif normalized_key == "open_governance":
+        state["pending_top_level_area"] = "Governance"
+        state.pop("pending_workspace_section", None)
+        state["last_action"] = {"level": "info", "message": f"{origin} handoff -> Governance."}
+        st.rerun()
+    elif normalized_key == "open_benchmarks":
+        state["pending_top_level_area"] = "Benchmarks"
+        state.pop("pending_workspace_section", None)
+        state["last_action"] = {"level": "info", "message": f"{origin} handoff -> Benchmarks."}
+        st.rerun()
+    elif normalized_key == "open_system":
+        state["pending_top_level_area"] = "System"
+        state.pop("pending_workspace_section", None)
+        state["last_action"] = {"level": "info", "message": f"{origin} handoff -> System."}
+        st.rerun()
     else:
         return False
     return True
+
+
+def _workspace_problem_guidance_action_buttons(recommended_sections: list[str] | None) -> list[dict]:
+    section_to_action = {
+        "Setup": {"label": "Open Setup", "action": "open_setup"},
+        "Review": {"label": "Open Review", "action": "open_review"},
+        "Decisions": {"label": "Open Decisions", "action": "open_decisions"},
+        "Output": {"label": "Open Output", "action": "open_output"},
+        "Catalog": {"label": "Open Catalog", "action": "open_catalog"},
+        "Governance": {"label": "Open Governance", "action": "open_governance"},
+        "Benchmarks": {"label": "Open Benchmarks", "action": "open_benchmarks"},
+        "System": {"label": "Open System", "action": "open_system"},
+    }
+    buttons: list[dict] = []
+    for section in list(dict.fromkeys(recommended_sections or []))[:2]:
+        action = section_to_action.get(str(section).strip())
+        if action:
+            buttons.append(action)
+    return buttons
+
+
+def _workspace_copilot_apply_problem_example(example_text: str, session_state: dict | None = None) -> str:
+    """Prefill the problem statement text area from one curated example."""
+
+    state = st.session_state if session_state is None else session_state
+    normalized = str(example_text or "").strip()
+    if normalized:
+        state["workspace_copilot_problem_statement_input"] = normalized
+    return normalized
+
+
+def _workspace_copilot_problem_example_options() -> tuple[object, ...]:
+    """Return selectbox options for curated problem-statement examples."""
+
+    return (WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER, *WORKSPACE_COPILOT_PROBLEM_EXAMPLES)
+
+
+def _workspace_copilot_problem_example_label(option: object) -> str:
+    """Return a human-readable label for one problem example option."""
+
+    if isinstance(option, tuple) and len(option) == 3:
+        group_name = str(option[0] or "").strip()
+        example_name = str(option[1] or "").strip()
+        if group_name and example_name:
+            return f"{group_name}: {example_name}"
+        return example_name or WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER
+    return WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER
+
+
+def _workspace_copilot_apply_selected_problem_example(selection_key: str, session_state: dict | None = None) -> str:
+    """Mirror the selected problem example into the problem statement text area."""
+
+    state = st.session_state if session_state is None else session_state
+    selection = state.get(selection_key)
+    if isinstance(selection, tuple) and len(selection) == 3:
+        return _workspace_copilot_apply_problem_example(str(selection[2] or ""), state)
+    return ""
 
 
 def render_status_badge_legend(*, title: str = "Decision Status Legend", compact: bool = False) -> None:
@@ -621,6 +814,96 @@ def _workspace_artifact_summary(state: dict) -> dict:
     }
 
 
+def _workspace_transformation_design_has_content(spec: dict | None) -> bool:
+    current_spec = spec if isinstance(spec, dict) else {}
+    if any(str(current_spec.get(key) or "").strip() for key in ("target_grain", "global_rules", "defaults", "examples")):
+        return True
+    return any(str((item or {}).get("rule") or "").strip() for item in (current_spec.get("field_rules") or []))
+
+
+def _workspace_transformation_design_summary(spec: dict | None) -> dict:
+    current_spec = spec if isinstance(spec, dict) else {}
+    target_fields = [str(item).strip() for item in (current_spec.get("target_fields") or []) if str(item).strip()]
+    target_grain = str(current_spec.get("target_grain") or "").strip()
+    global_rules = str(current_spec.get("global_rules") or "").strip()
+    defaults = str(current_spec.get("defaults") or "").strip()
+    described_lookup = {
+        str((item or {}).get("target_field") or "").strip()
+        for item in (current_spec.get("field_rules") or [])
+        if str((item or {}).get("target_field") or "").strip() and str((item or {}).get("rule") or "").strip()
+    }
+    missing_fields = [target_field for target_field in target_fields if target_field not in described_lookup]
+    if not target_fields:
+        return {
+            "state": "invalid",
+            "title": "No active target fields",
+            "message": "Add at least one active mapping decision before drafting a transformation spec.",
+            "target_count": 0,
+            "described_count": 0,
+            "missing_fields": [],
+        }
+    if not target_grain:
+        return {
+            "state": "incomplete",
+            "title": "Missing target grain",
+            "message": "Describe the target grain before using this transformation design as a governed output contract.",
+            "target_count": len(target_fields),
+            "described_count": len(described_lookup),
+            "missing_fields": missing_fields,
+        }
+    if not described_lookup and not global_rules and not defaults:
+        return {
+            "state": "incomplete",
+            "title": "Add transformation rules",
+            "message": "Define at least one field rule, global rule, or default behavior before this spec is ready.",
+            "target_count": len(target_fields),
+            "described_count": 0,
+            "missing_fields": missing_fields,
+        }
+    if missing_fields and not defaults:
+        return {
+            "state": "incomplete",
+            "title": "Field coverage is incomplete",
+            "message": "Add explicit rules for the remaining target fields or define default behavior.",
+            "target_count": len(target_fields),
+            "described_count": len(described_lookup),
+            "missing_fields": missing_fields,
+        }
+    return {
+        "state": "ready",
+        "title": "Ready for next output step",
+        "message": (
+            f"Structured spec covers {len(described_lookup)} of {len(target_fields)} target field(s)"
+            + (" with explicit defaults for the rest." if missing_fields else ".")
+        ),
+        "target_count": len(target_fields),
+        "described_count": len(described_lookup),
+        "missing_fields": missing_fields,
+    }
+
+
+def _workspace_transformation_design_context(state: dict) -> dict:
+    codegen_summary = ((state.get("codegen_response") or {}).get("transformation_spec_summary") or {})
+    preview_summary = ((state.get("preview_response") or {}).get("transformation_spec_summary") or {})
+    session_summary = state.get("workspace_transformation_spec_summary") or {}
+    current_spec = state.get("workspace_transformation_spec") or {}
+    proposal = state.get("workspace_transformation_spec_proposal") or {}
+    proposal_summary = proposal.get("summary") if isinstance(proposal, dict) else {}
+    proposal_spec = proposal.get("transformation_spec") if isinstance(proposal, dict) else {}
+
+    engaged = bool(codegen_summary or preview_summary) or _workspace_transformation_design_has_content(current_spec)
+    summary = codegen_summary or preview_summary or session_summary
+    if engaged and not summary:
+        summary = _workspace_transformation_design_summary(current_spec)
+
+    return {
+        "engaged": engaged,
+        "summary": summary if isinstance(summary, dict) else {},
+        "proposal_pending": bool(proposal_spec),
+        "proposal_summary": proposal_summary if isinstance(proposal_summary, dict) else {},
+    }
+
+
 def _workspace_review_decision_closure_response(state: dict) -> dict:
     context = workspace_copilot_sidebar_context(state)
     if not context["mapping_ready"]:
@@ -695,44 +978,78 @@ def _workspace_output_readiness_response(state: dict) -> dict:
     pending_proposals = int(context.get("pending_proposals") or 0)
     block_reason = _workspace_output_block_reason(state)
     artifact_summary = _workspace_artifact_summary(state)
+    transformation_design = _workspace_transformation_design_context(state)
+    transformation_summary = transformation_design["summary"]
+    transformation_state = str(transformation_summary.get("state") or "").strip()
+    transformation_title = str(transformation_summary.get("title") or "").strip()
+    transformation_message = str(transformation_summary.get("message") or "").strip()
 
     if block_reason:
         why_parts = [block_reason, f"Open review items: {open_review_items}."]
         if pending_proposals:
             why_parts.append(f"Pending proposals: {pending_proposals}.")
+        if transformation_design["engaged"] and transformation_title:
+            why_parts.append(f"Transformation Design: {transformation_title}. {transformation_message}")
+        if transformation_design["proposal_pending"]:
+            proposal_title = str((transformation_design["proposal_summary"] or {}).get("title") or "Review proposal").strip()
+            why_parts.append(f"Pending Transformation Design proposal: {proposal_title}.")
         if artifact_summary["has_artifact"]:
             why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+        next_actions = ["Close or accept the remaining review statuses."]
+        if pending_proposals:
+            next_actions.append("Resolve pending proposals before relying on code generation.")
+        else:
+            next_actions.append("Re-check Decisions after the remaining review rows are closed.")
+        if transformation_design["proposal_pending"]:
+            next_actions.append("After governance blockers clear, review and apply or discard the pending Transformation Design proposal.")
+        elif transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}:
+            next_actions.append(f"After governance blockers clear, complete Transformation Design: {transformation_message}")
         return _copilot_response(
             level="warning",
             kind="output-readiness",
             answer="Workspace is not ready for governed Output yet.",
             why=" ".join(why_parts),
-            next_actions=[
-                "Close or accept the remaining review statuses.",
-                "Resolve pending proposals before relying on code generation." if pending_proposals else "Re-check Decisions after the remaining review rows are closed.",
-            ],
+            next_actions=next_actions,
             action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}, {"label": "Open Review", "action": "open_review"}],
         )
 
+    drift_reasons: list[str] = []
+    drift_actions: list[str] = []
     if pending_proposals:
-        why_parts = [
-            "Code generation is technically unblocked, but pending proposals can still change the decision surface.",
-        ]
+        drift_reasons.append("Code generation is technically unblocked, but pending Decisions proposals can still change the decision surface.")
+        drift_actions.append(f"Resolve the remaining {pending_proposals} proposal(s) before treating output as final.")
+    if transformation_design["proposal_pending"]:
+        drift_reasons.append("Transformation Design still has a pending structured spec proposal that has not been applied or discarded.")
+        drift_actions.append("Review and apply or discard the pending Transformation Design proposal before treating Output as stable.")
+    elif transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}:
+        drift_reasons.append(f"Transformation Design is not stable yet: {transformation_title}. {transformation_message}")
+        drift_actions.append(f"Complete Transformation Design before treating Output as final: {transformation_message}")
+
+    if drift_reasons:
+        why_parts = drift_reasons
         if artifact_summary["has_artifact"]:
             why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+        next_actions = [*drift_actions, "Then open Output and generate or verify the target artifact."]
+        action_buttons = [{"label": "Open Output", "action": "open_output"}]
+        if pending_proposals:
+            action_buttons.insert(0, {"label": "Open Decisions", "action": "open_decisions"})
+        answer = "Output is technically ready, but the workspace still carries drift before finalization."
+        if transformation_design["proposal_pending"] and not pending_proposals:
+            answer = "Output is technically ready, but Transformation Design still has a pending proposal."
+        elif transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"} and not pending_proposals:
+            answer = "Output is technically ready, but Transformation Design is incomplete."
         return _copilot_response(
             level="warning",
             kind="output-readiness",
-            answer="Output is technically ready, but Decisions still carries proposal drift.",
+            answer=answer,
             why=" ".join(why_parts),
-            next_actions=[
-                f"Resolve the remaining {pending_proposals} proposal(s) before treating output as final.",
-                "Then open Output and generate or verify the target artifact.",
-            ],
-            action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}, {"label": "Open Output", "action": "open_output"}],
+            next_actions=next_actions,
+            action_buttons=action_buttons,
         )
 
     why_parts = ["All active mapping decisions are in a codegen-compatible state."]
+    if transformation_design["engaged"] and transformation_state == "ready":
+        why_parts.append(f"Transformation Design: {transformation_message}")
     if artifact_summary["has_artifact"]:
         why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
     return _copilot_response(
@@ -762,14 +1079,28 @@ def _workspace_output_explanation_response(state: dict) -> dict:
     priority_rows = _workspace_review_priority_rows(state, limit=2)
     current_warning_details = list(artifact_summary.get("warning_details") or [])
     refinement_warning_details = list(artifact_summary.get("refinement_warning_details") or [])
+    transformation_design = _workspace_transformation_design_context(state)
+    transformation_summary = transformation_design["summary"]
+    transformation_state = str(transformation_summary.get("state") or "").strip()
+    transformation_title = str(transformation_summary.get("title") or "").strip()
+    transformation_message = str(transformation_summary.get("message") or "").strip()
 
     if block_reason:
         why_parts = ["Output gating follows active review status governance."]
         if priority_rows:
             why_parts.append(f"Current blockers: {'; '.join(_workspace_review_row_detail(row) for row in priority_rows)}")
+        if transformation_design["engaged"] and transformation_title:
+            why_parts.append(f"Transformation Design: {transformation_title}. {transformation_message}")
+        if transformation_design["proposal_pending"]:
+            proposal_title = str((transformation_design["proposal_summary"] or {}).get("title") or "Review proposal").strip()
+            why_parts.append(f"Pending Transformation Design proposal: {proposal_title}.")
         if artifact_summary["has_artifact"]:
             why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
         next_actions = ["Close the current review and decision blockers before trusting governed code generation."]
+        if transformation_design["proposal_pending"]:
+            next_actions.append("Then review and apply or discard the pending Transformation Design proposal.")
+        elif transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}:
+            next_actions.append(f"Then complete Transformation Design: {transformation_message}")
         if current_warning_details:
             next_actions.append(f"After gating clears, start with {current_warning_details[0]}.")
         return _copilot_response(
@@ -783,6 +1114,24 @@ def _workspace_output_explanation_response(state: dict) -> dict:
         )
 
     if not artifact_summary["has_artifact"]:
+        if transformation_design["proposal_pending"] or (transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}):
+            why_parts = ["There is no generated artifact yet, so Transformation Design drift is the main Output priority right now."]
+            next_actions: list[str] = []
+            if transformation_design["proposal_pending"]:
+                why_parts.append("A pending structured spec proposal still needs a review decision.")
+                next_actions.append("Review and apply or discard the pending Transformation Design proposal.")
+            if transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}:
+                why_parts.append(f"Current Transformation Design status: {transformation_title}. {transformation_message}")
+                next_actions.append(f"Complete Transformation Design before generating the first artifact: {transformation_message}")
+            next_actions.append("Then generate preview or code so warning prioritization can use a concrete artifact.")
+            return _copilot_response(
+                level="warning",
+                kind="output-explanation",
+                answer="Output is unblocked, but Transformation Design needs attention before the first artifact.",
+                why=" ".join(why_parts),
+                next_actions=next_actions,
+                action_buttons=[{"label": "Open Output", "action": "open_output"}],
+            )
         return _copilot_response(
             level="info",
             kind="output-explanation",
@@ -797,21 +1146,44 @@ def _workspace_output_explanation_response(state: dict) -> dict:
         why_parts.append(
             f"Pending refinement candidate: {artifact_summary['refinement_reasoning_count']} reasoning note(s), {artifact_summary['refinement_warning_count']} warning(s)."
         )
+    if transformation_design["engaged"] and transformation_state == "ready":
+        why_parts.append(f"Transformation Design: {transformation_message}")
+    if transformation_design["proposal_pending"]:
+        why_parts.append("A pending Transformation Design proposal can still change how the output should be interpreted.")
 
     next_actions: list[str] = []
+    priority_index = 1
+    if transformation_design["proposal_pending"]:
+        next_actions.append(
+            f"Priority {priority_index}: Transformation Design proposal -> review and apply or discard the pending structured spec proposal."
+        )
+        priority_index += 1
+    elif transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}:
+        next_actions.append(
+            f"Priority {priority_index}: Transformation Design -> {transformation_title}: {transformation_message}"
+        )
+        priority_index += 1
+
     if current_warning_details or refinement_warning_details:
         current_priority = current_warning_details[:3]
         refinement_priority = refinement_warning_details[:2]
-        for idx, detail in enumerate(current_priority, start=1):
+        for idx, detail in enumerate(current_priority, start=priority_index):
             next_actions.append(f"Priority {idx}: current artifact -> {detail}")
-        offset = len(current_priority)
+        offset = priority_index + len(current_priority) - 1
         for idx, detail in enumerate(refinement_priority, start=offset + 1):
             next_actions.append(f"Priority {idx}: refinement candidate -> {detail}")
         next_actions.append("After reviewing those warnings, explicitly accept or discard the refinement candidate.")
-        answer = "Output is unblocked. Prioritize current artifact warnings before refinement-only warnings."
+        if transformation_design["proposal_pending"] or (transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}):
+            answer = "Output is unblocked. Resolve Transformation Design drift before artifact warnings."
+        else:
+            answer = "Output is unblocked. Prioritize current artifact warnings before refinement-only warnings."
     else:
-        next_actions = ["There are no reported warnings right now; use refinement only for deliberate polish or edge-case hardening."]
-        answer = "Output is unblocked and the current artifact has no reported warnings to prioritize."
+        if transformation_design["proposal_pending"] or (transformation_design["engaged"] and transformation_state in {"invalid", "incomplete"}):
+            next_actions.append("After that, re-check preview or code generation to confirm the artifact still matches the finalized design.")
+            answer = "Output is unblocked, but Transformation Design still needs attention before the artifact should be treated as final."
+        else:
+            next_actions = ["There are no reported warnings right now; use refinement only for deliberate polish or edge-case hardening."]
+            answer = "Output is unblocked and the current artifact has no reported warnings to prioritize."
 
     return _copilot_response(
         level="info",
@@ -1344,6 +1716,72 @@ def submit_workspace_copilot_chat_question(
     return response
 
 
+def submit_workspace_copilot_problem_statement(
+    problem_statement: str,
+    session_state: dict | None = None,
+    *,
+    request_workspace_problem_guidance_func=request_workspace_problem_guidance,
+) -> dict:
+    """Resolve one bounded problem statement into app-aware next actions and append it to sidebar history."""
+
+    state = st.session_state if session_state is None else session_state
+    normalized_problem = str(problem_statement or "").strip()
+    if not normalized_problem:
+        return _copilot_response(
+            level="info",
+            kind="problem-guidance-empty",
+            answer="Enter a problem statement before asking for an action plan.",
+            why="Use the suggested format so Copilot can map the request to Semantra capabilities.",
+            artifacts={"prompt_template": WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE},
+        )
+
+    try:
+        guidance = request_workspace_problem_guidance_func(normalized_problem)
+    except Exception as error:
+        response = _copilot_response(
+            level="warning",
+            kind="problem-guidance-error",
+            answer="Problem-statement guidance is unavailable right now.",
+            why=str(error),
+            next_actions=["Retry after checking runtime availability or restate the request using the suggested format."],
+            artifacts={"prompt_template": WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE},
+        )
+    else:
+        disposition = str(guidance.get("disposition") or "partial").strip().lower() or "partial"
+        recommended_steps = [str(item).strip() for item in (guidance.get("recommended_steps") or []) if str(item).strip()]
+        capability_hits = [str(item).strip() for item in (guidance.get("capability_hits") or []) if str(item).strip()]
+        recommended_sections = [str(item).strip() for item in (guidance.get("recommended_sections") or []) if str(item).strip()]
+        response = _copilot_response(
+            level="success" if disposition == "in_scope" else "warning" if disposition == "partial" else "info",
+            kind="problem-guidance",
+            answer=str(guidance.get("answer") or "").strip() or "Generated a bounded workspace action plan.",
+            why=str(guidance.get("scope_reason") or "").strip(),
+            next_actions=recommended_steps,
+            action_buttons=_workspace_problem_guidance_action_buttons(recommended_sections),
+            artifacts={
+                "capability_hits": capability_hits,
+                "prompt_template": str(guidance.get("prompt_template") or WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE).strip(),
+                "input_format_fields": [
+                    str(item).strip() for item in (guidance.get("input_format_fields") or []) if str(item).strip()
+                ],
+            },
+        )
+
+    history = list(state.get("workspace_copilot_chat_history") or [])
+    history.append(
+        {
+            "question": normalized_problem,
+            "answer": str(response.get("answer") or "").strip(),
+            "why": str(response.get("why") or "").strip(),
+            "level": str(response.get("level") or "info").strip(),
+            "kind": str(response.get("kind") or "info").strip(),
+        }
+    )
+    state["workspace_copilot_chat_history"] = history[-6:]
+    state["workspace_copilot_chat_last_response"] = response
+    return response
+
+
 def workspace_copilot_sidebar_context(session_state: dict | None = None) -> dict:
     """Return a compact, read-only Workspace Copilot context snapshot for sidebar rendering."""
 
@@ -1507,6 +1945,34 @@ def render_workspace_copilot_sidebar_context(session_state: dict | None = None) 
         _workspace_copilot_queue_widget_reset(quick_ask_key, state)
         st.rerun()
 
+    st.caption("Problem statement")
+    st.caption("Use a short structured brief when you want Copilot to turn a business or process problem into concrete in-app actions.")
+    problem_example_key = "workspace_copilot_problem_example_selection"
+    if problem_example_key not in state:
+        state[problem_example_key] = WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER
+    st.selectbox(
+        "Example prompts",
+        _workspace_copilot_problem_example_options(),
+        key=problem_example_key,
+        format_func=_workspace_copilot_problem_example_label,
+        on_change=_workspace_copilot_apply_selected_problem_example,
+        args=(problem_example_key,),
+    )
+    with st.expander("Show suggested format", expanded=False):
+        st.caption("Use this structure when you want the most precise in-app plan.")
+        st.code(WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE, language="text")
+    with st.form("workspace_copilot_problem_form", clear_on_submit=True):
+        problem_statement = st.text_area(
+            "Describe the problem you want to solve in Semantra",
+            key="workspace_copilot_problem_statement_input",
+            placeholder="Goal: Build a customer-ready output from a messy source export...",
+            height=140,
+        )
+        problem_submitted = st.form_submit_button("Plan actions")
+    if problem_submitted and str(problem_statement or "").strip():
+        submit_workspace_copilot_problem_statement(problem_statement, state)
+        st.rerun()
+
     response = state.get("workspace_copilot_chat_last_response") or {}
     if response:
         st.divider()
@@ -1516,6 +1982,7 @@ def render_workspace_copilot_sidebar_context(session_state: dict | None = None) 
         why = str(response.get("why") or "").strip()
         next_actions = [str(item).strip() for item in (response.get("next_actions") or []) if str(item).strip()]
         action_buttons = [item for item in (response.get("action_buttons") or []) if isinstance(item, dict)]
+        artifacts = response.get("artifacts") or {}
 
         if level == "error":
             st.error(answer)
@@ -1533,6 +2000,18 @@ def render_workspace_copilot_sidebar_context(session_state: dict | None = None) 
             st.caption("Next actions")
             for item in next_actions:
                 st.write(f"- {item}")
+        capability_hits = [str(item).strip() for item in (artifacts.get("capability_hits") or []) if str(item).strip()]
+        if capability_hits:
+            st.caption("Matched capabilities")
+            st.write(", ".join(capability_hits))
+        prompt_template = str(artifacts.get("prompt_template") or "").strip()
+        if prompt_template:
+            st.caption("Suggested format")
+            st.code(prompt_template, language="text")
+        input_format_fields = [str(item).strip() for item in (artifacts.get("input_format_fields") or []) if str(item).strip()]
+        if input_format_fields:
+            st.caption("Expected fields")
+            st.write(", ".join(input_format_fields))
 
         if action_buttons:
             st.caption("Actions")

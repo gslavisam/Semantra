@@ -116,6 +116,133 @@ def _current_review_state() -> dict:
     }
 
 
+def _workspace_transformation_spec_has_content(spec: dict | None) -> bool:
+    current_spec = spec if isinstance(spec, dict) else {}
+    if any(str(current_spec.get(key) or "").strip() for key in ("target_grain", "global_rules", "defaults", "examples")):
+        return True
+    return any(str((item or {}).get("rule") or "").strip() for item in (current_spec.get("field_rules") or []))
+
+
+def _workspace_transformation_spec_summary(spec: dict | None) -> dict:
+    current_spec = spec if isinstance(spec, dict) else {}
+    target_fields = [str(item).strip() for item in (current_spec.get("target_fields") or []) if str(item).strip()]
+    target_grain = str(current_spec.get("target_grain") or "").strip()
+    global_rules = str(current_spec.get("global_rules") or "").strip()
+    defaults = str(current_spec.get("defaults") or "").strip()
+    described_lookup = {
+        str((item or {}).get("target_field") or "").strip()
+        for item in (current_spec.get("field_rules") or [])
+        if str((item or {}).get("target_field") or "").strip() and str((item or {}).get("rule") or "").strip()
+    }
+    missing_fields = [target_field for target_field in target_fields if target_field not in described_lookup]
+
+    if not target_fields:
+        return {
+            "state": "invalid",
+            "title": "No active target fields",
+            "message": "Add at least one active mapping decision before drafting a transformation spec.",
+            "missing_fields": [],
+            "described_count": 0,
+            "target_count": 0,
+        }
+    if not target_grain:
+        return {
+            "state": "incomplete",
+            "title": "Missing target grain",
+            "message": "Describe the target grain before using this transformation design as a governed output contract.",
+            "missing_fields": missing_fields,
+            "described_count": len(described_lookup),
+            "target_count": len(target_fields),
+        }
+    if not described_lookup and not global_rules and not defaults:
+        return {
+            "state": "incomplete",
+            "title": "Add transformation rules",
+            "message": "Define at least one field rule, global rule, or default behavior before this spec is ready.",
+            "missing_fields": missing_fields,
+            "described_count": 0,
+            "target_count": len(target_fields),
+        }
+    if missing_fields and not defaults:
+        return {
+            "state": "incomplete",
+            "title": "Field coverage is incomplete",
+            "message": "Add explicit rules for the remaining target fields or define default behavior.",
+            "missing_fields": missing_fields,
+            "described_count": len(described_lookup),
+            "target_count": len(target_fields),
+        }
+    return {
+        "state": "ready",
+        "title": "Ready for next output step",
+        "message": (
+            f"Structured spec covers {len(described_lookup)} of {len(target_fields)} target field(s)"
+            + (" with explicit defaults for the rest." if missing_fields else ".")
+        ),
+        "missing_fields": missing_fields,
+        "described_count": len(described_lookup),
+        "target_count": len(target_fields),
+    }
+
+
+def _draft_session_resume_transformation_message(draft_session_detail: dict) -> str:
+    transformation_spec = dict(draft_session_detail.get("transformation_spec") or {})
+    if not _workspace_transformation_spec_has_content(transformation_spec):
+        return ""
+    summary = _workspace_transformation_spec_summary(transformation_spec)
+    title = str(summary.get("title") or "Transformation Design restored").strip()
+    message = str(summary.get("message") or "").strip()
+    return f" Transformation Design restored: {title}. {message}".rstrip()
+
+
+def _serialized_workspace_transformation_spec() -> dict:
+    current_spec = st.session_state.get("workspace_transformation_spec") or {}
+    if not isinstance(current_spec, dict) or not _workspace_transformation_spec_has_content(current_spec):
+        return {}
+    return {
+        "target_grain": str(current_spec.get("target_grain") or "").strip(),
+        "global_rules": str(current_spec.get("global_rules") or "").strip(),
+        "defaults": str(current_spec.get("defaults") or "").strip(),
+        "examples": str(current_spec.get("examples") or "").strip(),
+        "target_fields": [
+            str(item).strip()
+            for item in (current_spec.get("target_fields") or [])
+            if str(item).strip()
+        ],
+        "field_rules": [
+            {
+                "target_field": str((item or {}).get("target_field") or "").strip(),
+                "rule": str((item or {}).get("rule") or "").strip(),
+            }
+            for item in (current_spec.get("field_rules") or [])
+            if str((item or {}).get("target_field") or "").strip() and str((item or {}).get("rule") or "").strip()
+        ],
+    }
+
+
+def _apply_draft_session_transformation_spec(draft_session_detail: dict) -> None:
+    transformation_spec = dict(draft_session_detail.get("transformation_spec") or {})
+    if not _workspace_transformation_spec_has_content(transformation_spec):
+        return
+
+    st.session_state["workspace_transformation_target_grain"] = str(transformation_spec.get("target_grain") or "").strip()
+    st.session_state["workspace_transformation_global_rules"] = str(transformation_spec.get("global_rules") or "").strip()
+    st.session_state["workspace_transformation_defaults"] = str(transformation_spec.get("defaults") or "").strip()
+    st.session_state["workspace_transformation_examples"] = str(transformation_spec.get("examples") or "").strip()
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("workspace_transformation_rule::"):
+            st.session_state.pop(key, None)
+    for item in transformation_spec.get("field_rules") or []:
+        target_field = str((item or {}).get("target_field") or "").strip()
+        rule = str((item or {}).get("rule") or "").strip()
+        if target_field and rule:
+            st.session_state[f"workspace_transformation_rule::{target_field}"] = rule
+    st.session_state["workspace_transformation_spec"] = transformation_spec
+    summary = _workspace_transformation_spec_summary(transformation_spec)
+    st.session_state["workspace_transformation_spec_status"] = str(summary.get("state") or "").strip()
+    st.session_state["workspace_transformation_spec_summary"] = summary
+
+
 def _workspace_target_context_for_save(upload_response: dict, mapping_response: dict, mapping_mode: str) -> dict:
     runtime = dict(mapping_response.get("mapping_runtime") or {})
     target_system = str(upload_response.get("target_system") or runtime.get("target_system") or "").strip().lower() or None
@@ -305,6 +432,7 @@ def _build_draft_session_request_payload(name: str) -> dict:
         "mapping_runtime": dict(mapping_response.get("mapping_runtime") or {}),
         "mapping_editor_state": _serialized_mapping_editor_state(),
         "mapping_decision_audit": _decision_audit_map(),
+        "transformation_spec": _serialized_workspace_transformation_spec(),
     }
 
 
@@ -428,8 +556,20 @@ def _reset_draft_session_transient_outputs() -> None:
         "canonical_gap_triage_summary",
         "canonical_gap_triage_error",
         "llm_decision_proposals",
+        "workspace_transformation_target_grain",
+        "workspace_transformation_global_rules",
+        "workspace_transformation_defaults",
+        "workspace_transformation_examples",
+        "workspace_transformation_proposal_instruction",
+        "workspace_transformation_spec_proposal",
+        "workspace_transformation_spec",
+        "workspace_transformation_spec_status",
+        "workspace_transformation_spec_summary",
     ):
         st.session_state.pop(key, None)
+    for key in list(st.session_state.keys()):
+        if str(key).startswith("workspace_transformation_rule::"):
+            st.session_state.pop(key, None)
 
 
 def _apply_draft_session_review_state(draft_session_detail: dict) -> None:
@@ -478,6 +618,7 @@ def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
     st.session_state["pending_top_level_area"] = "Workspace"
     st.session_state["pending_workspace_section"] = restore_section
     _reset_draft_session_transient_outputs()
+    _apply_draft_session_transformation_spec(draft_session_detail)
     return restore_section
 
 
@@ -513,6 +654,7 @@ def _build_draft_session_decision_state_payload() -> dict:
         "active_workspace_section": "Decisions",
         "mapping_editor_state": _serialized_mapping_editor_state(),
         "mapping_decision_audit": _decision_audit_map(),
+        "transformation_spec": _serialized_workspace_transformation_spec(),
     }
 
 
@@ -1349,6 +1491,7 @@ def render_mapping_set_versions_panel(
                         "message": (
                             f"Resumed draft session '{draft_session_detail['name']}' "
                             f"into Workspace {restored_section}."
+                            f"{_draft_session_resume_transformation_message(draft_session_detail)}"
                         ),
                     }
                     st.rerun()

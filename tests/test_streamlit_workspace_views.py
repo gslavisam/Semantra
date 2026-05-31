@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from streamlit_ui.workspace_views import (
     WORKSPACE_COPILOT_ACTIONS,
     WORKSPACE_SECTIONS,
+    _workspace_build_transformation_spec,
+    _workspace_apply_transformation_spec_to_state,
     _workspace_copilot_chat_result,
     _workspace_copilot_context,
     _workspace_copilot_decisions_result,
@@ -27,7 +29,12 @@ from streamlit_ui.workspace_views import (
     _workspace_llm_refinement_enabled,
     _workspace_output_section_label,
     _workspace_preview_advisory_message,
+    _workspace_ready_transformation_spec,
     _workspace_refinement_source_response,
+    _workspace_reset_transformation_design_state,
+    _workspace_transformation_summary_caption,
+    _workspace_transformation_spec_status,
+    _workspace_transformation_target_fields,
     companion_enrichment_message,
     render_workspace_tab,
     resolve_active_workspace_section,
@@ -103,6 +110,163 @@ def test_workspace_codegen_helpers_support_dbt_labels() -> None:
 def test_workspace_output_section_label_appends_detail_only_when_present() -> None:
     assert _workspace_output_section_label("Preview Result", "12 rows") == "Preview Result · 12 rows"
     assert _workspace_output_section_label("Generated Pandas Code", "") == "Generated Pandas Code"
+
+
+def test_workspace_transformation_target_fields_preserve_order_without_duplicates() -> None:
+    assert _workspace_transformation_target_fields(
+        [
+            {"source": "cust_id", "target": "customer_id"},
+            {"source": "name", "target": "customer_name"},
+            {"source": "customer_code", "target": "customer_id"},
+            {"source": "ignored", "target": "   "},
+        ]
+    ) == ["customer_id", "customer_name"]
+
+
+def test_workspace_build_transformation_spec_reads_active_target_rules_only() -> None:
+    spec = _workspace_build_transformation_spec(
+        [{"target": "customer_id"}, {"target": "customer_name"}],
+        {
+            "workspace_transformation_target_grain": "One row per customer",
+            "workspace_transformation_global_rules": "Deduplicate by customer_id.",
+            "workspace_transformation_defaults": "Trim whitespace.",
+            "workspace_transformation_examples": "N/A -> null",
+            "workspace_transformation_rule::customer_id": "Cast source code to string.",
+            "workspace_transformation_rule::customer_name": "Join first_name and last_name.",
+            "workspace_transformation_rule::stale": "ignore",
+        },
+    )
+
+    assert spec == {
+        "target_grain": "One row per customer",
+        "global_rules": "Deduplicate by customer_id.",
+        "defaults": "Trim whitespace.",
+        "examples": "N/A -> null",
+        "target_fields": ["customer_id", "customer_name"],
+        "field_rules": [
+            {"target_field": "customer_id", "rule": "Cast source code to string."},
+            {"target_field": "customer_name", "rule": "Join first_name and last_name."},
+        ],
+    }
+
+
+def test_workspace_ready_transformation_spec_returns_none_until_ready() -> None:
+    session_state = {
+        "workspace_transformation_target_grain": "",
+        "workspace_transformation_defaults": "",
+        "workspace_transformation_global_rules": "",
+        "workspace_transformation_rule::customer_id": "Cast KUNNR to string.",
+    }
+
+    assert _workspace_ready_transformation_spec([{"target": "customer_id"}], session_state) is None
+
+
+def test_workspace_ready_transformation_spec_returns_spec_when_ready() -> None:
+    session_state = {
+        "workspace_transformation_target_grain": "One row per customer",
+        "workspace_transformation_defaults": "Keep unmatched optional fields as null.",
+        "workspace_transformation_global_rules": "",
+        "workspace_transformation_examples": "",
+        "workspace_transformation_rule::customer_id": "Cast KUNNR to string.",
+    }
+
+    assert _workspace_ready_transformation_spec(
+        [{"target": "customer_id"}, {"target": "country_code"}],
+        session_state,
+    ) == {
+        "target_grain": "One row per customer",
+        "global_rules": "",
+        "defaults": "Keep unmatched optional fields as null.",
+        "examples": "",
+        "target_fields": ["customer_id", "country_code"],
+        "field_rules": [{"target_field": "customer_id", "rule": "Cast KUNNR to string."}],
+    }
+
+
+def test_workspace_transformation_spec_status_requires_target_grain() -> None:
+    status = _workspace_transformation_spec_status(
+        {
+            "target_grain": "",
+            "global_rules": "Normalize country codes.",
+            "defaults": "",
+            "target_fields": ["country_code"],
+            "field_rules": [{"target_field": "country_code", "rule": "Map SAP land1 to ISO alpha-2."}],
+        }
+    )
+
+    assert status["state"] == "incomplete"
+    assert status["title"] == "Missing target grain"
+
+
+def test_workspace_transformation_spec_status_uses_defaults_for_remaining_fields() -> None:
+    status = _workspace_transformation_spec_status(
+        {
+            "target_grain": "One row per customer",
+            "global_rules": "",
+            "defaults": "Keep unmatched optional attributes as null.",
+            "target_fields": ["customer_id", "country_code"],
+            "field_rules": [{"target_field": "customer_id", "rule": "Cast KUNNR to string."}],
+        }
+    )
+
+    assert status["state"] == "ready"
+    assert status["missing_fields"] == ["country_code"]
+
+
+def test_workspace_reset_transformation_design_state_clears_widget_and_snapshot_keys() -> None:
+    session_state = {
+        "workspace_transformation_target_grain": "One row per customer",
+        "workspace_transformation_global_rules": "Normalize country codes.",
+        "workspace_transformation_defaults": "Trim whitespace.",
+        "workspace_transformation_examples": "N/A -> null",
+        "workspace_transformation_proposal_instruction": "Propose customer mastering rules.",
+        "workspace_transformation_spec_proposal": {"summary": {"state": "ready"}},
+        "workspace_transformation_rule::customer_id": "Cast code to string.",
+        "workspace_transformation_spec": {"target_grain": "One row per customer"},
+        "workspace_transformation_spec_status": "ready",
+        "other_key": 1,
+    }
+
+    _workspace_reset_transformation_design_state(session_state)
+
+    assert session_state == {"other_key": 1}
+
+
+def test_workspace_apply_transformation_spec_to_state_replaces_existing_rules() -> None:
+    session_state = {
+        "workspace_transformation_rule::stale": "old",
+        "workspace_transformation_rule::customer_id": "old id",
+    }
+
+    _workspace_apply_transformation_spec_to_state(
+        session_state,
+        {
+            "target_grain": "One row per customer",
+            "global_rules": "Deduplicate by customer_id.",
+            "defaults": "Trim whitespace.",
+            "examples": "N/A -> null",
+            "target_fields": ["customer_id", "customer_name"],
+            "field_rules": [
+                {"target_field": "customer_id", "rule": "Cast KUNNR to string."},
+                {"target_field": "customer_name", "rule": "Join first_name and last_name."},
+            ],
+        },
+    )
+
+    assert session_state == {
+        "workspace_transformation_target_grain": "One row per customer",
+        "workspace_transformation_global_rules": "Deduplicate by customer_id.",
+        "workspace_transformation_defaults": "Trim whitespace.",
+        "workspace_transformation_examples": "N/A -> null",
+        "workspace_transformation_rule::customer_id": "Cast KUNNR to string.",
+        "workspace_transformation_rule::customer_name": "Join first_name and last_name.",
+    }
+
+
+def test_workspace_transformation_summary_caption_compacts_backend_summary() -> None:
+    assert _workspace_transformation_summary_caption(
+        {"state": "ready", "described_count": 1, "target_count": 2, "missing_fields": ["country_code"]}
+    ) == "Spec state: ready | described fields: 1/2 | missing: country_code"
 
 
 def test_workspace_llm_refinement_enabled_requires_reachable_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -365,10 +529,10 @@ def test_workspace_copilot_execute_action_button_applies_safe_proposals(monkeypa
     assert session_state["last_action"]["message"] == "Applied 1 safe LLM proposal(s): cust_id."
 
 
-def test_render_workspace_tab_renders_copilot_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_workspace_tab_renders_section_content_without_copilot_shell(monkeypatch: pytest.MonkeyPatch) -> None:
     from streamlit_ui import workspace_views
 
-    rendered = {"shell": 0, "content": 0}
+    rendered = {"content": 0}
     fake_streamlit = SimpleNamespace(
         session_state={},
         radio=lambda *args, **kwargs: "Review",
@@ -376,11 +540,6 @@ def test_render_workspace_tab_renders_copilot_shell(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(workspace_views, "st", fake_streamlit)
     monkeypatch.setattr(workspace_views, "resolve_active_workspace_section", lambda session_state: "Review")
-    monkeypatch.setattr(
-        workspace_views,
-        "_render_workspace_copilot_shell",
-        lambda **kwargs: rendered.__setitem__("shell", rendered["shell"] + 1),
-    )
     monkeypatch.setattr(
         workspace_views,
         "_render_workspace_section_content",
@@ -415,7 +574,7 @@ def test_render_workspace_tab_renders_copilot_shell(monkeypatch: pytest.MonkeyPa
         request_mapping_analysis_summary=lambda: {},
     )
 
-    assert rendered == {"shell": 1, "content": 1}
+    assert rendered == {"content": 1}
 
 
 def test_render_workspace_tab_ignores_deleted_file_like_state(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -424,7 +583,7 @@ def test_render_workspace_tab_ignores_deleted_file_like_state(monkeypatch: pytes
     class DeletedFile:
         pass
 
-    rendered = {"shell": 0, "content": 0}
+    rendered = {"content": 0}
     fake_streamlit = SimpleNamespace(
         session_state={"source_file": DeletedFile(), "target_file": DeletedFile(), "mapping_mode": "Standard"},
         radio=lambda *args, **kwargs: "Setup",
@@ -432,11 +591,6 @@ def test_render_workspace_tab_ignores_deleted_file_like_state(monkeypatch: pytes
 
     monkeypatch.setattr(workspace_views, "st", fake_streamlit)
     monkeypatch.setattr(workspace_views, "resolve_active_workspace_section", lambda session_state: "Setup")
-    monkeypatch.setattr(
-        workspace_views,
-        "_render_workspace_copilot_shell",
-        lambda **kwargs: rendered.__setitem__("shell", rendered["shell"] + 1),
-    )
     monkeypatch.setattr(
         workspace_views,
         "_render_workspace_section_content",
@@ -471,7 +625,7 @@ def test_render_workspace_tab_ignores_deleted_file_like_state(monkeypatch: pytes
         request_mapping_analysis_summary=lambda: {},
     )
 
-    assert rendered == {"shell": 1, "content": 1}
+    assert rendered == {"content": 1}
 
 
 def test_workspace_copilot_handoff_sets_workspace_pending_state(monkeypatch: pytest.MonkeyPatch) -> None:
