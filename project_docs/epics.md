@@ -129,6 +129,38 @@ Otvoreno:
 - jasnije surfacing razlike između explanation, triage i refinement tokova
 - širi pilot feedback o tome koji od ovih guidance panela stvarno menjaju odluke korisnika
 
+### Epic 11B: Bounded upload recovery and structure understanding
+
+Status: first `schema-spec` recovery slice completed, broader expansion open.
+
+Cilj:
+
+- oporaviti ingest za fajlove koji su bliski propisanom upload obrascu, ali ne prolaze današnji deterministički parser bez ručnih hint-ova
+- zadržati Semantra princip da je `LLM` bounded recovery pomoćnik, a ne autoritativni upload parser
+
+Trenutno stanje:
+
+- row-data upload, `SQL` snapshot upload i `schema-spec` upload već postoje kroz determinističke parserе
+- `schema-spec` već ima heurističku detekciju kolona i ručne override parametre
+- `POST /upload/spec/recover` sada vraća bounded recovery predlog za parseable metadata fajlove koji ne prolaze užu layout detekciju
+- recovery i dalje prolazi kroz postojeći deterministički `schema-spec` replay pre nego što upload uspe
+- `Workspace > Setup` i companion metadata tokovi sada eksplicitno surfacuju recovery predlog, confidence, warnings i ručni override
+- bounded alias fallback pokriva uske `schema-spec` header slučajeve kada live `LLM` provider vrati neupotrebljiv odgovor, bez fail-open persistence ponašanja
+
+Otvoreno:
+
+- row-data header recovery izvan uskog `schema-spec` scope-a
+- multi-sheet i `record_path` recovery za složenije tabularne izvore
+- `SQL` recovery heuristika tek ako stvarni pilot tokovi pokažu potrebu
+- eventualni bounded recovery za malformed ili shape-invalid `JSON` / `XML` payloads tek ako realni pilot tokovi pokažu da strict reject više nije dovoljan
+- širi recovery telemetry/eval sloj ako bounded upload recovery postane češći pilot pattern
+
+Van scope-a prvog slice-a:
+
+- `PDF`, slike, OCR i proizvoljni nestrukturisani dokumenti
+- auto-persist bez korisničke potvrde ili bez replay-validacije
+- istovremeno širenje na row-data header recovery i `SQL` recovery heuristiku pre zatvaranja `spec` slice-a
+
 ### Epic 5B: Knowledge expansion and canonical coverage
 
 Status: active planning.

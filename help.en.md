@@ -131,6 +131,7 @@ Use `Canonical` when:
 
 Use `Review` to inspect:
 
+- the main `Workspace Copilot` panel with section questions such as `Summarize current mapping state` and `Summarize Review -> Decisions risks`
 - trust-layer explanations
 - confidence and signal breakdown
 - repeated-attention clustering for noisy or repeated review patterns
@@ -159,11 +160,13 @@ Important distinction:
 - `Gap Queue Summary` applies the same idea specifically to the canonical-gap queue
 - `Selected Mapping Details` is the place where source-side and target-side concept tables appear; they are not separate top-level review tabs
 - `LLM Decision Proposals` remain advisory until you explicitly apply them in `Decisions`
+- the main `Workspace Copilot` panel can now hand you directly into `Decisions` without tripping Streamlit rerun/navigation state errors
 
 ### `Decisions`
 
 Use `Decisions` for:
 
+- the main `Workspace Copilot` panel questions such as `What still needs a decision?` and `Am I ready for Output?`
 - manual target adjustments
 - manual mapping in canonical mode through the virtual canonical target options
 - exporting or importing mapping decisions as JSON or Excel
@@ -182,11 +185,13 @@ Important current rules:
 - `Active Decisions` now surfaces decision-origin metadata (`manual_mapping`, `llm_proposal`) when available
 - decision-origin audit metadata is now included in decision JSON export/import
 - draft sessions let you persist review filters, active decisions, and section context before returning later
+- when `Workspace Copilot` suggests a handoff back to `Review` or forward to `Output`, that handoff now uses pending navigation state so it remains rerun-safe
 
 ### `Output`
 
 Use `Output` for:
 
+- the main `Workspace Copilot` panel questions `Why is codegen blocked?` and `Explain output gating and warning priority`
 - `Generate preview`
 - `Generate Pandas code`, `Generate PySpark code`, or `Generate dbt model`
 - `Refine with LLM` on an already generated artifact

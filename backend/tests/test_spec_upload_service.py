@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from app.services.spec_upload_service import detect_spec_layout, map_spec_type, parse_spec_rows
+from io import BytesIO
+
+from openpyxl import Workbook
+
+from app.services.spec_upload_service import detect_spec_layout, map_spec_type, parse_spec_payload, parse_spec_rows
 
 
 def test_detect_spec_layout_returns_hint_for_field_spec_headers() -> None:
@@ -76,3 +80,60 @@ def test_parse_spec_rows_skips_empty_and_section_rows() -> None:
 
 def test_map_spec_type_maps_unknown_type_to_string() -> None:
     assert map_spec_type("CUSTOM_BLOB") == "string"
+
+
+def test_parse_spec_payload_extracts_embedded_csv_table_from_mixed_text() -> None:
+    profile = parse_spec_payload(
+        (
+            "Introductory note for analysts\n"
+            "The following section lists field definitions\n"
+            "SENIOR_FIELD,Senior Description,DataType,Example Values\n"
+            "AKONT,Reconciliation account,CHAR,160000|170000\n"
+            "ERDAT,Created on,DATS,20240101\n"
+            "Closing comment after the table\n"
+        ).encode("utf-8"),
+        "mixed_spec.csv",
+        name_col="SENIOR_FIELD",
+        description_col="Senior Description",
+        type_col="DataType",
+        sample_values_col="Example Values",
+    )
+
+    assert [column.name for column in profile.columns] == ["AKONT", "ERDAT"]
+    assert profile.columns[0].description == "Reconciliation account"
+    assert profile.columns[0].sample_values == ["160000", "170000"]
+
+
+def test_parse_spec_payload_extracts_embedded_xlsx_table_from_mixed_rows() -> None:
+    profile = parse_spec_payload(
+        xlsx_bytes(
+            [
+                ["Introductory note for analysts"],
+                ["The following section lists field definitions"],
+                ["SENIOR_FIELD", "Senior Description", "DataType", "Example Values"],
+                ["AKONT", "Reconciliation account", "CHAR", "160000|170000"],
+                ["ERDAT", "Created on", "DATS", "20240101"],
+                ["Closing comment after the table"],
+            ]
+        ),
+        "mixed_spec.xlsx",
+        name_col="SENIOR_FIELD",
+        description_col="Senior Description",
+        type_col="DataType",
+        sample_values_col="Example Values",
+    )
+
+    assert [column.name for column in profile.columns] == ["AKONT", "ERDAT"]
+    assert profile.columns[0].description == "Reconciliation account"
+    assert profile.columns[0].sample_values == ["160000", "170000"]
+
+
+def xlsx_bytes(rows: list[list[object]]) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    for row in rows:
+        sheet.append(row)
+    buffer = BytesIO()
+    workbook.save(buffer)
+    workbook.close()
+    return buffer.getvalue()

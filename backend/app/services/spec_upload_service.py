@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import csv
+from io import BytesIO
 import re
+from pathlib import Path
 from uuid import uuid4
 
+from openpyxl import load_workbook
+
 from app.models.schema import ColumnProfile, SchemaProfile, SpecLayoutHint
-from app.services.tabular_upload_service import parse_tabular_payload
+from app.services.tabular_upload_service import normalize_rows, parse_tabular_payload
 from app.utils.normalization import normalize_name, tokenize_name
-from app.utils.tabular import is_nullish, normalize_tabular_header
+from app.utils.tabular import decode_text_payload, is_nullish, normalize_tabular_header
 
 
 NAME_CANDIDATES = {
@@ -47,6 +52,10 @@ SAMPLE_VALUE_CANDIDATES = {
 }
 SPEC_LAYOUT_MAX_COLUMNS = 20
 MAX_SPEC_SAMPLE_VALUES = 5
+EMBEDDED_SPEC_DELIMITERS = (",", ";", "\t")
+EMBEDDED_SPEC_MIN_COLUMNS = 2
+EMBEDDED_SPEC_MAX_HEADER_TOKENS = 4
+EMBEDDED_SPEC_MAX_HEADER_LENGTH = 48
 
 
 def build_spec_layout_hint(rows: list[dict[str, object]]) -> SpecLayoutHint | None:
@@ -90,6 +99,7 @@ def parse_spec_payload(
     payload: bytes,
     filename: str,
     *,
+    header_row_index: int | None = None,
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
@@ -97,7 +107,15 @@ def parse_spec_payload(
 ) -> SchemaProfile:
     """Parse an uploaded schema-spec file into the SchemaProfile used by Semantra."""
 
-    rows = parse_tabular_payload(payload, filename)
+    rows, _resolved_header_row_index = parse_spec_source_rows(
+        payload,
+        filename,
+        header_row_index=header_row_index,
+        name_col=name_col,
+        description_col=description_col,
+        type_col=type_col,
+        sample_values_col=sample_values_col,
+    )
     return parse_spec_rows(
         rows,
         dataset_id=str(uuid4()),
@@ -107,6 +125,52 @@ def parse_spec_payload(
         type_col=type_col,
         sample_values_col=sample_values_col,
     )
+
+
+def parse_spec_source_rows(
+    payload: bytes,
+    filename: str,
+    *,
+    header_row_index: int | None = None,
+    name_col: str | None = None,
+    description_col: str | None = None,
+    type_col: str | None = None,
+    sample_values_col: str | None = None,
+) -> tuple[list[dict[str, object]], int]:
+    """Parse one schema-spec source, allowing a bounded embedded-table fallback for mixed CSV files."""
+
+    requested_header_row_index = max(1, int(header_row_index or 1))
+    direct_rows: list[dict[str, object]] | None = None
+    direct_error: ValueError | None = None
+
+    if requested_header_row_index == 1:
+        try:
+            direct_rows = parse_tabular_payload(payload, filename)
+        except ValueError as error:
+            direct_error = error
+        else:
+            if _rows_support_requested_spec_layout(
+                direct_rows,
+                name_col=name_col,
+                description_col=description_col,
+                type_col=type_col,
+                sample_values_col=sample_values_col,
+            ):
+                return direct_rows, 1
+
+    embedded = _extract_embedded_spec_rows(
+        payload,
+        filename,
+        requested_header_row_index=requested_header_row_index if requested_header_row_index > 1 else None,
+    )
+    if embedded is not None:
+        return embedded
+
+    if direct_rows is not None:
+        return direct_rows, 1
+    if direct_error is not None:
+        raise direct_error
+    raise ValueError(f"Could not resolve schema-spec header row {requested_header_row_index} from the uploaded file")
 
 
 def parse_spec_rows(
@@ -215,6 +279,28 @@ def resolve_spec_layout(
     return detected
 
 
+def _rows_support_requested_spec_layout(
+    rows: list[dict[str, object]],
+    *,
+    name_col: str | None,
+    description_col: str | None,
+    type_col: str | None,
+    sample_values_col: str | None,
+) -> bool:
+    if not rows:
+        return False
+
+    headers = {normalize_tabular_header(header) for header in rows[0].keys()}
+    if name_col:
+        return normalize_tabular_header(name_col) in headers
+
+    if build_spec_layout_hint(rows) is not None:
+        return True
+
+    optional_headers = [description_col, type_col, sample_values_col]
+    return any(normalize_tabular_header(value) in headers for value in optional_headers if value)
+
+
 def resolve_optional_header(
     requested_header: str | None,
     available_headers: dict[str, str],
@@ -241,6 +327,238 @@ def find_matching_header(
         if normalized in candidates:
             return header
     return None
+
+
+def _extract_embedded_spec_rows(
+    payload: bytes,
+    filename: str,
+    *,
+    requested_header_row_index: int | None = None,
+) -> tuple[list[dict[str, object]], int] | None:
+    candidates = list_embedded_spec_candidates(
+        payload,
+        filename,
+        requested_header_row_index=requested_header_row_index,
+    )
+    if not candidates:
+        return None
+    return candidates[0]
+
+
+def list_embedded_spec_candidates(
+    payload: bytes,
+    filename: str,
+    *,
+    requested_header_row_index: int | None = None,
+) -> list[tuple[list[dict[str, object]], int]]:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".csv":
+        return _list_embedded_csv_spec_candidates(
+            payload,
+            requested_header_row_index=requested_header_row_index,
+        )
+    if suffix == ".xlsx":
+        return _list_embedded_xlsx_spec_candidates(
+            payload,
+            requested_header_row_index=requested_header_row_index,
+        )
+    return []
+
+
+def _list_embedded_csv_spec_candidates(
+    payload: bytes,
+    *,
+    requested_header_row_index: int | None = None,
+) -> list[tuple[list[dict[str, object]], int]]:
+
+    decoded = decode_text_payload(payload)
+    lines = decoded.splitlines()
+    if not lines:
+        return []
+
+    candidate_starts = [requested_header_row_index - 1] if requested_header_row_index else list(range(len(lines)))
+    candidates: list[tuple[list[dict[str, object]], int]] = []
+    seen_signatures: set[tuple[int, tuple[str, ...]]] = set()
+
+    for delimiter in EMBEDDED_SPEC_DELIMITERS:
+        for start_index in candidate_starts:
+            candidate = _parse_embedded_csv_block(lines, start_index, delimiter)
+            if candidate is None:
+                continue
+            rows, header_row_index = candidate
+            signature = (header_row_index, tuple(str(header) for header in rows[0].keys()))
+            if signature in seen_signatures:
+                continue
+            seen_signatures.add(signature)
+            candidates.append((rows, header_row_index))
+
+    candidates.sort(key=lambda item: (-_score_embedded_spec_candidate(item[0]), item[1]))
+    return candidates
+
+
+def _list_embedded_xlsx_spec_candidates(
+    payload: bytes,
+    *,
+    requested_header_row_index: int | None = None,
+) -> list[tuple[list[dict[str, object]], int]]:
+    workbook = load_workbook(filename=BytesIO(payload), read_only=True, data_only=True)
+    try:
+        sheet = workbook.active
+        raw_rows = [tuple(row) for row in sheet.iter_rows(values_only=True)]
+    finally:
+        workbook.close()
+
+    if not raw_rows:
+        return []
+
+    candidate_starts = [requested_header_row_index - 1] if requested_header_row_index else list(range(len(raw_rows)))
+    candidates: list[tuple[list[dict[str, object]], int]] = []
+    seen_signatures: set[tuple[int, tuple[str, ...]]] = set()
+
+    for start_index in candidate_starts:
+        candidate = _parse_embedded_row_block(raw_rows, start_index)
+        if candidate is None:
+            continue
+        rows, header_row_index = candidate
+        signature = (header_row_index, tuple(str(header) for header in rows[0].keys()))
+        if signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        candidates.append((rows, header_row_index))
+
+    candidates.sort(key=lambda item: (-_score_embedded_spec_candidate(item[0]), item[1]))
+    return candidates
+
+
+def _parse_embedded_csv_block(
+    lines: list[str],
+    start_index: int,
+    delimiter: str,
+) -> tuple[list[dict[str, object]], int] | None:
+    if start_index < 0 or start_index >= len(lines):
+        return None
+
+    header_cells = _parse_csv_cells(lines[start_index], delimiter)
+    if not _looks_like_embedded_header_row(header_cells):
+        return None
+    if start_index > 0:
+        previous_cells = _parse_csv_cells(lines[start_index - 1], delimiter)
+        if _looks_like_embedded_data_row(previous_cells, len(header_cells)):
+            return None
+
+    data_rows: list[list[str]] = []
+    expected_columns = len(header_cells)
+    for line in lines[start_index + 1 :]:
+        if not line.strip():
+            break
+        row_cells = _parse_csv_cells(line, delimiter)
+        if not _looks_like_embedded_data_row(row_cells, expected_columns):
+            break
+        data_rows.append(row_cells)
+
+    if not data_rows:
+        return None
+
+    headers = [str(cell).strip() for cell in header_cells]
+    try:
+        records = [
+            {header: value for header, value in zip(headers, row_cells, strict=False)}
+            for row_cells in data_rows
+        ]
+        rows = normalize_rows(records, header_order=headers)
+    except ValueError:
+        return None
+
+    return rows, start_index + 1
+
+
+def _parse_embedded_row_block(
+    raw_rows: list[tuple[object, ...]],
+    start_index: int,
+) -> tuple[list[dict[str, object]], int] | None:
+    if start_index < 0 or start_index >= len(raw_rows):
+        return None
+
+    header_cells = _normalize_row_cells(raw_rows[start_index])
+    if not _looks_like_embedded_header_row(header_cells):
+        return None
+    if start_index > 0:
+        previous_cells = _normalize_row_cells(raw_rows[start_index - 1], expected_columns=len(header_cells))
+        if _looks_like_embedded_data_row(previous_cells, len(header_cells)):
+            return None
+
+    data_rows: list[list[str]] = []
+    expected_columns = len(header_cells)
+    for row in raw_rows[start_index + 1 :]:
+        row_cells = _normalize_row_cells(row, expected_columns=expected_columns)
+        if not any(cell.strip() for cell in row_cells):
+            break
+        if not _looks_like_embedded_data_row(row_cells, expected_columns):
+            break
+        data_rows.append(row_cells)
+
+    if not data_rows:
+        return None
+
+    headers = [str(cell).strip() for cell in header_cells]
+    try:
+        records = [
+            {header: value for header, value in zip(headers, row_cells, strict=False)}
+            for row_cells in data_rows
+        ]
+        rows = normalize_rows(records, header_order=headers)
+    except ValueError:
+        return None
+
+    return rows, start_index + 1
+
+
+def _parse_csv_cells(line: str, delimiter: str) -> list[str]:
+    return ["" if value is None else str(value).strip() for value in next(csv.reader([line], delimiter=delimiter))]
+
+
+def _normalize_row_cells(row: tuple[object, ...], *, expected_columns: int | None = None) -> list[str]:
+    cells = ["" if value is None else str(value).strip() for value in row]
+    if expected_columns is not None:
+        if len(cells) < expected_columns:
+            cells = cells + [""] * (expected_columns - len(cells))
+        else:
+            cells = cells[:expected_columns]
+    while cells and not cells[-1]:
+        cells.pop()
+    return cells
+
+
+def _looks_like_embedded_header_row(cells: list[str]) -> bool:
+    if len(cells) < EMBEDDED_SPEC_MIN_COLUMNS or len(cells) > SPEC_LAYOUT_MAX_COLUMNS:
+        return False
+    if any(not cell for cell in cells):
+        return False
+    header_like_count = sum(1 for cell in cells if _looks_like_embedded_header_cell(cell))
+    return header_like_count >= min(2, len(cells))
+
+
+def _looks_like_embedded_header_cell(value: str) -> bool:
+    normalized = normalize_header_candidate(value)
+    if not normalized:
+        return False
+    if len(value.strip()) > EMBEDDED_SPEC_MAX_HEADER_LENGTH:
+        return False
+    return len(normalized.split()) <= EMBEDDED_SPEC_MAX_HEADER_TOKENS
+
+
+def _looks_like_embedded_data_row(cells: list[str], expected_columns: int) -> bool:
+    if len(cells) != expected_columns:
+        return False
+    return any(cell for cell in cells)
+
+
+def _score_embedded_spec_candidate(rows: list[dict[str, object]]) -> int:
+    headers = list(rows[0].keys()) if rows else []
+    score = len(rows) * max(1, len(headers))
+    if headers and detect_spec_layout(headers) is not None:
+        score += 100
+    return score
 
 
 def normalize_header_candidate(header: str) -> str:

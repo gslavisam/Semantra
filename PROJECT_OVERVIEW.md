@@ -35,6 +35,7 @@ Today, Semantra uses optional AI only in controlled surfaces such as:
 - transformation generation
 - output artifact refinement
 - review queue planning
+- Workspace Copilot closure/readiness/output guidance across `Review`, `Decisions`, and `Output`
 - canonical-gap suggestion and queue summary
 - benchmark explanation
 - catalog workspace reuse-fit explanation
@@ -45,6 +46,7 @@ These surfaces share the same intent:
 - they expose structured output rather than freeform hidden reasoning
 - they stay close to a concrete local workflow step
 - they fall back gracefully when the LLM is unavailable or the response is invalid
+- when they navigate across Workspace sections, they now do so through rerun-safe pending handoff state rather than by mutating widget-bound active navigation state mid-render
 
 ## Product Shape Today
 
@@ -58,10 +60,10 @@ Semantra currently consists of:
 The main top-level UI areas are:
 
 - `Workspace`
-- `Canonical Console`
+- `Governance` (including `Canonical Console`)
 - `Catalog`
 - `Benchmarks`
-- `Admin / Debug`
+- `System`
 
 ## Core Functional Areas
 
@@ -128,6 +130,7 @@ Implemented today:
 - Mapping Analysis Overview with technical summary, recommended actions, and optional narration/audio
 - Review Queue Plan for the currently filtered review set
 - grouped review-attention summary for repeated unmatched or low-confidence patterns
+- Workspace Copilot `Review -> Decisions` risk/closure summary in both the sidebar `WS Copilot` and the main `Workspace Copilot` panel
 - Canonical Gap Suggestions plus Gap Queue Summary for queue-level canonical stewardship guidance
 
 This turns the engine output into an analyst-controlled review surface rather than an opaque guess.
@@ -153,6 +156,7 @@ Implemented today:
 - structured transformation warnings and fallback behavior
 - LLM transformation generation when configured
 - output artifact refinement with original vs refined compare and explicit accept/discard actions
+- Workspace Copilot `Decisions -> Output` readiness assessment and `Output` gating/warning-priority explanation in both the sidebar and main Workspace panel
 - transformation test set save/list/detail/run flows
 
 Important product contract:
@@ -164,6 +168,7 @@ Important product contract:
 - refinement is guidance only until the user explicitly accepts the refined artifact
 - active decisions now surface decision-origin metadata (`manual_mapping`, `llm_proposal`) when available
 - decision JSON export/import now includes decision-origin audit metadata
+- panel-level `Workspace Copilot` handoff actions are live-browser-validated against Streamlit reruns and no longer throw widget-state mutation exceptions on section handoff
 
 Detailed preview/codegen warning behavior and classification is documented in `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`.
 

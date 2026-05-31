@@ -16,12 +16,10 @@ Za to služe `completed_slices.md`, `epics.md` i `current_state.md`.
 
 Poslednji završeni execution wave-ovi i stariji delivery detalji prate se u `completed_slices.md`.
 
-Ovaj dokument sada služi kao operativni tracker za aktuelnih 10 otvorenih pravaca.
+Ovaj dokument sada služi kao operativni tracker za aktuelne otvorene pravce.
 
 Trenutno izabrani naredni portfolio fokus:
 
-- `Minimal identity + durable jobs` kao sledeći execution wave
-- `Workspace ownership + conflict semantics` kao sledeći design-to-execution wave odmah posle toga
 - `Operational hardening nad ključnim pilot tokovima` kao stalni paralelni execution tok
 
 ## Operativni protokol po pravcu
@@ -198,6 +196,7 @@ Napomena:
 - isti trio sada ima i repo-local browser E2E runner: `backend/scripts/run_operational_browser_e2e.py` plus `run_operational_browser_e2e.ps1` automatizuju `customer-draft-session` restore, `browser-diff-focus` review handoff, `stewardship-smoke-sync` governance handoff, `approved-customer-reuse-smoke` reuse apply i `operational-smoke-benchmark` comparison/explanation tok bez ručnog kliktanja
 - kada lokalni runtime krene sa praznim catalog skupom, repeatable `Catalog` handoff smoke nije zahtevao novi seed helper: minimalni `browser-diff-focus` diff family uspešno je posejan preko postojećeg `/mapping/sets` API-ja i odmah postao vidljiv kroz `Load all integrations`
 - live browser smoke je sada zatvorio i ranije otvorenu loaded-review tvrdnju: sa već učitanim `customer-draft-session` review state-om, `Catalog -> browser-diff-focus -> Load version diff -> Open current diff review focus` zaista vraća UI u `Workspace > Review`, zadržava `Filter by source = All`, i prenosi diff scope kroz `source_scope` info poruku plus review caption umesto kroz tvrdi source filter
+- zatvoren je i mali ingest hardening dodatak za parser boundary: malformed ili shape-invalid `JSON` / `XML` payload-i sada imaju fokusiranu API coverage mrežu i na realnom upload putu i na advisory `POST /upload/spec/detect` putu; detekcija za njih vraća `hint=None`, dok stvarni upload/recovery i dalje ostaju strict `400` reject bez bounded fallback-a
 
 Izabrani sledeći aktivni slice:
 
@@ -239,6 +238,18 @@ Workspace UX/stability zapažanja koja su već zatvorena:
 - [x] Review/Decisions draft-state panel adapter mismatch (`unexpected keyword argument 'api_request'`) je popravljen i browser-potvrđen.
 - [x] Saved draft-session picker više ne ostaje zalepljen za stariji entry sa istim imenom; selector sada prati aktivni `draft_session_id`.
 - [x] `API Base URL` switch više ne ostavlja UI zalepljen na starom top-level tabu; reset sada ide i kroz `pending_top_level_area` / `pending_workspace_section` handoff pa se live UI vraća na `Workspace > Setup` umesto da zadrži stari `Catalog` radio izbor.
+
+Workspace Copilot bounded closure/output mini-slice je zatvoren:
+
+- [x] Dodati `Review -> Decisions` risk/closure summary u `Workspace Copilot` kao bounded, current-state readout.
+- [x] Dodati `Decisions -> Output` readiness assessment koji razlikuje governance blocker, proposal drift i spremno stanje.
+- [x] Dodati `Output` explanation shell za gating i warning prioritization nad postojećim artifact/refinement state-om.
+- [x] Dopuniti quick-ask discoverability i fokusiranu `Streamlit` test mrežu za nove Copilot capability-je.
+- [x] Izložiti iste capability-je i kroz glavni `Workspace Copilot` panel u aktivnom `Workspace` section-u, ne samo kroz sidebar quick-ask.
+- [x] Zatvoriti live rerun/hot-reload pad nad stale `DeletedFile` upload state-om koji je browser smoke otkrio tokom ovog slice-a.
+- [x] Proći uski live browser smoke za `Review`, `Decisions` i `Output` panel pitanja nad glavnim `Workspace Copilot` shell-om.
+- [x] Zatvoriti glavni `Workspace Copilot` section-handoff pad gde je `Open Decisions` pokušavao da menja widget-bound `active_*` navigation ključeve usred render-a.
+- [x] Potvrditi live browser putem da `Review -> Open Decisions -> Am I ready for Output?` i `Output` gating objašnjenje rade nad realnim mapping state-om bez navigacionog pada.
 
 - [x] Dopuniti `docs/pilot/PILOT_REGRESSION_SUBSET.md` konkretnim browser smoke koracima za `Catalog -> Workspace Review` i `Catalog -> Governance` handoff tokove.
 - [x] Zabeležiti jedan live prolaz kroz novi `Catalog` handoff regression subset u pilot execution log-u.

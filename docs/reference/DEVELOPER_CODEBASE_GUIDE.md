@@ -162,20 +162,20 @@ Two practical boundaries matter while developing:
 
 - `streamlit_ui/mapping_state.py`: session-state utilities that keep mapping decisions, refinements, transformation choices, and current workflow state consistent across UI tabs.
 - `streamlit_ui/mapping_helpers.py`: helper functions that derive selected mappings, transformation mode labels, canonical explanation lines, and trust-layer support data from current session state.
-- `streamlit_ui/shared_views.py`: reusable rendering helpers for common UI blocks such as dataset summaries, last-action status, LLM runtime status, and step indicators.
+- `streamlit_ui/shared_views.py`: reusable rendering helpers for common UI blocks such as dataset summaries, last-action status, LLM runtime status, step indicators, and shared bounded `Workspace Copilot` behavior.
 - `streamlit_ui/governance.py`: small governance-focused UI helper module that computes action block reasons and friendly API error messages for approved-only or accepted-only flows.
 
 ### Workspace Surfaces
 
-- `streamlit_ui/workspace_views.py`: primary Workspace screen for upload, profiling, mapping execution, preview, transformation generation, and core workflow actions.
+- `streamlit_ui/workspace_views.py`: primary Workspace screen for upload, profiling, mapping execution, preview, transformation generation, main-panel `Workspace Copilot`, and core workflow actions.
 - `streamlit_ui/workspace_review_views.py`: Workspace review surface for trust-layer inspection, per-row and batch LLM refinement, mapping analysis, review plan, and canonical gap guidance.
 - `streamlit_ui/workspace_decision_views.py`: decision-management surface for saving reviewed mappings, mapping-set governance actions, corrections, and durable review outcomes.
 
-### Catalog, Benchmarks, And Admin
+### Catalog, Benchmarks, Governance, And System
 
 - `streamlit_ui/catalog_views.py`: Catalog search, detail, concept-centric reuse, similar integration hints, and workspace reuse-fit explanation views.
 - `streamlit_ui/benchmark_views.py`: benchmark dataset management, benchmark execution, profile comparison, correction impact, and benchmark explanation views.
-- `streamlit_ui/admin_views.py`: Canonical Console plus broader admin/debug surfaces, including overlay lifecycle, stewardship queues, runtime status, config inspection, and observability readouts.
+- `streamlit_ui/admin_views.py`: Governance-facing `Canonical Console` and related system/observability support surfaces, including overlay lifecycle, stewardship queues, runtime status, config inspection, and observability readouts.
 
 ## Tests
 
@@ -198,7 +198,7 @@ Two practical boundaries matter while developing:
 ### Streamlit And UI Tests
 
 - `tests/test_streamlit_api.py`: tests the Streamlit-side backend client wrapper.
-- `tests/test_streamlit_admin_views.py`: tests admin and Canonical Console helper behavior.
+- `tests/test_streamlit_admin_views.py`: tests Governance/System helper behavior around `Canonical Console`, overlays, and runtime-facing admin views.
 - `tests/test_streamlit_benchmark_views.py`: tests benchmark UI helpers and state transitions.
 - `tests/test_streamlit_catalog_views.py`: tests catalog UI helpers and reuse-oriented rendering logic.
 - `tests/test_streamlit_shared_views.py`: tests common UI helper rendering support.

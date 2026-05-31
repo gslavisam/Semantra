@@ -69,6 +69,42 @@ Fokus:
 - izbeći semantičko preklapanje između postojećeg trust layer-a i novih queue/explanation panela
 - zadržati pravilo da nijedna od ovih površina ne radi auto-apply ili auto-approval
 
+### 4A. Epic 11B: bounded upload recovery and structure understanding
+
+Prvi uski `schema-spec` recovery slice ovog pravca je sada zatvoren. Semantra već ume da oporavi parseable metadata fajl čiji su headeri bliski očekivanom obrascu, ali ne prolaze užu determinističku detekciju, uz bounded predlog i obavezni deterministički replay pre upload uspeha.
+
+Pravila koja ostaju i za svaki sledeći nastavak:
+
+- deterministički ingest ostaje authoritative putanja
+- bounded `LLM` sme da se koristi samo kao recovery sloj za razumevanje strukture kada postojeći upload ili `spec` detekcija ne uspeju
+- `LLM` nikada ne sme direktno da persistira dataset handle ili da zameni replay-validaciju postojećim parserima
+
+Zatvoreni prvi slice:
+
+- bounded recovery contract, recovery endpoint, `Workspace`/companion UX i fokusirana test mreža postoje za `schema-spec` metadata fajlove
+- live smoke je potvrdio source-only recovery affordance, eksplicitno prihvatanje predloga i uspešan upload/profile ishod nad realnim recovery fixture-om
+
+Sledeći legitimni nastavak, ali ne automatski sledeći prioritet:
+
+- row-data header recovery za neusaglašene poslovne recordset fajlove
+- multi-sheet i `record_path` heuristika za složenije tabularne izvore
+- `SQL` recovery heuristika tek kada za to postoji stvarni pilot pritisak
+- recovery telemetry/eval readout ako se pokaže da recovery ulazi u širu pilot upotrebu
+
+Fokus:
+
+- definisati strogo strukturisan fallback contract (`detected_mode`, `sheet_name`, `header_row_index`, `record_path`, `name_col`, `description_col`, `type_col`, `sample_values_col`, `selected_table`, `confidence`, `warnings`)
+- analizirati samo minimizovan strukturni uzorak fajla kad god je to dovoljno, umesto da se modelu šalje ceo payload
+- obavezno odraditi deterministički replay nad postojećim upload parserima pre bilo kakvog save koraka
+- izložiti korisniku predlog, confidence i ručni override umesto tihog auto-prihvatanja
+- logovati razlog fallback-a, prihvaćenu interpretaciju i replay ishod kao audit signal za kasniju evaluaciju
+
+Granice koje i dalje važe:
+
+- ne širiti recovery pravac na `PDF`, slike, OCR ili proizvoljne nestrukturisane dokumente pod istim ingest contract-om
+- ne dozvoliti auto-persist ili fail-open ponašanje samo zato što recovery postoji
+- malformed ili shape-invalid `JSON` / `XML` payload-i ostaju strict parser boundary: advisory detect za njih sme da vrati samo `hint=None`, dok pravi upload/recovery i dalje mora da vrati jasan reject dok se ne pojavi stvarni pilot razlog za bounded fallback i na toj strani
+
 ### 5. Session continuity and resume-by-design (ne uvoditi na brzinu)
 
 Sledeći UX/produkt fokus koji treba osmisliti pažljivo pre implementacije je nastavak rada nakon zatvaranja browser-a ili narednog dana.

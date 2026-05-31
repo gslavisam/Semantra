@@ -76,16 +76,16 @@ Main Product Surface
 **Slide bullets:**
 
 - `Workspace`
-- `Canonical Console`
+- `Governance`
 - `Catalog`
 - `Benchmarks`
-- `Admin / Debug`
+- `System`
 
 **Key message:**
 The product now has clear operator-facing areas rather than one generic review screen.
 
 **Talk track:**
-`Workspace` covers ingest, mapping, review, decisions, preview, and code generation. `Canonical Console` handles semantic stewardship. `Catalog` supports search and reuse. `Benchmarks` measures quality. `Admin / Debug` supports runtime inspection.
+`Workspace` covers ingest, mapping, review, decisions, preview, code generation, and bounded `Workspace Copilot` guidance. `Governance` contains `Canonical Console` and stewardship workflows. `Catalog` supports search and reuse. `Benchmarks` measures quality. `System` supports runtime inspection and operational controls.
 
 ---
 

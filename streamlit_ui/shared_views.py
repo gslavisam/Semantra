@@ -86,6 +86,7 @@ WORKSPACE_COPILOT_CHAT_QUICK_ASK_GROUPS = {
             "Most useful now",
             (
                 "Summarize current mapping state",
+                "Summarize Review -> Decisions risks",
                 "What should I review first?",
                 "Generate proposals for current review slice",
                 "What should I do next?",
@@ -103,6 +104,7 @@ WORKSPACE_COPILOT_CHAT_QUICK_ASK_GROUPS = {
         (
             "Most useful now",
             (
+                "Am I ready for Output?",
                 "Which proposals are safe to apply?",
                 "What still needs a decision?",
                 "Summarize current mapping state",
@@ -120,6 +122,7 @@ WORKSPACE_COPILOT_CHAT_QUICK_ASK_GROUPS = {
         (
             "Most useful now",
             (
+                "Explain output gating and warning priority",
                 "Why is codegen blocked?",
                 "Refine this artifact",
                 "Summarize current mapping state",
@@ -414,9 +417,7 @@ def _workspace_copilot_handoff(
     focus_sources: list[str] | None = None,
 ) -> None:
     state["pending_top_level_area"] = "Workspace"
-    state["active_top_level_area"] = "Workspace"
     state["pending_workspace_section"] = target_section
-    state["active_workspace_section"] = target_section
     if target_section == "Review" and focus_sources:
         state["review_focus_sources"] = list(focus_sources)
     elif target_section != "Review":
@@ -427,9 +428,7 @@ def _workspace_copilot_handoff(
 
 def _workspace_pin_output_context(state: dict) -> None:
     state["pending_top_level_area"] = "Workspace"
-    state["active_top_level_area"] = "Workspace"
     state["pending_workspace_section"] = "Output"
-    state["active_workspace_section"] = "Output"
 
 
 def _workspace_target_context_message(state: dict) -> str:
@@ -567,6 +566,22 @@ def _workspace_codegen_language_label(language: str | None) -> str:
     return normalized or "generated"
 
 
+def _workspace_warning_details(warnings: list[dict] | None) -> list[str]:
+    details: list[str] = []
+    for item in warnings or []:
+        if not isinstance(item, dict):
+            continue
+        code = str(item.get("code") or "").strip()
+        message = str(item.get("message") or "").strip()
+        if code and message:
+            details.append(f"{code}: {message}")
+        elif message:
+            details.append(message)
+        elif code:
+            details.append(code)
+    return details
+
+
 def _workspace_artifact_summary(state: dict) -> dict:
     codegen_response = state.get("codegen_response") or {}
     refinement_response = state.get("codegen_refinement_response") or {}
@@ -580,6 +595,8 @@ def _workspace_artifact_summary(state: dict) -> dict:
     ]
     refinement_reasoning = [str(item).strip() for item in (refinement_response.get("reasoning") or []) if str(item).strip()]
     refinement_warnings = refinement_response.get("warnings") or []
+    warning_details = _workspace_warning_details(warnings)
+    refinement_warning_details = _workspace_warning_details(refinement_warnings)
 
     current_summary = ""
     if current_code:
@@ -593,13 +610,218 @@ def _workspace_artifact_summary(state: dict) -> dict:
         "artifact_language": _workspace_codegen_language_label(codegen_response.get("language")),
         "warning_count": len(warnings),
         "warning_codes": warning_codes,
+        "warning_details": warning_details,
         "current_summary": current_summary,
         "refinement_pending": bool(refinement_code),
         "refinement_reasoning_count": len(refinement_reasoning),
         "refinement_warning_count": len(refinement_warnings),
         "refinement_reasoning": refinement_reasoning,
         "refinement_warnings": refinement_warnings,
+        "refinement_warning_details": refinement_warning_details,
     }
+
+
+def _workspace_review_decision_closure_response(state: dict) -> dict:
+    context = workspace_copilot_sidebar_context(state)
+    if not context["mapping_ready"]:
+        return _copilot_response(
+            level="warning",
+            kind="review-decision-closure-blocked",
+            answer="Review-to-Decisions closure summary is unavailable until mapping exists.",
+            why="The closure summary depends on the current review queue and active decision state.",
+            next_actions=["Generate mapping from Setup first."],
+            action_buttons=[{"label": "Open Setup", "action": "open_setup"}],
+        )
+
+    open_review_items = int(context.get("open_review_items") or 0)
+    pending_proposals = int(context.get("pending_proposals") or 0)
+    priority_rows = _workspace_review_priority_rows(state, limit=3)
+    focus_sources = [str(row.get("source") or "").strip() for row in priority_rows if str(row.get("source") or "").strip()]
+    focus_details = [_workspace_review_row_detail(row) for row in priority_rows]
+
+    if open_review_items == 0 and pending_proposals == 0:
+        return _copilot_response(
+            level="success",
+            kind="review-decision-closure",
+            answer="Review looks closed enough for a clean Decisions handoff.",
+            why="There are no open review items and no pending LLM proposals in the current workspace state.",
+            next_actions=[
+                "Open Decisions to verify the stabilized mapping state.",
+                "Save a draft or mapping set version if you want a durable checkpoint before Output.",
+            ],
+            action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}],
+            artifacts={"focus_sources": focus_sources, "focus_details": focus_details},
+        )
+
+    next_actions: list[str] = []
+    action_buttons: list[dict] = []
+    if focus_sources:
+        next_actions.append(f"Close highest-risk review rows first: {', '.join(focus_sources)}.")
+        action_buttons.append({"label": "Focus top review rows", "action": "open_review_focus", "focus_sources": focus_sources})
+    if pending_proposals:
+        next_actions.append(f"Resolve {pending_proposals} pending proposal(s) in Decisions after the top blockers are reviewed.")
+    else:
+        next_actions.append("Treat Decisions as the next step only after the remaining review rows are closed.")
+    action_buttons.append({"label": "Open Decisions", "action": "open_decisions"})
+
+    why_parts = [f"Open review items: {open_review_items}.", f"Pending proposals: {pending_proposals}."]
+    if focus_details:
+        why_parts.append(f"Top blockers: {'; '.join(focus_details[:2])}")
+
+    return _copilot_response(
+        level="warning",
+        kind="review-decision-closure",
+        answer="Review is not closed enough for a clean Decisions handoff yet.",
+        why=" ".join(why_parts),
+        next_actions=next_actions,
+        action_buttons=action_buttons,
+        artifacts={"focus_sources": focus_sources, "focus_details": focus_details},
+    )
+
+
+def _workspace_output_readiness_response(state: dict) -> dict:
+    context = workspace_copilot_sidebar_context(state)
+    if not context["mapping_ready"]:
+        return _copilot_response(
+            level="warning",
+            kind="output-readiness-blocked",
+            answer="Output readiness is unavailable until mapping exists.",
+            why="Readiness depends on the active decision state and output governance gates.",
+            next_actions=["Generate mapping from Setup first."],
+            action_buttons=[{"label": "Open Setup", "action": "open_setup"}],
+        )
+
+    open_review_items = int(context.get("open_review_items") or 0)
+    pending_proposals = int(context.get("pending_proposals") or 0)
+    block_reason = _workspace_output_block_reason(state)
+    artifact_summary = _workspace_artifact_summary(state)
+
+    if block_reason:
+        why_parts = [block_reason, f"Open review items: {open_review_items}."]
+        if pending_proposals:
+            why_parts.append(f"Pending proposals: {pending_proposals}.")
+        if artifact_summary["has_artifact"]:
+            why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+        return _copilot_response(
+            level="warning",
+            kind="output-readiness",
+            answer="Workspace is not ready for governed Output yet.",
+            why=" ".join(why_parts),
+            next_actions=[
+                "Close or accept the remaining review statuses.",
+                "Resolve pending proposals before relying on code generation." if pending_proposals else "Re-check Decisions after the remaining review rows are closed.",
+            ],
+            action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}, {"label": "Open Review", "action": "open_review"}],
+        )
+
+    if pending_proposals:
+        why_parts = [
+            "Code generation is technically unblocked, but pending proposals can still change the decision surface.",
+        ]
+        if artifact_summary["has_artifact"]:
+            why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+        return _copilot_response(
+            level="warning",
+            kind="output-readiness",
+            answer="Output is technically ready, but Decisions still carries proposal drift.",
+            why=" ".join(why_parts),
+            next_actions=[
+                f"Resolve the remaining {pending_proposals} proposal(s) before treating output as final.",
+                "Then open Output and generate or verify the target artifact.",
+            ],
+            action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}, {"label": "Open Output", "action": "open_output"}],
+        )
+
+    why_parts = ["All active mapping decisions are in a codegen-compatible state."]
+    if artifact_summary["has_artifact"]:
+        why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+    return _copilot_response(
+        level="success",
+        kind="output-readiness",
+        answer="Decisions state is ready for Output.",
+        why=" ".join(why_parts),
+        next_actions=["Open Output for preview, code generation, or artifact review."],
+        action_buttons=[{"label": "Open Output", "action": "open_output"}],
+    )
+
+
+def _workspace_output_explanation_response(state: dict) -> dict:
+    context = workspace_copilot_sidebar_context(state)
+    if not context["mapping_ready"]:
+        return _copilot_response(
+            level="warning",
+            kind="output-explanation-blocked",
+            answer="Output explanation is unavailable until mapping exists.",
+            why="Gating and warning prioritization depend on the active workspace decisions and current artifact state.",
+            next_actions=["Generate mapping from Setup first."],
+            action_buttons=[{"label": "Open Setup", "action": "open_setup"}],
+        )
+
+    block_reason = _workspace_output_block_reason(state)
+    artifact_summary = _workspace_artifact_summary(state)
+    priority_rows = _workspace_review_priority_rows(state, limit=2)
+    current_warning_details = list(artifact_summary.get("warning_details") or [])
+    refinement_warning_details = list(artifact_summary.get("refinement_warning_details") or [])
+
+    if block_reason:
+        why_parts = ["Output gating follows active review status governance."]
+        if priority_rows:
+            why_parts.append(f"Current blockers: {'; '.join(_workspace_review_row_detail(row) for row in priority_rows)}")
+        if artifact_summary["has_artifact"]:
+            why_parts.append(f"Current artifact: {artifact_summary['current_summary']}.")
+        next_actions = ["Close the current review and decision blockers before trusting governed code generation."]
+        if current_warning_details:
+            next_actions.append(f"After gating clears, start with {current_warning_details[0]}.")
+        return _copilot_response(
+            level="warning",
+            kind="output-explanation",
+            answer=block_reason,
+            why=" ".join(why_parts),
+            next_actions=next_actions,
+            action_buttons=[{"label": "Open Decisions", "action": "open_decisions"}, {"label": "Open Review", "action": "open_review"}],
+            artifacts={"current_warning_details": current_warning_details, "refinement_warning_details": refinement_warning_details},
+        )
+
+    if not artifact_summary["has_artifact"]:
+        return _copilot_response(
+            level="info",
+            kind="output-explanation",
+            answer="Output is unblocked, but there is no generated artifact yet to explain or prioritize.",
+            why="Generate preview or code first so Copilot can reason about concrete warnings instead of hypothetical ones.",
+            next_actions=["Open Output and generate the first artifact.", "Then ask for gating or warning prioritization again."],
+            action_buttons=[{"label": "Open Output", "action": "open_output"}],
+        )
+
+    why_parts = [f"Current artifact: {artifact_summary['current_summary']}."]
+    if artifact_summary["refinement_pending"]:
+        why_parts.append(
+            f"Pending refinement candidate: {artifact_summary['refinement_reasoning_count']} reasoning note(s), {artifact_summary['refinement_warning_count']} warning(s)."
+        )
+
+    next_actions: list[str] = []
+    if current_warning_details or refinement_warning_details:
+        current_priority = current_warning_details[:3]
+        refinement_priority = refinement_warning_details[:2]
+        for idx, detail in enumerate(current_priority, start=1):
+            next_actions.append(f"Priority {idx}: current artifact -> {detail}")
+        offset = len(current_priority)
+        for idx, detail in enumerate(refinement_priority, start=offset + 1):
+            next_actions.append(f"Priority {idx}: refinement candidate -> {detail}")
+        next_actions.append("After reviewing those warnings, explicitly accept or discard the refinement candidate.")
+        answer = "Output is unblocked. Prioritize current artifact warnings before refinement-only warnings."
+    else:
+        next_actions = ["There are no reported warnings right now; use refinement only for deliberate polish or edge-case hardening."]
+        answer = "Output is unblocked and the current artifact has no reported warnings to prioritize."
+
+    return _copilot_response(
+        level="info",
+        kind="output-explanation",
+        answer=answer,
+        why=" ".join(why_parts),
+        next_actions=next_actions,
+        action_buttons=[{"label": "Open Output", "action": "open_output"}],
+        artifacts={"current_warning_details": current_warning_details, "refinement_warning_details": refinement_warning_details},
+    )
 
 
 def _workspace_has_reachable_llm(state: dict) -> bool:
@@ -800,6 +1022,9 @@ def workspace_copilot_chat_response(
             next_actions=["Add source companion metadata first.", "Add target companion metadata too for standard source-to-target runs."],
         )
 
+    if "review -> decisions" in normalized or "review to decisions" in normalized or "review-to-decisions" in normalized:
+        return _workspace_review_decision_closure_response(state)
+
     if (
         any(token in normalized for token in ("block", "blocked", "what now", "risk", "stuck"))
         or "what should i do next" in normalized
@@ -984,6 +1209,12 @@ def workspace_copilot_chat_response(
             next_actions=next_actions,
             action_buttons=buttons,
         )
+
+    if "ready for output" in normalized or "decisions -> output" in normalized or "decision to output" in normalized:
+        return _workspace_output_readiness_response(state)
+
+    if "warning priority" in normalized or "prioritize warning" in normalized or "output gating" in normalized:
+        return _workspace_output_explanation_response(state)
 
     if "codegen blocked" in normalized or ("blocked" in normalized and "codegen" in normalized):
         if not context["mapping_ready"]:

@@ -74,6 +74,41 @@ class SpecDetectionResponse(BaseModel):
     hint: SpecLayoutHint | None = None
 
 
+SpecRecoveryStatus = Literal[
+    "recovered",
+    "unavailable",
+    "no_suggestion",
+    "invalid_suggestion",
+    "replay_failed",
+]
+
+
+class SpecRecoverySuggestion(BaseModel):
+    """Bounded recovery proposal for a schema-spec upload that did not match deterministic heuristics."""
+
+    detected_mode: Literal["spec", "row_data", "unknown"] = "unknown"
+    sheet_name: str | None = None
+    header_row_index: int | None = None
+    record_path: str | None = None
+    name_col: str | None = None
+    description_col: str | None = None
+    type_col: str | None = None
+    sample_values_col: str | None = None
+    selected_table: str | None = None
+    confidence: float = 0.0
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SpecRecoveryResponse(BaseModel):
+    """Response returned after bounded schema-spec recovery analysis and deterministic replay."""
+
+    status: SpecRecoveryStatus
+    suggestion: SpecRecoverySuggestion | None = None
+    hint: SpecLayoutHint | None = None
+    warnings: list[str] = Field(default_factory=list)
+    failure_reason: str = ""
+
+
 class UploadResponse(BaseModel):
     """Response containing the stored source and target dataset handles."""
 

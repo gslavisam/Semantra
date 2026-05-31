@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-29, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, reuse discovery, and a first pilot RBAC slice for selected mapping-governance surfaces. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-05-31, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, reuse discovery, and a first pilot RBAC slice for selected mapping-governance surfaces. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -108,14 +108,24 @@ Implemented:
 - row-data upload for CSV, JSON, XML, and XLSX
 - SQL schema snapshot upload with table discovery and explicit table selection for multi-table files
 - schema-spec upload where each row describes one field rather than one business record
+- bounded schema-spec recovery for parseable metadata files whose headers are close to the expected layout but do not match the narrow deterministic detector
 - source-side companion metadata enrichment over an existing uploaded dataset handle
 - target-side companion metadata enrichment over an existing uploaded target dataset handle in standard mode
 - dataset summary and schema-profile display in the Workspace setup flow
+
+Current behavior of the new recovery slice:
+
+- `POST /upload/spec/recover` returns a bounded recovery proposal instead of silently persisting anything
+- deterministic replay through the existing `schema-spec` parser still decides whether the proposed layout is actually valid
+- `Workspace > Setup` and companion-metadata flows surface the proposal, confidence, warnings, and manual override fields explicitly
+- when the live `LLM` provider is unavailable or returns an invalid suggestion, the bounded recovery path can still salvage close header aliases for narrow `schema-spec` cases; broader row-data and `SQL` recovery remain out of scope
+- malformed or shape-invalid `JSON` / `XML` uploads remain strict parser rejects today: Semantra returns a clear `400` parse failure and does not attempt bounded recovery for those payloads
 
 Main code surfaces:
 
 - `backend/app/api/routes/upload.py`
 - `backend/app/services/spec_upload_service.py`
+- `backend/app/services/spec_recovery_service.py`
 - `backend/app/services/schema_snapshot_service.py`
 - `backend/app/services/upload_store.py`
 - `streamlit_ui/workspace_views.py`
@@ -166,6 +176,7 @@ Implemented:
 - optional narration/audio generation for Mapping Analysis Overview
 - Review Queue Plan for queue-level prioritization over the currently filtered review set
 - grouped attention summary for repeated unmatched or low-confidence review patterns
+- Workspace Copilot `Review -> Decisions` risk/closure summary for the current review and proposal state
 - canonical-gap suggestion flow for individual candidates
 - Gap Queue Summary for the current canonical-gap queue before candidate-by-candidate review
 
@@ -175,7 +186,10 @@ Important current behavior:
 - they are designed to stay close to a concrete local workflow step
 - they use deterministic fallback behavior when LLM output is unavailable or invalid
 - proposal generation in Review remains advisory until explicit apply actions are executed in Decisions
+- Workspace Copilot can now summarize whether Review is actually closed enough to hand off into Decisions, instead of only exposing row-level refine/proposal actions in isolation
+- the same bounded closure/output questions are now exposed both through sidebar quick-ask and through the main `Workspace Copilot` panel inside the active `Workspace` section, so the user does not need to switch surfaces to reach them
 - the five bounded guidance panels now share the same `LLM` / `Fallback` header-detail pattern, explicit read-only role messaging, aligned success/error copy, and aligned section-heading treatment for `Risks` and `Next actions`
+- main-panel `Workspace Copilot` handoff actions now use rerun-safe pending navigation state; live browser smoke confirmed `Review -> Open Decisions -> Am I ready for Output?` without the earlier widget-state mutation crash
 
 Main code surfaces:
 
@@ -199,6 +213,7 @@ Implemented:
 - structured preview/codegen warnings for syntax, runtime, type coercion, row-count mismatch, and related issues
 - transformation templates
 - output artifact refinement with side-by-side original/refined compare and explicit accept/discard actions
+- Workspace Copilot `Decisions -> Output` readiness assessment plus `Output` gating and warning-priority explanation
 - transformation test set persistence, detail, listing, and execution
 - decision-origin audit metadata (`manual_mapping`, `llm_proposal`) surfaced in Active Decisions
 
@@ -206,8 +221,12 @@ Important current behavior:
 
 - preview is intentionally advisory and remains available before all decisions are accepted
 - standard-mode code generation is governance-gated and requires accepted active decisions
+- Workspace Copilot can now distinguish `not ready`, `technically ready but still drift-prone`, and `ready for Output` states, then point to the smallest next closing action
 - canonical mode intentionally skips preview because no concrete target dataset exists, but still supports Pandas/PySpark/dbt code generation and artifact refinement from active source-to-canonical decisions
 - dbt output is currently scoped to starter-artifact generation and refinement; generating a fuller dbt package (`model.sql`, `schema.yml`, optional `sources.yml`) is intentionally deferred to a future iteration
+- when an artifact already exists, Workspace Copilot can now prioritize current artifact warnings ahead of refinement-only warnings instead of treating Output help as a single generic blocker message
+- the main Workspace render path is now hardened against stale `DeletedFile` uploader objects during Streamlit reruns, so file-change reloads no longer crash the page before the Copilot panel can render
+- the same live smoke also validated the fixed main-panel section-handoff path, so closure/readiness guidance is now both present and rerun-safe in the browser
 - draft-session continuity now has a minimal save/list/load path for `Workspace > Review` and `Workspace > Decisions`; restore rebuilds a stable mapping contract from saved schema handles, editor state, audit metadata, and `mapping_runtime`, while still clearing preview/codegen/guidance artifacts instead of reviving stale generated outputs
 - draft-session restore also persists the saved `api_base_url` and blocks resume when the active runtime or upload schema context does not match the saved draft
 - transformation test-set save and run are governance-gated and require accepted active decisions
@@ -222,6 +241,7 @@ Main code surfaces:
 - `backend/app/services/transformation_test_service.py`
 - `backend/app/services/llm_service.py`
 - `streamlit_ui/workspace_views.py`
+- `streamlit_ui/shared_views.py`
 
 ### 5. Mapping Set Governance and Reuse
 

@@ -130,6 +130,7 @@ Kada koristiš `Canonical`:
 
 Ovde vidiš:
 
+- glavni `Workspace Copilot` panel sa sekcijskim pitanjima kao što su `Summarize current mapping state` i `Summarize Review -> Decisions risks`
 - trust-layer objašnjenja za izabrane predloge
 - confidence i signal breakdown
 - repeated-attention grupisanje za šumovite ili ponavljane review paterne
@@ -158,11 +159,13 @@ Važna razlika:
 - `Gap Queue Summary` radi isto to, ali samo za canonical gap candidate red
 - `Selected Mapping Details` je mesto gde se pojavljuju source-side i target-side concept tabele; nisu zasebni top-level review tabovi
 - `LLM Decision Proposals` ostaju advisory dok ih eksplicitno ne apply-uješ u `Decisions`
+- `Workspace Copilot` u glavnom panelu sada može i direktno da te prebaci u `Decisions` bez pucanja stranice na Streamlit rerun-u
 
 ### `Decisions`
 
 Ovde radiš:
 
+- koristiš glavni `Workspace Copilot` panel za pitanja kao što su `What still needs a decision?` i `Am I ready for Output?`
 - ručne izmene target izbora
 - ručno mapiranje i u canonical modu, prema virtual canonical target opcijama
 - import/export mapping odluka kao JSON ili Excel
@@ -181,11 +184,13 @@ Važna pravila:
 - `Active Decisions` sada prikazuje i decision-origin metadata (`manual_mapping`, `llm_proposal`) kada je dostupna
 - decision-origin audit metadata je uključena i u decision JSON export/import tok
 - draft session-i ti omogućavaju da sačuvaš review filtere, aktivne odluke i section context pre povratka kasnije
+- ako `Workspace Copilot` predloži handoff nazad ka `Review` ili napred ka `Output`, taj handoff sada koristi pending navigation pattern i bezbedan je kroz rerun/hot-reload cikluse
 
 ### `Output`
 
 Ovde radiš:
 
+- koristiš glavni `Workspace Copilot` panel za `Why is codegen blocked?` i `Explain output gating and warning priority`
 - `Generate preview`
 - `Generate Pandas code`, `Generate PySpark code` ili `Generate dbt model`
 - `Refine with LLM` nad već generisanim artefaktom

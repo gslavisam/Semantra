@@ -5,6 +5,26 @@ Ovaj dokument je strogo hronološki ledger isporučenih slice-ova i završenih t
 Za današnje stanje proizvoda koristi `current_state.md`.
 Za plan i backlog koristi `plan.md` i `epics.md`.
 
+## 2026-05-31
+
+### Workspace Copilot closure and output-guidance addendum
+
+Isporučeno:
+
+- `Workspace Copilot` quick-ask sloj sada ima tri nova bounded capability-ja: `Review -> Decisions` risk/closure summary, `Decisions -> Output` readiness assessment, i `Output` gating + warning-priority explanation
+- `Review` summary sada ume da objedini open review count, pending proposal drift i top blocker rows u jedan closure readout umesto da korisnik ručno spaja više odvojenih signala
+- `Output` summary sada razlikuje governance blocker od warning-priority rada nad već generisanim artifact-om, uključujući redosled `current artifact` upozorenja pre `refinement candidate` upozorenja
+- fokusirani `Streamlit` Copilot testovi potvrđuju quick-ask discoverability i response shape za nove capability-je
+- isti bounded capability-ji sada su izloženi i kroz glavni `Workspace Copilot` panel u `Workspace` render putanji, pa korisnik može da ih pokrene bez prelaska u sidebar `WS Copilot`
+- live browser smoke je potvrdio panel-level pitanja u `Review`, `Decisions` i `Output` sekcijama; tokom tog smoke-a otkriven je i popravljen stale `DeletedFile` rerun pad koji je prethodno mogao da sruši celu `Workspace` stranu posle file-change ciklusa
+- sledeći live smoke je zatvorio i glavni panel handoff bug: `Open Decisions` i srodna section CTA dugmad više ne pokušavaju da menjaju widget-bound `active_*` navigation state tokom render-a, već koriste pending navigation handoff i prolaze bez Streamlit exception-a
+- isti smoke je potvrdio puni `Review -> Decisions -> Output` put nad realnim mapping state-om, uključujući closure blocker, readiness blocker i output gating objašnjenje u glavnom panelu
+
+Ishod:
+
+- bounded LLM pomoć između `Review`, `Decisions` i `Output` više nije samo skup odvojenih explanation/refine panela; Semantra sada ima konkretniji closure/readiness sloj koji skraćuje analyst put do sledeće bezbedne akcije bez auto-apply ponašanja
+- isti closure/readiness sloj sada radi i u glavnom panelu, preživljava Streamlit rerun cikluse bez pucanja na zastarelom upload widget state-u i više ne pada na section-handoff CTA putanjama
+
 ## 2026-05-29
 
 ### Documentation alignment, Workspace guidance hardening, and pilot RBAC bootstrap
@@ -20,6 +40,37 @@ Isporučeno:
 Ishod:
 
 - entry-point dokumenti, reference i stakeholder narrative sada pričaju istu priču o tome šta Semantra danas stvarno jeste, gde su joj granice i kojim redom ima smisla raditi sledeće korake
+
+## 2026-05-30
+
+### Epic 11B first slice: bounded schema-spec recovery and structure understanding
+
+Isporučeno:
+
+- novi bounded recovery contract za `schema-spec` upload fallback: `detected_mode`, `sheet_name`, `header_row_index`, `record_path`, `name_col`, `description_col`, `type_col`, `sample_values_col`, `selected_table`, `confidence`, `warnings`
+- novi `POST /upload/spec/recover` backend endpoint odvojen od regularnog happy-path `POST /upload/spec` toka
+- `spec_recovery_service.py` koji radi minimizovan sample build, bounded recovery attempt, strict output validation i obavezni deterministički replay kroz postojeći `parse_spec_payload`
+- audit-friendly recovery log signal za bypass, unavailable, invalid suggestion, replay-failed i validated recovery ishode
+- `Streamlit` recovery affordance u `Workspace > Setup` i source/target companion metadata tokovima, sa eksplicitnim prikazom predloga, confidence/warnings signala i ručnim override inputima
+- recovery safety-net za uske `schema-spec` alias slučajeve kada live `LLM` provider vrati neupotrebljiv odgovor, bez silent auto-apply ponašanja i bez menjanja happy-path upload contract-a
+- fokusirani unit i API testovi za validan predlog, invalidan predlog, unavailable/no-suggestion putanje i happy-path non-regression
+- live browser smoke nad `ui_fixtures/spec_recovery_source.csv` + `ui_fixtures/target_schema_spec.csv`: source recovery affordance se pojavio samo tamo gde je bio potreban, predlog je eksplicitno prihvaćen, a upload/profile je završio sa validnim source/target schema profilima
+
+Ishod:
+
+- Semantra više ne tera korisnika odmah na ručno pogađanje kolona kada `schema-spec` fajl ima bliske, ali neusaglašene headere; bounded recovery sada uvodi kontrolisan, proverljiv i audit-friendly recovery korak pre ručnog override-a
+- wave je zatvoren samo za `schema-spec` metadata fajlove; row-data header recovery, multi-sheet heuristika i `SQL` recovery ostaju zaseban follow-on scope
+
+### JSON/XML parser hardening addendum
+
+Isporučeno:
+
+- fokusirani API testovi sada eksplicitno pokrivaju malformed i shape-invalid `JSON` / `XML` slučajeve za stvarni upload put (`/upload/handle`) i za advisory detect put (`/upload/spec/detect`)
+- pravilo je sada eksplicitno potvrđeno u testovima: advisory detect za takve payload-e vraća `hint=None`, dok stvarni upload i `schema-spec` recovery ostaju strict parser reject sa jasnim `400` odgovorom
+
+Ishod:
+
+- parser boundary za `JSON` / `XML` više nije samo implicitno “fail-fast” ponašanje u kodu, već i dokumentovan i testiran produktni ugovor; bounded recovery i dalje ostaje ograničen na parseable `schema-spec` tokove
 
 ## 2026-05-02
 

@@ -14,10 +14,15 @@ WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output")
 WORKSPACE_CODEGEN_MODES = ("pandas", "pyspark", "dbt")
 WORKSPACE_COPILOT_ACTIONS = {
     "Setup": ("What unlocks Review?",),
-    "Review": ("Summarize current mapping state",),
-    "Decisions": ("What still needs a decision?",),
-    "Output": ("Why is codegen blocked?",),
+    "Review": ("Summarize current mapping state", "Summarize Review -> Decisions risks"),
+    "Decisions": ("What still needs a decision?", "Am I ready for Output?"),
+    "Output": ("Why is codegen blocked?", "Explain output gating and warning priority"),
 }
+
+
+def _workspace_uploaded_file_or_none(uploaded_file):
+    file_name = getattr(uploaded_file, "name", None)
+    return uploaded_file if isinstance(file_name, str) and file_name.strip() else None
 
 
 def _set_active_mapping_job(job_id: str, *, start_path: str, payload: dict) -> None:
@@ -269,6 +274,128 @@ def _workspace_target_context_message(upload_response: dict | None, mapping_resp
     return message
 
 
+def _apply_recovery_hint_to_manual_inputs(
+    *,
+    cache_key: str,
+    hint: dict,
+    suggestion: dict | None,
+    manual_name_key: str,
+    manual_desc_key: str,
+    manual_type_key: str,
+    manual_sample_key: str,
+    success_message: str,
+) -> None:
+    st.session_state[manual_name_key] = str(hint.get("name_col") or "")
+    st.session_state[manual_desc_key] = str(hint.get("description_col") or "")
+    st.session_state[manual_type_key] = str(hint.get("type_col") or "")
+    st.session_state[manual_sample_key] = str(hint.get("sample_values_col") or "")
+    header_row_index = int((suggestion or {}).get("header_row_index") or 1)
+    st.session_state[f"{cache_key}_spec_header_row_index"] = header_row_index if header_row_index > 1 else None
+    st.session_state["last_action"] = {"level": "info", "message": success_message}
+    st.session_state[f"{cache_key}_spec_recovery_applied"] = True
+    st.rerun()
+
+
+def _render_spec_manual_inputs(
+    *,
+    manual_name_key: str,
+    manual_desc_key: str,
+    manual_type_key: str,
+    manual_sample_key: str,
+    name_label: str,
+    description_label: str,
+    type_label: str,
+    sample_label: str,
+) -> None:
+    manual_columns = st.columns(4)
+    manual_columns[0].text_input(name_label, key=manual_name_key, placeholder="e.g. Column")
+    manual_columns[1].text_input(description_label, key=manual_desc_key, placeholder="e.g. Description")
+    manual_columns[2].text_input(type_label, key=manual_type_key, placeholder="e.g. Type")
+    manual_columns[3].text_input(sample_label, key=manual_sample_key, placeholder="e.g. Sample Values")
+
+
+def _render_spec_detection_or_recovery(
+    *,
+    uploaded_file,
+    cache_key: str,
+    detected_hint: dict | None,
+    recover_spec_hint_for_upload,
+    manual_name_key: str,
+    manual_desc_key: str,
+    manual_type_key: str,
+    manual_sample_key: str,
+    detected_caption_prefix: str,
+    missing_detection_message: str,
+    apply_button_label: str,
+    applied_message: str,
+    name_label: str,
+    description_label: str,
+    type_label: str,
+    sample_label: str,
+) -> None:
+    if uploaded_file is None:
+        return
+
+    if detected_hint:
+        st.session_state.pop(f"{cache_key}_spec_header_row_index", None)
+        st.caption(
+            f"{detected_caption_prefix}: "
+            f"name={detected_hint['name_col']}, "
+            f"description={detected_hint.get('description_col') or '-'}, "
+            f"type={detected_hint.get('type_col') or '-'}, "
+            f"sample={detected_hint.get('sample_values_col') or '-'}"
+        )
+        return
+
+    recovery_response = recover_spec_hint_for_upload(uploaded_file, cache_key)
+    recovery_hint = (recovery_response or {}).get("hint") or None
+    recovery_suggestion = (recovery_response or {}).get("suggestion") or {}
+    recovery_warnings = [str(item) for item in ((recovery_response or {}).get("warnings") or []) if str(item).strip()]
+    confidence = float(recovery_suggestion.get("confidence") or (recovery_hint or {}).get("confidence") or 0.0)
+
+    if recovery_hint:
+        header_row_index = int(recovery_suggestion.get("header_row_index") or 1)
+        st.caption(
+            "Auto-detection found no matching column headers. "
+            "Bounded recovery suggested: "
+            f"name={recovery_hint['name_col']}, "
+            f"description={recovery_hint.get('description_col') or '-'}, "
+            f"type={recovery_hint.get('type_col') or '-'}, "
+            f"sample={recovery_hint.get('sample_values_col') or '-'} | "
+            f"header_row={header_row_index} | "
+            f"confidence={confidence:.2f}"
+        )
+        if recovery_warnings:
+            st.caption("Recovery warnings: " + " | ".join(recovery_warnings))
+        if st.button(apply_button_label, key=f"{cache_key}_apply_spec_recovery"):
+            _apply_recovery_hint_to_manual_inputs(
+                cache_key=cache_key,
+                hint=recovery_hint,
+                suggestion=recovery_suggestion,
+                manual_name_key=manual_name_key,
+                manual_desc_key=manual_desc_key,
+                manual_type_key=manual_type_key,
+                manual_sample_key=manual_sample_key,
+                success_message=applied_message,
+            )
+    else:
+        st.caption(missing_detection_message)
+        failure_reason = str((recovery_response or {}).get("failure_reason") or "").strip()
+        if failure_reason:
+            st.info(f"Bounded recovery did not produce a validated suggestion: {failure_reason}")
+
+    _render_spec_manual_inputs(
+        manual_name_key=manual_name_key,
+        manual_desc_key=manual_desc_key,
+        manual_type_key=manual_type_key,
+        manual_sample_key=manual_sample_key,
+        name_label=name_label,
+        description_label=description_label,
+        type_label=type_label,
+        sample_label=sample_label,
+    )
+
+
 def _reset_workspace_mapping_state(session_state: dict) -> None:
     session_state.pop("mapping_response", None)
     session_state.pop("mapping_analysis_summary", None)
@@ -409,9 +536,7 @@ def _workspace_copilot_handoff(
     focus_sources: list[str] | None = None,
 ) -> None:
     session_state["pending_top_level_area"] = "Workspace"
-    session_state["active_top_level_area"] = "Workspace"
     session_state["pending_workspace_section"] = target_section
-    session_state["active_workspace_section"] = target_section
     if target_section == "Review" and focus_sources:
         session_state["review_focus_sources"] = list(focus_sources)
     elif target_section != "Review":
@@ -421,6 +546,69 @@ def _workspace_copilot_handoff(
         "message": message,
     }
     st.rerun()
+
+
+def _workspace_copilot_result_from_chat_response(section: str, response: dict) -> dict:
+    action_map = {
+        "open_setup": "Setup",
+        "open_review": "Review",
+        "open_review_focus": "Review",
+        "open_decisions": "Decisions",
+        "open_output": "Output",
+    }
+
+    handoff_actions: list[dict] = []
+    action_buttons: list[dict] = []
+    for action in response.get("action_buttons") or []:
+        if not isinstance(action, dict):
+            continue
+        action_key = str(action.get("action") or "").strip().lower()
+        action_buttons.append(
+            {
+                "label": str(action.get("label") or "Run action"),
+                "action": action_key,
+                "focus_sources": action.get("focus_sources"),
+            }
+        )
+        target_section = action_map.get(action_key)
+        if not target_section:
+            continue
+        handoff_actions.append(
+            {
+                "label": str(action.get("label") or f"Open {target_section}"),
+                "target_section": target_section,
+                "message": f"Workspace Copilot handoff -> {target_section}.",
+                "focus_sources": action.get("focus_sources"),
+            }
+        )
+
+    return {
+        "section": section,
+        "level": str(response.get("level") or "info"),
+        "title": "Workspace Copilot",
+        "answer": str(response.get("answer") or "").strip(),
+        "why": str(response.get("why") or "").strip(),
+        "next_actions": [str(item).strip() for item in (response.get("next_actions") or []) if str(item).strip()],
+        "action_buttons": action_buttons,
+        "handoff_actions": handoff_actions,
+    }
+
+
+def _workspace_copilot_chat_result(
+    session_state: dict,
+    *,
+    section: str,
+    question: str,
+    request_mapping_analysis_summary,
+) -> dict:
+    from streamlit_ui.shared_views import workspace_copilot_chat_response
+
+    response = workspace_copilot_chat_response(
+        question,
+        session_state,
+        request_mapping_analysis_summary_func=request_mapping_analysis_summary,
+    )
+    return _workspace_copilot_result_from_chat_response(section, response)
 
 
 def _workspace_copilot_setup_result(context: dict) -> dict:
@@ -640,7 +828,25 @@ def _render_workspace_copilot_result(result: dict | None) -> None:
     answer = str(result.get("answer") or "").strip()
     why = str(result.get("why") or "").strip()
     next_actions = [str(item).strip() for item in (result.get("next_actions") or []) if str(item).strip()]
+    action_buttons = [item for item in (result.get("action_buttons") or []) if isinstance(item, dict)]
     handoff_actions = [item for item in (result.get("handoff_actions") or []) if isinstance(item, dict)]
+
+    if not action_buttons and handoff_actions:
+        for action in handoff_actions:
+            target_section = str(action.get("target_section") or "Setup").strip()
+            focus_sources = action.get("focus_sources")
+            action_key = (
+                "open_review_focus"
+                if target_section == "Review" and focus_sources
+                else f"open_{target_section.lower()}"
+            )
+            action_buttons.append(
+                {
+                    "label": str(action.get("label") or f"Open {target_section}"),
+                    "action": action_key,
+                    "focus_sources": focus_sources,
+                }
+            )
 
     if level == "error":
         st.error(answer)
@@ -658,21 +864,56 @@ def _render_workspace_copilot_result(result: dict | None) -> None:
         for item in next_actions:
             st.write(f"- {item}")
 
-    if handoff_actions:
+    if action_buttons:
         st.caption("Do this now")
-        action_columns = st.columns(len(handoff_actions))
-        for idx, action in enumerate(handoff_actions):
+        action_columns = st.columns(len(action_buttons))
+        for idx, action in enumerate(action_buttons):
             if action_columns[idx].button(
-                str(action.get("label") or f"Open {action.get('target_section') or 'section'}"),
-                key=f"workspace_copilot_handoff_{idx}_{str(action.get('target_section') or 'workspace').lower()}",
+                str(action.get("label") or "Run action"),
+                key=f"workspace_copilot_handoff_{idx}_{str(action.get('action') or 'workspace').lower()}",
                 width="stretch",
             ):
-                _workspace_copilot_handoff(
-                    st.session_state,
-                    target_section=str(action.get("target_section") or "Setup"),
-                    message=str(action.get("message") or "Workspace Copilot handoff."),
-                    focus_sources=action.get("focus_sources"),
-                )
+                _workspace_copilot_execute_action_button(st.session_state, action, result)
+
+
+def _workspace_copilot_execute_action_button(session_state: dict, action: dict, result: dict | None = None) -> None:
+    from streamlit_ui.shared_views import _workspace_apply_safe_proposals, _workspace_run_action
+
+    action_key = str(action.get("action") or "").strip().lower()
+    focus_sources = [str(item).strip() for item in (action.get("focus_sources") or []) if str(item).strip()]
+    if _workspace_run_action(session_state, action_key, focus_sources=focus_sources, origin="Workspace Copilot"):
+        return
+
+    if action_key == "apply_safe_proposals":
+        applied_count, applied_sources = _workspace_apply_safe_proposals(session_state)
+        current_section = str((result or {}).get("section") or session_state.get("active_workspace_section") or "Decisions").strip() or "Decisions"
+        if applied_count:
+            session_state["workspace_copilot_result"] = {
+                "section": current_section,
+                "level": "success",
+                "title": "Workspace Copilot",
+                "answer": f"Applied {applied_count} safe proposal(s).",
+                "why": f"Applied sources: {', '.join(applied_sources)}.",
+                "next_actions": ["Review remaining proposals or move into Output if decision state is now closed."],
+                "action_buttons": [{"label": "Open Decisions", "action": "open_decisions"}],
+                "handoff_actions": [],
+            }
+            session_state["last_action"] = {
+                "level": "success",
+                "message": f"Applied {applied_count} safe LLM proposal(s): {', '.join(applied_sources)}.",
+            }
+        else:
+            session_state["workspace_copilot_result"] = {
+                "section": current_section,
+                "level": "warning",
+                "title": "Workspace Copilot",
+                "answer": "No safe proposals were applied.",
+                "why": "The workspace state may have changed since the proposals were prepared.",
+                "next_actions": ["Regenerate proposals from Review if needed."],
+                "action_buttons": [{"label": "Open Review", "action": "open_review"}],
+                "handoff_actions": [],
+            }
+        st.rerun()
 
 
 def _render_workspace_copilot_shell(
@@ -722,17 +963,25 @@ def _render_workspace_copilot_shell(
                     if selected_workspace_section == "Setup":
                         session_state["workspace_copilot_result"] = _workspace_copilot_setup_result(context)
                     elif selected_workspace_section == "Review":
-                        session_state["workspace_copilot_result"] = _workspace_copilot_review_result(
+                        session_state["workspace_copilot_result"] = _workspace_copilot_chat_result(
                             session_state,
-                            request_mapping_analysis_summary,
+                            section="Review",
+                            question=action_label,
+                            request_mapping_analysis_summary=request_mapping_analysis_summary,
                         )
                     elif selected_workspace_section == "Decisions":
-                        session_state["workspace_copilot_result"] = _workspace_copilot_decisions_result(context)
+                        session_state["workspace_copilot_result"] = _workspace_copilot_chat_result(
+                            session_state,
+                            section="Decisions",
+                            question=action_label,
+                            request_mapping_analysis_summary=request_mapping_analysis_summary,
+                        )
                     elif selected_workspace_section == "Output":
-                        session_state["workspace_copilot_result"] = _workspace_copilot_output_result(
-                            context,
-                            mapping_decisions,
-                            codegen_mode,
+                        session_state["workspace_copilot_result"] = _workspace_copilot_chat_result(
+                            session_state,
+                            section="Output",
+                            question=action_label,
+                            request_mapping_analysis_summary=request_mapping_analysis_summary,
                         )
                     result = session_state.get("workspace_copilot_result")
 
@@ -749,6 +998,7 @@ def _render_workspace_section_content(
     selected_workspace_section: str,
     all_upload_types,
     detect_spec_hint_for_upload,
+    recover_spec_hint_for_upload,
     api_request,
     upload_dataset_handle,
     enrich_dataset_metadata,
@@ -865,38 +1115,42 @@ def _render_workspace_section_content(
                     key="source_upload_mode",
                 )
                 if source_spec_hint:
-                    st.caption(
-                        "Source file looks like a field specification: "
-                        f"name={source_spec_hint['name_col']}, "
-                        f"description={source_spec_hint.get('description_col') or '-'}, "
-                        f"type={source_spec_hint.get('type_col') or '-'}, "
-                        f"sample={source_spec_hint.get('sample_values_col') or '-'}"
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=source_file,
+                        cache_key="source",
+                        detected_hint=source_spec_hint,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="source_spec_manual_name_col",
+                        manual_desc_key="source_spec_manual_desc_col",
+                        manual_type_key="source_spec_manual_type_col",
+                        manual_sample_key="source_spec_manual_sample_col",
+                        detected_caption_prefix="Source file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers. Enter the column names from your spec file manually.",
+                        apply_button_label="Use suggested source spec headers",
+                        applied_message="Applied suggested source spec headers. Review or override them before uploading.",
+                        name_label="Name column",
+                        description_label="Description column",
+                        type_label="Type column",
+                        sample_label="Sample values column",
                     )
                 elif source_mode == "Schema spec":
-                    st.caption(
-                        "Auto-detection found no matching column headers. "
-                        "Enter the column names from your spec file manually."
-                    )
-                    _src_cols = st.columns(4)
-                    _src_cols[0].text_input(
-                        "Name column",
-                        key="source_spec_manual_name_col",
-                        placeholder="e.g. Column",
-                    )
-                    _src_cols[1].text_input(
-                        "Description column",
-                        key="source_spec_manual_desc_col",
-                        placeholder="e.g. Description",
-                    )
-                    _src_cols[2].text_input(
-                        "Type column",
-                        key="source_spec_manual_type_col",
-                        placeholder="e.g. Type",
-                    )
-                    _src_cols[3].text_input(
-                        "Sample values column",
-                        key="source_spec_manual_sample_col",
-                        placeholder="e.g. Sample Values",
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=source_file,
+                        cache_key="source",
+                        detected_hint=None,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="source_spec_manual_name_col",
+                        manual_desc_key="source_spec_manual_desc_col",
+                        manual_type_key="source_spec_manual_type_col",
+                        manual_sample_key="source_spec_manual_sample_col",
+                        detected_caption_prefix="Source file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers. Enter the column names from your spec file manually.",
+                        apply_button_label="Use suggested source spec headers",
+                        applied_message="Applied suggested source spec headers. Review or override them before uploading.",
+                        name_label="Name column",
+                        description_label="Description column",
+                        type_label="Type column",
+                        sample_label="Sample values column",
                     )
 
         target_mode = "data"
@@ -912,38 +1166,42 @@ def _render_workspace_section_content(
                     key="target_upload_mode",
                 )
                 if target_spec_hint:
-                    st.caption(
-                        "Target file looks like a field specification: "
-                        f"name={target_spec_hint['name_col']}, "
-                        f"description={target_spec_hint.get('description_col') or '-'}, "
-                        f"type={target_spec_hint.get('type_col') or '-'}, "
-                        f"sample={target_spec_hint.get('sample_values_col') or '-'}"
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=target_file,
+                        cache_key="target",
+                        detected_hint=target_spec_hint,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="target_spec_manual_name_col",
+                        manual_desc_key="target_spec_manual_desc_col",
+                        manual_type_key="target_spec_manual_type_col",
+                        manual_sample_key="target_spec_manual_sample_col",
+                        detected_caption_prefix="Target file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers. Enter the column names from your spec file manually.",
+                        apply_button_label="Use suggested target spec headers",
+                        applied_message="Applied suggested target spec headers. Review or override them before uploading.",
+                        name_label="Name column",
+                        description_label="Description column",
+                        type_label="Type column",
+                        sample_label="Sample values column",
                     )
                 elif target_mode == "Schema spec":
-                    st.caption(
-                        "Auto-detection found no matching column headers. "
-                        "Enter the column names from your spec file manually."
-                    )
-                    _tgt_cols = st.columns(4)
-                    _tgt_cols[0].text_input(
-                        "Name column",
-                        key="target_spec_manual_name_col",
-                        placeholder="e.g. Column",
-                    )
-                    _tgt_cols[1].text_input(
-                        "Description column",
-                        key="target_spec_manual_desc_col",
-                        placeholder="e.g. Description",
-                    )
-                    _tgt_cols[2].text_input(
-                        "Type column",
-                        key="target_spec_manual_type_col",
-                        placeholder="e.g. Type",
-                    )
-                    _tgt_cols[3].text_input(
-                        "Sample values column",
-                        key="target_spec_manual_sample_col",
-                        placeholder="e.g. Sample Values",
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=target_file,
+                        cache_key="target",
+                        detected_hint=None,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="target_spec_manual_name_col",
+                        manual_desc_key="target_spec_manual_desc_col",
+                        manual_type_key="target_spec_manual_type_col",
+                        manual_sample_key="target_spec_manual_sample_col",
+                        detected_caption_prefix="Target file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers. Enter the column names from your spec file manually.",
+                        apply_button_label="Use suggested target spec headers",
+                        applied_message="Applied suggested target spec headers. Review or override them before uploading.",
+                        name_label="Name column",
+                        description_label="Description column",
+                        type_label="Type column",
+                        sample_label="Sample values column",
                     )
 
         st.subheader("3. Select Tables")
@@ -983,6 +1241,7 @@ def _render_workspace_section_content(
                         source_file,
                         mode="spec" if source_mode == "Schema spec" else "data",
                         selected_table=source_table,
+                        header_row_index=st.session_state.get("source_spec_header_row_index"),
                         name_col=source_spec_hint.get("name_col") if source_spec_hint else (st.session_state.get("source_spec_manual_name_col") or None),
                         description_col=source_spec_hint.get("description_col") if source_spec_hint else (st.session_state.get("source_spec_manual_desc_col") or None),
                         type_col=source_spec_hint.get("type_col") if source_spec_hint else (st.session_state.get("source_spec_manual_type_col") or None),
@@ -996,6 +1255,7 @@ def _render_workspace_section_content(
                         target_file,
                         mode="spec" if target_mode == "Schema spec" else "data",
                         selected_table=target_table,
+                        header_row_index=st.session_state.get("target_spec_header_row_index"),
                         name_col=target_spec_hint.get("name_col") if target_spec_hint else (st.session_state.get("target_spec_manual_name_col") or None),
                         description_col=target_spec_hint.get("description_col") if target_spec_hint else (st.session_state.get("target_spec_manual_desc_col") or None),
                         type_col=target_spec_hint.get("type_col") if target_spec_hint else (st.session_state.get("target_spec_manual_type_col") or None),
@@ -1051,29 +1311,50 @@ def _render_workspace_section_content(
             )
             source_companion_hint = detect_spec_hint_for_upload(source_companion_file, "source_companion")
             if source_companion_file is not None and source_companion_hint:
-                st.caption(
-                    "Companion file looks like a field specification: "
-                    f"name={source_companion_hint['name_col']}, "
-                    f"description={source_companion_hint.get('description_col') or '-'}, "
-                    f"type={source_companion_hint.get('type_col') or '-'}, "
-                    f"sample={source_companion_hint.get('sample_values_col') or '-'}"
+                _render_spec_detection_or_recovery(
+                    uploaded_file=source_companion_file,
+                    cache_key="source_companion",
+                    detected_hint=source_companion_hint,
+                    recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                    manual_name_key="source_companion_manual_name_col",
+                    manual_desc_key="source_companion_manual_desc_col",
+                    manual_type_key="source_companion_manual_type_col",
+                    manual_sample_key="source_companion_manual_sample_col",
+                    detected_caption_prefix="Companion file looks like a field specification",
+                    missing_detection_message="Auto-detection found no matching column headers in the companion file. Enter the spec header names manually.",
+                    apply_button_label="Use suggested source companion headers",
+                    applied_message="Applied suggested source companion spec headers. Review or override them before applying metadata.",
+                    name_label="Companion name column",
+                    description_label="Companion description column",
+                    type_label="Companion type column",
+                    sample_label="Companion sample values column",
                 )
             elif source_companion_file is not None:
-                st.caption(
-                    "Auto-detection found no matching column headers in the companion file. "
-                    "Enter the spec header names manually."
+                _render_spec_detection_or_recovery(
+                    uploaded_file=source_companion_file,
+                    cache_key="source_companion",
+                    detected_hint=None,
+                    recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                    manual_name_key="source_companion_manual_name_col",
+                    manual_desc_key="source_companion_manual_desc_col",
+                    manual_type_key="source_companion_manual_type_col",
+                    manual_sample_key="source_companion_manual_sample_col",
+                    detected_caption_prefix="Companion file looks like a field specification",
+                    missing_detection_message="Auto-detection found no matching column headers in the companion file. Enter the spec header names manually.",
+                    apply_button_label="Use suggested source companion headers",
+                    applied_message="Applied suggested source companion spec headers. Review or override them before applying metadata.",
+                    name_label="Companion name column",
+                    description_label="Companion description column",
+                    type_label="Companion type column",
+                    sample_label="Companion sample values column",
                 )
-                _cmp_cols = st.columns(4)
-                _cmp_cols[0].text_input("Companion name column", key="source_companion_manual_name_col", placeholder="e.g. Column")
-                _cmp_cols[1].text_input("Companion description column", key="source_companion_manual_desc_col", placeholder="e.g. Description")
-                _cmp_cols[2].text_input("Companion type column", key="source_companion_manual_type_col", placeholder="e.g. Type")
-                _cmp_cols[3].text_input("Companion sample values column", key="source_companion_manual_sample_col", placeholder="e.g. Sample Values")
 
             if st.button("Apply source companion metadata", key="apply_source_companion_metadata"):
                 try:
                     enrichment_result = enrich_dataset_metadata(
                         upload_response["source"]["dataset_id"],
                         source_companion_file,
+                        header_row_index=st.session_state.get("source_companion_spec_header_row_index"),
                         name_col=(source_companion_hint.get("name_col") if source_companion_hint else (st.session_state.get("source_companion_manual_name_col") or None)),
                         description_col=(source_companion_hint.get("description_col") if source_companion_hint else (st.session_state.get("source_companion_manual_desc_col") or None)),
                         type_col=(source_companion_hint.get("type_col") if source_companion_hint else (st.session_state.get("source_companion_manual_type_col") or None)),
@@ -1119,29 +1400,50 @@ def _render_workspace_section_content(
                 )
                 target_companion_hint = detect_spec_hint_for_upload(target_companion_file, "target_companion")
                 if target_companion_file is not None and target_companion_hint:
-                    st.caption(
-                        "Companion file looks like a field specification: "
-                        f"name={target_companion_hint['name_col']}, "
-                        f"description={target_companion_hint.get('description_col') or '-'}, "
-                        f"type={target_companion_hint.get('type_col') or '-'}, "
-                        f"sample={target_companion_hint.get('sample_values_col') or '-'}"
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=target_companion_file,
+                        cache_key="target_companion",
+                        detected_hint=target_companion_hint,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="target_companion_manual_name_col",
+                        manual_desc_key="target_companion_manual_desc_col",
+                        manual_type_key="target_companion_manual_type_col",
+                        manual_sample_key="target_companion_manual_sample_col",
+                        detected_caption_prefix="Companion file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers in the companion file. Enter the spec header names manually.",
+                        apply_button_label="Use suggested target companion headers",
+                        applied_message="Applied suggested target companion spec headers. Review or override them before applying metadata.",
+                        name_label="Target companion name column",
+                        description_label="Target companion description column",
+                        type_label="Target companion type column",
+                        sample_label="Target companion sample values column",
                     )
                 elif target_companion_file is not None:
-                    st.caption(
-                        "Auto-detection found no matching column headers in the companion file. "
-                        "Enter the spec header names manually."
+                    _render_spec_detection_or_recovery(
+                        uploaded_file=target_companion_file,
+                        cache_key="target_companion",
+                        detected_hint=None,
+                        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
+                        manual_name_key="target_companion_manual_name_col",
+                        manual_desc_key="target_companion_manual_desc_col",
+                        manual_type_key="target_companion_manual_type_col",
+                        manual_sample_key="target_companion_manual_sample_col",
+                        detected_caption_prefix="Companion file looks like a field specification",
+                        missing_detection_message="Auto-detection found no matching column headers in the companion file. Enter the spec header names manually.",
+                        apply_button_label="Use suggested target companion headers",
+                        applied_message="Applied suggested target companion spec headers. Review or override them before applying metadata.",
+                        name_label="Target companion name column",
+                        description_label="Target companion description column",
+                        type_label="Target companion type column",
+                        sample_label="Target companion sample values column",
                     )
-                    _target_cmp_cols = st.columns(4)
-                    _target_cmp_cols[0].text_input("Target companion name column", key="target_companion_manual_name_col", placeholder="e.g. Column")
-                    _target_cmp_cols[1].text_input("Target companion description column", key="target_companion_manual_desc_col", placeholder="e.g. Description")
-                    _target_cmp_cols[2].text_input("Target companion type column", key="target_companion_manual_type_col", placeholder="e.g. Type")
-                    _target_cmp_cols[3].text_input("Target companion sample values column", key="target_companion_manual_sample_col", placeholder="e.g. Sample Values")
 
                 if st.button("Apply target companion metadata", key="apply_target_companion_metadata"):
                     try:
                         enrichment_result = enrich_dataset_metadata(
                             upload_response["target"]["dataset_id"],
                             target_companion_file,
+                            header_row_index=st.session_state.get("target_companion_spec_header_row_index"),
                             name_col=(target_companion_hint.get("name_col") if target_companion_hint else (st.session_state.get("target_companion_manual_name_col") or None)),
                             description_col=(target_companion_hint.get("description_col") if target_companion_hint else (st.session_state.get("target_companion_manual_desc_col") or None)),
                             type_col=(target_companion_hint.get("type_col") if target_companion_hint else (st.session_state.get("target_companion_manual_type_col") or None)),
@@ -1656,6 +1958,7 @@ def render_workspace_tab(
     *,
     all_upload_types,
     detect_spec_hint_for_upload,
+    recover_spec_hint_for_upload,
     sql_tables_for_upload,
     api_request,
     upload_dataset_handle,
@@ -1691,8 +1994,8 @@ def render_workspace_tab(
     )
 
     active_mapping_mode = st.session_state.get("mapping_mode", "Standard")
-    source_file = st.session_state.get("source_file")
-    target_file = st.session_state.get("target_file") if active_mapping_mode == "Standard" else None
+    source_file = _workspace_uploaded_file_or_none(st.session_state.get("source_file"))
+    target_file = _workspace_uploaded_file_or_none(st.session_state.get("target_file")) if active_mapping_mode == "Standard" else None
     source_tables: list[str] = []
     target_tables: list[str] = []
     source_spec_hint = None
@@ -1712,10 +2015,21 @@ def render_workspace_tab(
     preview_response = st.session_state.get("preview_response")
     codegen_response = st.session_state.get("codegen_response")
     codegen_refinement_response = st.session_state.get("codegen_refinement_response")
+    _render_workspace_copilot_shell(
+        session_state=st.session_state,
+        selected_workspace_section=selected_workspace_section,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        preview_response=preview_response,
+        codegen_response=codegen_response,
+        build_mapping_decisions=build_mapping_decisions,
+        request_mapping_analysis_summary=request_mapping_analysis_summary,
+    )
     _render_workspace_section_content(
         selected_workspace_section=selected_workspace_section,
         all_upload_types=all_upload_types,
         detect_spec_hint_for_upload=detect_spec_hint_for_upload,
+        recover_spec_hint_for_upload=recover_spec_hint_for_upload,
         api_request=api_request,
         upload_dataset_handle=upload_dataset_handle,
         enrich_dataset_metadata=enrich_dataset_metadata,

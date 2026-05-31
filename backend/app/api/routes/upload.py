@@ -11,11 +11,14 @@ from app.models.schema import (
     MetadataEnrichmentResponse,
     SpecDetectionResponse,
     SpecLayoutHint,
+    SpecRecoveryResponse,
     SqlTableDiscoveryResponse,
     UploadResponse,
 )
+from app.services.llm_service import build_provider_from_settings
 from app.services.schema_snapshot_service import build_schema_profile_from_sql_snapshot, list_tables_from_sql_snapshot
-from app.services.spec_upload_service import build_spec_layout_hint, parse_spec_payload
+from app.services.spec_recovery_service import recover_spec_layout
+from app.services.spec_upload_service import build_spec_layout_hint, parse_spec_payload, parse_spec_source_rows
 from app.services.tabular_upload_service import SUPPORTED_ROW_FORMATS, parse_tabular_payload
 from app.services.upload_store import dataset_store
 from app.utils.tabular import decode_text_payload
@@ -52,13 +55,36 @@ async def detect_spec_upload(file: UploadFile = File(...)) -> SpecDetectionRespo
         )
 
     payload = await file.read()
-    rows = read_tabular_payload(payload, file.filename or "spec.csv")
+    try:
+        rows, _header_row_index = parse_spec_source_rows(payload, file.filename or "spec.csv")
+    except Exception:
+        return SpecDetectionResponse(hint=None)
     return SpecDetectionResponse(hint=build_spec_layout_hint(rows))
+
+
+@router.post("/upload/spec/recover", response_model=SpecRecoveryResponse)
+async def recover_spec_upload(file: UploadFile = File(...)) -> SpecRecoveryResponse:
+    """Analyze a parseable metadata file and return a bounded schema-spec recovery suggestion."""
+
+    filename = (file.filename or "").lower()
+    if not filename.endswith(SUPPORTED_ROW_FORMATS):
+        raise HTTPException(
+            status_code=400,
+            detail="Spec recovery supports CSV, JSON, XML, and XLSX tabular uploads.",
+        )
+
+    payload = await file.read()
+    upload_name = file.filename or "spec.csv"
+    try:
+        return recover_spec_layout(payload, upload_name, provider=build_provider_from_settings())
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=f"Failed to parse tabular file: {error}") from error
 
 
 @router.post("/upload/spec", response_model=DatasetHandle)
 async def upload_schema_spec(
     file: UploadFile = File(...),
+    header_row_index: int | None = Form(default=None),
     name_col: str | None = Form(default=None),
     description_col: str | None = Form(default=None),
     type_col: str | None = Form(default=None),
@@ -79,6 +105,7 @@ async def upload_schema_spec(
         profile = parse_spec_payload(
             payload,
             upload_name,
+            header_row_index=header_row_index,
             name_col=name_col,
             description_col=description_col,
             type_col=type_col,
@@ -103,6 +130,7 @@ async def upload_dataset_handle(
 async def enrich_dataset_metadata(
     dataset_id: str = Form(...),
     file: UploadFile = File(...),
+    header_row_index: int | None = Form(default=None),
     name_col: str | None = Form(default=None),
     description_col: str | None = Form(default=None),
     type_col: str | None = Form(default=None),
@@ -123,6 +151,7 @@ async def enrich_dataset_metadata(
         companion_profile = parse_spec_payload(
             payload,
             upload_name,
+            header_row_index=header_row_index,
             name_col=name_col,
             description_col=description_col,
             type_col=type_col,

@@ -84,6 +84,9 @@ def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
     if cached_signature == signature:
         return st.session_state.get(f"{cache_key}_spec_hint")
 
+    st.session_state.pop(f"{cache_key}_spec_header_row_index", None)
+    st.session_state.pop(f"{cache_key}_spec_recovery_applied", None)
+
     payload = api_request(
         "POST",
         "/upload/spec/detect",
@@ -95,11 +98,37 @@ def detect_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
     return hint
 
 
+def recover_spec_hint_for_upload(uploaded_file, cache_key: str) -> dict | None:
+    """Request and cache a bounded schema-spec recovery proposal for an uploaded metadata file."""
+
+    if uploaded_file is None or uploaded_file.name.lower().endswith(".sql"):
+        return None
+
+    file_bytes = uploaded_file_bytes(uploaded_file)
+    signature = (uploaded_file.name, len(file_bytes), "spec-recover")
+    cached_signature = st.session_state.get(f"{cache_key}_spec_recovery_signature")
+    if cached_signature == signature:
+        return st.session_state.get(f"{cache_key}_spec_recovery")
+
+    st.session_state.pop(f"{cache_key}_spec_header_row_index", None)
+    st.session_state.pop(f"{cache_key}_spec_recovery_applied", None)
+
+    payload = api_request(
+        "POST",
+        "/upload/spec/recover",
+        files={"file": (uploaded_file.name, file_bytes, uploaded_file.type or "text/csv")},
+    )
+    st.session_state[f"{cache_key}_spec_recovery_signature"] = signature
+    st.session_state[f"{cache_key}_spec_recovery"] = payload
+    return payload
+
+
 def upload_dataset_handle(
     uploaded_file,
     *,
     mode: str,
     selected_table: str | None = None,
+    header_row_index: int | None = None,
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
@@ -113,6 +142,8 @@ def upload_dataset_handle(
     request_files = upload_file_to_request_files(uploaded_file)
     if mode == "spec":
         form_data: dict[str, str] = {}
+        if header_row_index and int(header_row_index) > 1:
+            form_data["header_row_index"] = str(int(header_row_index))
         if name_col:
             form_data["name_col"] = name_col
         if description_col:
@@ -134,6 +165,7 @@ def enrich_dataset_metadata(
     dataset_id: str,
     uploaded_file,
     *,
+    header_row_index: int | None = None,
     name_col: str | None = None,
     description_col: str | None = None,
     type_col: str | None = None,
@@ -147,6 +179,8 @@ def enrich_dataset_metadata(
         raise ValueError("Select a companion schema/spec file before applying metadata enrichment.")
 
     form_data = {"dataset_id": dataset_id}
+    if header_row_index and int(header_row_index) > 1:
+        form_data["header_row_index"] = str(int(header_row_index))
     if name_col:
         form_data["name_col"] = name_col
     if description_col:

@@ -22,15 +22,15 @@ The current product shape is a FastAPI backend plus a Streamlit product UI. It i
 Top-level UI areas:
 
 - `Workspace`
-	- upload, profile, map, review, decide, preview, codegen, and artifact refinement
-- `Canonical Console`
-	- canonical concept registry, overlay lifecycle, canonical-gap stewardship, and stable glossary promotion
+	- upload, profile, map, review, decide, preview, codegen, artifact refinement, and the main `Workspace Copilot` panel
+- `Governance`
+	- `Canonical Console`, canonical concept registry, overlay lifecycle, canonical-gap stewardship, and stable glossary promotion
 - `Catalog`
 	- searchable integration inventory, concept-centric reuse views, and workspace-fit explanation for approved reuse candidates
 - `Benchmarks`
 	- benchmark dataset save/run flows, scoring-profile comparison, correction impact, run history, and bounded explanation
-- `Admin / Debug`
-	- runtime config, observability, and supporting admin surfaces
+- `System`
+	- runtime config, observability, sidebar support surfaces, and operational reset/runtime checks
 
 Core implemented capabilities:
 
@@ -56,6 +56,8 @@ Core implemented capabilities:
 - benchmark datasets, evaluation runs, scoring-profile comparison, correction impact, and benchmark explanation
 - compact sidebar operations strip and unified status legend for cross-surface orientation
 - dismissible onboarding hints per top-level area (`Workspace`, `Governance`, `Catalog`, `Benchmarks`, `System`)
+- main-panel `Workspace Copilot` closure/readiness/output guidance in `Review`, `Decisions`, and `Output`, mirrored with the sidebar `WS Copilot`
+- rerun-safe `Workspace Copilot` section handoffs that now queue pending navigation instead of mutating widget-bound active navigation state mid-render
 
 For the full grounded feature inventory, see `project_docs/current_state.md`.
 
@@ -68,6 +70,7 @@ Semantra does not use LLMs as an autonomous mapper. The current bounded AI surfa
 - transformation code generation
 - artifact refinement in `Workspace > Output`
 - review queue planning in `Workspace > Review`
+- `Workspace Copilot` review-closure, decision-readiness, and output-gating guidance in the main panel and sidebar
 - canonical-gap suggestion and queue summary
 - benchmark explanation
 - catalog workspace reuse-fit explanation

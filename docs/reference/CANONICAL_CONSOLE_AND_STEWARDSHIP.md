@@ -49,7 +49,7 @@ Current implementation exposes canonical behavior through:
 - overlay validate/create/list/detail/activate/deactivate/archive/rollback endpoints
 - stewardship item list/detail/upsert/status/promotion endpoints
 - canonical-gap candidate, suggestion, approval, rejection, and proposal-state endpoints
-- the `Canonical Console` area rendered from `streamlit_ui/admin_views.py`
+- the `Governance -> Canonical Console` surface rendered from `streamlit_ui/admin_views.py`
 
 ## Canonical Runtime Model
 

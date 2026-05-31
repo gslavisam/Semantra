@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from streamlit_ui import shared_views
 
 
@@ -267,12 +269,21 @@ def test_workspace_copilot_sidebar_brief_points_setup_when_upload_missing() -> N
 
 def test_workspace_copilot_quick_asks_group_by_section_and_fallback_to_default() -> None:
     review_groups = shared_views._workspace_copilot_quick_ask_groups("Review")
+    decision_groups = shared_views._workspace_copilot_quick_ask_groups("Decisions")
+    output_groups = shared_views._workspace_copilot_quick_ask_groups("Output")
     fallback_groups = shared_views._workspace_copilot_quick_ask_groups("Unknown")
     review_prompts = shared_views._workspace_copilot_quick_asks("Review")
+    decision_prompts = shared_views._workspace_copilot_quick_asks("Decisions")
+    output_prompts = shared_views._workspace_copilot_quick_asks("Output")
 
     assert review_groups[0][0] == "Most useful now"
     assert review_groups[1][0] == "Explain this step"
+    assert decision_groups[0][0] == "Most useful now"
+    assert output_groups[0][0] == "Most useful now"
     assert "What should I review first?" in review_prompts
+    assert "Summarize Review -> Decisions risks" in review_prompts
+    assert "Am I ready for Output?" in decision_prompts
+    assert "Explain output gating and warning priority" in output_prompts
     assert "What does Output do?" in review_prompts
     assert len(review_prompts) >= 5
     assert fallback_groups == shared_views.WORKSPACE_COPILOT_CHAT_QUICK_ASK_GROUPS["default"]
@@ -474,6 +485,104 @@ def test_workspace_copilot_chat_response_summarizes_safe_proposals() -> None:
     assert response["action_buttons"][0] == {"label": "Apply safe proposals", "action": "apply_safe_proposals"}
 
 
+def test_workspace_copilot_chat_response_summarizes_review_to_decisions_risks() -> None:
+    response = shared_views.workspace_copilot_chat_response(
+        "Summarize Review -> Decisions risks",
+        {
+            "active_top_level_area": "Workspace",
+            "active_workspace_section": "Review",
+            "upload_response": {"mapping_mode": "standard"},
+            "mapping_response": {
+                "mapping_runtime": {},
+                "ranked_mappings": [
+                    {
+                        "source": "phone",
+                        "candidates": [{"target": "phone_number"}],
+                        "confidence_label": "low_confidence",
+                        "validator": "llm_validated",
+                    }
+                ],
+            },
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+                "phone": {"target": "phone_number", "status": "needs_review"},
+            },
+            "llm_decision_proposals": [{"source": "phone", "safe_to_apply": False}],
+        },
+    )
+
+    assert response["kind"] == "review-decision-closure"
+    assert "not closed enough" in response["answer"]
+    assert "Open review items: 1." in response["why"]
+    assert "Pending proposals: 1." in response["why"]
+    assert response["action_buttons"][0] == {
+        "label": "Focus top review rows",
+        "action": "open_review_focus",
+        "focus_sources": ["phone"],
+    }
+    assert response["action_buttons"][1] == {"label": "Open Decisions", "action": "open_decisions"}
+
+
+def test_workspace_copilot_chat_response_reports_output_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shared_views, "_workspace_output_block_reason", lambda state: "")
+
+    response = shared_views.workspace_copilot_chat_response(
+        "Am I ready for Output?",
+        {
+            "active_top_level_area": "Workspace",
+            "active_workspace_section": "Decisions",
+            "upload_response": {"mapping_mode": "standard"},
+            "mapping_response": {"mapping_runtime": {}},
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+        },
+    )
+
+    assert response["kind"] == "output-readiness"
+    assert response["level"] == "success"
+    assert "ready for Output" in response["answer"]
+    assert response["action_buttons"] == [{"label": "Open Output", "action": "open_output"}]
+
+
+def test_workspace_copilot_chat_response_prioritizes_output_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shared_views, "_workspace_output_block_reason", lambda state: "")
+
+    response = shared_views.workspace_copilot_chat_response(
+        "Explain output gating and warning priority",
+        {
+            "active_top_level_area": "Workspace",
+            "active_workspace_section": "Output",
+            "upload_response": {"mapping_mode": "standard"},
+            "mapping_response": {"mapping_runtime": {}},
+            "mapping_editor_state": {
+                "cust_id": {"target": "customer_id", "status": "accepted"},
+            },
+            "codegen_response": {
+                "code": "print('ok')",
+                "language": "python",
+                "warnings": [
+                    {"code": "W001", "message": "Review null handling."},
+                    {"code": "W002", "message": "Verify type casting."},
+                ],
+            },
+            "codegen_refinement_response": {
+                "code": "print('better')",
+                "language": "python",
+                "reasoning": ["Added safer coercion."],
+                "warnings": [{"code": "RW01", "message": "Confirm downstream schema expectations."}],
+            },
+        },
+    )
+
+    assert response["kind"] == "output-explanation"
+    assert "Prioritize current artifact warnings before refinement-only warnings" in response["answer"]
+    assert response["next_actions"][0] == "Priority 1: current artifact -> W001: Review null handling."
+    assert response["next_actions"][1] == "Priority 2: current artifact -> W002: Verify type casting."
+    assert response["next_actions"][2] == "Priority 3: refinement candidate -> RW01: Confirm downstream schema expectations."
+    assert response["action_buttons"] == [{"label": "Open Output", "action": "open_output"}]
+
+
 def test_workspace_copilot_chat_response_blocks_refinement_without_artifact() -> None:
     response = shared_views.workspace_copilot_chat_response(
         "Refine this artifact",
@@ -564,7 +673,7 @@ def test_workspace_execute_artifact_refinement_pins_output_context(monkeypatch) 
     assert state["pending_top_level_area"] == "Workspace"
     assert state["active_top_level_area"] == "Workspace"
     assert state["pending_workspace_section"] == "Output"
-    assert state["active_workspace_section"] == "Output"
+    assert state["active_workspace_section"] == "Setup"
     assert state["codegen_refinement_response"]["code"] == "print('better')"
 
 
@@ -580,7 +689,7 @@ def test_workspace_accept_and_discard_refinement_preserve_output_context(monkeyp
     shared_views._workspace_accept_refinement(accept_state)
 
     assert accept_state["pending_workspace_section"] == "Output"
-    assert accept_state["active_workspace_section"] == "Output"
+    assert accept_state["active_workspace_section"] == "Setup"
     assert accept_state["codegen_response"]["code"] == "print('better')"
     assert "codegen_refinement_response" not in accept_state
 
@@ -592,7 +701,7 @@ def test_workspace_accept_and_discard_refinement_preserve_output_context(monkeyp
     shared_views._workspace_discard_refinement(discard_state)
 
     assert discard_state["pending_workspace_section"] == "Output"
-    assert discard_state["active_workspace_section"] == "Output"
+    assert discard_state["active_workspace_section"] == "Setup"
     assert "codegen_refinement_response" not in discard_state
     assert reruns == ["rerun", "rerun"]
 

@@ -1,0 +1,9 @@
+Introductory note for analysts
+Customer ID,Customer Email,Phone Number
+1001,ana@example.com,0641234567
+1002,marko@example.com,0659998888
+Field definition section
+SENIOR_FIELD,Senior Description,DataType,Example Values
+AKONT,Reconciliation account,CHAR,160000|170000
+ERDAT,Created on,DATS,20240101
+Closing comment after the table

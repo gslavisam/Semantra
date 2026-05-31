@@ -1,0 +1,3 @@
+SENIOR_FIELD,Senior Description,DataType,Example Values
+AKONT,Reconciliation account,CHAR,160000|170000
+ERDAT,Created on,DATS,20240101
