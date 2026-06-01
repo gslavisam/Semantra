@@ -24,118 +24,30 @@ from app.models.mapping import (
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.models.schema import ColumnProfile, SchemaProfile
-from app.services.llm_service import LLMProvider, call_transformation_generator, call_validator
+from app.services.llm_service import LLMProvider, call_transformation_generator, call_validator, resolve_bounded_llm_timeout
+from app.services.mapping_policy import (
+    DEFAULT_SCORING_PROFILE,
+    SCORING_PROFILES,
+    SIGNAL_WEIGHT_NAMES,
+    WEIGHTS,
+    normalize_scoring_profile_name,
+    resolve_decision_threshold_policy,
+    resolve_sap_signal_policy,
+    resolve_scoring_weights,
+    resolve_signal_evidence_policy,
+)
 from app.services.embedding_service import cosine_similarity, get_embedding, is_enabled as embedding_enabled
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.utils.normalization import semantic_token_set
 from app.utils.similarity import clamp_score, fuzzy_similarity, jaccard_similarity, score_distance
 
 
-DEFAULT_SCORING_PROFILE = "balanced"
 AUTO_DESCRIPTION_PRIORITY_MIN_METADATA_COLUMNS = 1
 AUTO_LLM_TRANSFORMATION_INSTRUCTION = (
     "Assess whether the selected source-to-target mapping needs a pandas transformation to become implementation-ready. "
     "If a conversion, extraction, normalization, split, merge, parsing, or type coercion is needed, return the minimal pandas transformation. "
     "If direct mapping is sufficient, return no transformation code."
 )
-SCORING_PROFILES = {
-    "balanced": {
-        "name": 0.20,
-        "semantic": 0.12,
-        "knowledge": 0.10,
-        "canonical": 0.05,
-        "pattern": 0.20,
-        "statistical": 0.15,
-        "overlap": 0.10,
-        "embedding": 0.12,
-        "correction": 0.10,
-        "llm": 0.05,
-    },
-    "schema_only": {
-        "name": 0.22,
-        "semantic": 0.16,
-        "knowledge": 0.16,
-        "canonical": 0.10,
-        "pattern": 0.12,
-        "statistical": 0.08,
-        "overlap": 0.04,
-        "embedding": 0.14,
-        "correction": 0.10,
-        "llm": 0.05,
-    },
-    "data_rich": {
-        "name": 0.16,
-        "semantic": 0.10,
-        "knowledge": 0.10,
-        "canonical": 0.06,
-        "pattern": 0.20,
-        "statistical": 0.18,
-        "overlap": 0.16,
-        "embedding": 0.10,
-        "correction": 0.08,
-        "llm": 0.05,
-    },
-    "canonical_first": {
-        "name": 0.10,
-        "semantic": 0.12,
-        "knowledge": 0.22,
-        "canonical": 0.18,
-        "pattern": 0.12,
-        "statistical": 0.08,
-        "overlap": 0.05,
-        "embedding": 0.08,
-        "correction": 0.10,
-        "llm": 0.05,
-    },
-    "description_priority": {
-        "name": 0.12,
-        "semantic": 0.22,
-        "knowledge": 0.18,
-        "canonical": 0.12,
-        "pattern": 0.08,
-        "statistical": 0.05,
-        "overlap": 0.03,
-        "embedding": 0.12,
-        "correction": 0.03,
-        "llm": 0.05,
-    },
-}
-WEIGHTS = SCORING_PROFILES[DEFAULT_SCORING_PROFILE]
-SIGNAL_WEIGHT_NAMES = tuple(WEIGHTS.keys())
-
-
-def normalize_scoring_profile_name(profile_name: str | None) -> str:
-    """Normalize a scoring profile name into the canonical internal identifier."""
-
-    normalized = (profile_name or DEFAULT_SCORING_PROFILE).strip().lower().replace("-", "_")
-    return normalized or DEFAULT_SCORING_PROFILE
-
-
-def resolve_scoring_weights(
-    profile_name: str | None = None,
-    overrides: dict[str, float] | None = None,
-) -> dict[str, float]:
-    """Resolve the active scoring weights for a profile plus any runtime overrides."""
-
-    resolved_profile = normalize_scoring_profile_name(profile_name or settings.scoring_profile)
-    base_weights = SCORING_PROFILES.get(resolved_profile)
-    if base_weights is None:
-        available = ", ".join(sorted(SCORING_PROFILES))
-        raise ValueError(f"Unknown scoring profile '{resolved_profile}'. Available profiles: {available}.")
-
-    merged = dict(base_weights)
-    configured_overrides = overrides if overrides is not None else settings.scoring_weight_overrides
-    for signal_name, signal_weight in configured_overrides.items():
-        normalized_name = str(signal_name).strip().lower().replace("-", "_")
-        if normalized_name not in merged:
-            available = ", ".join(SIGNAL_WEIGHT_NAMES)
-            raise ValueError(f"Unknown scoring signal '{signal_name}' in overrides. Expected one of: {available}.")
-        merged[normalized_name] = float(signal_weight)
-        if merged[normalized_name] < 0:
-            raise ValueError(f"Scoring weight for '{normalized_name}' cannot be negative.")
-    return merged
-
-
 def build_mapping_runtime_fingerprint(*, description_priority: bool) -> MappingRuntimeFingerprint:
     """Build a short fingerprint describing the scoring/runtime code used for one mapping response."""
 
@@ -190,7 +102,7 @@ def _maybe_generate_llm_transformation_code(
         user_instruction=AUTO_LLM_TRANSFORMATION_INSTRUCTION,
         provider=llm_provider,
         max_retries=1,
-        timeout_seconds=max(1.0, min(settings.llm_timeout_seconds, 5.0)),
+        timeout_seconds=resolve_bounded_llm_timeout(),
     )
     if response is None or not response.transformation_code:
         return None
@@ -1006,7 +918,11 @@ def is_strong_canonical_concept_match(target: ColumnProfile, knowledge_signal: f
     resolved_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(target.name)
     if resolved_concept_id != target.name:
         return False
-    return knowledge_signal >= 0.85 and canonical_signal >= 0.6
+    sap_policy = resolve_sap_signal_policy()
+    return (
+        knowledge_signal >= sap_policy.strong_canonical_knowledge_min
+        and canonical_signal >= sap_policy.strong_canonical_canonical_min
+    )
 
 
 def compute_final_score(
@@ -1081,10 +997,11 @@ def should_deemphasize_name_signal(
         and signals.knowledge >= settings.strong_concept_lock_min
         and signals.canonical >= settings.strong_concept_lock_min
     )
+    evidence_policy = resolve_signal_evidence_policy()
     has_business_concept_lock = (
-        signals.semantic >= 0.60
-        and signals.knowledge >= 0.95
-        and signals.canonical >= 0.75
+        signals.semantic >= evidence_policy.business_concept_lock_semantic_min
+        and signals.knowledge >= evidence_policy.business_concept_lock_knowledge_min
+        and signals.canonical >= evidence_policy.business_concept_lock_canonical_min
     )
     return has_semantic_concept_lock or has_business_concept_lock
 
@@ -1100,9 +1017,10 @@ def strong_concept_lock_deemphasized_signals(
         return set()
 
     deemphasized = {"name"}
-    if "pattern" in active_signal_names and signals.pattern <= 0.2:
+    evidence_policy = resolve_signal_evidence_policy()
+    if "pattern" in active_signal_names and signals.pattern <= evidence_policy.weak_pattern_deemphasis_max:
         deemphasized.add("pattern")
-    if "overlap" in active_signal_names and signals.overlap <= 0.1:
+    if "overlap" in active_signal_names and signals.overlap <= evidence_policy.weak_overlap_deemphasis_max:
         deemphasized.add("overlap")
     return deemphasized
 
@@ -1161,19 +1079,35 @@ def compute_sap_confidence_boost(signals: ScoringSignals, sap_profile: SourceSap
     if sap_profile is None:
         return 0.0
 
+    sap_policy = resolve_sap_signal_policy()
     boost = 0.0
-    if sap_profile.has_sap_table_field_context and signals.knowledge >= 0.65 and signals.canonical >= 0.45:
+    if (
+        sap_profile.has_sap_table_field_context
+        and signals.knowledge >= sap_policy.table_field_knowledge_min
+        and signals.canonical >= sap_policy.table_field_canonical_min
+    ):
         boost = settings.sap_table_field_context_boost
-        if sap_profile.has_pir_table_field_context and signals.knowledge >= 0.75 and signals.canonical >= 0.55:
+        if (
+            sap_profile.has_pir_table_field_context
+            and signals.knowledge >= sap_policy.pir_table_field_knowledge_min
+            and signals.canonical >= sap_policy.pir_table_field_canonical_min
+        ):
             boost = settings.sap_pir_table_field_context_boost
 
     exact_code_boost = 0.0
     if sap_profile.exact_canonical_concept_id:
-        if signals.canonical >= 0.85:
+        if signals.canonical >= sap_policy.exact_code_canonical_strong_min:
             exact_code_boost = settings.sap_exact_code_canonical_strong_boost
-        elif signals.canonical >= 0.70 and signals.knowledge >= 0.60:
+        elif (
+            signals.canonical >= sap_policy.exact_code_canonical_medium_min
+            and signals.knowledge >= sap_policy.exact_code_knowledge_medium_min
+        ):
             exact_code_boost = settings.sap_exact_code_canonical_medium_boost
-        elif sap_profile.has_pir_table_field_context and signals.canonical >= 0.55 and signals.knowledge >= 0.55:
+        elif (
+            sap_profile.has_pir_table_field_context
+            and signals.canonical >= sap_policy.exact_code_pir_canonical_min
+            and signals.knowledge >= sap_policy.exact_code_pir_knowledge_min
+        ):
             exact_code_boost = settings.sap_exact_code_canonical_pir_boost
 
     return boost + exact_code_boost
@@ -1189,7 +1123,11 @@ def is_sap_pir_slice_source(source: ColumnProfile) -> bool:
 def is_sap_anchor_preserved(signals: ScoringSignals) -> bool:
     """Return whether a candidate has enough business evidence to preserve a SAP anchor."""
 
-    return signals.knowledge >= 0.75 or signals.canonical >= 0.6
+    sap_policy = resolve_sap_signal_policy()
+    return (
+        signals.knowledge >= sap_policy.anchor_preserved_knowledge_min
+        or signals.canonical >= sap_policy.anchor_preserved_canonical_min
+    )
 
 
 def sap_business_anchor_floor(source: ColumnProfile, signals: ScoringSignals) -> float:
@@ -1200,10 +1138,13 @@ def sap_business_anchor_floor(source: ColumnProfile, signals: ScoringSignals) ->
     if not is_sap_anchor_preserved(signals):
         return 0.0
 
+    sap_policy = resolve_sap_signal_policy()
     business_anchor = max(
         signals.knowledge,
-        (0.85 * signals.knowledge) + (0.15 * signals.canonical),
-        (0.70 * signals.knowledge) + (0.30 * signals.canonical),
+        (sap_policy.business_anchor_primary_knowledge_weight * signals.knowledge)
+        + (sap_policy.business_anchor_primary_canonical_weight * signals.canonical),
+        (sap_policy.business_anchor_secondary_knowledge_weight * signals.knowledge)
+        + (sap_policy.business_anchor_secondary_canonical_weight * signals.canonical),
     )
     return clamp_score(business_anchor - settings.sap_business_signal_max_dilution)
 
@@ -1221,17 +1162,20 @@ def has_strong_identifier_consensus(
             if float(getattr(signals, signal_name, 0.0) or 0.0) != 0.0
         }
 
+    evidence_policy = resolve_signal_evidence_policy()
     has_business_consensus = (
-        ("knowledge" in active_signal_names and signals.knowledge >= 0.95)
-        or ("canonical" in active_signal_names and signals.canonical >= 0.75)
+        ("knowledge" in active_signal_names and signals.knowledge >= evidence_policy.identifier_business_knowledge_min)
+        or ("canonical" in active_signal_names and signals.canonical >= evidence_policy.identifier_business_canonical_min)
     )
     has_value_consensus = (
         "overlap" in active_signal_names
-        and signals.overlap >= 0.95
+        and signals.overlap >= evidence_policy.identifier_value_overlap_min
         and "statistical" in active_signal_names
-        and signals.statistical >= 0.95
+        and signals.statistical >= evidence_policy.identifier_value_statistical_min
     )
-    has_pattern_consensus = "pattern" not in active_signal_names or signals.pattern >= 0.95
+    has_pattern_consensus = (
+        "pattern" not in active_signal_names or signals.pattern >= evidence_policy.identifier_pattern_min
+    )
     has_llm_consensus = "llm" in active_signal_names and signals.llm >= settings.strong_identifier_llm_min_confidence
     return has_business_consensus and has_value_consensus and has_pattern_consensus and has_llm_consensus
 
@@ -1249,16 +1193,20 @@ def canonical_core_identifier_floor(
     bridge but weaker lexical similarity than more verbose canonical variants.
     """
 
+    evidence_policy = resolve_signal_evidence_policy()
     resolved_concept_id = metadata_knowledge_service.resolve_canonical_concept_id(target.name)
     if resolved_concept_id != target.name:
         return 0.0
     if not target.name.endswith(".id"):
         return 0.0
-    if signals.knowledge < 0.85:
+    if signals.knowledge < evidence_policy.canonical_core_identifier_knowledge_min:
         return 0.0
-    if source.unique_ratio < 0.9 or source.null_ratio > 0.2:
+    if (
+        source.unique_ratio < evidence_policy.canonical_core_identifier_unique_ratio_min
+        or source.null_ratio > evidence_policy.canonical_core_identifier_null_ratio_max
+    ):
         return 0.0
-    return clamp_score(signals.knowledge - 0.45)
+    return clamp_score(signals.knowledge - evidence_policy.canonical_core_identifier_floor_offset)
 
 
 def sample_overlap_score(source_values: set[str], target_values: set[str]) -> float:
@@ -1492,14 +1440,15 @@ def should_fallback_to_closed_set_no_match(
     if not candidate_scores:
         return False
 
+    evidence_policy = resolve_signal_evidence_policy()
     has_strong_selection_evidence = (
-        selected_score.signals.name >= 0.75
-        or selected_score.signals.semantic >= 0.6
-        or selected_score.signals.knowledge >= 0.6
-        or selected_score.signals.canonical >= 0.6
-        or selected_score.signals.pattern >= 0.8
-        or selected_score.signals.overlap >= 0.5
-        or selected_score.signals.embedding >= 0.65
+        selected_score.signals.name >= evidence_policy.fallback_name_min
+        or selected_score.signals.semantic >= evidence_policy.fallback_semantic_min
+        or selected_score.signals.knowledge >= evidence_policy.fallback_knowledge_min
+        or selected_score.signals.canonical >= evidence_policy.fallback_canonical_min
+        or selected_score.signals.pattern >= evidence_policy.fallback_pattern_min
+        or selected_score.signals.overlap >= evidence_policy.fallback_overlap_min
+        or selected_score.signals.embedding >= evidence_policy.fallback_embedding_min
         or selected_score.signals.correction > 0
     )
     if has_strong_selection_evidence:
@@ -1607,6 +1556,7 @@ def build_explanation(
 ) -> list[str]:
     """Build the human-readable explanation lines that accompany a scored candidate."""
 
+    evidence_policy = resolve_signal_evidence_policy()
     explanation: list[str] = []
     correction_feedback = correction_store.describe_feedback(source.name, target.name)
 
@@ -1618,7 +1568,7 @@ def build_explanation(
         explanation.append(
             f"Strong pattern alignment: source {', '.join(source.detected_patterns)} matches target {', '.join(target.detected_patterns)}."
         )
-    if signals.semantic >= 0.6:
+    if signals.semantic >= evidence_policy.explanation_semantic_min:
         explanation.append("Semantic tokens align after abbreviation expansion and synonym enrichment.")
     if description_priority and (source.description or source.declared_type):
         explanation.append(
@@ -1640,13 +1590,13 @@ def build_explanation(
                 prefer_metadata_text=description_priority,
             )
         )
-    if signals.name >= 0.75:
+    if signals.name >= evidence_policy.explanation_name_min:
         explanation.append("Field names are lexically very similar.")
     if signals.overlap > 0:
         explanation.append(f"Sample overlap detected across representative values ({signals.overlap:.2f}).")
     if signals.statistical >= 0.7:
         explanation.append("Null ratio, uniqueness, and average length are compatible.")
-    if signals.embedding >= 0.65:
+    if signals.embedding >= evidence_policy.explanation_embedding_min:
         explanation.append("Embedding similarity reinforces the candidate after semantic normalization.")
     elif embedding_enabled():
         explanation.append("Embedding signal was evaluated but remained weaker than the heuristic signals.")
@@ -1688,15 +1638,13 @@ def build_explanation(
 def score_to_label(score: float, *, source: ColumnProfile | None = None) -> str:
     """Map a numeric confidence score into Semantra's confidence label buckets."""
 
-    high_threshold = settings.high_confidence_threshold
-    medium_threshold = settings.medium_confidence_threshold
-    if source is not None and is_sap_pir_slice_source(source):
-        high_threshold = settings.sap_pir_high_confidence_threshold
-        medium_threshold = settings.sap_pir_medium_confidence_threshold
+    thresholds = resolve_decision_threshold_policy(
+        is_sap_pir=bool(source is not None and is_sap_pir_slice_source(source))
+    )
 
-    if score >= high_threshold:
+    if score >= thresholds.high_confidence:
         return "high_confidence"
-    if score >= medium_threshold:
+    if score >= thresholds.medium_confidence:
         return "medium_confidence"
     return "low_confidence"
 
@@ -1704,10 +1652,10 @@ def score_to_label(score: float, *, source: ColumnProfile | None = None) -> str:
 def label_to_status(score: float, *, source: ColumnProfile | None = None) -> str:
     """Map a numeric score into the default review status for auto-mapping results."""
 
-    auto_accept_threshold = settings.auto_accept_threshold
-    if source is not None and is_sap_pir_slice_source(source):
-        auto_accept_threshold = settings.sap_pir_auto_accept_threshold
+    thresholds = resolve_decision_threshold_policy(
+        is_sap_pir=bool(source is not None and is_sap_pir_slice_source(source))
+    )
 
-    if score >= auto_accept_threshold:
+    if score >= thresholds.auto_accept:
         return "accepted"
     return "needs_review"

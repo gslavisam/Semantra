@@ -44,6 +44,10 @@ from app.models.mapping import (
     TransformationTestSetRecord,
     UserCorrectionEntry,
 )
+from app.models.schema import PersistedDatasetRecord
+
+
+SQLITE_BUSY_TIMEOUT_MS = 5000
 
 
 class SQLitePersistenceService:
@@ -57,10 +61,16 @@ class SQLitePersistenceService:
     def connection(self):
         """Yield a commit-on-success SQLite connection scoped to one persistence operation."""
 
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=SQLITE_BUSY_TIMEOUT_MS / 1000)
         try:
+            connection.execute("PRAGMA journal_mode=WAL")
+            connection.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
+            connection.execute("PRAGMA foreign_keys=ON")
             yield connection
             connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
         finally:
             connection.close()
 
@@ -126,6 +136,23 @@ class SQLitePersistenceService:
                     payload TEXT NOT NULL
                 )
                 """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS uploaded_datasets (
+                    dataset_id TEXT PRIMARY KEY,
+                    dataset_name TEXT NOT NULL,
+                    storage_mode TEXT NOT NULL,
+                    source_format TEXT NOT NULL,
+                    selected_table TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    payload TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_uploaded_datasets_updated_at ON uploaded_datasets (updated_at)"
             )
             connection.execute(
                 """
@@ -1832,6 +1859,67 @@ class SQLitePersistenceService:
     def clear_draft_sessions(self) -> None:
         with self.connection() as connection:
             connection.execute("DELETE FROM draft_sessions")
+
+    def save_uploaded_dataset(self, record: PersistedDatasetRecord) -> PersistedDatasetRecord:
+        payload = record.model_dump_json()
+        created_at = record.created_at or datetime.now(UTC).isoformat()
+        updated_at = record.updated_at or created_at
+        with self.connection() as connection:
+            existing = connection.execute(
+                "SELECT created_at FROM uploaded_datasets WHERE dataset_id = ?",
+                (record.dataset_id,),
+            ).fetchone()
+            if existing is not None:
+                created_at = str(existing[0] or created_at)
+            connection.execute(
+                """
+                INSERT INTO uploaded_datasets (
+                    dataset_id,
+                    dataset_name,
+                    storage_mode,
+                    source_format,
+                    selected_table,
+                    created_at,
+                    updated_at,
+                    payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(dataset_id) DO UPDATE SET
+                    dataset_name = excluded.dataset_name,
+                    storage_mode = excluded.storage_mode,
+                    source_format = excluded.source_format,
+                    selected_table = excluded.selected_table,
+                    updated_at = excluded.updated_at,
+                    payload = excluded.payload
+                """,
+                (
+                    record.dataset_id,
+                    record.dataset_name,
+                    record.storage_mode,
+                    record.source_format,
+                    record.selected_table,
+                    created_at,
+                    updated_at,
+                    payload,
+                ),
+            )
+        return record.model_copy(update={"created_at": created_at, "updated_at": updated_at})
+
+    def get_uploaded_dataset(self, dataset_id: str) -> PersistedDatasetRecord:
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT payload, created_at, updated_at FROM uploaded_datasets WHERE dataset_id = ?",
+                (dataset_id,),
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown dataset_id: {dataset_id}")
+        payload = json.loads(row[0])
+        payload["created_at"] = payload.get("created_at") or row[1]
+        payload["updated_at"] = payload.get("updated_at") or row[2]
+        return PersistedDatasetRecord.model_validate(payload)
+
+    def clear_uploaded_datasets(self) -> None:
+        with self.connection() as connection:
+            connection.execute("DELETE FROM uploaded_datasets")
 
     def _catalog_record_from_row(self, row: sqlite3.Row | tuple[object, ...]) -> CatalogIntegrationRecord:
         return CatalogIntegrationRecord(

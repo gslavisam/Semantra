@@ -5,6 +5,53 @@ Ovaj dokument je strogo hronološki ledger isporučenih slice-ova i završenih t
 Za današnje stanje proizvoda koristi `current_state.md`.
 Za plan i backlog koristi `plan.md` i `epics.md`.
 
+## 2026-06-01
+
+### Operational hardening: minimal sync backpressure boundary for long mapping and bounded LLM routes
+
+Isporučeno:
+
+- dodat je `runtime_capacity_service` kao uzak local-runtime guard za dve lane grupe: `sync mapping` i `bounded LLM`
+- `/mapping/auto` i `/mapping/canonical` sada imaju jasan overload contract: kada je sync mapping lane pun, vraćaju `429` sa `Retry-After` i upućuju caller-a na postojeće `/mapping/auto/jobs` i `/mapping/canonical/jobs` fallback putanje
+- bounded LLM guard sada pokriva `/mapping/refine` kada koristi LLM, plus `/mapping/analysis/summary`, `/mapping/analysis/narration`, `/mapping/review-plan`, `/mapping/workspace-guidance`, `/mapping/codegen/refine`, `/mapping/transformation/generate` i `/mapping/transformation/spec/propose`
+- uvedeni su eksplicitni runtime settings za taj boundary: `sync_mapping_max_concurrent_requests`, `bounded_llm_max_concurrent_requests` i `runtime_capacity_retry_after_seconds`
+- fokusirani backend smoke testovi potvrđuju i fail-fast overload signal i non-regression na success putanjama za analysis, review-plan, workspace-guidance, transformation generation i transformation spec proposal
+
+Ishod:
+
+- Semantra lokalni backend više ne dozvoljava potpuno neograničeno gomilanje dužih sync mapping i bounded LLM request-ova na istom runtime-u
+- wave je namerno ostao mali: nije uveden novi generički async job model za sve guidance/LLM response tipove, već samo prvi održivi backpressure boundary pre šireg async/generalization refactora
+
+### Engine cleanup: mapping policy extraction for SAP calibration and decision thresholds
+
+Isporučeno:
+
+- dodat je `mapping_policy.py` kao poseban policy sloj za scoring profile, decision thresholds i SAP/signal-evidence pragove
+- `mapping_service.py` više ne nosi lokalne kopije scoring profile definicija niti razasute threshold odluke za confidence label, auto-accept i SAP calibration branch-eve
+- `score_to_label()` i `label_to_status()` sada koriste isti centralni `DecisionThresholdPolicy` resolver, uključujući SAP PIR override putanju
+- SAP calibration i signal-evidence pragovi za canonical lock, SAP boost, business-anchor floor, strong identifier consensus, canonical core identifier floor i closed-set fallback sada su poravnati kroz centralne policy objekte
+- fokusirani mapping-engine testovi potvrđuju da cleanup nije promenio postojeći scoring contract
+
+Ishod:
+
+- Semantra engine je i dalje funkcionalno isti, ali je sledeći refactor korak sada realno manji: scoring/threshold politika je izdvojena iz glavnog execution modula i više nije zalepljena uz SAP branch logiku u više nepovezanih funkcija
+
+### Operational hardening: durable upload state, SQLite stability, and timeout contract cleanup
+
+Isporučeno:
+
+- `upload_store` više nije jedini in-memory source istine za uploaded dataset handle-ove; uveden je novi `uploaded_dataset_repository` i SQLite-backed `uploaded_datasets` contract iza istog backend façade-a
+- uploaded dataset persistence sada čuva `dataset_id`, `dataset_name`, `schema_profile`, bounded `preview_rows` i ingest lineage metadata (`storage_mode`, `source_format`, `selected_table`, timestamps`) bez promene postojećeg `/upload` i `/mapping` API contract-a
+- ordinary backend reload više ne ruši minimalni `dataset_id` lookup za postojeći `upload -> mapping -> preview` scope; fokusirani smoke testovi potvrđuju reload-safe `mapping/auto` i `mapping/preview` tokove posle brisanja samo in-memory cache-a
+- SQLite connection bootstrap je operativno ojačan kroz `WAL`, `busy_timeout`, `foreign_keys=ON` i eksplicitni rollback na exception putanji
+- bounded LLM timeout ponašanje više nije razasuto kroz skrivene literalne clamp-ove; uvedeni su eksplicitni `llm_bounded_timeout_seconds` i `llm_probe_timeout_seconds` settings plus centralni helper-i za bounded JSON i probe putanje
+- fokusirani backend testovi pokrivaju reload-safe dataset lookup, SQLite hardening regression i timeout contract behavior
+
+Ishod:
+
+- Semantra sada ima stabilniji pilot runtime contract za glavni upload-based Workspace tok bez širenja scope-a na puni DB-native workspace redesign ili širi async/backend-worker refactor
+- upload dataset handle je postao stvarni durable backend anchor, dok su UI orchestration state, generated guidance/output paneli i ostali transient Workspace signali namerno ostali van ovog wave-a
+
 ## 2026-05-31
 
 ### Workspace Copilot closure and output-guidance addendum

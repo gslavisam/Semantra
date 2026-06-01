@@ -1,6 +1,6 @@
 # Semantra Current State
 
-As of 2026-05-31, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, reuse discovery, and a first pilot RBAC slice for selected mapping-governance surfaces. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
+As of 2026-06-01, Semantra is a pilot-ready semantic integration workbench built around a FastAPI backend, a Streamlit product UI, and a SQLite persistence layer. It already supports end-to-end analyst workflows from upload and schema profiling through mapping review, transformation authoring, guided explanation, governed artifact persistence, canonical knowledge management, benchmark evaluation, reuse discovery, and a first pilot RBAC slice for selected mapping-governance surfaces. It is not yet a production-grade execution platform with persistent background workers, release packaging, or a DB-only canonical authoring model.
 
 ## Product Posture
 
@@ -33,6 +33,7 @@ The product already persists a substantial part of its governed domain model in 
 
 These slices already live in SQLite and are part of the current durable backend model:
 
+- uploaded dataset handles with bounded preview payloads and ingest lineage (`uploaded_datasets`)
 - mapping-set governance records and version payloads (`mapping_sets`)
 - catalog discovery projections and concept usage read models (`mapping_catalog_entries`, `mapping_catalog_concepts`)
 - draft-session persistence for the current minimal save/list/load flow (`draft_sessions`)
@@ -65,7 +66,7 @@ This is why the current product should be described as `DB-first runtime` rather
 
 These slices still rely heavily on `st.session_state` and are not yet modeled as durable collaborative domain entities:
 
-- active upload response and current profiled dataset handles in the browser session
+- active upload response wrapper and the surrounding Workspace/UI orchestration around already-persisted dataset handles
 - current mapping response, review filters, queue focus, and editor selections
 - generated explanation, preview, codegen, and refinement panels that are intentionally rebuilt or cleared
 - API base URL, admin token, backend reachability snapshot, and similar UI connection state
@@ -115,6 +116,8 @@ Implemented:
 
 Current behavior of the new recovery slice:
 
+- uploaded dataset handles are now durably persisted in SQLite behind the existing `dataset_store` façade, including bounded `preview_rows` and ingest lineage metadata
+- ordinary backend reload no longer invalidates the minimal `dataset_id` lookup contract needed by upload -> mapping -> preview tokovi that already rely on `dataset_store`
 - `POST /upload/spec/recover` returns a bounded recovery proposal instead of silently persisting anything
 - deterministic replay through the existing `schema-spec` parser still decides whether the proposed layout is actually valid
 - `Workspace > Setup` and companion-metadata flows surface the proposal, confidence, warnings, and manual override fields explicitly
@@ -151,7 +154,9 @@ Important current behavior:
 - mappings with score `>= 0.75` are currently auto-accepted even if the label remains `medium_confidence`
 - canonical mode can narrow the initial search to a configurable likely-candidate pool before full scoring; the UI default is currently `10`
 - async job API contract stays `start`, `poll status`, and `cancel`, but runtime state now survives ordinary in-process object churn because status/progress are read from SQLite
+- sync `mapping/auto` and `mapping/canonical` routes now have a small local backpressure boundary: when their sync lane is full, the backend returns `429` with `Retry-After` and points callers to the existing `/jobs` variants instead of silently piling more long requests onto the same local runtime
 - finished jobs keep the same retention contract: up to `32` retained finished rows with a `900s` TTL; interrupted active jobs are marked `failed` on restart instead of remaining stuck in `running`
+- scoring profiles, decision thresholds, and SAP calibration cutoffs are now centralized in `backend/app/services/mapping_policy.py` instead of being scattered across multiple independent branches inside `mapping_service.py`
 
 Main code surfaces:
 
@@ -185,6 +190,7 @@ Important current behavior:
 - these guidance surfaces do not auto-approve or auto-apply durable changes
 - they are designed to stay close to a concrete local workflow step
 - they use deterministic fallback behavior when LLM output is unavailable or invalid
+- bounded LLM guidance and output-helper routes now also use a small local concurrency guard; under saturation they fail fast with `429` and `Retry-After` instead of queuing an unbounded number of long local LLM requests
 - proposal generation in Review remains advisory until explicit apply actions are executed in Decisions
 - Workspace Copilot can now summarize whether Review is actually closed enough to hand off into Decisions, instead of only exposing row-level refine/proposal actions in isolation
 - the same bounded closure/output questions are now exposed both through sidebar quick-ask and through the main `Workspace Copilot` panel inside the active `Workspace` section, so the user does not need to switch surfaces to reach them

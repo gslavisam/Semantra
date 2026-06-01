@@ -281,6 +281,244 @@ Napomena:
 - [x] Uvesti uske repository slojeve za stewardship queue, catalog discovery, mapping-set governance i knowledge runtime snapshot pristup.
 - [ ] Širiti normalizaciju dalje samo kada nove discovery/governance površine pokažu da je to stvarno potrebno.
 
+### 6A. Durable upload state, SQLite stability, and timeout contract cleanup
+
+Status: completed current execution wave.
+
+Zašto je ovaj wave izabran sada:
+
+- `upload_store` i dalje drži aktivne dataset handle-ove samo u memoriji, pa ordinary backend reload i dalje može da slomi `dataset_id` anchor i restore/preview/codegen tokove
+- SQLite je već legitiman pilot backend za Semantru, ali connection contract još nije dovoljno operativno ojačan za mirniji lokalni multi-request rad
+- `llm_timeout_seconds` trenutno nije jedinstveno poštovan kroz sve bounded LLM putanje, pa runtime config nije potpuno istinit operativni ugovor
+
+Šta ovaj wave jeste:
+
+- uzak backend/runtime hardening slice nad postojećim API contract-om
+- fokus na trajnosti dataset anchor-a, stabilnijem SQLite connection ponašanju i usaglašenom timeout contract-u
+
+Šta ovaj wave nije:
+
+- nije puni `workspace` DB-native redesign
+- nije prelazak na broker/worker queue ili širi async backend refactor
+- nije mapping-engine decomposition wave
+- nije SAP knowledge/model refactor wave
+
+Operativna odluka za scope:
+
+- `async` backend ostaje follow-up tema posle ovog wave-a, osim ako tokom ove implementacije uski testovi pokažu da je blocking LLM boundary sada glavni realni pilot problem
+- embedding durable cache ostaje van scope-a ovog wave-a jer je trenutni embedding provider i dalje `none` ili deterministic `hash`, pa nema dokazano skupog eksternog embedding poziva koji sada traži persistence sloj
+- SAP hardcoding i šira signal/weight konsolidacija ostaju carry-forward refactor teme, ne blokiraju ovaj hardening slice
+
+Precizni ciljevi prvog execution slice-a:
+
+- uvesti durable backend identitet za uploaded dataset handle i schema-profile lineage bez razbijanja postojećeg `/upload` -> `/mapping` contract-a
+- ojačati SQLite connection/runtime ponašanje tako da lokalni pilot režim bude otporniji na `database is locked` i sličan connection drift
+- poravnati LLM timeout ponašanje tako da `settings.llm_timeout_seconds` ili jasno izvedeni bounded timeout setting zaista bude authoritative runtime contract
+
+Checklist za implementaciju:
+
+- [x] Potvrditi tačne read/write tačke koje danas zavise od `upload_store` in-memory dataset state-a (`upload`, companion enrichment, preview, mapping, draft restore) i zapisati minimalni durable contract koji te putanje zaista traže.
+Potvrđeni inventory za prvi slice:
+
+- write ulazi su koncentrisani u `backend/app/api/routes/upload.py`: `/upload/spec` i `parse_and_store_upload()` upisuju dataset handle kroz `save_schema_profile()` ili `save_rows()`, dok `/upload/handle/metadata` radi in-place enrichment kroz `merge_companion_metadata()`
+- live read površine su koncentrisane u `backend/app/api/routes/mapping.py`: `/mapping/auto`, `/mapping/auto/jobs`, `/mapping/canonical`, `/mapping/canonical/jobs`, `/mapping/refine`, `_resolve_refinement_target_schema()` i `/mapping/transformation/generate` traže lookup po `source_dataset_id` / `target_dataset_id`, ali koriste samo `handle.schema_profile`
+- `/mapping/preview` je jedina aktivna backend putanja koja danas poseže za `source.rows`; pritom `preview_service.build_preview()` i `transformation_service.build_transformed_target_frame()` koriste samo prvih 10 redova, a endpoint već ima fallback `source_preview_rows` contract za slučaj da lookup po `dataset_id` padne
+- `draft session` restore nije primarno vezan za live `dataset_store` lookup: `DraftSessionCreateRequest` i `DraftSessionDetail` već persisitiraju `source_handle` / `target_handle` snapshot payload, pa minimalni restore-worthy review/decisions/output tok već radi nad snapshot contract-om, ne nad obaveznim ponovnim čitanjem iz `upload_store`
+
+Minimalni durable contract potvrđen ovim prolazom:
+
+- obavezno: `dataset_id`, `dataset_name`, `schema_profile`
+- potrebno za postojeći preview i upload response surface: bounded `preview_rows`
+- potrebno za metadata lineage i kasniji restore/debug: lightweight ingest metadata (`storage_mode`, `source_format`, opcioni `selected_table` / spec lineage marker)
+- nije dokazano potrebno za prvi hardening slice: neograničeni full row payload; trenutni backend behavior pokazuje da je bounded preview payload dovoljan za postojeći preview contract, dok mapping/refine/codegen lookup-i rade nad schema handle-om
+- [x] Definisati uski persisted dataset model: `dataset_id`, `dataset_name`, `schema_profile`, bounded `preview_rows`, dovoljno lineage metadata i samo onaj raw/derived payload koji je potreban za postojeće restore i preview tokove.
+Prva-wave odluka za model:
+
+- authoritative persistent ključ ostaje postojeći `dataset_id: str`, bez uvođenja novog numeričkog upload identiteta u ovom slice-u
+- durable payload čuva `dataset_id`, `dataset_name`, `schema_profile`, bounded `preview_rows` i mali ingest metadata envelope (`storage_mode`, `source_format`, `selected_table`, `created_at`, opciono `updated_at`)
+- `schema_profile.row_count` ostaje deo authoritative profila; ne uvodi se odvojeni duplicate row-count field osim ako migracioni/write path to kasnije zatraži radi query optimizacije
+- full raw rows ne ulaze u prvi persistent contract; za postojeći backend preview behavior authoritative ostaje bounded `preview_rows`, jer current preview ionako koristi samo prvih 10 redova
+- companion metadata merge i SQL/schema-spec lineage ažuriraju isti persistent dataset payload, ne otvaraju poseban secondary resource tip
+
+- [x] Izabrati gde taj model živi: uski repository/service sloj iznad SQLite-a, bez uvlačenja celog upload lifecycle-a direktno u široki `persistence_service` surface više nego što je neophodno.
+Prva-wave odluka za smeštaj:
+
+- dodaje se novi uzak repository sloj tipa `uploaded_dataset_repository.py`, po istom obrascu kao postojeći `draft_session_repository.py`, `mapping_governance_repository.py` i srodni repozitorijumi
+- SQLite tabela i niski CRUD helper-i i dalje žive u `persistence_service.py`, jer je to i dalje centralni schema/migration owner, ali rute i `upload_store` ne treba direktno da zavise od širokog persistence surface-a
+- `dataset_store` ostaje glavni façade za upload runtime: prvo upisuje/čita kroz repository-backed durable store, a lokalni in-memory cache ostaje samo opportunistic hot cache umesto jedinog source-a za dataset lookup
+- API contract (`/upload`, `/upload/handle`, `/upload/handle/metadata`, `/mapping/*`) ostaje nepromenjen; promena je unutrašnja backend persistence zamena, ne novi route surface
+- [x] Implementirati durable dataset save/load contract tako da postojeći `dataset_store` može da ostane façade nad novim backend modelom umesto da API i UI odmah menjaju ceo tok.
+Isporučeno u ovom wave-u:
+
+- `backend/app/services/upload_store.py` više nije single-source in-memory registry; ostaje isti façade, ali čita/piše kroz novi `uploaded_dataset_repository.py` i koristi memoriju samo kao hot cache
+- novi SQLite-backed `uploaded_datasets` contract čuva `dataset_id`, `dataset_name`, `schema_profile`, bounded `preview_rows` i lineage metadata bez promene postojećeg `/upload` i `/mapping` API surface-a
+- `/upload/spec`, row-data upload i SQL snapshot upload sada svi pune isti durable dataset contract sa odgovarajućim `source_format` / `storage_mode` markerima
+- [x] Obezbediti da ordinary backend reload više ne invalidira aktivne `source_dataset_id` / `target_dataset_id` handlere za minimalni restore-worthy scope.
+Potvrđeni ishod:
+
+- `dataset_store.get_dataset()` sada fallback-uje na durable repository kada lokalni cache nema traženi handle
+- fokusirani smoke testovi potvrđuju da `mapping/auto` i `mapping/preview` nastavljaju da rade i posle `dataset_store.clear_memory_cache()` simulacije ordinary backend reload-a
+- [x] Definisati jasnu granicu šta ostaje transient UI/session state, a šta postaje durable upload/runtime entitet, da se ne otvori prerani "persist everything" scope.
+Granica posle ovog wave-a:
+
+- durable backend entitet je uploaded dataset handle sa bounded preview payload-om i ingest lineage metadata
+- `upload_response` wrapper, aktivni Workspace section, review filteri, generated guidance/output panel state i ostala Streamlit orkestracija i dalje ostaju transient/session-local sloj
+- draft-session snapshot i dalje ostaje zaseban continuity contract; ovaj wave ga nije pretvarao u `persist everything` redesign
+- [x] Ojačati SQLite connection contract: WAL režim, razuman `busy_timeout`, eksplicitni rollback na exception putanji i jedan dosledan connection bootstrap za runtime operacije.
+Isporučeno u `persistence_service.connection()`:
+
+- `PRAGMA journal_mode=WAL`
+- `PRAGMA busy_timeout=5000`
+- `PRAGMA foreign_keys=ON`
+- eksplicitni `rollback()` na exception putanji pre zatvaranja konekcije
+- [x] Proveriti da li postoje uski write-hotspot-ovi ili cleanup tokovi kojima treba dodatni serialization/locking guard u lokalnom pilot režimu, bez uvođenja brokera ili lease worker modela.
+Zaključak ovog wave-a:
+
+- dodatni app-level serialization guard nije uveden, jer novi upload-dataset write path radi kroz kratke single-row upsert operacije, a runtime hot cache je već zatvoren postojećim `Lock`-om u `upload_store`
+- za prvi pilot hardening slice `WAL` + `busy_timeout` + rollback contract pokrivaju realni operativni lock rizik bez uvođenja šireg worker/lease modela
+- eventualni budući hotspot ostaje tema samo ako live pilot ili širi test subset pokažu stvarni contention izvan ovog upload slice-a
+- [x] Inventarisati sve LLM putanje koje danas clamp-uju ili zaobilaze `settings.llm_timeout_seconds` i svesti ih na jedan jasan runtime contract.
+Potvrđeni inventory i poravnanje:
+
+- bounded JSON helper i runtime probe helper više ne nose skriveni literalni clamp u telu funkcije
+- transformation-generation bounded path sada koristi isti centralni helper umesto lokalnog `min(..., 5.0)` obrasca u `mapping_service.py`
+- [x] Odlučiti da li bounded LLM operacije ostaju na posebnom kratkom timeout-u; ako ostaju, izvući to u eksplicitno imenovan setting umesto skrivenog `min(..., 5.0)` obrasca u više fajlova.
+Prva-wave odluka:
+
+- bounded LLM operacije ostaju namerno kraće od opšteg `llm_timeout_seconds`
+- to je sada eksplicitno modelovano kroz `llm_bounded_timeout_seconds` i `llm_probe_timeout_seconds`, uz centralne helper-e umesto razasutih literalnih clamp-ova
+- [x] Dodati fokusirane backend testove za: durable dataset round-trip, reload-safe dataset lookup, SQLite hardening regression, i timeout contract ponašanje.
+Potvrđena validacija:
+
+- `tests/test_api_smoke.py -k "survives_dataset_store_memory_reset or survives_dataset_store_memory_reset_with_persisted_preview_rows"` prolazi
+- `tests/test_provider_and_persistence.py -k "sqlite_connection_applies_busy_timeout_and_rollback"` prolazi
+- `tests/test_llm_and_evaluation.py -k "bounded_llm_timeout"` prolazi
+- [x] Posle implementacije ažurirati `current_state.md`, `completed_slices.md` i ovaj dokument u istom wave-u.
+
+Definition of done za ovaj wave:
+
+- uploaded dataset handle više nije samo in-memory anchor za glavni upload -> mapping -> preview tok
+- ordinary backend reload ne ruši minimalni dataset lookup contract za postojeće radne tokove koje eksplicitno podržimo u ovom slice-u
+- SQLite runtime bootstrap koristi jedno dosledno hardening ponašanje za connection/timeout/rollback putanje
+- `llm_timeout_seconds` više nije implicitno ignorisan ili prikriveno clamp-ovan bez jasnog config contract-a
+- fokusirani testovi potvrđuju novi behavior bez regressije na postojećem `/upload`, `/mapping`, `draft session` i output helper scope-u
+
+### 6B. Minimal sync backpressure boundary for long mapping and bounded LLM routes
+
+Status: completed current execution wave.
+
+Zašto je ovaj wave izabran sada:
+
+- `mapping/auto` i `mapping/canonical` već imaju async job varijante, ali sync route-ovi i dalje nisu imali nikakav mali runtime backpressure boundary za lokalni pilot režim
+- bounded guidance i output LLM putanje (`analysis`, `review-plan`, `workspace-guidance`, `artifact refinement`, `transformation generation`) i dalje su išle direktno na request thread bez capacity guard-a
+- cilj je bio da se uvede najmanji održiv operativni boundary pre većeg async/job-generalization refactora
+
+Šta ovaj wave jeste:
+
+- uzak runtime hardening slice za lokalni backend overload scenario
+- eksplicitni `429 + Retry-After` contract kada su duže sync mapping ili bounded LLM lane-ovi puni
+- zadržavanje postojećeg API surface-a uz jasniji fallback na već postojeće async job putanje tamo gde one već postoje
+
+Šta ovaj wave nije:
+
+- nije generički job framework za sve LLM response tipove
+- nije prelazak na broker/worker execution model
+- nije Streamlit polling/UI wave za nove async guidance tokove
+
+Isporučeno u ovom wave-u:
+
+- [x] Identifikovati koje duže request putanje već imaju async fallback, a koje i dalje ostaju potpuno sync i neograničene.
+Potvrđeni scope:
+
+- `mapping/auto` i `mapping/canonical` već imaju `/jobs` fallback i zato su najbolji kandidati za sync backpressure boundary umesto za novi job model
+- preostale bounded LLM putanje ostaju sync, ali sada imaju mali concurrency guard umesto potpunog neograničenog request piling-a
+- [x] Uvesti minimalni runtime capacity service umesto širenja postojećeg `mapping_job_store` modela na nove response tipove.
+Isporučeno:
+
+- dodat je `backend/app/services/runtime_capacity_service.py`
+- uvedeni su odvojeni lane-ovi za `sync mapping` i `bounded LLM` pozive
+- uvedeni su eksplicitni settings: `sync_mapping_max_concurrent_requests`, `bounded_llm_max_concurrent_requests`, `runtime_capacity_retry_after_seconds`
+- [x] Ojačati sync mapping route-ove koji već imaju async fallback tako da vrate jasan backpressure signal umesto da tiho zagušuju lokalni runtime.
+Isporučeno:
+
+- `/mapping/auto` sada vraća `429` sa `Retry-After` i hint-om ka `/mapping/auto/jobs` kada je sync mapping lane pun
+- `/mapping/canonical` sada vraća isti obrazac sa hint-om ka `/mapping/canonical/jobs`
+- [x] Ojačati bounded LLM route-ove malim concurrency guard-om bez menjanja njihovog response shape-a.
+Isporučeno:
+
+- bounded LLM guard sada pokriva `/mapping/refine` kada `use_llm=True`, `/mapping/analysis/summary`, `/mapping/analysis/narration`, `/mapping/review-plan`, `/mapping/workspace-guidance`, `/mapping/codegen/refine`, `/mapping/transformation/generate` i `/mapping/transformation/spec/propose`
+- guard ne menja success payload shape; menja samo overload ponašanje u jasan `429` contract
+- [x] Zadržati granicu tako da fallback/deterministic ponašanje i dalje radi kada LLM provider nije aktivan.
+Potvrđeno ponašanje:
+
+- bounded guidance route-ovi aktiviraju guard samo kada stvarno postoji LLM provider putanja; fallback-only tokovi ne dobijaju lažni overload blok
+- [x] Dodati fokusirane backend testove za backpressure signal i non-regression na susednim success putanjama.
+Potvrđena validacija:
+
+- `tests/test_api_smoke.py -k "test_sync_auto_map_returns_429_when_runtime_capacity_is_full"` prolazi
+- `tests/test_api_smoke.py -k "test_workspace_guidance_returns_429_when_bounded_llm_capacity_is_full"` prolazi
+- `tests/test_api_smoke.py -k "test_auto_map_survives_dataset_store_memory_reset or test_review_plan_returns_structured_clusters_when_llm_is_available or test_workspace_problem_guidance_uses_llm_when_provider_returns_valid_json or test_transformation_spec_proposal_endpoint_returns_structured_spec"` prolazi
+- `tests/test_api_smoke.py -k "test_mapping_analysis_summary_uses_llm_when_provider_returns_valid_json or test_mapping_analysis_narration_returns_fallback_when_provider_missing"` prolazi
+- `tests/test_api_smoke.py -k "test_transformation_generation_endpoint_returns_llm_generated_code"` prolazi
+
+Definition of done za ovaj wave:
+
+- lokalni backend više nema potpuno neograničen sync request piling na najskupljim mapping i bounded LLM putanjama koje su trenutno ostale sync
+- caller dobija jasan `429 + Retry-After` signal umesto tihog request zadržavanja kada je lane pun
+- postojeći success tokovi za mapping analysis, review plan, workspace guidance, transformation generation i transformation spec proposal ostaju netaknuti
+
+### 6C. Mapping policy extraction for SAP calibration and decision thresholds
+
+Status: completed current execution wave.
+
+Zašto je ovaj wave izabran sada:
+
+- `mapping_service.py` je nosio i generički scoring engine i SAP-specifične calibration pragove u istom modulu
+- odluke za confidence label, auto-accept status, SAP boost i closed-set fallback bile su razasute kroz više funkcija i literalnih pragova
+- cilj je bio da se smanji hardcoding i dupliranje bez otvaranja velikog engine decomposition wave-a
+
+Šta ovaj wave jeste:
+
+- uzak internal cleanup slice nad scoring/threshold politikom
+- centralizacija scoring profila i signal pragova bez promene spoljnog API contract-a
+
+Šta ovaj wave nije:
+
+- nije zamena SAP heuristika novim knowledge-model slojem
+- nije novi scoring profile system ili retuning signal weights
+- nije puna podela `mapping_service` na više execution komponenti
+
+Isporučeno u ovom wave-u:
+
+- [x] Izdvojiti scoring profile i threshold politiku iz glavnog mapping engine modula u poseban policy sloj.
+Isporučeno:
+
+- dodat je `backend/app/services/mapping_policy.py`
+- scoring profile definicije i weight resolution više nisu lokalno ugnježdene u `mapping_service.py`
+- [x] Centralizovati odluke za confidence label i auto-accept pragove, uključujući SAP PIR override putanju.
+Isporučeno:
+
+- `score_to_label()` i `label_to_status()` sada koriste isti centralni `DecisionThresholdPolicy` resolver umesto odvojene lokalne threshold grananja
+- [x] Centralizovati SAP calibration pragove i signal-evidence pragove koji su prethodno bili razasuti kroz više funkcija.
+Isporučeno:
+
+- `is_strong_canonical_concept_match()`, `compute_sap_confidence_boost()`, `is_sap_anchor_preserved()`, `sap_business_anchor_floor()`, `has_strong_identifier_consensus()`, `canonical_core_identifier_floor()`, `should_fallback_to_closed_set_no_match()` i explanation threshold odluke sada čitaju pragove iz centralnih policy objekata umesto iz razasutih literalnih vrednosti
+- [x] Zadržati ponašanje engine-a stabilnim i eksplicitno razdvojiti test koji proverava name-deemphasis od testova koji proveravaju SAP boost behavior.
+Potvrđeno:
+
+- SAP name-deemphasis unit test sada eksplicitno zamrzava `source_sap_profile` kada želi da proveri samo deemphasis logiku, dok zasebni SAP anchor/boost testovi i dalje proveravaju pravi runtime behavior
+- [x] Dodati fokusiranu validaciju za scoring profile, SAP calibration i threshold routing posle extraction-a.
+Potvrđena validacija:
+
+- `tests/test_mapping_service.py -k "sap or label_to_status_auto_accepts_scores_above_auto_accept_threshold or scoring_weight_overrides_replace_profile_weights or compute_final_score_normalizes_over_active_weights or mapping_returns_no_match_when_closed_set_is_only_weak_candidates"` prolazi
+- statička provera nad `mapping_policy.py`, `mapping_service.py` i `test_mapping_service.py` je čista
+
+Definition of done za ovaj wave:
+
+- SAP calibration i decision-threshold politika više nisu razasute kroz engine kao niz nepovezanih literalnih pragova
+- scoring profile i threshold odluke imaju jedan centralni policy sloj koji se može dalje refaktorisati bez ponovnog kopanja po celom `mapping_service.py`
+- behavior-scoped mapping testovi potvrđuju da cleanup nije promenio postojeći scoring contract
+
 ### 7. Minimal identity + durable jobs
 
 Status: closed as the first backend identity + durable-jobs wave.

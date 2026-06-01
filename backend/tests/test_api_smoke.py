@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 import json
 import time
 from io import BytesIO
@@ -21,6 +22,7 @@ from app.services.llm_service import StaticLLMProvider, build_artifact_refinemen
 from app.services.mapping_job_service import MappingJobCapacityError, mapping_job_store
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.services.persistence_service import persistence_service
+from app.services.runtime_capacity_service import runtime_capacity_guard
 from app.services.upload_store import dataset_store
 
 
@@ -31,6 +33,7 @@ client = TestClient(app)
 def isolate_api_smoke_runtime(tmp_path: Path):
     original_db_path = persistence_service.db_path
     persistence_service.reconfigure(str(tmp_path / "api_smoke.sqlite3"))
+    runtime_capacity_guard.reset()
     dataset_store.clear()
     decision_log_store.clear()
     correction_store.clear()
@@ -48,6 +51,7 @@ def isolate_api_smoke_runtime(tmp_path: Path):
     settings.admin_api_token = ""
     yield
     persistence_service.reconfigure(original_db_path)
+    runtime_capacity_guard.reset()
     dataset_store.clear()
     decision_log_store.clear()
     correction_store.clear()
@@ -76,6 +80,142 @@ def test_upload_returns_schema_profiles_and_dataset_ids() -> None:
     assert payload["target"]["dataset_id"]
     assert payload["source"]["schema_profile"]["columns"][0]["name"] == "cust_id"
     assert payload["target"]["schema_profile"]["columns"][1]["name"] == "phone_number"
+
+
+def test_auto_map_survives_dataset_store_memory_reset() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n2,0659998888\n"), "text/csv"),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_id,phone_number\n1,0641234567\n2,0659998888\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+    dataset_store.clear_memory_cache()
+
+    response = client.post(
+        "/mapping/auto",
+        json={
+            "source_dataset_id": payload["source"]["dataset_id"],
+            "target_dataset_id": payload["target"]["dataset_id"],
+            "use_llm": False,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["mappings"]
+
+
+def test_preview_survives_dataset_store_memory_reset_with_persisted_preview_rows() -> None:
+    upload_response = client.post(
+        "/upload",
+        files={
+            "source_file": ("source.csv", csv_bytes("cust_id,phone\n1,0641234567\n2,0659998888\n"), "text/csv"),
+            "target_file": (
+                "target.csv",
+                csv_bytes("customer_id,phone_number\n1,0641234567\n2,0659998888\n"),
+                "text/csv",
+            ),
+        },
+    )
+
+    assert upload_response.status_code == 200
+    payload = upload_response.json()
+    dataset_store.clear_memory_cache()
+
+    response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": payload["source"]["dataset_id"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "phone", "target": "phone_number", "status": "accepted"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    preview = response.json()["preview"]
+    assert preview
+    assert preview[0]["values"]["customer_id"] == "1"
+
+
+def test_sync_auto_map_returns_429_when_runtime_capacity_is_full() -> None:
+    upload_payload = upload_example_datasets()
+
+    with ExitStack() as stack:
+        for _ in range(runtime_capacity_guard.sync_mapping_capacity):
+            stack.enter_context(
+                runtime_capacity_guard.acquire_sync_mapping_slot(
+                    route_path="/test/sync-capacity",
+                    retry_path="/mapping/auto/jobs",
+                )
+            )
+
+        response = client.post(
+            "/mapping/auto",
+            json={
+                "source_dataset_id": upload_payload["source"]["dataset_id"],
+                "target_dataset_id": upload_payload["target"]["dataset_id"],
+                "use_llm": False,
+            },
+        )
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == str(settings.runtime_capacity_retry_after_seconds)
+    assert "/mapping/auto/jobs" in response.json()["detail"]
+
+
+def test_workspace_guidance_returns_429_when_bounded_llm_capacity_is_full() -> None:
+    provider = StaticLLMProvider(
+        json.dumps(
+            {
+                "title": "Workspace problem guidance",
+                "disposition": "in_scope",
+                "normalized_problem": "Need to finish a customer output.",
+                "scope_reason": "Matched capabilities: Review, Output.",
+                "answer": "This request belongs to Review first, then Output.",
+                "capability_hits": ["Review", "Output"],
+                "recommended_sections": ["Review", "Output"],
+                "recommended_steps": ["Open Review.", "Open Output."],
+                "prompt_template": "Goal: ...",
+                "input_format_fields": ["Goal"],
+            }
+        )
+    )
+
+    with ExitStack() as stack:
+        for _ in range(runtime_capacity_guard.bounded_llm_capacity):
+            stack.enter_context(runtime_capacity_guard.acquire_bounded_llm_slot(route_path="/test/llm-capacity"))
+
+        with patch("app.api.routes.mapping.build_provider_from_settings", return_value=provider):
+            response = client.post(
+                "/mapping/workspace-guidance",
+                json={
+                    "problem_statement": "Need to finish a customer output with transformation rules.",
+                    "workspace": {
+                        "mapping_mode": "standard",
+                        "source_dataset_name": "customer_source.csv",
+                        "target_dataset_name": "customer_target.csv",
+                    },
+                    "capability_snapshot": {
+                        "section": "Review",
+                        "has_upload": True,
+                        "mapping_ready": True,
+                    },
+                },
+            )
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == str(settings.runtime_capacity_retry_after_seconds)
+    assert "/mapping/workspace-guidance" in response.json()["detail"]
 
 
 def test_sql_table_discovery_returns_available_tables() -> None:

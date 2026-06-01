@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -74,6 +75,7 @@ from app.services.review_plan_service import build_review_plan
 from app.services.mapping_service import generate_mapping_candidates, refine_mapping_for_source
 from app.services.persistence_service import DraftSessionStaleWriteError, persistence_service
 from app.services.preview_service import build_preview
+from app.services.runtime_capacity_service import RuntimeCapacityError, runtime_capacity_guard
 from app.services.source_field_hint_service import apply_inline_source_field_hint, apply_source_field_hints
 from app.services.transformation_test_service import run_transformation_test_set
 from app.services.transformation_template_service import list_transformation_templates
@@ -89,6 +91,35 @@ from app.services.virtual_target_service import (
 
 
 router = APIRouter(prefix="/mapping", tags=["mapping"])
+
+
+def _runtime_capacity_http_exception(error: RuntimeCapacityError) -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail=str(error),
+        headers={"Retry-After": str(error.retry_after_seconds)},
+    )
+
+
+@contextmanager
+def _sync_mapping_capacity_guard(*, route_path: str, retry_path: str):
+    try:
+        with runtime_capacity_guard.acquire_sync_mapping_slot(route_path=route_path, retry_path=retry_path):
+            yield
+    except RuntimeCapacityError as error:
+        raise _runtime_capacity_http_exception(error) from error
+
+
+@contextmanager
+def _bounded_llm_capacity_guard(*, route_path: str, enabled: bool):
+    if not enabled:
+        yield
+        return
+    try:
+        with runtime_capacity_guard.acquire_bounded_llm_slot(route_path=route_path):
+            yield
+    except RuntimeCapacityError as error:
+        raise _runtime_capacity_http_exception(error) from error
 
 
 def _principal_actor_constraint(
@@ -327,14 +358,15 @@ async def auto_map(request: AutoMappingRequest) -> AutoMappingResponse:
         integration_name=request.integration_name,
     )
 
-    response = generate_mapping_candidates(
-        prepared_source_schema,
-        target.handle.schema_profile,
-        llm_provider=build_provider_from_settings() if request.use_llm else None,
-        description_priority=request.description_priority or bool(applied_persistent_hints),
-        created_by=request.created_by,
-        workspace_id=request.workspace_id,
-    )
+    with _sync_mapping_capacity_guard(route_path="/mapping/auto", retry_path="/mapping/auto/jobs"):
+        response = generate_mapping_candidates(
+            prepared_source_schema,
+            target.handle.schema_profile,
+            llm_provider=build_provider_from_settings() if request.use_llm else None,
+            description_priority=request.description_priority or bool(applied_persistent_hints),
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
+        )
     return _attach_applied_source_field_hints(response, applied_persistent_hints)
 
 
@@ -403,15 +435,16 @@ async def canonical_map(request: CanonicalMappingRequest) -> AutoMappingResponse
         integration_name=request.integration_name,
     )
 
-    response = generate_mapping_candidates(
-        prepared_source_schema,
-        target_schema,
-        llm_provider=build_provider_from_settings() if request.use_llm else None,
-        description_priority=request.description_priority or bool(applied_persistent_hints),
-        candidate_pool_size=request.candidate_pool_size,
-        created_by=request.created_by,
-        workspace_id=request.workspace_id,
-    )
+    with _sync_mapping_capacity_guard(route_path="/mapping/canonical", retry_path="/mapping/canonical/jobs"):
+        response = generate_mapping_candidates(
+            prepared_source_schema,
+            target_schema,
+            llm_provider=build_provider_from_settings() if request.use_llm else None,
+            description_priority=request.description_priority or bool(applied_persistent_hints),
+            candidate_pool_size=request.candidate_pool_size,
+            created_by=request.created_by,
+            workspace_id=request.workspace_id,
+        )
     response = _attach_applied_source_field_hints(response, applied_persistent_hints)
     return _attach_target_intent_metadata(response, target_system=request.target_system)
 
@@ -592,7 +625,8 @@ async def summarize_mapping_analysis(request: MappingAnalysisRequest) -> Mapping
     """Generate a bounded textual analysis summary for the current mapping decisions."""
 
     provider = build_provider_from_settings()
-    return build_mapping_analysis_summary(request, provider=provider)
+    with _bounded_llm_capacity_guard(route_path="/mapping/analysis/summary", enabled=provider is not None):
+        return build_mapping_analysis_summary(request, provider=provider)
 
 
 @router.post("/analysis/narration", response_model=MappingAnalysisNarrationResponse)
@@ -600,7 +634,8 @@ async def narrate_mapping_analysis(request: MappingAnalysisNarrationRequest) -> 
     """Generate a spoken-script style narration for the current mapping analysis."""
 
     provider = build_provider_from_settings()
-    return build_mapping_analysis_narration(request, provider=provider)
+    with _bounded_llm_capacity_guard(route_path="/mapping/analysis/narration", enabled=provider is not None):
+        return build_mapping_analysis_narration(request, provider=provider)
 
 
 @router.post("/analysis/audio")
@@ -631,7 +666,8 @@ async def summarize_review_plan(request: ReviewPlanRequest) -> ReviewPlanRespons
     """Generate a bounded review plan for unresolved or risky mapping decisions."""
 
     provider = build_provider_from_settings()
-    return build_review_plan(request, provider=provider)
+    with _bounded_llm_capacity_guard(route_path="/mapping/review-plan", enabled=provider is not None):
+        return build_review_plan(request, provider=provider)
 
 
 @router.post("/workspace-guidance", response_model=WorkspaceCopilotProblemStatementResponse)
@@ -641,7 +677,8 @@ async def summarize_workspace_problem_guidance(
     """Turn one user-defined workspace problem into bounded product-aware next steps."""
 
     provider = build_provider_from_settings()
-    return build_workspace_problem_guidance(request, provider=provider)
+    with _bounded_llm_capacity_guard(route_path="/mapping/workspace-guidance", enabled=provider is not None):
+        return build_workspace_problem_guidance(request, provider=provider)
 
 
 @router.get("/source-field-hints", response_model=list[SourceFieldHintRecord])
@@ -702,15 +739,16 @@ async def refine_codegen_artifact(request: ArtifactRefinementRequest) -> Artifac
     if provider is None:
         raise HTTPException(status_code=503, detail="LLM provider is not configured.")
 
-    result = call_artifact_refinement(
-        mapping_decisions=[decision.model_dump() for decision in request.mapping_decisions],
-        mode=request.mode,
-        current_code=request.current_code,
-        instruction=request.instruction,
-        edge_cases=request.edge_cases,
-        reference_excerpt=request.reference_excerpt,
-        provider=provider,
-    )
+    with _bounded_llm_capacity_guard(route_path="/mapping/codegen/refine", enabled=True):
+        result = call_artifact_refinement(
+            mapping_decisions=[decision.model_dump() for decision in request.mapping_decisions],
+            mode=request.mode,
+            current_code=request.current_code,
+            instruction=request.instruction,
+            edge_cases=request.edge_cases,
+            reference_excerpt=request.reference_excerpt,
+            provider=provider,
+        )
     if result is None:
         raise HTTPException(status_code=502, detail="LLM did not return a valid artifact refinement.")
     return result
@@ -1208,26 +1246,27 @@ async def generate_transformation(request: TransformationGenerationRequest) -> T
     if target_column is None:
         raise HTTPException(status_code=404, detail=f"Unknown target column: {request.target_column}")
 
-    result = call_transformation_generator(
-        source_field={
-            "name": source_column.name,
-            "sample_values": source_column.sample_values,
-            "pattern": source_column.detected_patterns,
-            "dtype": source_column.dtype,
-            "unique_ratio": source_column.unique_ratio,
-            "null_ratio": source_column.null_ratio,
-        },
-        target_field={
-            "name": target_column.name,
-            "sample_values": target_column.sample_values,
-            "pattern": target_column.detected_patterns,
-            "dtype": target_column.dtype,
-            "unique_ratio": target_column.unique_ratio,
-            "null_ratio": target_column.null_ratio,
-        },
-        user_instruction=request.instruction,
-        provider=provider,
-    )
+    with _bounded_llm_capacity_guard(route_path="/mapping/transformation/generate", enabled=True):
+        result = call_transformation_generator(
+            source_field={
+                "name": source_column.name,
+                "sample_values": source_column.sample_values,
+                "pattern": source_column.detected_patterns,
+                "dtype": source_column.dtype,
+                "unique_ratio": source_column.unique_ratio,
+                "null_ratio": source_column.null_ratio,
+            },
+            target_field={
+                "name": target_column.name,
+                "sample_values": target_column.sample_values,
+                "pattern": target_column.detected_patterns,
+                "dtype": target_column.dtype,
+                "unique_ratio": target_column.unique_ratio,
+                "null_ratio": target_column.null_ratio,
+            },
+            user_instruction=request.instruction,
+            provider=provider,
+        )
     if result is None:
         raise HTTPException(status_code=502, detail="LLM did not return a valid transformation suggestion.")
 
@@ -1242,12 +1281,13 @@ async def propose_transformation_spec(request: TransformationSpecProposalRequest
     if provider is None:
         raise HTTPException(status_code=503, detail="LLM provider is not configured.")
 
-    result = call_transformation_spec_generator(
-        mapping_decisions=[decision.model_dump(mode="json") for decision in request.mapping_decisions],
-        instruction=request.instruction,
-        current_spec=request.current_spec.model_dump(mode="json") if request.current_spec else None,
-        provider=provider,
-    )
+    with _bounded_llm_capacity_guard(route_path="/mapping/transformation/spec/propose", enabled=True):
+        result = call_transformation_spec_generator(
+            mapping_decisions=[decision.model_dump(mode="json") for decision in request.mapping_decisions],
+            instruction=request.instruction,
+            current_spec=request.current_spec.model_dump(mode="json") if request.current_spec else None,
+            provider=provider,
+        )
     if result is None:
         raise HTTPException(status_code=502, detail="LLM did not return a valid transformation spec proposal.")
 

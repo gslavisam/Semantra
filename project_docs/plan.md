@@ -275,6 +275,19 @@ Potrebno je odvojiti:
 
 SQLite ostaje prihvatljiv za trenutnu fazu, ali treba postepeno normalizovati queryable read/write modele tamo gde listing, governance i discovery to već traže.
 
+Izabrani sledeći uski execution slice u ovom pravcu je:
+
+- durable upload dataset handle i schema-profile lineage za postojeći `Workspace` tok
+- SQLite connection/runtime hardening bez napuštanja lokalnog `SQLite` backend modela
+- cleanup `LLM` timeout contract-a tako da runtime config bude stvarno authoritative
+
+Ovaj slice namerno ne otvara:
+
+- puni DB-native `workspace` redesign
+- broker ili lease/dequeue worker model
+- širi async backend refactor
+- mapping-engine decomposition ili SAP-specific refactor
+
 Sledeći korak ovde treba formulisati preciznije: cilj nije da "sve iz UI-ja završava u bazi", nego da svi domenski entiteti koji nose ownership, audit, resume, collaboration ili lifecycle semantiku imaju backend identitet i DB model.
 
 DB-first target za sledeću fazu:

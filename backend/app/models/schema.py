@@ -50,12 +50,37 @@ class SchemaProfile(BaseModel):
 
 
 class DatasetHandle(BaseModel):
-    """Session-scoped handle combining schema profile metadata and preview rows."""
+    """Dataset handle combining schema profile metadata and preview rows."""
 
     dataset_id: str
     dataset_name: str
     schema_profile: SchemaProfile
     preview_rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+DatasetStorageMode = Literal["row_data", "schema_only"]
+
+
+class PersistedDatasetRecord(BaseModel):
+    """Durable uploaded-dataset payload stored behind the upload runtime facade."""
+
+    dataset_id: str
+    dataset_name: str
+    schema_profile: SchemaProfile
+    preview_rows: list[dict[str, Any]] = Field(default_factory=list)
+    storage_mode: DatasetStorageMode = "row_data"
+    source_format: str = ""
+    selected_table: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+    def to_handle(self) -> DatasetHandle:
+        return DatasetHandle(
+            dataset_id=self.dataset_id,
+            dataset_name=self.dataset_name,
+            schema_profile=self.schema_profile,
+            preview_rows=list(self.preview_rows),
+        )
 
 
 class SpecLayoutHint(BaseModel):

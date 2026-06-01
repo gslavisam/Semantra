@@ -33,6 +33,8 @@ from app.services.llm_service import (
     call_transformation_generator,
     call_validator,
     request_llm_json,
+    request_bounded_llm_json,
+    resolve_bounded_llm_timeout,
 )
 from app.services.mapping_service import CandidateScore, generate_mapping_candidates, should_run_canonical_semantic_rescue, should_run_llm_validation
 from app.services.mapping_analysis_service import build_mapping_analysis_narration_prompt, build_mapping_analysis_prompt
@@ -220,6 +222,36 @@ def test_request_llm_json_accepts_prompt_envelope_with_static_provider() -> None
     assert "SYSTEM:" in captured["prompt"]
     assert "TASK:" in captured["prompt"]
     assert "PAYLOAD:" in captured["prompt"]
+
+
+def test_bounded_llm_timeout_uses_explicit_setting() -> None:
+    previous = (settings.llm_timeout_seconds, settings.llm_bounded_timeout_seconds)
+    settings.llm_timeout_seconds = 30.0
+    settings.llm_bounded_timeout_seconds = 7.0
+    captured: dict[str, float] = {}
+
+    class CaptureProvider:
+        def generate(self, prompt, timeout_seconds: float) -> str:
+            captured["timeout"] = timeout_seconds
+            return '{"selected_target":"no_match","confidence":0.0,"reasoning":["none"]}'
+
+    try:
+        result = request_bounded_llm_json(CaptureProvider(), "prompt", "validator")
+    finally:
+        settings.llm_timeout_seconds, settings.llm_bounded_timeout_seconds = previous
+
+    assert result is not None
+    assert captured["timeout"] == 7.0
+
+
+def test_bounded_llm_timeout_respects_global_ceiling_when_lower() -> None:
+    previous = (settings.llm_timeout_seconds, settings.llm_bounded_timeout_seconds)
+    settings.llm_timeout_seconds = 3.0
+    settings.llm_bounded_timeout_seconds = 7.0
+    try:
+        assert resolve_bounded_llm_timeout() == 3.0
+    finally:
+        settings.llm_timeout_seconds, settings.llm_bounded_timeout_seconds = previous
 
 
 def test_review_plan_prompt_uses_standard_sections_and_baseline_payload() -> None:
@@ -611,12 +643,19 @@ def test_llm_override_is_explained_when_global_assignment_picks_a_different_targ
         columns=[customer, customer_id, customer_segment],
     )
 
-    def fake_rankings(source_column, _targets, target_embedding_cache=None):
+    def fake_rankings(
+        source_column,
+        _targets,
+        target_embedding_cache=None,
+        description_priority=False,
+        candidate_pool_size=None,
+    ):
+        _ = (target_embedding_cache, description_priority, candidate_pool_size)
         if source_column.name == "LEGACY_CUST":
             return [
-                CandidateScore(customer, customer, 0.6119, ScoringSignals(), [], set()),
-                CandidateScore(customer, customer_id, 0.6102, ScoringSignals(), [], set()),
-                CandidateScore(customer, customer_segment, 0.5615, ScoringSignals(), [], set()),
+                CandidateScore(source_column, customer, 0.9119, ScoringSignals(), [], set()),
+                CandidateScore(source_column, customer_id, 0.6102, ScoringSignals(), [], set()),
+                CandidateScore(source_column, customer_segment, 0.5615, ScoringSignals(), [], set()),
             ]
         return [
             CandidateScore(source_column, customer, 0.5723, ScoringSignals(), [], set()),
@@ -628,7 +667,7 @@ def test_llm_override_is_explained_when_global_assignment_picks_a_different_targ
         lambda prompt: json.dumps(
             {
                 "selected_target": "customer",
-                "confidence": 0.6119 if "LEGACY_CUST" in prompt else 0.5723,
+                "confidence": 0.9119 if "LEGACY_CUST" in prompt else 0.5723,
                 "reasoning": ["LLM prefers the generic customer field."],
             }
         )

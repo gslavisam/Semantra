@@ -37,6 +37,11 @@ class Settings:
     llm_provider: str = "none"
     llm_model: str = "mock-validator"
     llm_timeout_seconds: float = 30.0
+    llm_bounded_timeout_seconds: float = 5.0
+    llm_probe_timeout_seconds: float = 2.0
+    sync_mapping_max_concurrent_requests: int = 2
+    bounded_llm_max_concurrent_requests: int = 2
+    runtime_capacity_retry_after_seconds: int = 5
     llm_max_retries: int = 2
     llm_min_confidence: float = 0.5
     llm_gate_min_score: float = 0.3
@@ -122,6 +127,11 @@ def settings_snapshot() -> dict[str, Any]:
         "llm_provider": settings.llm_provider,
         "llm_model": settings.llm_model,
         "llm_timeout_seconds": settings.llm_timeout_seconds,
+        "llm_bounded_timeout_seconds": settings.llm_bounded_timeout_seconds,
+        "llm_probe_timeout_seconds": settings.llm_probe_timeout_seconds,
+        "sync_mapping_max_concurrent_requests": settings.sync_mapping_max_concurrent_requests,
+        "bounded_llm_max_concurrent_requests": settings.bounded_llm_max_concurrent_requests,
+        "runtime_capacity_retry_after_seconds": settings.runtime_capacity_retry_after_seconds,
         "lmstudio_base_url": settings.lmstudio_base_url,
         "tts_provider": settings.tts_provider,
         "tts_timeout_seconds": settings.tts_timeout_seconds,

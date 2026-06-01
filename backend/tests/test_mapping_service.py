@@ -8,6 +8,7 @@ from app.services.correction_service import correction_store
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.mapping_service import (
     CandidateScore,
+    SourceSapContextProfile,
     TOTAL_WEIGHT,
     assignment_weight,
     assign_unique_targets,
@@ -289,6 +290,7 @@ def test_mapping_uses_user_correction_history_as_score_boost() -> None:
             "source": "cust_ref",
             "suggested_target": "customer_id",
             "corrected_target": "phone_number",
+            "status": "accepted",
             "note": "phone pattern was the right answer",
         }
     )
@@ -321,6 +323,7 @@ def test_mapping_penalizes_previously_wrong_suggested_target() -> None:
             "source": "cust_ref",
             "suggested_target": "customer_id",
             "corrected_target": "phone_number",
+            "status": "accepted",
             "note": "customer_id was wrong",
         }
     )
@@ -589,7 +592,7 @@ def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None
                 "source": "cust_ref",
                 "suggested_target": "customer_id",
                 "corrected_target": "account_id",
-                "status": "overridden",
+                "status": "accepted",
                 "note": "Prefer account id",
             }
         )
@@ -599,7 +602,7 @@ def test_promoted_reusable_rule_influences_ranking_without_raw_history() -> None
             "source": "cust_ref",
             "suggested_target": "customer_id",
             "corrected_target": "account_id",
-            "status": "overridden",
+            "status": "accepted",
             "occurrence_count": 3,
         }
     )
@@ -654,12 +657,12 @@ def test_active_overlay_synonym_enriches_semantic_tokens() -> None:
     assert "customer" in tokens
 
 
-def test_canonical_glossary_influences_mapping_for_business_concepts() -> None:
+def test_canonical_glossary_influences_mapping_for_generic_customer_alias() -> None:
     source_schema = SchemaProfile(
         dataset_id="source",
         dataset_name="source.csv",
         row_count=5,
-        columns=[make_column("sold_to_party", ["numeric_id"], ["C001", "C002"])],
+        columns=[make_column("cust_id", ["numeric_id"], ["C001", "C002"])],
     )
     target_schema = SchemaProfile(
         dataset_id="target",
@@ -698,13 +701,13 @@ def test_canonical_virtual_target_prefers_core_customer_id_for_sold_to_party_ali
     assert result.mappings[0].target == "customer.id"
 
 
-def test_canonical_coverage_reports_matched_and_unmatched_columns() -> None:
+def test_canonical_coverage_reports_matched_and_unmatched_columns_for_generic_customer_alias() -> None:
     schema = SchemaProfile(
         dataset_id="source",
         dataset_name="source.csv",
         row_count=5,
         columns=[
-            make_column("sold_to_party", ["numeric_id"], ["C001", "C002"]),
+            make_column("cust_id", ["numeric_id"], ["C001", "C002"]),
             make_column("mystery_field", ["text"], ["foo", "bar"]),
         ],
     )
@@ -715,7 +718,7 @@ def test_canonical_coverage_reports_matched_and_unmatched_columns() -> None:
     assert coverage.matched_columns == 1
     assert coverage.coverage_ratio == 0.5
     assert coverage.unmatched_columns == ["mystery_field"]
-    assert coverage.matched_columns_detail[0].column == "sold_to_party"
+    assert coverage.matched_columns_detail[0].column == "cust_id"
     assert "customer.id" in coverage.matched_columns_detail[0].concept_ids
 
 
@@ -763,7 +766,7 @@ def test_canonical_project_coverage_reports_shared_and_dataset_specific_concepts
         dataset_name="source.csv",
         row_count=5,
         columns=[
-            make_column("sold_to_party", ["numeric_id"], ["1", "2"]),
+            make_column("cust_id", ["numeric_id"], ["1", "2"]),
             make_column("client_mail", ["email"], ["ana@example.com", "marko@example.com"]),
         ],
     )
@@ -832,7 +835,7 @@ def test_canonical_coverage_matches_curated_erp_aliases() -> None:
     assert "gl_account.id" in matches["HKONT"]
     assert "cost_center.id" in matches["KOSTL"]
     assert "profit_center.id" in matches["PRCTR"]
-    assert "uom.code" in matches["MEINS"]
+    assert "material.base_uom_code" in matches["MEINS"]
     assert "currency.code" in matches["WAERS"]
     assert "payment_term.id" in matches["ZTERM"]
     assert "incoterm.code" in matches["INCO1"]
@@ -926,6 +929,7 @@ def test_sap_concept_lock_deemphasizes_weak_name_signal() -> None:
         profile_name="description_priority",
         source=source,
         target=target,
+        source_sap_profile=SourceSapContextProfile(),
     )
 
     assert 0.75 <= score <= 0.77

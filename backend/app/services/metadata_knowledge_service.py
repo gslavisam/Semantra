@@ -438,6 +438,11 @@ class MetadataKnowledgeService:
         self._active_overlay_name: str | None = None
         self._overlay_aliases_by_concept: dict[str, set[str]] = {}
         self._overlay_canonical_aliases_by_concept: dict[str, set[str]] = {}
+        self._concept_match_cache: dict[tuple[bool, tuple[str, str, str, str, tuple[str, ...]]], list[ConceptMatch]] = {}
+        self._canonical_concept_match_cache: dict[
+            tuple[bool, tuple[str, str, str, str, tuple[str, ...]]],
+            list[CanonicalConceptMatch],
+        ] = {}
         self._last_runtime_source = "source_files"
         # Bridge: KC concept_id → set of CC concept_ids reachable via shared aliases.
         # Built after every full load so match_canonical_concepts() can use KC signal.
@@ -987,6 +992,23 @@ class MetadataKnowledgeService:
             metadata_tokens.update(semantic_token_set(text))
         return metadata_candidates, metadata_tokens
 
+    def _profile_match_cache_key(
+        self,
+        profile: ColumnProfile,
+        *,
+        prefer_metadata_text: bool,
+    ) -> tuple[bool, tuple[str, str, str, str, tuple[str, ...]]]:
+        return (
+            bool(prefer_metadata_text),
+            (
+                str(profile.name),
+                str(profile.normalized_name),
+                str(profile.description),
+                str(profile.declared_type),
+                tuple(str(token) for token in profile.tokenized_name),
+            ),
+        )
+
     def _metadata_match_strengths(self, *, prefer_metadata_text: bool = False) -> tuple[float, float, float, float, float]:
         if prefer_metadata_text:
             return (
@@ -1363,6 +1385,11 @@ class MetadataKnowledgeService:
     def match_concepts(self, profile: ColumnProfile, *, prefer_metadata_text: bool = False) -> list[ConceptMatch]:
         """Match one schema profile against the knowledge-layer concept index."""
 
+        cache_key = self._profile_match_cache_key(profile, prefer_metadata_text=prefer_metadata_text)
+        cached = self._concept_match_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
         profile_tokens = {token for token in normalized_profile_name.split() if token}
@@ -1410,7 +1437,7 @@ class MetadataKnowledgeService:
                     strengths[concept_id] = max(strengths.get(concept_id, 0.0), metadata_token_strength)
                     matched_aliases.setdefault(concept_id, set()).add(alias)
 
-        return [
+        results = [
             ConceptMatch(
                 concept_id=concept_id,
                 strength=strength,
@@ -1419,9 +1446,16 @@ class MetadataKnowledgeService:
             )
             for concept_id, strength in sorted(strengths.items())
         ]
+        self._concept_match_cache[cache_key] = results
+        return results
 
     def match_canonical_concepts(self, profile: ColumnProfile, *, prefer_metadata_text: bool = False) -> list[CanonicalConceptMatch]:
         """Match one schema profile against the canonical business concept registry."""
+
+        cache_key = self._profile_match_cache_key(profile, prefer_metadata_text=prefer_metadata_text)
+        cached = self._canonical_concept_match_cache.get(cache_key)
+        if cached is not None:
+            return cached
 
         normalized_name = _normalize_alias(profile.name)
         normalized_profile_name = _normalize_alias(profile.normalized_name)
@@ -1514,7 +1548,7 @@ class MetadataKnowledgeService:
                                 strengths[cc_id] = 0.5
                                 matched_aliases.setdefault(cc_id, set()).add(alias)
 
-        return [
+        results = [
             CanonicalConceptMatch(
                 concept_id=concept_id,
                 strength=strength,
@@ -1522,6 +1556,8 @@ class MetadataKnowledgeService:
             )
             for concept_id, strength in sorted(strengths.items())
         ]
+        self._canonical_concept_match_cache[cache_key] = results
+        return results
 
     def _canonical_match_details(
         self,
@@ -1640,6 +1676,8 @@ class MetadataKnowledgeService:
         self._field_alias_to_contexts.clear()
         self._canonical_concepts_by_id.clear()
         self._canonical_alias_to_concepts.clear()
+        self._concept_match_cache.clear()
+        self._canonical_concept_match_cache.clear()
         self._active_overlay_name = None
         self._overlay_aliases_by_concept.clear()
         self._overlay_canonical_aliases_by_concept.clear()

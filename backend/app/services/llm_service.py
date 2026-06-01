@@ -39,6 +39,18 @@ MAX_PROMPT_SAMPLE_VALUES = 5
 MAX_PROMPT_SAMPLE_VALUE_LENGTH = 80
 
 
+def resolve_bounded_llm_timeout() -> float:
+    """Return the configured short timeout used for bounded LLM operations."""
+
+    return max(1.0, min(settings.llm_timeout_seconds, settings.llm_bounded_timeout_seconds))
+
+
+def resolve_probe_timeout(total_timeout_seconds: float, *, probe_timeout_seconds: float) -> float:
+    """Return a short reachability timeout without silently ignoring the configured ceiling."""
+
+    return max(0.5, min(total_timeout_seconds, probe_timeout_seconds))
+
+
 @dataclass(frozen=True, slots=True)
 class LLMPromptEnvelope:
     """Structured prompt split into system instructions, task instructions, and payload."""
@@ -296,7 +308,10 @@ def summarize_llm_runtime() -> dict[str, object]:
         return snapshot
 
     provider = LMStudioProvider(model=settings.llm_model, base_url=settings.lmstudio_base_url)
-    probe_timeout = max(0.5, min(settings.llm_timeout_seconds, 2.0))
+    probe_timeout = resolve_probe_timeout(
+        settings.llm_timeout_seconds,
+        probe_timeout_seconds=settings.llm_probe_timeout_seconds,
+    )
     try:
         available_models = provider.list_models(probe_timeout)
     except Exception as error:
@@ -527,7 +542,7 @@ def request_bounded_llm_json(
 ) -> tuple[str, dict] | None:
     """Request JSON using Semantra's short bounded timeout and retry contract."""
 
-    timeout_seconds = max(1.0, min(settings.llm_timeout_seconds, 5.0))
+    timeout_seconds = resolve_bounded_llm_timeout()
     retries = 1
     return request_llm_json(
         provider,

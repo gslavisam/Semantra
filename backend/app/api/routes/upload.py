@@ -113,7 +113,13 @@ async def upload_schema_spec(
         )
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    return dataset_store.save_schema_profile(profile, dataset_name=upload_name, rows=[])
+    return dataset_store.save_schema_profile(
+        profile,
+        dataset_name=upload_name,
+        rows=[],
+        source_format="schema_spec",
+        storage_mode="schema_only",
+    )
 
 
 @router.post("/upload/handle", response_model=DatasetHandle)
@@ -196,10 +202,17 @@ async def parse_and_store_upload(upload: UploadFile, fallback_name: str, selecte
 
     if filename.endswith(SUPPORTED_ROW_FORMATS):
         rows = read_tabular_payload(payload, upload_name)
-        return dataset_store.save_rows(rows, upload_name)
+        return dataset_store.save_rows(rows, upload_name, source_format=filename.rsplit(".", 1)[-1])
     if filename.endswith(".sql"):
         profile = read_sql_snapshot_payload(payload, dataset_name=upload_name, selected_table=selected_table)
-        return dataset_store.save_schema_profile(profile, dataset_name=upload_name, rows=[])
+        return dataset_store.save_schema_profile(
+            profile,
+            dataset_name=upload_name,
+            rows=[],
+            source_format="sql",
+            storage_mode="schema_only",
+            selected_table=selected_table,
+        )
 
     raise HTTPException(
         status_code=400,

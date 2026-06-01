@@ -76,6 +76,33 @@ def setup_function() -> None:
     persistence_service.clear_evaluation_runs()
     persistence_service.clear_transformation_test_sets()
     persistence_service.clear_knowledge_overlays()
+    persistence_service.clear_uploaded_datasets()
+
+
+def test_sqlite_connection_applies_busy_timeout_and_rollback(tmp_path: Path) -> None:
+    original_db_path = persistence_service.db_path
+    persistence_service.reconfigure(str(tmp_path / "persistence_contract.sqlite3"))
+    try:
+        with persistence_service.connection() as connection:
+            busy_timeout = connection.execute("PRAGMA busy_timeout").fetchone()[0]
+            journal_mode = connection.execute("PRAGMA journal_mode").fetchone()[0]
+
+        assert int(busy_timeout) >= 5000
+        assert str(journal_mode).lower() == "wal"
+
+        try:
+            with persistence_service.connection() as connection:
+                connection.execute("INSERT INTO draft_sessions (name, payload) VALUES (?, ?)", ("temp", "{}"))
+                raise RuntimeError("force rollback")
+        except RuntimeError:
+            pass
+
+        with persistence_service.connection() as connection:
+            row_count = connection.execute("SELECT COUNT(*) FROM draft_sessions").fetchone()[0]
+
+        assert row_count == 0
+    finally:
+        persistence_service.reconfigure(original_db_path)
 
 
 def test_openai_provider_extracts_text_from_responses_api_shape() -> None:
