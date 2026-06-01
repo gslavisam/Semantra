@@ -1921,57 +1921,57 @@ def render_workspace_copilot_sidebar_context(session_state: dict | None = None) 
     metric_row_2[1].metric("Proposals", int(context["pending_proposals"]))
 
     st.divider()
-    st.caption("Ask")
     section = str(context.get("section") or "Setup")
     quick_ask_key = f"workspace_copilot_quick_ask_{section.lower()}"
     _workspace_copilot_apply_pending_widget_reset(quick_ask_key, state)
     if quick_ask_key not in state:
         state[quick_ask_key] = WORKSPACE_COPILOT_QUICK_ASK_PLACEHOLDER
-    st.caption("Choose a suggestion to prefill the question box below.")
-    st.selectbox(
-        "Suggested questions",
-        _workspace_copilot_quick_ask_options(section),
-        key=quick_ask_key,
-        format_func=_workspace_copilot_quick_ask_label,
-        on_change=_workspace_copilot_apply_selected_prompt,
-        args=(quick_ask_key,),
-    )
+    with st.expander("Ask", expanded=False):
+        st.caption("Choose a suggestion to prefill the question box below.")
+        st.selectbox(
+            "Suggested questions",
+            _workspace_copilot_quick_ask_options(section),
+            key=quick_ask_key,
+            format_func=_workspace_copilot_quick_ask_label,
+            on_change=_workspace_copilot_apply_selected_prompt,
+            args=(quick_ask_key,),
+        )
 
-    with st.form("workspace_copilot_chat_form", clear_on_submit=True):
-        question = st.text_input("Ask about this Workspace step", key=WORKSPACE_COPILOT_CHAT_INPUT_KEY)
-        submitted = st.form_submit_button("Send")
-    if submitted and str(question or "").strip():
-        submit_workspace_copilot_chat_question(question, state)
-        _workspace_copilot_queue_widget_reset(quick_ask_key, state)
-        st.rerun()
+        with st.form("workspace_copilot_chat_form", clear_on_submit=True):
+            question = st.text_input("Ask about this Workspace step", key=WORKSPACE_COPILOT_CHAT_INPUT_KEY)
+            submitted = st.form_submit_button("Send")
+        if submitted and str(question or "").strip():
+            submit_workspace_copilot_chat_question(question, state)
+            _workspace_copilot_queue_widget_reset(quick_ask_key, state)
+            st.rerun()
 
-    st.caption("Problem statement")
-    st.caption("Use a short structured brief when you want Copilot to turn a business or process problem into concrete in-app actions.")
     problem_example_key = "workspace_copilot_problem_example_selection"
     if problem_example_key not in state:
         state[problem_example_key] = WORKSPACE_COPILOT_PROBLEM_EXAMPLE_PLACEHOLDER
-    st.selectbox(
-        "Example prompts",
-        _workspace_copilot_problem_example_options(),
-        key=problem_example_key,
-        format_func=_workspace_copilot_problem_example_label,
-        on_change=_workspace_copilot_apply_selected_problem_example,
-        args=(problem_example_key,),
-    )
-    with st.expander("Show suggested format", expanded=False):
-        st.caption("Use this structure when you want the most precise in-app plan.")
-        st.code(WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE, language="text")
-    with st.form("workspace_copilot_problem_form", clear_on_submit=True):
-        problem_statement = st.text_area(
-            "Describe the problem you want to solve in Semantra",
-            key="workspace_copilot_problem_statement_input",
-            placeholder="Goal: Build a customer-ready output from a messy source export...",
-            height=140,
+    with st.expander("Problem statement", expanded=False):
+        st.caption("Use a short structured brief when you want Copilot to turn a business or process problem into concrete in-app actions.")
+        st.selectbox(
+            "Example prompts",
+            _workspace_copilot_problem_example_options(),
+            key=problem_example_key,
+            format_func=_workspace_copilot_problem_example_label,
+            on_change=_workspace_copilot_apply_selected_problem_example,
+            args=(problem_example_key,),
         )
-        problem_submitted = st.form_submit_button("Plan actions")
-    if problem_submitted and str(problem_statement or "").strip():
-        submit_workspace_copilot_problem_statement(problem_statement, state)
-        st.rerun()
+        with st.expander("Show suggested format", expanded=False):
+            st.caption("Use this structure when you want the most precise in-app plan.")
+            st.code(WORKSPACE_COPILOT_PROBLEM_STATEMENT_TEMPLATE, language="text")
+        with st.form("workspace_copilot_problem_form", clear_on_submit=True):
+            problem_statement = st.text_area(
+                "Describe the problem you want to solve in Semantra",
+                key="workspace_copilot_problem_statement_input",
+                placeholder="Goal: Build a customer-ready output from a messy source export...",
+                height=140,
+            )
+            problem_submitted = st.form_submit_button("Plan actions")
+        if problem_submitted and str(problem_statement or "").strip():
+            submit_workspace_copilot_problem_statement(problem_statement, state)
+            st.rerun()
 
     response = state.get("workspace_copilot_chat_last_response") or {}
     if response:
