@@ -8,6 +8,12 @@ import time
 
 from streamlit_ui.api import current_workspace_scope, list_target_intents
 from streamlit_ui.governance import api_error_message, mapping_output_block_reason
+from streamlit_ui.workspace_decision_views import (
+    _apply_draft_session_detail_to_workspace,
+    _draft_session_identity_query_params,
+    _draft_session_option_label,
+    _resolve_selected_draft_session_id,
+)
 
 
 WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output")
@@ -23,6 +29,105 @@ WORKSPACE_COPILOT_ACTIONS = {
 def _workspace_uploaded_file_or_none(uploaded_file):
     file_name = getattr(uploaded_file, "name", None)
     return uploaded_file if isinstance(file_name, str) and file_name.strip() else None
+
+
+def _load_setup_saved_draft_sessions(api_request, *, force_refresh: bool = False) -> list[dict]:
+    if not force_refresh and st.session_state.get("setup_saved_draft_sessions_loaded"):
+        cached = st.session_state.get("saved_draft_sessions")
+        return cached if isinstance(cached, list) else []
+
+    try:
+        saved_draft_sessions = api_request("GET", "/mapping/draft-sessions")
+    except httpx.HTTPError as error:
+        st.session_state["setup_saved_draft_sessions_loaded"] = True
+        st.session_state["setup_saved_draft_sessions_error"] = api_error_message(
+            error,
+            default_prefix="Loading saved draft sessions failed",
+        )
+        cached = st.session_state.get("saved_draft_sessions")
+        return cached if isinstance(cached, list) else []
+
+    st.session_state["setup_saved_draft_sessions_loaded"] = True
+    st.session_state["saved_draft_sessions"] = saved_draft_sessions
+    st.session_state.pop("setup_saved_draft_sessions_error", None)
+    return saved_draft_sessions
+
+
+def _resume_setup_saved_draft(api_request, draft_session: dict) -> str:
+    draft_session_id = int(draft_session.get("draft_session_id") or 0)
+    if not draft_session_id:
+        raise ValueError("Select a saved draft session before continuing.")
+
+    draft_session_detail = api_request(
+        "GET",
+        f"/mapping/draft-sessions/{draft_session_id}",
+        params=_draft_session_identity_query_params(draft_session),
+    )
+    restored_section = _apply_draft_session_detail_to_workspace(draft_session_detail)
+    st.session_state["saved_draft_sessions"] = _load_setup_saved_draft_sessions(api_request, force_refresh=True)
+    st.session_state["last_action"] = {
+        "level": "success",
+        "message": f"Continued draft session '{draft_session_detail['name']}' from Upload and restored Workspace {restored_section}.",
+    }
+    st.rerun()
+    return restored_section
+
+
+def _render_setup_saved_draft_panel(api_request) -> None:
+    with st.expander("Continue Saved Draft", expanded=False):
+        st.caption(
+            "Resume a saved draft directly from Upload when you want to continue existing workspace work instead of starting a fresh upload."
+        )
+
+        refresh_column, _ = st.columns([1, 3])
+        if refresh_column.button("Refresh saved drafts", key="setup_refresh_saved_drafts", width="stretch"):
+            saved_draft_sessions = _load_setup_saved_draft_sessions(api_request, force_refresh=True)
+        else:
+            saved_draft_sessions = _load_setup_saved_draft_sessions(api_request)
+
+        error_message = str(st.session_state.get("setup_saved_draft_sessions_error") or "").strip()
+        if error_message:
+            st.warning(error_message)
+
+        if not saved_draft_sessions:
+            st.info("No saved draft sessions are available yet. Save one from Decisions to continue it later from Upload.")
+            return
+
+        option_map = {
+            int(item.get("draft_session_id") or 0): item
+            for item in saved_draft_sessions
+            if int(item.get("draft_session_id") or 0)
+        }
+        option_ids = list(option_map.keys())
+        selected_draft_session_id = _resolve_selected_draft_session_id(
+            saved_draft_sessions,
+            selection_key="setup_selected_draft_session_id",
+        )
+        selected_draft_session_id = st.selectbox(
+            "Saved draft session",
+            options=option_ids,
+            index=option_ids.index(selected_draft_session_id) if selected_draft_session_id in option_ids else 0,
+            key="setup_selected_draft_session_id",
+            format_func=lambda option_id: _draft_session_option_label(option_map[option_id]),
+        )
+        selected_draft_session = option_map[selected_draft_session_id]
+        st.caption(
+            f"Saved section: {selected_draft_session.get('active_workspace_section') or 'Decisions'} | "
+            f"Source: {selected_draft_session.get('source_dataset_name') or 'n/a'}"
+        )
+
+        if st.button("Continue selected draft", key="setup_continue_selected_draft", width="stretch"):
+            try:
+                _resume_setup_saved_draft(api_request, selected_draft_session)
+            except (KeyError, ValueError) as error:
+                st.session_state["last_action"] = {"level": "error", "message": f"Continuing saved draft failed: {error}"}
+                st.rerun()
+            except httpx.HTTPError as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": api_error_message(error, default_prefix="Continuing saved draft failed"),
+                }
+                st.rerun()
 
 
 def _set_active_mapping_job(job_id: str, *, start_path: str, payload: dict) -> None:
@@ -1606,6 +1711,8 @@ def _render_workspace_section_content(
                 st.session_state["last_action"] = {"level": "error", "message": f"Upload failed: {error}"}
                 st.rerun()
 
+        _render_setup_saved_draft_panel(api_request)
+
         if upload_response:
             upload_mode = upload_response.get("mapping_mode", "standard")
             if upload_mode == "canonical":
@@ -2054,6 +2161,9 @@ def _render_workspace_section_content(
                                 "/mapping/preview",
                                 json={
                                     "source_dataset_id": st.session_state["upload_response"]["source"]["dataset_id"],
+                                    "source_preview_rows": list(
+                                        st.session_state["upload_response"]["source"].get("preview_rows") or []
+                                    ),
                                     "mapping_decisions": mapping_decisions,
                                     "transformation_spec": ready_transformation_spec,
                                 },

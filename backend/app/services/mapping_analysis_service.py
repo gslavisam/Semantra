@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 
 from app.core.config import settings
@@ -25,6 +24,11 @@ from app.models.mapping import (
     MappingCandidate,
 )
 from app.services.llm_service import LLMProvider, normalize_llm_list_field, request_bounded_llm_json
+from app.services.prompt_templates import (
+    MAPPING_ANALYSIS_NARRATION_PROMPT_TEMPLATE,
+    MAPPING_ANALYSIS_PROMPT_TEMPLATE,
+    render_prompt,
+)
 
 
 def build_mapping_analysis_summary(
@@ -112,24 +116,7 @@ def build_mapping_analysis_prompt(
         "mapping_evidence": [_compact_mapping_evidence(mapping) for mapping in mapping_response.mappings[:20]],
         "canonical_coverage": mapping_response.canonical_coverage.model_dump(mode="json"),
     }
-    return (
-        "You are a senior data integration analyst preparing a technical mapping handoff for a data engineer. "
-        "You must summarize only the evidence present in the provided payload. "
-        "Do not invent business rules, source semantics, target semantics, or transformations that are not supported by the payload.\n\n"
-        "Analyze the provided mapping response and workspace context. Produce one technical mapping overview for a technical implementor. "
-        "Focus on mapping quality, ambiguity, canonical alignment, transformation hotspots, and next engineering actions.\n\n"
-        "Return JSON only. No markdown. No prose outside JSON. No code fences.\n"
-        "Use only the provided payload. If evidence is missing, state that explicitly.\n"
-        "Do not restate every mapping. Prioritize strongest validated mappings, needs-review rows, unmatched rows, canonical findings, and implementation hotspots.\n"
-        "Every risk and recommendation must be grounded in confidence, status, canonical coverage, signals, explanation lines, llm recommendation, or transformation presence.\n"
-        "If a field has no evidence, return an empty array or empty string instead of inventing content.\n"
-        "Return exactly these top-level fields: title, audience, mapping_mode, overall_mapping_health, confidence_distribution, strongest_matches, needs_review_items, unmatched_sources, canonical_coverage_summary, transformation_hotspots, implementation_risks, recommended_next_actions, narration_script_seed, generation_metadata.\n"
-        "Treat unmatched rows, low-confidence rows, and global-assignment conflicts as the primary review queue.\n"
-        "Treat canonical coverage as semantic evidence, not final proof of implementation readiness.\n"
-        "Treat transformation presence as an implementation hotspot, especially when confidence is not high.\n"
-        "If llm_recommendation differs from the final target, surface that as a review signal.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence_payload, ensure_ascii=True)}"
-    )
+    return render_prompt(MAPPING_ANALYSIS_PROMPT_TEMPLATE, evidence_payload)
 
 
 def build_mapping_analysis_narration_prompt(summary: MappingAnalysisSummaryResponse) -> str:
@@ -148,19 +135,7 @@ def build_mapping_analysis_narration_prompt(summary: MappingAnalysisSummaryRespo
         "recommended_next_actions": list(summary.recommended_next_actions[:4]),
         "narration_script_seed": summary.narration_script_seed,
     }
-    return (
-        "You are a technical presenter explaining mapping analysis to a data engineer. "
-        "Your script must sound natural when read aloud and must stay faithful to the supplied overview.\n\n"
-        "Convert the provided technical mapping overview into one concise spoken walkthrough for a technical implementor. "
-        "Focus on the current mapping state, strongest alignments, the review queue, canonical findings, transformation hotspots, and the next engineering actions.\n\n"
-        "Return exactly one final spoken script and nothing else.\n"
-        "Forbidden in the output: markdown, headings, bullet points, tables, JSON, speaker labels, stage directions, commentary about the script, multiple alternatives, or implementation notes.\n"
-        "Do not add facts that are not present in the overview.\n"
-        "Keep the tone technical, calm, and direct.\n"
-        "Target length: about 90 to 150 seconds when spoken.\n"
-        "Wrap the final answer only inside <final_script> and </final_script>.\n\n"
-        f"OVERVIEW:\n{json.dumps(compact_payload, ensure_ascii=True)}"
-    )
+    return render_prompt(MAPPING_ANALYSIS_NARRATION_PROMPT_TEMPLATE, compact_payload)
 
 
 def _build_deterministic_summary(

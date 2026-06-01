@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from streamlit_ui.workspace_views import (
     WORKSPACE_COPILOT_ACTIONS,
     WORKSPACE_SECTIONS,
+    _load_setup_saved_draft_sessions,
+    _resume_setup_saved_draft,
     _workspace_build_transformation_spec,
     _workspace_apply_transformation_spec_to_state,
     _workspace_copilot_chat_result,
@@ -230,6 +232,87 @@ def test_workspace_reset_transformation_design_state_clears_widget_and_snapshot_
     _workspace_reset_transformation_design_state(session_state)
 
     assert session_state == {"other_key": 1}
+
+
+def test_load_setup_saved_draft_sessions_caches_first_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    from streamlit_ui import workspace_views
+
+    calls: list[tuple[str, str]] = []
+    fake_streamlit = SimpleNamespace(session_state={})
+    monkeypatch.setattr(workspace_views, "st", fake_streamlit)
+
+    def api_request(method: str, path: str, **_kwargs):
+        calls.append((method, path))
+        return [{"draft_session_id": 7, "name": "customer-wip"}]
+
+    first = _load_setup_saved_draft_sessions(api_request)
+    second = _load_setup_saved_draft_sessions(api_request)
+
+    assert first == [{"draft_session_id": 7, "name": "customer-wip"}]
+    assert second == first
+    assert calls == [("GET", "/mapping/draft-sessions")]
+    assert fake_streamlit.session_state["saved_draft_sessions"][0]["draft_session_id"] == 7
+
+
+def test_resume_setup_saved_draft_restores_workspace_and_refreshes_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    from streamlit_ui import workspace_views
+
+    rerun_called = {"value": False}
+    applied_detail = {"value": None}
+    fake_streamlit = SimpleNamespace(
+        session_state={},
+        rerun=lambda: rerun_called.__setitem__("value", True),
+    )
+    monkeypatch.setattr(workspace_views, "st", fake_streamlit)
+
+    def apply_draft_session_detail(detail: dict) -> str:
+        applied_detail["value"] = detail
+        fake_streamlit.session_state["upload_response"] = {"source": {"dataset_name": "source.csv"}}
+        return "Output"
+
+    monkeypatch.setattr(workspace_views, "_apply_draft_session_detail_to_workspace", apply_draft_session_detail)
+
+    def api_request(method: str, path: str, **kwargs):
+        if method == "GET" and path == "/mapping/draft-sessions":
+            return [
+                {
+                    "draft_session_id": 7,
+                    "name": "customer-wip",
+                    "active_workspace_section": "Output",
+                    "source_dataset_name": "source.csv",
+                }
+            ]
+        if method == "GET" and path == "/mapping/draft-sessions/7":
+            assert kwargs["params"] == {"created_by": "qa-user", "workspace_id": "ws-customer-01"}
+            return {
+                "draft_session_id": 7,
+                "name": "customer-wip",
+                "active_workspace_section": "Output",
+                "source_handle": {"dataset_name": "source.csv", "schema_profile": {"columns": []}, "preview_rows": []},
+                "target_handle": {"dataset_name": "target.csv", "schema_profile": {"columns": []}, "preview_rows": []},
+                "mapping_mode": "standard",
+                "mapping_editor_state": {},
+                "mapping_decision_audit": {},
+                "mapping_runtime": {},
+            }
+        raise AssertionError(f"Unexpected API request: {(method, path, kwargs)}")
+
+    restored_section = _resume_setup_saved_draft(
+        api_request,
+        {
+            "draft_session_id": 7,
+            "name": "customer-wip",
+            "created_by": "qa-user",
+            "workspace_id": "ws-customer-01",
+        },
+    )
+
+    assert restored_section == "Output"
+    assert applied_detail["value"]["name"] == "customer-wip"
+    assert fake_streamlit.session_state["saved_draft_sessions"][0]["draft_session_id"] == 7
+    assert fake_streamlit.session_state["last_action"]["level"] == "success"
+    assert "continued draft session 'customer-wip'".lower() in fake_streamlit.session_state["last_action"]["message"].lower()
+    assert rerun_called["value"] is True
 
 
 def test_workspace_apply_transformation_spec_to_state_replaces_existing_rules() -> None:

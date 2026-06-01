@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 
 from app.core.config import settings
@@ -12,6 +11,7 @@ from app.models.mapping import (
     WorkspaceCopilotProblemStatementResponse,
 )
 from app.services.llm_service import LLMProvider, request_bounded_llm_json
+from app.services.prompt_templates import WORKSPACE_PROBLEM_GUIDANCE_PROMPT_TEMPLATE, render_prompt
 
 
 PROBLEM_STATEMENT_FIELDS = [
@@ -86,22 +86,11 @@ def build_workspace_problem_guidance_prompt(
         "workspace": request.workspace.model_dump(mode="json"),
         "capability_snapshot": request.capability_snapshot,
         "capability_descriptions": CAPABILITY_DESCRIPTIONS,
-        "fallback_guidance": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
+        "baseline_guidance": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
         "required_input_format_fields": PROBLEM_STATEMENT_FIELDS,
         "prompt_template": PROBLEM_STATEMENT_TEMPLATE,
     }
-    return (
-        "You are a bounded Workspace Copilot planner for Semantra. "
-        "First decide whether the user's problem statement is in scope for the application's current capabilities. "
-        "Stay grounded in the provided workspace state, capability snapshot, and product surfaces only.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Do not invent product features. Do not promise automation the app does not have.\n"
-        "If the request is only partly aligned, explain how to restate it using the provided input format.\n"
-        "Return exactly these top-level fields: title, disposition, normalized_problem, scope_reason, answer, capability_hits, recommended_sections, recommended_steps, prompt_template, input_format_fields, generation_metadata.\n"
-        "recommended_sections must only contain values from Setup, Review, Decisions, Output, Catalog, Governance, Benchmarks, System.\n"
-        "recommended_steps must be concrete actions the user can take inside Semantra.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence, ensure_ascii=True)}"
-    )
+    return render_prompt(WORKSPACE_PROBLEM_GUIDANCE_PROMPT_TEMPLATE, evidence)
 
 
 def _build_fallback_problem_guidance(

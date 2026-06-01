@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from app.core.config import settings
 from app.models.mapping import (
     CatalogReuseFitGenerationMetadata,
@@ -11,6 +9,7 @@ from app.models.mapping import (
     CatalogReuseFitResponse,
 )
 from app.services.llm_service import LLMProvider, request_bounded_llm_json
+from app.services.prompt_templates import CATALOG_REUSE_FIT_PROMPT_TEMPLATE, render_prompt
 
 
 def build_catalog_reuse_fit(
@@ -48,16 +47,9 @@ def build_catalog_reuse_fit_prompt(
     evidence = {
         "mapping_set_detail": request.mapping_set_detail.model_dump(mode="json"),
         "workspace_context": request.workspace_context.model_dump(mode="json"),
-        "fallback_fit": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
+        "baseline_fit": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
     }
-    return (
-        "You are assessing whether a saved mapping set is a good reuse candidate for the current workspace context. "
-        "Stay strictly grounded in the provided mapping-set metadata, decision counts, systems, domain, artifact type, canonical coverage, unmatched-source context, and workspace context.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Do not tell the user to apply or persist automatically. Only explain fit, risks, and next controlled actions.\n"
-        "Return exactly these top-level fields: title, fit_assessment, summary, key_matches, risks, next_actions, generation_metadata.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence, ensure_ascii=True)}"
-    )
+    return render_prompt(CATALOG_REUSE_FIT_PROMPT_TEMPLATE, evidence)
 
 
 def _build_fallback_fit(request: CatalogReuseFitRequest) -> CatalogReuseFitResponse:

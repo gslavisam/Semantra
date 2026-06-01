@@ -10,22 +10,38 @@ from unittest.mock import patch
 import pytest
 
 from app.core.config import settings
-from app.models.mapping import ScoringSignals
+from app.models.mapping import (
+    AutoMappingResponse,
+    MappingAnalysisOptions,
+    MappingAnalysisSummaryResponse,
+    MappingAnalysisWorkspaceContext,
+    ReviewPlanRequest,
+    ScoringSignals,
+    WorkspaceCopilotProblemStatementRequest,
+)
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import compare_scoring_profiles, evaluate_cases, evaluate_cases_for_profile
 from app.services.llm_service import (
+    LLMPromptEnvelope,
     StaticLLMProvider,
+    build_artifact_refinement_prompt,
     build_transformation_spec_prompt,
     build_transformation_generator_prompt,
+    build_validator_prompt_envelope,
     call_transformation_spec_generator,
     build_validator_prompt,
     call_transformation_generator,
     call_validator,
+    request_llm_json,
 )
 from app.services.mapping_service import CandidateScore, generate_mapping_candidates, should_run_canonical_semantic_rescue, should_run_llm_validation
+from app.services.mapping_analysis_service import build_mapping_analysis_narration_prompt, build_mapping_analysis_prompt
+from app.services.review_plan_service import _build_fallback_review_plan, build_review_plan_prompt
+from app.services.spec_recovery_service import build_spec_recovery_prompt
 from app.models.schema import ColumnProfile, SchemaProfile
 from app.services.spec_upload_service import parse_spec_payload
 from app.services.virtual_target_service import build_virtual_target_schema
+from app.services.workspace_copilot_service import _build_fallback_problem_guidance, build_workspace_problem_guidance_prompt
 
 
 def make_column(name: str, patterns: list[str], sample_values: list[str], unique_ratio: float = 1.0) -> ColumnProfile:
@@ -164,6 +180,126 @@ def test_validator_prompt_includes_description_aware_context_with_guardrails() -
     assert '"6000"' not in prompt
     assert 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' in prompt
     assert ('A' * 320) not in prompt
+    assert '"transformation_code"' not in prompt
+    assert "prefer no_match over guessing" in prompt
+    assert "strongest alternative was rejected" in prompt
+
+
+def test_validator_prompt_envelope_separates_system_task_and_payload() -> None:
+    envelope = build_validator_prompt_envelope(
+        source_field={"name": "AKONT", "sample_values": ["1000"]},
+        candidate_targets=[{"name": "reconciliation_account", "sample_values": ["100000"]}],
+    )
+
+    assert envelope.system_instructions == ("You are a strict data mapping validator.",)
+    assert any("Select the best target field only" in line for line in envelope.task_instructions)
+    assert envelope.payload["source_field"]["name"] == "AKONT"
+
+
+def test_request_llm_json_accepts_prompt_envelope_with_static_provider() -> None:
+    captured: dict[str, str] = {}
+
+    def _responder(prompt: str) -> str:
+        captured["prompt"] = prompt
+        return '{"selected_target":"no_match","confidence":0.0,"reasoning":["No good candidate in the closed set."]}'
+
+    response = request_llm_json(
+        StaticLLMProvider(_responder),
+        LLMPromptEnvelope(
+            system_instructions=("You are a strict data mapping validator.",),
+            task_instructions=("Return only valid JSON.",),
+            payload={"source_field": {"name": "AKONT"}},
+            payload_label="PAYLOAD",
+        ),
+        timeout_seconds=1.0,
+        retries=1,
+        operation_name="validator",
+    )
+
+    assert response is not None
+    assert "SYSTEM:" in captured["prompt"]
+    assert "TASK:" in captured["prompt"]
+    assert "PAYLOAD:" in captured["prompt"]
+
+
+def test_review_plan_prompt_uses_standard_sections_and_baseline_payload() -> None:
+    request = ReviewPlanRequest(
+        filtered_rows=[{"source": "LAND1", "target": "", "status": "needs_review", "confidence_label": "low_confidence"}],
+        attention_summary_rows=[{"issue_type": "unmatched", "focus": "No canonical match", "count": 1}],
+        filters={"status": "needs_review"},
+    )
+
+    prompt = build_review_plan_prompt(request, _build_fallback_review_plan(request))
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"baseline_plan"' in prompt
+    assert '"fallback_plan"' not in prompt
+    assert "Merge overlapping issue patterns into one cluster instead of restating similar groups separately." in prompt
+    assert "Prioritize clusters by operational blocking impact first and repeated count second." in prompt
+
+
+def test_workspace_problem_guidance_prompt_uses_standard_sections_and_baseline_payload() -> None:
+    request = WorkspaceCopilotProblemStatementRequest(
+        problem_statement="Need a customer-ready output with transformation rules.",
+        capability_snapshot={"section": "Review", "mapping_ready": True, "pending_proposals": 1},
+    )
+
+    prompt = build_workspace_problem_guidance_prompt(request, _build_fallback_problem_guidance(request))
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"baseline_guidance"' in prompt
+    assert '"fallback_guidance"' not in prompt
+    assert "Identify the primary bottleneck or gate before recommending later-stage work." in prompt
+    assert "The first recommended step must be immediately actionable in the current workspace state." in prompt
+
+
+def test_spec_recovery_prompt_uses_standard_sections() -> None:
+    prompt = build_spec_recovery_prompt(
+        "source_spec.csv",
+        [([
+            {"Column": "KUNNR", "Description": "Customer number", "Type": "CHAR"},
+            {"Column": "LAND1", "Description": "Country", "Type": "CHAR"},
+        ], 1)],
+    )
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"candidate_blocks"' in prompt
+
+
+def test_mapping_analysis_prompt_uses_standard_sections_and_payload() -> None:
+    prompt = build_mapping_analysis_prompt(
+        AutoMappingResponse(),
+        MappingAnalysisWorkspaceContext(mapping_mode="standard", source_dataset_name="source", target_dataset_name="target"),
+        MappingAnalysisOptions(),
+        MappingAnalysisSummaryResponse(title="Fallback overview"),
+    )
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"derived_overview"' in prompt
+    assert "Treat canonical coverage as semantic evidence, not final proof of implementation readiness." in prompt
+
+
+def test_mapping_analysis_narration_prompt_uses_standard_sections_and_overview_label() -> None:
+    prompt = build_mapping_analysis_narration_prompt(
+        MappingAnalysisSummaryResponse(
+            title="Mapping analysis",
+            mapping_mode="standard",
+            narration_script_seed="Fallback spoken script.",
+        )
+    )
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "OVERVIEW:" in prompt
+    assert "Wrap the final answer only inside <final_script> and </final_script>." in prompt
 
 
 def test_transformation_prompt_includes_description_aware_context() -> None:
@@ -188,6 +324,23 @@ def test_transformation_prompt_includes_description_aware_context() -> None:
     assert '"description": "SAP created-on date"' in prompt
     assert '"declared_type": "DATS"' in prompt
     assert '"name": "document.created_date"' in prompt
+    assert "Return empty transformation_code when direct mapping already satisfies the target meaning." in prompt
+    assert "Prefer the smallest valid change that satisfies the instruction and payload." in prompt
+
+
+def test_artifact_refinement_prompt_emphasizes_surgical_edits() -> None:
+    prompt = build_artifact_refinement_prompt(
+        mapping_decisions=[{"source": "cust_id", "target": "customer_id", "status": "accepted"}],
+        mode="pandas",
+        current_code='df_target["customer_id"] = df_source["cust_id"]',
+        instruction="Trim the customer id before assignment.",
+        edge_cases="Keep nulls as nulls.",
+        reference_excerpt="",
+    )
+
+    assert "Preserve unaffected structure, naming, and runtime idioms unless the instruction requires otherwise." in prompt
+    assert "Change only what is needed to satisfy the instruction and explicit edge cases." in prompt
+    assert "Do not add new imports, helpers, or dependencies unless the current scaffold cannot satisfy the request." in prompt
 
 
 def test_transformation_spec_prompt_uses_closed_target_set_rules() -> None:
@@ -281,6 +434,55 @@ def test_mapping_uses_llm_validator_only_in_ambiguity_band_and_logs_decision() -
         assert len(logs) == 1
         assert logs[0].used_llm is True
         assert logs[0].llm_result is not None
+    finally:
+        settings.llm_gate_min_score, settings.llm_gate_max_score = previous_bounds
+
+
+def test_mapping_generates_transformation_in_follow_up_llm_call_after_target_selection() -> None:
+    previous_bounds = (settings.llm_gate_min_score, settings.llm_gate_max_score)
+    settings.llm_gate_min_score = 0.0
+    settings.llm_gate_max_score = 1.0
+    prompts: list[str] = []
+
+    def _responder(prompt: str) -> str:
+        prompts.append(prompt)
+        if "strict data mapping validator" in prompt:
+            return '{"selected_target":"customer_email","confidence":0.82,"reasoning":["The email-shaped values match the email target best."]}'
+        if "pandas-oriented Python transformations" in prompt:
+            return json.dumps(
+                {
+                    "transformation_code": 'df_source["email"].str.strip().str.lower()',
+                    "reasoning": ["Normalize whitespace and casing before assignment."],
+                    "warnings": [],
+                }
+            )
+        raise AssertionError(prompt)
+
+    try:
+        provider = StaticLLMProvider(_responder)
+        source_schema = SchemaProfile(
+            dataset_id="source",
+            dataset_name="source.csv",
+            row_count=5,
+            columns=[make_column("email", ["email"], ["ana.markovic@example.com", "marko.jovanovic@example.com"])],
+        )
+        target_schema = SchemaProfile(
+            dataset_id="target",
+            dataset_name="target.csv",
+            row_count=5,
+            columns=[
+                make_column("customer_name", ["text"], ["Ana Markovic", "Marko Jovanovic"]),
+                make_column("customer_email", ["email"], ["ana.markovic@example.com", "marko.jovanovic@example.com"]),
+            ],
+        )
+
+        result = generate_mapping_candidates(source_schema, target_schema, llm_provider=provider)
+
+        assert result.mappings[0].target == "customer_email"
+        assert result.mappings[0].transformation_code == 'df_source["email"].str.strip().str.lower()'
+        assert len(prompts) >= 2
+        assert any("strict data mapping validator" in prompt for prompt in prompts)
+        assert any("pandas-oriented Python transformations" in prompt for prompt in prompts)
     finally:
         settings.llm_gate_min_score, settings.llm_gate_max_score = previous_bounds
 

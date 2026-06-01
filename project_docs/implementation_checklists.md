@@ -110,11 +110,11 @@ Predloženi prvi minimalni resume slice:
 Isporučeni continuity pod-slice u ovom wave-u:
 
 - backend sada ima prvi minimalni `draft session` contract: `POST /mapping/draft-sessions`, `GET /mapping/draft-sessions`, `GET /mapping/draft-sessions/{id}`
-- persisted payload trenutno pokriva `source_handle`, `target_handle`, `mapping_mode`, `active_workspace_section`, `mapping_runtime`, `mapping_editor_state` i `mapping_decision_audit`
-- `Workspace > Decisions` i minimalni `Workspace > Review` restore sada dele isti Streamlit save/load affordance za draft session tok, odvojeno od `mapping set` governance/versioning flow-a
-- restore trenutno rekonstruiše minimalni `Workspace Review/Decisions` kontekst iz draft-session detail payload-a i namerno čisti preview/codegen/guidance output-e umesto da ih pokušava vratiti kao stale artefakte
+- persisted payload trenutno pokriva `source_handle`, `target_handle`, `mapping_mode`, `active_workspace_section`, `mapping_runtime`, `mapping_editor_state`, `mapping_decision_audit`, `transformation_spec` i bounded `output_state`
+- `Workspace > Decisions` i minimalni `Workspace > Review`/`Output` restore sada dele isti Streamlit save/load affordance za draft session tok, odvojeno od `mapping set` governance/versioning flow-a
+- restore trenutno rekonstruiše minimalni `Workspace Review/Decisions` kontekst iz draft-session detail payload-a, vraća `Transformation Design`, i po potrebi vraća bounded output snapshot (`preview`, generated/refined artifact, mapping-analysis summary/script) umesto slepog re-run-a
 - restore sada čuva i `api_base_url` marker i eksplicitno blokira resume kada se draft ne poklapa sa aktivnim API base URL-om ili sa aktivnim upload schema kontekstom
-- restore u `Workspace > Review` vraća samo minimalni stabilni mapping contract (`mapping_runtime`, sintetisani `ranked_mappings`/`mappings`, canonical coverage) bez bounded guidance/output cache-a
+- restore u `Workspace > Review` i `Workspace > Output` vraća minimalni stabilni mapping contract (`mapping_runtime`, sintetisani `ranked_mappings`/`mappings`, canonical coverage) plus samo eksplicitno sačuvane bounded output snapshot-e
 - live browser smoke je potvrdio `Decisions -> Mapping Set Versions -> Resume draft session -> Workspace Review` tok tek nakon što je resume prebačen sa direktnog pisanja u widget-bound `active_*` navigation ključeve na `pending_top_level_area` / `pending_workspace_section` pattern
 - fokusirani backend smoke sada potvrđuje da se draft session može sačuvati, izlistati i vratiti bez regressije na susednom `mapping set` persistence toku
 

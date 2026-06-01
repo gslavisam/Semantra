@@ -24,7 +24,7 @@ from app.models.mapping import (
 from app.services.correction_service import correction_store
 from app.services.decision_log_service import decision_log_store
 from app.models.schema import ColumnProfile, SchemaProfile
-from app.services.llm_service import LLMProvider, call_validator
+from app.services.llm_service import LLMProvider, call_transformation_generator, call_validator
 from app.services.embedding_service import cosine_similarity, get_embedding, is_enabled as embedding_enabled
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.utils.normalization import semantic_token_set
@@ -33,6 +33,11 @@ from app.utils.similarity import clamp_score, fuzzy_similarity, jaccard_similari
 
 DEFAULT_SCORING_PROFILE = "balanced"
 AUTO_DESCRIPTION_PRIORITY_MIN_METADATA_COLUMNS = 1
+AUTO_LLM_TRANSFORMATION_INSTRUCTION = (
+    "Assess whether the selected source-to-target mapping needs a pandas transformation to become implementation-ready. "
+    "If a conversion, extraction, normalization, split, merge, parsing, or type coercion is needed, return the minimal pandas transformation. "
+    "If direct mapping is sufficient, return no transformation code."
+)
 SCORING_PROFILES = {
     "balanced": {
         "name": 0.20,
@@ -153,6 +158,47 @@ class ProgressCallbackCancelled(RuntimeError):
     pass
 
 
+def _column_prompt_context(column: ColumnProfile, *, confidence: float | None = None) -> dict:
+    payload = {
+        "name": column.name,
+        "description": column.description,
+        "declared_type": column.declared_type,
+        "sample_values": column.sample_values,
+        "pattern": column.detected_patterns,
+        "detected_patterns": column.detected_patterns,
+    }
+    if confidence is None:
+        payload["unique_ratio"] = column.unique_ratio
+    else:
+        payload["confidence"] = confidence
+    return payload
+
+
+def _maybe_generate_llm_transformation_code(
+    source: ColumnProfile,
+    target: ColumnProfile,
+    llm_provider: LLMProvider | None,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> str | None:
+    if llm_provider is None:
+        return None
+
+    response = call_transformation_generator(
+        source_field=_column_prompt_context(source),
+        target_field=_column_prompt_context(target),
+        user_instruction=AUTO_LLM_TRANSFORMATION_INSTRUCTION,
+        provider=llm_provider,
+        max_retries=1,
+        timeout_seconds=max(1.0, min(settings.llm_timeout_seconds, 5.0)),
+    )
+    if response is None or not response.transformation_code:
+        return None
+
+    _emit_progress(progress_callback, f"LLM proposed transformation logic for {source.name} -> {target.name}.")
+    return response.transformation_code
+
+
 @dataclass
 class CandidateScore:
     """Internal scored candidate bundle used during ranking, validation, and assignment."""
@@ -234,7 +280,7 @@ def generate_mapping_candidates(
         candidate_options = [build_candidate_option(score) for score in rankings[: settings.top_k_candidates]]
 
         llm_result = llm_decisions.get(source_column.name)
-        transformation_code = llm_result.transformation_code if llm_result and hasattr(llm_result, 'transformation_code') else None
+        transformation_code = None
 
         if not rankings:
             ranked_results.append(
@@ -276,7 +322,6 @@ def generate_mapping_candidates(
                     *[f"LLM: {reason}" for reason in llm_result.reasoning],
                 ],
                 alternatives=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
-                transformation_code=transformation_code,
                 llm_consulted=True,
                 llm_recommendation=llm_result,
                 llm_decision_proposition=build_llm_decision_proposition(
@@ -379,7 +424,14 @@ def generate_mapping_candidates(
                 llm_result=llm_result,
                 considered_targets=[candidate.target.name for candidate in rankings[: settings.top_k_candidates]],
             )
-        # Attach transformation_code if present
+        if llm_result and llm_result.selected_target != "no_match" and selected.target:
+            selected_target = selected_score.target if selected_score is not None else rankings[0].target
+            transformation_code = _maybe_generate_llm_transformation_code(
+                source_column,
+                selected_target,
+                llm_provider,
+                progress_callback=progress_callback,
+            )
         if transformation_code:
             selected.transformation_code = transformation_code
 
@@ -465,25 +517,9 @@ def refine_mapping_for_source(
         raise ValueError("LLM mapping refinement requires an active runtime provider.")
 
     llm_result = call_validator(
-        source_field={
-            "name": source.name,
-            "description": source.description,
-            "declared_type": source.declared_type,
-            "sample_values": source.sample_values,
-            "pattern": source.detected_patterns,
-            "detected_patterns": source.detected_patterns,
-            "unique_ratio": source.unique_ratio,
-        },
+        source_field=_column_prompt_context(source),
         candidate_targets=[
-            {
-                "name": candidate.target.name,
-                "description": candidate.target.description,
-                "declared_type": candidate.target.declared_type,
-                "sample_values": candidate.target.sample_values,
-                "pattern": candidate.target.detected_patterns,
-                "detected_patterns": candidate.target.detected_patterns,
-                "confidence": candidate.score,
-            }
+            _column_prompt_context(candidate.target, confidence=candidate.score)
             for candidate in candidate_scores
         ],
         provider=llm_provider,
@@ -511,7 +547,6 @@ def refine_mapping_for_source(
                 *[f"LLM: {reason}" for reason in llm_result.reasoning],
             ],
             alternatives=considered_targets,
-            transformation_code=llm_result.transformation_code,
             llm_consulted=True,
             llm_recommendation=llm_result,
             llm_decision_proposition=build_llm_decision_proposition(
@@ -553,8 +588,13 @@ def refine_mapping_for_source(
         llm_result=llm_result,
         considered_targets=considered_targets,
     )
-    if llm_result.transformation_code:
-        selected.transformation_code = llm_result.transformation_code
+    generated_transformation = _maybe_generate_llm_transformation_code(
+        source,
+        selected_score.target,
+        llm_provider,
+    )
+    if generated_transformation:
+        selected.transformation_code = generated_transformation
     return SourceMappingResult(source=source.name, selected=selected, candidates=candidate_options)
 
 

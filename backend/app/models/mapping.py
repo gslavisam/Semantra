@@ -879,6 +879,16 @@ class DraftSessionReviewState(BaseModel):
     canonical_concept_filter: str = "All"
 
 
+class DraftSessionOutputState(BaseModel):
+    """Bounded output snapshot that can be safely resumed without re-running generation."""
+
+    preview_response: dict[str, Any] = Field(default_factory=dict)
+    codegen_response: dict[str, Any] = Field(default_factory=dict)
+    codegen_refinement_response: dict[str, Any] = Field(default_factory=dict)
+    mapping_analysis_summary: dict[str, Any] = Field(default_factory=dict)
+    mapping_analysis_spoken_script: str = ""
+
+
 class DraftSessionCreateRequest(BaseModel):
     """Request payload for saving one durable draft workspace session snapshot."""
 
@@ -897,6 +907,7 @@ class DraftSessionCreateRequest(BaseModel):
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
     transformation_spec: dict[str, Any] = Field(default_factory=dict)
+    output_state: DraftSessionOutputState = Field(default_factory=DraftSessionOutputState)
 
 
 class DraftSessionUpdateRequest(DraftSessionCreateRequest):
@@ -917,6 +928,7 @@ class DraftSessionDecisionStateUpdateRequest(BaseModel):
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
     transformation_spec: dict[str, Any] = Field(default_factory=dict)
+    output_state: DraftSessionOutputState = Field(default_factory=DraftSessionOutputState)
 
 
 class DraftSessionReviewStateUpdateRequest(BaseModel):
@@ -961,6 +973,7 @@ class DraftSessionDetail(DraftSessionRecord):
     mapping_editor_state: dict[str, DraftSessionEditorEntry] = Field(default_factory=dict)
     mapping_decision_audit: dict[str, DraftSessionDecisionAuditEntry] = Field(default_factory=dict)
     transformation_spec: dict[str, Any] = Field(default_factory=dict)
+    output_state: DraftSessionOutputState = Field(default_factory=DraftSessionOutputState)
 
 
 class CatalogIntegrationRecord(BaseModel):
@@ -1468,6 +1481,7 @@ class PreviewRequest(BaseModel):
     """Request payload for previewing mapping decisions against uploaded source rows."""
 
     source_dataset_id: str
+    source_preview_rows: list[dict[str, Any]] | None = None
     mapping_decisions: list[MappingDecision]
     transformation_spec: TransformationSpec | None = None
 

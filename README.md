@@ -77,6 +77,10 @@ Semantra does not use LLMs as an autonomous mapper. The current bounded AI surfa
 
 Each of these surfaces is optional, inspectable, and backed by deterministic fallback behavior where applicable.
 
+They now share one bounded prompt contract across the backend: static prompt text lives in `backend/app/services/prompt_templates.py`, runtime requests are split into explicit `SYSTEM`, `TASK`, and labeled payload sections, and planner-style prompts use neutral `baseline_*` payload hints instead of `fallback_*` prompt anchoring.
+
+For mapping specifically, the LLM path is now split into two bounded steps: the validator chooses only the best target inside the closed candidate set, and transformation generation runs as a separate follow-up call only after a target has been selected.
+
 ## Quick Start
 
 ### 1. Install dependencies
@@ -149,6 +153,12 @@ If you want protected governance/admin flows enabled, set `SEMANTRA_ADMIN_API_TO
 
 The app supports bounded LLM use for validation, review guidance, transformation generation, artifact refinement, benchmark explanation, canonical-gap assistance, and reuse-fit assessment.
 
+Prompt authoring is intentionally code-backed rather than environment-configured. Runtime config still controls provider, model, and timeout behavior, while static prompt wording is centralized in `backend/app/services/prompt_templates.py`.
+
+For a full prompt inventory showing each static template, dynamic payload builder, and response contract, see `docs/reference/LLM_PROMPT_MATRIX.md`.
+
+For the checklist used to evaluate future prompt revisions, see `docs/reference/LLM_PROMPT_EVALUATION_CHECKLIST.md`.
+
 Example for LM Studio:
 
 - `SEMANTRA_LLM_PROVIDER=lmstudio`
@@ -194,7 +204,7 @@ Semantra currently treats browser session state as local UI state.
 - if the browser is closed, transient Workspace state is not automatically restored on the next day
 - continuing work is supported through explicit persisted artifacts: saved draft sessions, saved mapping-set versions, and exported mapping JSON/Excel
 - current draft-session continuity is intentionally minimal: save, list, load, and bounded restore for the active review/decision contract
-- generated guidance, preview, codegen, and refinement outputs are still intentionally rebuilt instead of being blindly revived from an older UI session
+- draft-session restore now also revives bounded output snapshots for preview, generated/refined artifacts, and mapping-analysis summary/script when they were explicitly saved with the draft
 
 ## Authorization Posture Today
 
@@ -233,6 +243,7 @@ Supporting docs:
 - `docs/reference/BENCHMARK_METRICS_AND_CORRECTION_IMPACT.md`
 - `docs/reference/CANONICAL_CONSOLE_AND_STEWARDSHIP.md`
 - `docs/reference/CATALOG_SEARCH_REUSE_AND_SIMILARITY.md`
+- `docs/reference/LLM_PROMPT_MATRIX.md`
 - `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`
 - `docs/reference/TRANSFORMATION_TEST_SETS_AND_ASSERTIONS.md`
 - `docs/reference/TRANSFORMATION_PREVIEW_AND_CODEGEN_WARNINGS.md`

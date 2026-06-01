@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from app.core.config import settings
 from app.models.mapping import (
     CanonicalGapSuggestion,
@@ -12,7 +10,8 @@ from app.models.mapping import (
     CanonicalGapTriageSummaryRequest,
     CanonicalGapTriageSummaryResponse,
 )
-from app.services.llm_service import LLMProvider, request_llm_json
+from app.services.llm_service import LLMProvider, request_bounded_llm_json
+from app.services.prompt_templates import CANONICAL_GAP_TRIAGE_SUMMARY_PROMPT_TEMPLATE, render_prompt
 
 
 def build_canonical_gap_triage_summary(
@@ -26,13 +25,7 @@ def build_canonical_gap_triage_summary(
         return fallback
 
     prompt = build_canonical_gap_triage_prompt(request, fallback)
-    response = request_llm_json(
-        provider,
-        prompt,
-        settings.llm_timeout_seconds,
-        settings.llm_max_retries,
-        "canonical_gap_triage",
-    )
+    response = request_bounded_llm_json(provider, prompt, "canonical_gap_triage")
     if response is None:
         return fallback
 
@@ -55,16 +48,9 @@ def build_canonical_gap_triage_prompt(
             key: value.model_dump(mode="json") for key, value in list((request.suggestions or {}).items())[:20]
         },
         "proposal_states": dict(request.proposal_states or {}),
-        "fallback_summary": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
+        "baseline_summary": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
     }
-    return (
-        "You are triaging a canonical-gap review queue for human stewardship. "
-        "Stay strictly grounded in the provided candidates, cached suggestion payloads, and proposal states.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Do not approve, reject, or invent canonical concepts. Only summarize repeated queue patterns, risks, and next actions.\n"
-        "Return exactly these top-level fields: title, summary, groups, risks, next_actions, generation_metadata.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence, ensure_ascii=True)}"
-    )
+    return render_prompt(CANONICAL_GAP_TRIAGE_SUMMARY_PROMPT_TEMPLATE, evidence)
 
 
 def _build_fallback_summary(request: CanonicalGapTriageSummaryRequest) -> CanonicalGapTriageSummaryResponse:

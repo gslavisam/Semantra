@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 from app.core.config import settings
 from app.models.mapping import (
     BenchmarkExplanationGenerationMetadata,
@@ -11,6 +9,7 @@ from app.models.mapping import (
     BenchmarkExplanationResponse,
 )
 from app.services.llm_service import LLMProvider, request_bounded_llm_json
+from app.services.prompt_templates import BENCHMARK_EXPLANATION_PROMPT_TEMPLATE, render_prompt
 
 
 def build_benchmark_explanation(
@@ -50,18 +49,9 @@ def build_benchmark_explanation_prompt(
         "benchmark_result": request.benchmark_result.model_dump(mode="json") if request.benchmark_result else None,
         "correction_impact": request.correction_impact.model_dump(mode="json") if request.correction_impact else None,
         "profile_comparison": request.profile_comparison.model_dump(mode="json") if request.profile_comparison else None,
-        "fallback_explanation": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
+        "baseline_explanation": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
     }
-    return (
-        "You are explaining benchmark evidence for a mapping-engine tuning workflow. "
-        "Stay strictly grounded in the provided metrics and recommendation fields.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Summarize what the benchmark evidence says, what the main risks are, and what the next controlled actions should be.\n"
-        "Do not invent causes that are not supported by the payload.\n"
-        "Return exactly these top-level fields: title, summary, key_findings, risks, next_actions, generation_metadata.\n"
-        "Keep lists short and specific.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence, ensure_ascii=True)}"
-    )
+    return render_prompt(BENCHMARK_EXPLANATION_PROMPT_TEMPLATE, evidence)
 
 
 def _build_fallback_explanation(request: BenchmarkExplanationRequest) -> BenchmarkExplanationResponse:

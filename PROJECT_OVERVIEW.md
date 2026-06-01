@@ -48,6 +48,9 @@ These surfaces share the same intent:
 - they fall back gracefully when the LLM is unavailable or the response is invalid
 - when they navigate across Workspace sections, they now do so through rerun-safe pending handoff state rather than by mutating widget-bound active navigation state mid-render
 
+Implementation note:
+Bounded prompts now share a common backend envelope with explicit `SYSTEM`, `TASK`, and labeled payload sections. Planner and summarizer prompts also use neutral `baseline_*` payload hints so deterministic fallback content can be used as a guardrail without over-anchoring the model toward copying the fallback verbatim.
+
 ## Product Shape Today
 
 Semantra currently consists of:
@@ -108,6 +111,7 @@ Important behavior:
 - current thresholds are `high >= 0.85`, `medium >= 0.65`, otherwise `low`
 - scores `>= 0.75` are auto-accepted even when the confidence label remains `medium_confidence`
 - canonical mode can narrow the initial search to a configurable likely-candidate pool before full scoring; the default UI pool is now `10`
+- bounded LLM target validation and bounded transformation generation are now separate steps; the validator selects from the closed target set, and transformation code is generated only after a target has already been chosen
 
 Detailed signal, score, and bounded LLM behavior is documented in `docs/reference/MAPPING_SIGNALS_AND_SCORING.md`.
 
@@ -116,6 +120,7 @@ Main anchors:
 - `backend/app/services/mapping_service.py`
 - `backend/app/api/routes/mapping.py`
 - `backend/app/services/mapping_job_service.py`
+- `backend/app/services/prompt_templates.py`
 
 ### 3. Review, explainability, and guided queue support
 
@@ -180,6 +185,7 @@ Main anchors:
 - `backend/app/services/codegen_service.py`
 - `backend/app/services/transformation_test_service.py`
 - `backend/app/services/llm_service.py`
+- `backend/app/services/prompt_templates.py`
 - `backend/app/api/routes/mapping.py`
 - `streamlit_ui/workspace_views.py`
 

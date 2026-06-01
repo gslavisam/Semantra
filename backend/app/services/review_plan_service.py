@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
-
 from app.core.config import settings
 from app.models.mapping import ReviewPlanCluster, ReviewPlanGenerationMetadata, ReviewPlanRequest, ReviewPlanResponse
 from app.services.llm_service import LLMProvider, request_bounded_llm_json
+from app.services.prompt_templates import REVIEW_PLAN_PROMPT_TEMPLATE, render_prompt
 
 
 def build_review_plan(
@@ -45,17 +44,9 @@ def build_review_plan_prompt(
         "filters": request.filters,
         "filtered_rows": request.filtered_rows[:30],
         "attention_summary_rows": request.attention_summary_rows[:12],
-        "fallback_plan": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
+        "baseline_plan": fallback.model_dump(mode="json", exclude={"generation_metadata"}),
     }
-    return (
-        "You are planning a bounded mapping-review triage workflow for a human reviewer. "
-        "Stay strictly grounded in the provided filtered rows, issue groups, statuses, confidence labels, and canonical states.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Do not propose target mappings. Do not change statuses. Do not invent glossary concepts.\n"
-        "Return exactly these top-level fields: title, queue_summary, clusters, risks, next_actions, generation_metadata.\n"
-        "Each cluster should describe a repeated review pattern with priority, count, summary, and recommended_follow_up.\n\n"
-        f"PAYLOAD:\n{json.dumps(evidence, ensure_ascii=True)}"
-    )
+    return render_prompt(REVIEW_PLAN_PROMPT_TEMPLATE, evidence)
 
 
 def _build_fallback_review_plan(request: ReviewPlanRequest) -> ReviewPlanResponse:

@@ -254,7 +254,6 @@ class SQLitePersistenceService:
                     "workspace_id": "TEXT",
                 },
             )
-            self._apply_named_migrations(connection)
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_mapping_jobs_status_updated ON mapping_jobs (status, updated_at_monotonic)"
             )
@@ -424,6 +423,7 @@ class SQLitePersistenceService:
                 )
                 """
             )
+            self._apply_named_migrations(connection)
         self._backfill_mapping_catalog_entries()
         self._backfill_mapping_catalog_concepts()
 
@@ -1679,6 +1679,7 @@ class SQLitePersistenceService:
             mapping_editor_state=request.mapping_editor_state,
             mapping_decision_audit=normalized_decision_audit,
             transformation_spec=request.transformation_spec,
+            output_state=request.output_state,
         )
         with self.connection() as connection:
             cursor = connection.execute(
@@ -1726,6 +1727,7 @@ class SQLitePersistenceService:
                     current_detail.mapping_editor_state != request.mapping_editor_state,
                     current_detail.mapping_decision_audit != normalized_decision_audit,
                     current_detail.transformation_spec != request.transformation_spec,
+                    current_detail.output_state != request.output_state,
                 ]
             )
             if not durable_state_changed:
@@ -1756,6 +1758,7 @@ class SQLitePersistenceService:
                 mapping_editor_state=request.mapping_editor_state,
                 mapping_decision_audit=normalized_decision_audit,
                 transformation_spec=request.transformation_spec,
+                output_state=request.output_state,
             )
             connection.execute(
                 "UPDATE draft_sessions SET name = ?, payload = ? WHERE id = ?",

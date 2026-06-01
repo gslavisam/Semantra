@@ -227,7 +227,7 @@ Important current behavior:
 - when an artifact already exists, Workspace Copilot can now prioritize current artifact warnings ahead of refinement-only warnings instead of treating Output help as a single generic blocker message
 - the main Workspace render path is now hardened against stale `DeletedFile` uploader objects during Streamlit reruns, so file-change reloads no longer crash the page before the Copilot panel can render
 - the same live smoke also validated the fixed main-panel section-handoff path, so closure/readiness guidance is now both present and rerun-safe in the browser
-- draft-session continuity now has a minimal save/list/load path for `Workspace > Review` and `Workspace > Decisions`; restore rebuilds a stable mapping contract from saved schema handles, editor state, audit metadata, and `mapping_runtime`, while still clearing preview/codegen/guidance artifacts instead of reviving stale generated outputs
+- draft-session continuity now has a minimal save/list/load path for `Workspace > Review`, `Workspace > Decisions`, and bounded `Workspace > Output` resume; restore rebuilds a stable mapping contract from saved schema handles, editor state, audit metadata, and `mapping_runtime`, and now also restores explicitly saved preview/codegen/mapping-analysis snapshots without re-running generation
 - draft-session restore also persists the saved `api_base_url` and blocks resume when the active runtime or upload schema context does not match the saved draft
 - transformation test-set save and run are governance-gated and require accepted active decisions
 - refinement does not replace the active generated artifact until the user explicitly accepts it

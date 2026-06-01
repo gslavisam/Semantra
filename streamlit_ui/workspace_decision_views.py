@@ -30,6 +30,8 @@ def _draft_session_restore_section(section: str | None, draft_session_detail: di
         runtime = (draft_session_detail or {}).get("mapping_runtime") or {}
         if runtime:
             return "Review"
+    if normalized == "Output":
+        return "Output"
     if normalized == "Decisions":
         return "Decisions"
     return "Decisions"
@@ -49,7 +51,6 @@ def _set_active_draft_session(draft_session: dict | None) -> None:
     draft_session_id = int(current.get("draft_session_id") or 0)
     if not draft_session_id:
         st.session_state.pop("active_draft_session", None)
-        st.session_state.pop("selected_draft_session_id", None)
         return
     st.session_state["active_draft_session"] = {
         "draft_session_id": draft_session_id,
@@ -61,7 +62,6 @@ def _set_active_draft_session(draft_session: dict | None) -> None:
         "updated_at": current.get("updated_at"),
         "active_workspace_section": current.get("active_workspace_section") or "Decisions",
     }
-    st.session_state["selected_draft_session_id"] = draft_session_id
 
 
 def _draft_session_option_label(draft_session: dict) -> str:
@@ -71,21 +71,25 @@ def _draft_session_option_label(draft_session: dict) -> str:
     )
 
 
-def _resolve_selected_draft_session_id(saved_draft_sessions: list[dict]) -> int:
+def _resolve_selected_draft_session_id(
+    saved_draft_sessions: list[dict],
+    *,
+    selection_key: str = "selected_draft_session_id",
+) -> int:
     option_ids = [int(item.get("draft_session_id") or 0) for item in saved_draft_sessions if int(item.get("draft_session_id") or 0)]
     if not option_ids:
         return 0
 
-    current_selected_id = int(st.session_state.get("selected_draft_session_id") or 0)
+    current_selected_id = int(st.session_state.get(selection_key) or 0)
     if current_selected_id in option_ids:
         return current_selected_id
 
     active_draft_id = int((_active_draft_session().get("draft_session_id") or 0))
     if active_draft_id in option_ids:
-        st.session_state["selected_draft_session_id"] = active_draft_id
+        st.session_state[selection_key] = active_draft_id
         return active_draft_id
 
-    st.session_state["selected_draft_session_id"] = option_ids[0]
+    st.session_state[selection_key] = option_ids[0]
     return option_ids[0]
 
 
@@ -101,6 +105,10 @@ def _serialized_mapping_editor_state() -> dict[str, dict]:
             "llm_transformation_instruction": str(entry.get("llm_transformation_instruction") or ""),
             "manual_apply_transformation": bool(entry.get("manual_apply_transformation", False)),
             "manual": bool(entry.get("manual", False)),
+            "llm_proposal_confidence": float(entry.get("llm_proposal_confidence", 0.0) or 0.0),
+            "llm_proposal_origin": str(entry.get("llm_proposal_origin") or ""),
+            "llm_proposal_target": str(entry.get("llm_proposal_target") or ""),
+            "llm_proposal_status": str(entry.get("llm_proposal_status") or ""),
         }
         for source, entry in editor_state.items()
         if str(source or "").strip()
@@ -193,6 +201,50 @@ def _draft_session_resume_transformation_message(draft_session_detail: dict) -> 
     title = str(summary.get("title") or "Transformation Design restored").strip()
     message = str(summary.get("message") or "").strip()
     return f" Transformation Design restored: {title}. {message}".rstrip()
+
+
+def _draft_session_resume_output_message(draft_session_detail: dict) -> str:
+    output_state = dict(draft_session_detail.get("output_state") or {})
+    restored_labels: list[str] = []
+    if isinstance(output_state.get("preview_response"), dict) and output_state.get("preview_response"):
+        restored_labels.append("preview snapshot")
+    if isinstance(output_state.get("codegen_refinement_response"), dict) and output_state.get("codegen_refinement_response"):
+        restored_labels.append("refined artifact")
+    elif isinstance(output_state.get("codegen_response"), dict) and output_state.get("codegen_response"):
+        restored_labels.append("generated artifact")
+    if isinstance(output_state.get("mapping_analysis_summary"), dict) and output_state.get("mapping_analysis_summary"):
+        restored_labels.append("mapping analysis")
+    if str(output_state.get("mapping_analysis_spoken_script") or "").strip():
+        restored_labels.append("narration script")
+    if not restored_labels:
+        return ""
+    return f" Output snapshot restored: {', '.join(restored_labels)}."
+
+
+def _serialized_draft_session_output_state() -> dict:
+    output_state: dict[str, object] = {}
+
+    preview_response = st.session_state.get("preview_response")
+    if isinstance(preview_response, dict) and preview_response:
+        output_state["preview_response"] = dict(preview_response)
+
+    codegen_response = st.session_state.get("codegen_response")
+    if isinstance(codegen_response, dict) and codegen_response:
+        output_state["codegen_response"] = dict(codegen_response)
+
+    codegen_refinement_response = st.session_state.get("codegen_refinement_response")
+    if isinstance(codegen_refinement_response, dict) and codegen_refinement_response:
+        output_state["codegen_refinement_response"] = dict(codegen_refinement_response)
+
+    mapping_analysis_summary = st.session_state.get("mapping_analysis_summary")
+    if isinstance(mapping_analysis_summary, dict) and mapping_analysis_summary:
+        output_state["mapping_analysis_summary"] = dict(mapping_analysis_summary)
+
+    mapping_analysis_spoken_script = str(st.session_state.get("mapping_analysis_spoken_script") or "").strip()
+    if mapping_analysis_spoken_script:
+        output_state["mapping_analysis_spoken_script"] = mapping_analysis_spoken_script
+
+    return output_state
 
 
 def _serialized_workspace_transformation_spec() -> dict:
@@ -433,6 +485,7 @@ def _build_draft_session_request_payload(name: str) -> dict:
         "mapping_editor_state": _serialized_mapping_editor_state(),
         "mapping_decision_audit": _decision_audit_map(),
         "transformation_spec": _serialized_workspace_transformation_spec(),
+        "output_state": _serialized_draft_session_output_state(),
     }
 
 
@@ -572,6 +625,30 @@ def _reset_draft_session_transient_outputs() -> None:
             st.session_state.pop(key, None)
 
 
+def _apply_draft_session_output_state(draft_session_detail: dict) -> None:
+    output_state = dict(draft_session_detail.get("output_state") or {})
+
+    preview_response = output_state.get("preview_response")
+    if isinstance(preview_response, dict) and preview_response:
+        st.session_state["preview_response"] = dict(preview_response)
+
+    codegen_response = output_state.get("codegen_response")
+    if isinstance(codegen_response, dict) and codegen_response:
+        st.session_state["codegen_response"] = dict(codegen_response)
+
+    codegen_refinement_response = output_state.get("codegen_refinement_response")
+    if isinstance(codegen_refinement_response, dict) and codegen_refinement_response:
+        st.session_state["codegen_refinement_response"] = dict(codegen_refinement_response)
+
+    mapping_analysis_summary = output_state.get("mapping_analysis_summary")
+    if isinstance(mapping_analysis_summary, dict) and mapping_analysis_summary:
+        st.session_state["mapping_analysis_summary"] = dict(mapping_analysis_summary)
+
+    mapping_analysis_spoken_script = str(output_state.get("mapping_analysis_spoken_script") or "").strip()
+    if mapping_analysis_spoken_script:
+        st.session_state["mapping_analysis_spoken_script"] = mapping_analysis_spoken_script
+
+
 def _apply_draft_session_review_state(draft_session_detail: dict) -> None:
     review_state = dict(draft_session_detail.get("review_state") or {})
     st.session_state["filter_status"] = str(review_state.get("status_filter") or "All").strip() or "All"
@@ -619,6 +696,7 @@ def _apply_draft_session_detail_to_workspace(draft_session_detail: dict) -> str:
     st.session_state["pending_workspace_section"] = restore_section
     _reset_draft_session_transient_outputs()
     _apply_draft_session_transformation_spec(draft_session_detail)
+    _apply_draft_session_output_state(draft_session_detail)
     return restore_section
 
 
@@ -651,10 +729,11 @@ def _build_draft_session_decision_state_payload() -> dict:
         "workspace_id": active_draft.get("workspace_id"),
         "expected_version": int(active_draft.get("version") or 1),
         "last_writer": active_draft.get("created_by") or active_draft.get("last_writer"),
-        "active_workspace_section": "Decisions",
+        "active_workspace_section": str(st.session_state.get("active_workspace_section") or "Decisions").strip() or "Decisions",
         "mapping_editor_state": _serialized_mapping_editor_state(),
         "mapping_decision_audit": _decision_audit_map(),
         "transformation_spec": _serialized_workspace_transformation_spec(),
+        "output_state": _serialized_draft_session_output_state(),
     }
 
 
@@ -791,16 +870,22 @@ def _apply_llm_decision_proposal(editor_state: dict, proposal: dict) -> bool:
         return False
 
     proposal_type = str(proposal.get("proposal_type") or "").strip()
+    proposal_confidence = float(proposal.get("confidence", 0.0) or 0.0)
+    proposal_origin = str(proposal.get("origin") or "llm_proposal")
     if proposal_type == "switch_target":
         current_entry["target"] = str(proposal.get("proposed_target") or "").strip()
         current_entry["status"] = "accepted"
+        current_entry["llm_proposal_confidence"] = proposal_confidence
+        current_entry["llm_proposal_origin"] = proposal_origin
+        current_entry["llm_proposal_target"] = current_entry["target"]
+        current_entry["llm_proposal_status"] = current_entry["status"]
         _record_decision_audit(
             source,
             origin="llm_proposal",
             details={
                 "mode": "switch_target",
-                "proposal_origin": str(proposal.get("origin") or ""),
-                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+                "proposal_origin": proposal_origin,
+                "confidence": proposal_confidence,
             },
         )
         return bool(current_entry.get("target"))
@@ -808,13 +893,17 @@ def _apply_llm_decision_proposal(editor_state: dict, proposal: dict) -> bool:
         if not actual_target and expected_target:
             current_entry["target"] = expected_target
         current_entry["status"] = "accepted"
+        current_entry["llm_proposal_confidence"] = proposal_confidence
+        current_entry["llm_proposal_origin"] = proposal_origin
+        current_entry["llm_proposal_target"] = str(current_entry.get("target") or "")
+        current_entry["llm_proposal_status"] = current_entry["status"]
         _record_decision_audit(
             source,
             origin="llm_proposal",
             details={
                 "mode": "accept_current",
-                "proposal_origin": str(proposal.get("origin") or ""),
-                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+                "proposal_origin": proposal_origin,
+                "confidence": proposal_confidence,
             },
         )
         return bool(current_entry.get("target"))
@@ -822,13 +911,17 @@ def _apply_llm_decision_proposal(editor_state: dict, proposal: dict) -> bool:
         if not actual_target and expected_target:
             current_entry["target"] = expected_target
         current_entry["status"] = "rejected"
+        current_entry["llm_proposal_confidence"] = proposal_confidence
+        current_entry["llm_proposal_origin"] = proposal_origin
+        current_entry["llm_proposal_target"] = str(current_entry.get("target") or "")
+        current_entry["llm_proposal_status"] = current_entry["status"]
         _record_decision_audit(
             source,
             origin="llm_proposal",
             details={
                 "mode": "reject",
-                "proposal_origin": str(proposal.get("origin") or ""),
-                "confidence": float(proposal.get("confidence", 0.0) or 0.0),
+                "proposal_origin": proposal_origin,
+                "confidence": proposal_confidence,
             },
         )
         return True
@@ -1492,6 +1585,7 @@ def render_mapping_set_versions_panel(
                             f"Resumed draft session '{draft_session_detail['name']}' "
                             f"into Workspace {restored_section}."
                             f"{_draft_session_resume_transformation_message(draft_session_detail)}"
+                            f"{_draft_session_resume_output_message(draft_session_detail)}"
                         ),
                     }
                     st.rerun()

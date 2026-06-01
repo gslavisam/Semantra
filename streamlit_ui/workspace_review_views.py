@@ -12,6 +12,105 @@ def _normalized_text(value: str | None) -> str:
     return str(value or "").strip().lower()
 
 
+def _confidence_percent_label(value: object) -> str:
+    try:
+        return f"{round(float(value or 0.0) * 100)}%"
+    except (TypeError, ValueError):
+        return "n/a"
+
+
+def _llm_proposal_percent_label(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    try:
+        return f"{round(float(value) * 100)}%"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _mapping_llm_proposal_confidence(
+    row: dict,
+    entry: dict,
+    *,
+    pending_proposals: list[dict] | None = None,
+) -> float | None:
+    source = str(row.get("source") or "")
+    current_target = str(row.get("target") or "")
+    current_status = str((entry or {}).get("status", row.get("status") or "needs_review") or "needs_review")
+    persisted_target = str((entry or {}).get("llm_proposal_target") or "")
+    persisted_status = str((entry or {}).get("llm_proposal_status") or "")
+    persisted_confidence = (entry or {}).get("llm_proposal_confidence")
+    if persisted_confidence not in (None, ""):
+        if (not persisted_target or persisted_target == current_target) and (
+            not persisted_status or persisted_status == current_status
+        ):
+            try:
+                return float(persisted_confidence)
+            except (TypeError, ValueError):
+                pass
+
+    for proposal in pending_proposals or []:
+        if not isinstance(proposal, dict):
+            continue
+        if str(proposal.get("source") or "") != source:
+            continue
+        if str(proposal.get("current_target") or "") != current_target:
+            continue
+        proposal_status = str(proposal.get("current_status") or row.get("status") or "needs_review")
+        if proposal_status != current_status:
+            continue
+        confidence = proposal.get("confidence")
+        if confidence in (None, ""):
+            continue
+        try:
+            return float(confidence)
+        except (TypeError, ValueError):
+            continue
+
+    refinement_response = (entry or {}).get("llm_mapping_refinement")
+    if isinstance(refinement_response, dict):
+        selected = refinement_response.get("selected") or {}
+        llm_recommendation = selected.get("llm_recommendation") or {}
+        confidence = llm_recommendation.get("confidence")
+        if confidence not in (None, ""):
+            try:
+                return float(confidence)
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def _selected_mapping_display_rows(
+    rows: list[dict],
+    editor_state: dict[str, dict] | None = None,
+    pending_proposals: list[dict] | None = None,
+) -> list[dict]:
+    display_rows: list[dict] = []
+    state_by_source = editor_state or {}
+    for row in rows:
+        source = str(row.get("source") or "")
+        entry = state_by_source.get(source) or {}
+        display_rows.append(
+            {
+                "source": source,
+                "target": row.get("target") or "",
+                "original_confidence": _confidence_percent_label(row.get("confidence")),
+                "llm_proposal_confidence": _llm_proposal_percent_label(
+                    _mapping_llm_proposal_confidence(row, entry, pending_proposals=pending_proposals)
+                ),
+                "status": row.get("status") or "",
+                "validator": row.get("validator") or "",
+                "canonical_status": row.get("canonical_status_label") or row.get("canonical_status") or "",
+                "shared_concepts": row.get("shared_concepts") or "",
+                "source_concepts": row.get("source_concepts") or "",
+                "target_concepts": row.get("target_concepts") or "",
+                "canonical_path": row.get("canonical_path") or "",
+                "llm_consulted": "yes" if row.get("llm_consulted") else "no",
+            }
+        )
+    return display_rows
+
+
 def _parse_hint_sample_values(value: str) -> list[str]:
     normalized = str(value or "").replace("\n", ",")
     parsed: list[str] = []
@@ -185,6 +284,12 @@ def _apply_llm_mapping_refinement(entry: dict) -> str:
     entry["target"] = selected_target
     entry["status"] = "needs_review"
     entry["llm_mapping_refinement_applied"] = True
+    entry["llm_proposal_confidence"] = float(
+        ((selected.get("llm_recommendation") or {}).get("confidence", 0.0) or 0.0)
+    )
+    entry["llm_proposal_origin"] = "llm_refine"
+    entry["llm_proposal_target"] = selected_target
+    entry["llm_proposal_status"] = entry["status"]
     return selected_target
 
 
@@ -196,6 +301,11 @@ def _clear_llm_mapping_refinement(entry: dict, *, restore_previous: bool) -> Non
     entry.pop("llm_mapping_refinement_previous_target", None)
     entry.pop("llm_mapping_refinement_previous_status", None)
     entry.pop("llm_mapping_refinement_applied", None)
+    if str(entry.get("llm_proposal_origin") or "") == "llm_refine":
+        entry.pop("llm_proposal_confidence", None)
+        entry.pop("llm_proposal_origin", None)
+        entry.pop("llm_proposal_target", None)
+        entry.pop("llm_proposal_status", None)
 
 
 def _render_llm_mapping_refine_panel(
@@ -1190,7 +1300,7 @@ def display_trust_layer(
         if f"llm_mapping_prompt_{source}" not in st.session_state:
             st.session_state[f"llm_mapping_prompt_{source}"] = str(entry.get("llm_mapping_instruction") or "")
 
-        col1, col2, col3 = st.columns([3, 3, 2])
+        col1, col2, col3, col4 = st.columns([3, 3, 1.5, 1.5])
         with col1:
             st.info(f"Source: **{source}**")
         with col2:
@@ -1238,8 +1348,19 @@ def display_trust_layer(
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
         with col3:
             score = mapping.get("confidence", 0.0)
-            st.metric("Confidence", f"{round(float(score or 0.0) * 100)}%")
+            st.metric("Original confidence", _confidence_percent_label(score))
             st.progress(score)
+        with col4:
+            llm_proposal_confidence = _mapping_llm_proposal_confidence(
+                mapping,
+                entry,
+                pending_proposals=st.session_state.get("llm_decision_proposals") or [],
+            )
+            if llm_proposal_confidence is None:
+                st.caption("LLM proposal appears only after you generate it from the Review tab.")
+            else:
+                st.metric("LLM proposal", _llm_proposal_percent_label(llm_proposal_confidence))
+                st.caption("Tracked separately from the ranking score.")
         with st.expander(f"⚙️ Details and Transformation for {source}"):
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
             reason = mapping.get("explanation", []) or mapping.get("reason", [])
@@ -1887,20 +2008,18 @@ def render_mapping_review(
         for row in filtered_rows
         if row.get("canonical_status") != "shared_match"
     ]
-    selected_mapping_display_rows = [
-        {
-            **{key: value for key, value in row.items() if key != "canonical_status"},
-            "canonical_status": row.get("canonical_status_label") or row.get("canonical_status") or "",
-        }
-        for row in filtered_rows
-    ]
-    canonical_mismatch_display_rows = [
-        {
-            **{key: value for key, value in row.items() if key != "canonical_status"},
-            "canonical_status": row.get("canonical_status_label") or row.get("canonical_status") or "",
-        }
-        for row in canonical_mismatch_rows
-    ]
+    editor_state = st.session_state.get("mapping_editor_state") or {}
+    pending_proposals = st.session_state.get("llm_decision_proposals") or []
+    selected_mapping_display_rows = _selected_mapping_display_rows(
+        filtered_rows,
+        editor_state,
+        pending_proposals,
+    )
+    canonical_mismatch_display_rows = _selected_mapping_display_rows(
+        canonical_mismatch_rows,
+        editor_state,
+        pending_proposals,
+    )
     attention_summary_rows = _review_attention_summary_rows(filtered_rows)
     review_plan_summary = st.session_state.get("review_plan_summary")
     review_plan_error = st.session_state.get("review_plan_error")
@@ -1981,7 +2100,6 @@ def render_mapping_review(
         else:
             st.info("No review queue plan has been generated yet for the current filters.")
 
-    pending_proposals = st.session_state.get("llm_decision_proposals") or []
     proposal_candidates = _llm_decision_proposals_for_filtered_rows(
         filtered_rows,
         mapping_response,
@@ -2065,7 +2183,7 @@ def render_mapping_review(
 
     st.subheader(_section_label("Selected Mapping", f"{len(selected_mapping_display_rows)} active" if selected_mapping_display_rows else None))
     st.caption(
-        "Canonical status shows whether both sides share a business concept, only the source resolved, only the target resolved, source and target resolve to different concepts, or neither side resolved to a canonical concept."
+        "Original confidence is the ranking score for the selected candidate. LLM proposal confidence is shown separately when a review/refine proposal exists or was applied. Canonical status shows whether both sides share a business concept, only the source resolved, only the target resolved, source and target resolve to different concepts, or neither side resolved to a canonical concept."
     )
     st.dataframe(selected_mapping_display_rows, width="stretch", hide_index=True)
 

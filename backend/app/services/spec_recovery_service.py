@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from app.models.schema import SpecLayoutHint, SpecRecoveryResponse, SpecRecoverySuggestion
 from app.services.llm_service import LLMProvider, normalize_llm_list_field, request_bounded_llm_json
+from app.services.prompt_templates import SPEC_RECOVERY_PROMPT_TEMPLATE, render_prompt
 from app.services.spec_upload_service import (
     DESCRIPTION_CANDIDATES,
     NAME_CANDIDATES,
@@ -313,14 +314,7 @@ def build_spec_recovery_prompt(
             ],
         },
     }
-    return (
-        "You are recovering a schema-spec metadata upload for a deterministic parser. "
-        "Stay strictly grounded in the provided headers and sample rows.\n\n"
-        "Return JSON only. No markdown. No code fences. No extra prose.\n"
-        "Return exactly these top-level fields: detected_mode, sheet_name, header_row_index, record_path, name_col, description_col, type_col, sample_values_col, selected_table, confidence, warnings.\n"
-        "Never invent header names and never infer columns outside allowed_headers.\n\n"
-        f"PAYLOAD:\n{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return render_prompt(SPEC_RECOVERY_PROMPT_TEMPLATE, payload)
 
 
 def _normalize_spec_recovery_suggestion(

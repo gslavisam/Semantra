@@ -20,8 +20,45 @@ def test_draft_session_restore_section_allows_review_when_runtime_exists() -> No
         )
         == "Review"
     )
+    assert workspace_decision_views._draft_session_restore_section("Output") == "Output"
     assert workspace_decision_views._draft_session_restore_section("Decisions") == "Decisions"
     assert workspace_decision_views._draft_session_restore_section("Review") == "Decisions"
+
+
+def test_resolve_selected_draft_session_id_uses_requested_selection_key() -> None:
+    session_state = {"selected_draft_session_id": 65}
+    saved_draft_sessions = [
+        {"draft_session_id": 72, "name": "customer-draft-session-0531"},
+        {"draft_session_id": 65, "name": "customer-draft-session"},
+    ]
+
+    with patch.object(workspace_decision_views.st, "session_state", session_state):
+        selected_id = workspace_decision_views._resolve_selected_draft_session_id(
+            saved_draft_sessions,
+            selection_key="setup_selected_draft_session_id",
+        )
+
+    assert selected_id == 72
+    assert session_state["selected_draft_session_id"] == 65
+    assert session_state["setup_selected_draft_session_id"] == 72
+
+
+def test_set_active_draft_session_keeps_widget_selection_key_untouched() -> None:
+    session_state = {"selected_draft_session_id": 3}
+
+    with patch.object(workspace_decision_views.st, "session_state", session_state):
+        workspace_decision_views._set_active_draft_session(
+            {
+                "draft_session_id": 7,
+                "name": "customer-wip",
+                "version": 2,
+                "active_workspace_section": "Output",
+            }
+        )
+
+    assert session_state["selected_draft_session_id"] == 3
+    assert session_state["active_draft_session"]["draft_session_id"] == 7
+    assert session_state["active_draft_session"]["active_workspace_section"] == "Output"
 
 
 def test_saved_mapping_set_apply_block_reason_requires_approved_status() -> None:
@@ -42,12 +79,18 @@ def test_apply_llm_decision_proposal_switches_target_and_accepts() -> None:
             "current_status": "needs_review",
             "proposal_type": "switch_target",
             "proposed_target": "operation_type_code",
+            "confidence": 0.8,
+            "origin": "mapping_validation",
         },
     )
 
     assert applied is True
     assert editor_state["op_type"]["target"] == "operation_type_code"
     assert editor_state["op_type"]["status"] == "accepted"
+    assert editor_state["op_type"]["llm_proposal_confidence"] == 0.8
+    assert editor_state["op_type"]["llm_proposal_origin"] == "mapping_validation"
+    assert editor_state["op_type"]["llm_proposal_target"] == "operation_type_code"
+    assert editor_state["op_type"]["llm_proposal_status"] == "accepted"
 
 
 def test_apply_llm_decision_proposal_rejects_stale_state() -> None:
@@ -121,6 +164,14 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
             "target_fields": ["customer_id"],
             "field_rules": [{"target_field": "customer_id", "rule": "Cast source code to string."}],
         },
+        "preview_response": {
+            "preview": [{"values": {"customer_id": "1"}, "warnings": []}],
+            "unresolved_targets": [],
+            "transformation_previews": [],
+        },
+        "codegen_response": {"code": "print('artifact')", "language": "python", "warnings": []},
+        "mapping_analysis_summary": {"title": "Customer mapping overview"},
+        "mapping_analysis_spoken_script": "Customer narration script.",
     }
 
     with patch.object(workspace_decision_views.st, "session_state", session_state):
@@ -136,6 +187,10 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
     assert payload["mapping_editor_state"]["cust_id"]["status"] == "accepted"
     assert payload["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
     assert payload["transformation_spec"]["target_grain"] == "One row per customer"
+    assert payload["output_state"]["preview_response"]["preview"][0]["values"]["customer_id"] == "1"
+    assert payload["output_state"]["codegen_response"]["language"] == "python"
+    assert payload["output_state"]["mapping_analysis_summary"]["title"] == "Customer mapping overview"
+    assert payload["output_state"]["mapping_analysis_spoken_script"] == "Customer narration script."
 
 
 def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clears_outputs() -> None:
@@ -239,6 +294,69 @@ def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clear
     assert "mapping_analysis_summary" not in session_state
 
 
+def test_apply_draft_session_detail_to_workspace_restores_bounded_output_state() -> None:
+    session_state = {
+        "api_base_url": "http://127.0.0.1:8000",
+    }
+    detail = {
+        "name": "customer-output-wip",
+        "api_base_url": "http://127.0.0.1:8000",
+        "mapping_mode": "standard",
+        "active_workspace_section": "Output",
+        "mapping_runtime": {
+            "generated_at": "2026-05-27T10:00:00+00:00",
+            "app_version": "dev",
+            "scoring_profile": "balanced",
+            "description_priority": False,
+            "code_fingerprint": "draft-build-output",
+        },
+        "source_handle": {
+            "dataset_id": "src-1",
+            "dataset_name": "source.csv",
+            "schema_profile": {"dataset_id": "src-1", "dataset_name": "source.csv", "row_count": 1, "columns": [{"name": "cust_id"}]},
+            "preview_rows": [{"cust_id": 1}],
+        },
+        "target_handle": {
+            "dataset_id": "tgt-1",
+            "dataset_name": "target.csv",
+            "schema_profile": {"dataset_id": "tgt-1", "dataset_name": "target.csv", "row_count": 1, "columns": [{"name": "customer_id"}]},
+            "preview_rows": [],
+        },
+        "mapping_editor_state": {
+            "cust_id": {
+                "target": "customer_id",
+                "status": "accepted",
+                "suggested_target": "customer_id",
+                "manual_transformation_code": "",
+            }
+        },
+        "mapping_decision_audit": {},
+        "transformation_spec": {},
+        "output_state": {
+            "preview_response": {
+                "preview": [{"values": {"customer_id": "1"}, "warnings": []}],
+                "unresolved_targets": [],
+                "transformation_previews": [],
+            },
+            "codegen_response": {"code": "df_target['customer_id'] = df_source['cust_id']", "language": "python", "warnings": []},
+            "codegen_refinement_response": {"code": "df_target['customer_id'] = df_source['cust_id'].astype(str)", "language": "python", "warnings": []},
+            "mapping_analysis_summary": {"title": "Customer mapping overview"},
+            "mapping_analysis_spoken_script": "Customer narration script.",
+        },
+    }
+
+    with patch.object(workspace_decision_views.st, "session_state", session_state):
+        restored_section = workspace_decision_views._apply_draft_session_detail_to_workspace(detail)
+
+    assert restored_section == "Output"
+    assert session_state["pending_workspace_section"] == "Output"
+    assert session_state["preview_response"]["preview"][0]["values"]["customer_id"] == "1"
+    assert session_state["codegen_response"]["language"] == "python"
+    assert "astype(str)" in session_state["codegen_refinement_response"]["code"]
+    assert session_state["mapping_analysis_summary"]["title"] == "Customer mapping overview"
+    assert session_state["mapping_analysis_spoken_script"] == "Customer narration script."
+
+
 def test_draft_session_restore_conflict_reason_blocks_api_base_url_mismatch() -> None:
     session_state = {
         "api_base_url": "http://127.0.0.1:8001",
@@ -309,3 +427,22 @@ def test_draft_session_resume_transformation_message_reports_restored_spec_statu
 
     assert "Transformation Design restored" in message
     assert "Ready for next output step" in message
+
+
+def test_draft_session_resume_output_message_reports_restored_snapshots() -> None:
+    message = workspace_decision_views._draft_session_resume_output_message(
+        {
+            "output_state": {
+                "preview_response": {"preview": [{"values": {"customer_id": "1"}}]},
+                "codegen_refinement_response": {"code": "refined"},
+                "mapping_analysis_summary": {"title": "Customer mapping overview"},
+                "mapping_analysis_spoken_script": "Narration.",
+            }
+        }
+    )
+
+    assert "Output snapshot restored" in message
+    assert "preview snapshot" in message
+    assert "refined artifact" in message
+    assert "mapping analysis" in message
+    assert "narration script" in message

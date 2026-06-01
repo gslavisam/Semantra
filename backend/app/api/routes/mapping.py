@@ -578,10 +578,13 @@ async def preview_mapping(request: PreviewRequest) -> PreviewResponse:
 
     try:
         source = dataset_store.get_dataset(request.source_dataset_id)
+        source_rows = source.rows
     except KeyError as error:
-        raise HTTPException(status_code=404, detail=str(error)) from error
+        if request.source_preview_rows is None:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        source_rows = list(request.source_preview_rows)
 
-    return build_preview(source.rows, request.mapping_decisions, transformation_spec=request.transformation_spec)
+    return build_preview(source_rows, request.mapping_decisions, transformation_spec=request.transformation_spec)
 
 
 @router.post("/analysis/summary", response_model=MappingAnalysisSummaryResponse)
@@ -912,6 +915,7 @@ async def update_draft_session_decision_state(
         mapping_editor_state=normalized_request.mapping_editor_state,
         mapping_decision_audit=normalized_request.mapping_decision_audit,
         transformation_spec=normalized_request.transformation_spec,
+        output_state=normalized_request.output_state,
     )
     try:
         return draft_session_repository.update_draft_session(draft_session_id, merged_request)

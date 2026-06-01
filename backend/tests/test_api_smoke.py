@@ -27,7 +27,10 @@ from app.services.upload_store import dataset_store
 client = TestClient(app)
 
 
-def setup_function() -> None:
+@pytest.fixture(autouse=True)
+def isolate_api_smoke_runtime(tmp_path: Path):
+    original_db_path = persistence_service.db_path
+    persistence_service.reconfigure(str(tmp_path / "api_smoke.sqlite3"))
     dataset_store.clear()
     decision_log_store.clear()
     correction_store.clear()
@@ -40,6 +43,15 @@ def setup_function() -> None:
     persistence_service.clear_knowledge_overlays()
     persistence_service.clear_knowledge_stewardship_items()
     persistence_service.clear_knowledge_audit_logs()
+    mapping_job_store.clear()
+    metadata_knowledge_service.refresh()
+    settings.admin_api_token = ""
+    yield
+    persistence_service.reconfigure(original_db_path)
+    dataset_store.clear()
+    decision_log_store.clear()
+    correction_store.clear()
+    correction_store.clear_reusable_rules()
     mapping_job_store.clear()
     metadata_knowledge_service.refresh()
     settings.admin_api_token = ""
@@ -592,6 +604,30 @@ def test_preview_returns_empty_rows_for_schema_only_source() -> None:
 
     assert preview_response.status_code == 200
     assert preview_response.json()["preview"] == []
+
+
+def test_preview_uses_request_preview_rows_when_dataset_store_entry_is_missing() -> None:
+    upload_payload = upload_example_datasets()
+    source_handle = upload_payload["source"]
+    dataset_store.clear()
+
+    preview_response = client.post(
+        "/mapping/preview",
+        json={
+            "source_dataset_id": source_handle["dataset_id"],
+            "source_preview_rows": source_handle["preview_rows"],
+            "mapping_decisions": [
+                {"source": "cust_id", "target": "customer_id", "status": "accepted"},
+                {"source": "phone", "target": "phone_number", "status": "accepted"},
+            ],
+        },
+    )
+
+    assert preview_response.status_code == 200
+    payload = preview_response.json()
+    assert len(payload["preview"]) == 2
+    assert payload["preview"][0]["values"]["customer_id"] == "1"
+    assert payload["preview"][0]["values"]["phone_number"] == "0641234567"
 
 
 def test_auto_map_returns_selected_mapping_and_ranked_candidates() -> None:
@@ -2434,7 +2470,7 @@ def test_build_artifact_refinement_prompt_includes_active_dbt_profile(monkeypatc
         edge_cases="",
         reference_excerpt="",
     )
-    payload = json.loads(prompt.split("\n\n", 1)[1])
+    payload = json.loads(prompt.split("PAYLOAD:\n", 1)[1])
 
     assert payload["rules"]["allowed_objects"] == ["stage_input", "ref", "source", "config", "adapter.quote"]
     assert payload["rules"]["dbt_profile"] == {
@@ -3138,6 +3174,23 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
                 "target_fields": ["customer_id", "phone_number"],
                 "field_rules": [{"target_field": "customer_id", "rule": "Cast cust_id to string."}],
             },
+            "output_state": {
+                "preview_response": {
+                    "preview": [{"values": {"customer_id": "1", "phone_number": "0641234567"}, "warnings": []}],
+                    "unresolved_targets": [],
+                    "transformation_previews": [],
+                },
+                "codegen_response": {
+                    "code": "df_target['customer_id'] = df_source['cust_id']",
+                    "language": "python",
+                    "warnings": [],
+                },
+                "mapping_analysis_summary": {
+                    "title": "Customer mapping overview",
+                    "recommended_next_actions": ["Validate phone formatting."],
+                },
+                "mapping_analysis_spoken_script": "Customer mapping analysis narration.",
+            },
         },
         headers=headers,
     )
@@ -3175,6 +3228,10 @@ def test_draft_session_endpoints_save_list_and_load_restore_payload() -> None:
     assert detail["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
     assert detail["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
     assert detail["transformation_spec"]["target_grain"] == "One row per customer"
+    assert detail["output_state"]["preview_response"]["preview"][0]["values"]["customer_id"] == "1"
+    assert detail["output_state"]["codegen_response"]["language"] == "python"
+    assert detail["output_state"]["mapping_analysis_summary"]["title"] == "Customer mapping overview"
+    assert detail["output_state"]["mapping_analysis_spoken_script"] == "Customer mapping analysis narration."
     assert detail["mapping_decision_audit"]["cust_id"]["created_by"] == "qa-user"
     assert detail["mapping_decision_audit"]["cust_id"]["workspace_id"] == "ws-customer-01"
     assert detail["version"] == 1
@@ -3540,6 +3597,18 @@ def test_update_draft_session_decision_state_persists_shared_write_slice() -> No
                     "details": {"reason": "validated after review"},
                 }
             },
+            "output_state": {
+                "preview_response": {
+                    "preview": [{"values": {"phone_number": "0641234567"}, "warnings": []}],
+                    "unresolved_targets": [],
+                    "transformation_previews": [],
+                },
+                "codegen_refinement_response": {
+                    "code": "df_target['phone_number'] = normalize_phone(df_source['phone'])",
+                    "language": "python",
+                    "warnings": [],
+                },
+            },
         },
         headers=admin_headers(),
     )
@@ -3551,6 +3620,8 @@ def test_update_draft_session_decision_state_persists_shared_write_slice() -> No
     assert payload["active_workspace_section"] == "Decisions"
     assert payload["mapping_editor_state"]["phone"]["status"] == "accepted"
     assert payload["mapping_decision_audit"]["phone"]["workspace_id"] == "ws-customer-01"
+    assert payload["output_state"]["preview_response"]["preview"][0]["values"]["phone_number"] == "0641234567"
+    assert "normalize_phone" in payload["output_state"]["codegen_refinement_response"]["code"]
 
 
 def test_update_draft_session_review_state_persists_shared_write_slice() -> None:

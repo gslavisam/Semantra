@@ -59,6 +59,77 @@ def test_canonical_gap_approval_block_reason_allows_ready_state_with_real_sugges
     ) == ""
 
 
+def test_mapping_llm_proposal_confidence_ignores_generate_time_llm_validation() -> None:
+    confidence = workspace_review_views._mapping_llm_proposal_confidence(
+        {
+            "source": "VKORG",
+            "target": "sales_organization_id",
+            "status": "accepted",
+            "llm_recommendation": {"confidence": 0.86},
+            "llm_decision_proposition": {"confidence": 0.86},
+        },
+        {"status": "accepted"},
+        pending_proposals=[],
+    )
+
+    assert confidence is None
+
+
+def test_mapping_llm_proposal_confidence_uses_refine_preview_when_present() -> None:
+    confidence = workspace_review_views._mapping_llm_proposal_confidence(
+        {
+            "source": "VKORG",
+            "target": "sales_organization_id",
+            "status": "accepted",
+        },
+        {
+            "status": "accepted",
+            "llm_mapping_refinement": {
+                "selected": {
+                    "target": "sales_organization_id",
+                    "llm_recommendation": {"confidence": 0.66},
+                }
+            },
+        },
+        pending_proposals=[],
+    )
+
+    assert confidence == 0.66
+
+
+def test_llm_proposal_percent_label_hides_missing_values() -> None:
+    assert workspace_review_views._llm_proposal_percent_label(None) == ""
+    assert workspace_review_views._llm_proposal_percent_label("") == ""
+    assert workspace_review_views._llm_proposal_percent_label(0.66) == "66%"
+
+
+def test_selected_mapping_display_rows_leave_llm_proposal_blank_without_review_generated_state() -> None:
+    rows = workspace_review_views._selected_mapping_display_rows(
+        [
+            {
+                "source": "VKORG",
+                "target": "sales_organization_id",
+                "confidence": 0.86,
+                "status": "accepted",
+                "validator": "Knowledge match",
+                "canonical_status": "shared_match",
+                "canonical_status_label": "Shared canonical match",
+                "shared_concepts": "sales.organization",
+                "source_concepts": "sales.organization",
+                "target_concepts": "sales.organization",
+                "canonical_path": "VKORG -> sales.organization -> sales_organization_id",
+                "llm_consulted": True,
+                "llm_recommendation": {"confidence": 0.86},
+            }
+        ],
+        {"VKORG": {"status": "accepted"}},
+        [],
+    )
+
+    assert rows[0]["original_confidence"] == "86%"
+    assert rows[0]["llm_proposal_confidence"] == ""
+
+
 def test_review_attention_summary_rows_groups_unmatched_and_low_confidence_patterns() -> None:
     rows = workspace_review_views._review_attention_summary_rows(
         [
@@ -169,6 +240,100 @@ def test_guidance_generation_metadata_caption_uses_llm_fallback_pattern() -> Non
 def test_guidance_output_heading_preserves_section_title() -> None:
     assert workspace_review_views._guidance_output_heading("Key matches") == "Key matches"
     assert workspace_review_views._guidance_output_heading(" Risks ") == "Risks"
+
+
+def test_selected_mapping_display_rows_formats_original_and_llm_proposal_confidence() -> None:
+    rows = workspace_review_views._selected_mapping_display_rows(
+        [
+            {
+                "source": "segment_label",
+                "target": "customer_segment",
+                "confidence": 0.61,
+                "status": "accepted",
+                "validator": "Manual review",
+                "canonical_status": "source_only_match",
+                "canonical_status_label": "Source-only canonical match",
+                "shared_concepts": "",
+                "source_concepts": "customer.segment",
+                "target_concepts": "",
+                "canonical_path": "segment_label -> customer.segment -> customer_segment",
+                "llm_consulted": True,
+            }
+        ],
+        {
+            "segment_label": {
+                "status": "accepted",
+                "llm_proposal_confidence": 0.8,
+                "llm_proposal_target": "customer_segment",
+                "llm_proposal_status": "accepted",
+            }
+        },
+    )
+
+    assert rows == [
+        {
+            "source": "segment_label",
+            "target": "customer_segment",
+            "original_confidence": "61%",
+            "llm_proposal_confidence": "80%",
+            "status": "accepted",
+            "validator": "Manual review",
+            "canonical_status": "Source-only canonical match",
+            "shared_concepts": "",
+            "source_concepts": "customer.segment",
+            "target_concepts": "",
+            "canonical_path": "segment_label -> customer.segment -> customer_segment",
+            "llm_consulted": "yes",
+        }
+    ]
+
+
+def test_selected_mapping_display_rows_uses_pending_generated_llm_proposal_confidence() -> None:
+    rows = workspace_review_views._selected_mapping_display_rows(
+        [
+            {
+                "source": "segment_label",
+                "target": "customer_segment",
+                "confidence": 0.61,
+                "status": "needs_review",
+                "validator": "Manual review",
+                "canonical_status": "source_only_match",
+                "canonical_status_label": "Source-only canonical match",
+                "shared_concepts": "",
+                "source_concepts": "customer.segment",
+                "target_concepts": "",
+                "canonical_path": "segment_label -> customer.segment -> customer_segment",
+                "llm_consulted": True,
+            }
+        ],
+        {},
+        [
+            {
+                "source": "segment_label",
+                "current_target": "customer_segment",
+                "current_status": "needs_review",
+                "confidence": 0.8,
+                "proposal_type": "accept_current",
+            }
+        ],
+    )
+
+    assert rows == [
+        {
+            "source": "segment_label",
+            "target": "customer_segment",
+            "original_confidence": "61%",
+            "llm_proposal_confidence": "80%",
+            "status": "needs_review",
+            "validator": "Manual review",
+            "canonical_status": "Source-only canonical match",
+            "shared_concepts": "",
+            "source_concepts": "customer.segment",
+            "target_concepts": "",
+            "canonical_path": "segment_label -> customer.segment -> customer_segment",
+            "llm_consulted": "yes",
+        }
+    ]
 
 
 def test_canonical_gap_triage_copy_helpers_state_read_only_and_unlock_roles() -> None:

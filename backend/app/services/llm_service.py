@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from urllib import parse, request
 from urllib.error import URLError
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 from app.core.config import settings
 from app.models.mapping import (
@@ -21,6 +21,14 @@ from app.models.mapping import (
 )
 from app.models.mapping import CanonicalGapCandidate, CanonicalGapSuggestion
 from app.services.dbt_codegen_profile import dbt_profile_snapshot
+from app.services.prompt_templates import (
+    ARTIFACT_REFINEMENT_PROMPT_TEMPLATE,
+    CANONICAL_GAP_PROMPT_TEMPLATE,
+    PromptTemplate,
+    TRANSFORMATION_GENERATOR_PROMPT_TEMPLATE,
+    TRANSFORMATION_SPEC_PROMPT_TEMPLATE,
+    VALIDATOR_PROMPT_TEMPLATE,
+)
 from app.services.transformation_spec_service import normalize_transformation_spec, summarize_transformation_spec
 
 
@@ -31,10 +39,77 @@ MAX_PROMPT_SAMPLE_VALUES = 5
 MAX_PROMPT_SAMPLE_VALUE_LENGTH = 80
 
 
+@dataclass(frozen=True, slots=True)
+class LLMPromptEnvelope:
+    """Structured prompt split into system instructions, task instructions, and payload."""
+
+    system_instructions: tuple[str, ...]
+    task_instructions: tuple[str, ...]
+    payload: Any
+    payload_label: str | None = None
+
+    def render(self) -> str:
+        sections: list[str] = []
+        system_text = "\n".join(line.strip() for line in self.system_instructions if str(line).strip())
+        task_text = "\n".join(line.strip() for line in self.task_instructions if str(line).strip())
+        serialized_payload = self.payload if isinstance(self.payload, str) else json.dumps(self.payload, ensure_ascii=True)
+        if system_text:
+            sections.append(f"SYSTEM:\n{system_text}")
+        if task_text:
+            sections.append(f"TASK:\n{task_text}")
+        if self.payload_label is None:
+            sections.append(serialized_payload)
+        else:
+            sections.append(f"{self.payload_label}:\n{serialized_payload}")
+        return "\n\n".join(sections)
+
+
+def _build_prompt_envelope(template: PromptTemplate, payload: Any, **context: str) -> LLMPromptEnvelope:
+    return LLMPromptEnvelope(
+        system_instructions=tuple(
+            line.format(**context).strip()
+            for line in template.system_instructions
+            if str(line).strip()
+        ),
+        task_instructions=tuple(
+            line.format(**context).strip()
+            for line in template.task_instructions
+            if str(line).strip()
+        ),
+        payload=payload,
+        payload_label=template.payload_label,
+    )
+
+
+def _prompt_text(prompt: str | LLMPromptEnvelope) -> str:
+    return prompt if isinstance(prompt, str) else prompt.render()
+
+
+def _prompt_system_text(prompt: str | LLMPromptEnvelope) -> str:
+    if isinstance(prompt, str):
+        return ""
+    return "\n".join(line for line in prompt.system_instructions if str(line).strip())
+
+
+def _prompt_user_text(prompt: str | LLMPromptEnvelope) -> str:
+    if isinstance(prompt, str):
+        return prompt
+    sections: list[str] = []
+    task_text = "\n".join(line for line in prompt.task_instructions if str(line).strip())
+    serialized_payload = prompt.payload if isinstance(prompt.payload, str) else json.dumps(prompt.payload, ensure_ascii=True)
+    if task_text:
+        sections.append(f"TASK:\n{task_text}")
+    if prompt.payload_label is None:
+        sections.append(serialized_payload)
+    else:
+        sections.append(f"{prompt.payload_label}:\n{serialized_payload}")
+    return "\n\n".join(sections)
+
+
 class LLMProvider(Protocol):
     """Protocol implemented by bounded LLM providers used throughout Semantra."""
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
         ...
 
 
@@ -44,9 +119,10 @@ class StaticLLMProvider:
 
     responder: Callable[[str], str] | str
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+        rendered_prompt = _prompt_text(prompt)
         if callable(self.responder):
-            return self.responder(prompt)
+            return self.responder(rendered_prompt)
         return self.responder
 
 
@@ -58,11 +134,19 @@ class OpenAIResponsesProvider:
     model: str | None = None
     base_url: str | None = None
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+        if isinstance(prompt, LLMPromptEnvelope):
+            input_payload: str | list[dict[str, object]] = []
+            system_text = _prompt_system_text(prompt)
+            if system_text:
+                input_payload.append({"role": "system", "content": [{"type": "input_text", "text": system_text}]})
+            input_payload.append({"role": "user", "content": [{"type": "input_text", "text": _prompt_user_text(prompt)}]})
+        else:
+            input_payload = prompt
         payload = json.dumps(
             {
                 "model": self.model or settings.llm_model,
-                "input": prompt,
+                "input": input_payload,
                 "temperature": 0,
             }
         ).encode("utf-8")
@@ -89,8 +173,12 @@ class OllamaProvider:
     model: str
     base_url: str | None = None
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
-        payload = json.dumps({"model": self.model, "prompt": prompt, "stream": False}).encode("utf-8")
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+        body: dict[str, object] = {"model": self.model, "prompt": _prompt_user_text(prompt), "stream": False}
+        system_text = _prompt_system_text(prompt)
+        if system_text:
+            body["system"] = system_text
+        payload = json.dumps(body).encode("utf-8")
         http_request = request.Request(
             self.base_url or settings.ollama_base_url,
             data=payload,
@@ -156,12 +244,17 @@ class LMStudioProvider:
 
         return self.list_models(timeout_seconds)[0]
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
         model = self._resolve_model(timeout_seconds)
+        messages = []
+        system_text = _prompt_system_text(prompt)
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        messages.append({"role": "user", "content": _prompt_user_text(prompt)})
         payload = json.dumps(
             {
                 "model": model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": messages,
                 "temperature": 0,
             }
         ).encode("utf-8")
@@ -400,7 +493,7 @@ def normalize_llm_list_field(value: object) -> list[str]:
 
 def request_llm_json(
     provider: LLMProvider,
-    prompt: str,
+    prompt: str | LLMPromptEnvelope,
     timeout_seconds: float,
     retries: int,
     operation_name: str,
@@ -429,7 +522,7 @@ def request_llm_json(
 
 def request_bounded_llm_json(
     provider: LLMProvider,
-    prompt: str,
+    prompt: str | LLMPromptEnvelope,
     operation_name: str,
 ) -> tuple[str, dict] | None:
     """Request JSON using Semantra's short bounded timeout and retry contract."""
@@ -617,14 +710,7 @@ def call_validator(
 
     retries = max_retries if max_retries is not None else settings.llm_max_retries
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
-    prompt = build_validator_prompt(source_field, candidate_targets)
-    prompt += (
-        "\n\nFor each mapping decision, return a JSON object with: 'selected_target', 'confidence' (0-1 float), 'reasoning' (list of strings explaining the choice and why others were not selected), and 'transformation_code' (Python Pandas code to convert the source column to the target format, or null/empty if not needed)."
-        "\nAnalyze the field names and, if available, the data patterns. If a transformation is needed (e.g. extracting name from email, formatting dates, splitting or combining fields, type conversion, normalization), generate the appropriate Pandas code. If not, set 'transformation_code' to null or empty."
-        "\nYou should infer the transformation based on the semantic meaning and typical data formats, not just on explicit examples."
-        "\nExample: If mapping from an email field like 'ime.prezime@firma.com' to a name field, generate Pandas code to extract and format the name. If mapping from a date string to a date field, generate code to parse the date."
-        "\nIf no transformation is needed, set 'transformation_code' to null or empty."
-    )
+    prompt = build_validator_prompt_envelope(source_field, candidate_targets)
 
     response = request_llm_json(provider, prompt, timeout, retries, "validator")
     if response is None:
@@ -634,12 +720,11 @@ def call_validator(
     try:
         # Accept both old and new keys for backward compatibility
         confidence = float(parsed.get("confidence_score", parsed.get("confidence", 0.5)))
-        transformation_code = parsed.get("transformation_code")
         result = LLMValidationResult(
             selected_target=parsed["selected_target"],
             confidence=confidence,
             reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
-            transformation_code=transformation_code,
+            transformation_code=None,
             raw_response=raw_response,
         )
         if (
@@ -680,7 +765,7 @@ def call_transformation_generator(
 
     retries = max_retries if max_retries is not None else settings.llm_max_retries
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
-    prompt = build_transformation_generator_prompt(source_field, target_field, user_instruction)
+    prompt = build_transformation_generator_prompt_envelope(source_field, target_field, user_instruction)
 
     response = request_llm_json(provider, prompt, timeout, retries, "transformation")
     if response is None:
@@ -721,7 +806,7 @@ def call_transformation_spec_generator(
 
     retries = max_retries if max_retries is not None else settings.llm_max_retries
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
-    prompt = build_transformation_spec_prompt(
+    prompt = build_transformation_spec_prompt_envelope(
         mapping_decisions=mapping_decisions,
         instruction=instruction,
         current_spec=current_spec,
@@ -768,7 +853,7 @@ def call_artifact_refinement(
 
     retries = max_retries if max_retries is not None else settings.llm_max_retries
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
-    prompt = build_artifact_refinement_prompt(
+    prompt = build_artifact_refinement_prompt_envelope(
         mapping_decisions=mapping_decisions,
         mode=mode,
         current_code=current_code,
@@ -852,7 +937,7 @@ def call_canonical_gap_assistant(
 
     retries = max_retries if max_retries is not None else settings.llm_max_retries
     timeout = timeout_seconds if timeout_seconds is not None else settings.llm_timeout_seconds
-    prompt = build_canonical_gap_prompt(candidate, nearest_concepts)
+    prompt = build_canonical_gap_prompt_envelope(candidate, nearest_concepts)
     response = request_llm_json(provider, prompt, timeout, retries, "canonical_gap")
     if response is None:
         return None
@@ -925,6 +1010,10 @@ def validate_canonical_gap_suggestion(
 def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) -> str:
     """Build the closed-set mapping validation prompt for one source field."""
 
+    return build_validator_prompt_envelope(source_field, candidate_targets).render()
+
+
+def build_validator_prompt_envelope(source_field: dict, candidate_targets: list[dict]) -> LLMPromptEnvelope:
     payload = {
         "source_field": sanitize_prompt_field_context(source_field),
         "candidate_targets": [sanitize_prompt_field_context(target) for target in candidate_targets],
@@ -941,18 +1030,19 @@ def build_validator_prompt(source_field: dict, candidate_targets: list[dict]) ->
             "reasoning": ["short bullet points"],
         },
     }
-    return (
-        "You are a strict data mapping validator.\n"
-        "Select the best target field only from the provided candidate_targets.\n"
-        "If no good match exists, return no_match.\n"
-        "Return only valid JSON.\n\n"
-        f"{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return _build_prompt_envelope(VALIDATOR_PROMPT_TEMPLATE, payload)
 
 
 def build_canonical_gap_prompt(candidate: CanonicalGapCandidate, nearest_concepts: list[dict]) -> str:
     """Build the bounded prompt used to suggest a canonical-gap action."""
 
+    return build_canonical_gap_prompt_envelope(candidate, nearest_concepts).render()
+
+
+def build_canonical_gap_prompt_envelope(
+    candidate: CanonicalGapCandidate,
+    nearest_concepts: list[dict],
+) -> LLMPromptEnvelope:
     payload = {
         "canonical_gap_candidate": candidate.model_dump(mode="json"),
         "nearest_existing_canonical_concepts": nearest_concepts,
@@ -973,19 +1063,20 @@ def build_canonical_gap_prompt(candidate: CanonicalGapCandidate, nearest_concept
             "risk_notes": ["short bullet points"],
         },
     }
-    return (
-        "You are a strict canonical glossary assistant.\n"
-        "A mapping row is already selected, but its canonical path is missing.\n"
-        "Suggest a controlled canonical overlay change only when it is well-supported by the provided source/target names, signals, and explanations.\n"
-        "Use an existing concept if it fits. Propose a new canonical concept only for clear enterprise data concepts.\n"
-        "Return only valid JSON.\n\n"
-        f"{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return _build_prompt_envelope(CANONICAL_GAP_PROMPT_TEMPLATE, payload)
 
 
 def build_transformation_generator_prompt(source_field: dict, target_field: dict, user_instruction: str) -> str:
     """Build the bounded prompt used to generate transformation code for one field pair."""
 
+    return build_transformation_generator_prompt_envelope(source_field, target_field, user_instruction).render()
+
+
+def build_transformation_generator_prompt_envelope(
+    source_field: dict,
+    target_field: dict,
+    user_instruction: str,
+) -> LLMPromptEnvelope:
     payload = {
         "source_field": sanitize_prompt_field_context(source_field),
         "target_field": sanitize_prompt_field_context(target_field),
@@ -1004,13 +1095,7 @@ def build_transformation_generator_prompt(source_field: dict, target_field: dict
             "warnings": ["short bullet points"],
         },
     }
-    return (
-        "You generate pandas-oriented Python transformations for tabular data mapping.\n"
-        "Return only valid JSON. Do not include markdown or code fences.\n"
-        "Use only df_source, df_target, pd, and standard Python built-ins.\n"
-        "The transformation_code may be either a full assignment like df_target[\"target\"] = ... or just the right-hand expression.\n\n"
-        f"{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return _build_prompt_envelope(TRANSFORMATION_GENERATOR_PROMPT_TEMPLATE, payload)
 
 
 def build_transformation_spec_prompt(
@@ -1021,6 +1106,19 @@ def build_transformation_spec_prompt(
 ) -> str:
     """Build the bounded prompt used to propose a structured transformation design spec."""
 
+    return build_transformation_spec_prompt_envelope(
+        mapping_decisions=mapping_decisions,
+        instruction=instruction,
+        current_spec=current_spec,
+    ).render()
+
+
+def build_transformation_spec_prompt_envelope(
+    *,
+    mapping_decisions: list[dict],
+    instruction: str,
+    current_spec: dict | None,
+) -> LLMPromptEnvelope:
     target_fields: list[str] = []
     seen_targets: set[str] = set()
     for item in mapping_decisions:
@@ -1063,13 +1161,7 @@ def build_transformation_spec_prompt(
             "warnings": ["short bullet points"],
         },
     }
-    return (
-        "You convert natural-language transformation intent into a structured, reviewable transformation design spec.\n"
-        "Return JSON only. No markdown. No code fences. No executable code.\n"
-        "Use only the provided target fields. Do not invent new targets.\n"
-        "Prefer concise business-readable rules over implementation detail.\n\n"
-        f"{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return _build_prompt_envelope(TRANSFORMATION_SPEC_PROMPT_TEMPLATE, payload)
 
 
 def build_artifact_refinement_prompt(
@@ -1083,6 +1175,25 @@ def build_artifact_refinement_prompt(
 ) -> str:
     """Build the bounded prompt used to refine an already generated code artifact."""
 
+    return build_artifact_refinement_prompt_envelope(
+        mapping_decisions=mapping_decisions,
+        mode=mode,
+        current_code=current_code,
+        instruction=instruction,
+        edge_cases=edge_cases,
+        reference_excerpt=reference_excerpt,
+    ).render()
+
+
+def build_artifact_refinement_prompt_envelope(
+    *,
+    mapping_decisions: list[dict],
+    mode: str,
+    current_code: str,
+    instruction: str,
+    edge_cases: str,
+    reference_excerpt: str,
+) -> LLMPromptEnvelope:
     runtime_language = "python-pyspark" if mode == "pyspark" else "sql-dbt" if mode == "dbt" else "python-pandas"
     dbt_profile = dbt_profile_snapshot() if mode == "dbt" else None
     allowed_objects = (
@@ -1121,12 +1232,7 @@ def build_artifact_refinement_prompt(
             "warnings": ["short bullet points"],
         },
     }
-    return (
-        f"You refine {runtime_language} starter code for a data-mapping workflow.\n"
-        "Return only valid JSON. Do not include markdown or code fences.\n"
-        "Follow the requested runtime strictly and return the complete rewritten artifact in the code field.\n\n"
-        f"{json.dumps(payload, ensure_ascii=True)}"
-    )
+    return _build_prompt_envelope(ARTIFACT_REFINEMENT_PROMPT_TEMPLATE, payload, runtime_language=runtime_language)
 
 
 def sanitize_generated_code(code: str) -> str:

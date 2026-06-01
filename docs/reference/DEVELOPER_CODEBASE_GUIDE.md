@@ -132,8 +132,17 @@ Two practical boundaries matter while developing:
 
 #### LLM And Evaluation
 
-- `backend/app/services/llm_service.py`: provider abstraction for OpenAI, LM Studio, Ollama, and Gemini; builds bounded prompts, normalizes structured outputs, and handles fallback behavior.
+- `backend/app/services/llm_service.py`: provider abstraction for OpenAI, LM Studio, Ollama, and Gemini; builds and routes bounded `SYSTEM`/`TASK`/`PAYLOAD` prompt envelopes, normalizes structured outputs, and keeps mapping validation separate from follow-up transformation generation.
+- `backend/app/services/prompt_templates.py`: central authoring layer for static bounded prompt text; keeps system instructions, task instructions, and payload labels consistent across review guidance, Workspace Copilot, canonical-gap, benchmark, reuse-fit, spec-recovery, validation, and transformation flows.
 - `backend/app/services/evaluation_service.py`: evaluates mappings against saved benchmark datasets and compares scoring profiles or correction impact.
+
+Prompt inventory note:
+For the current matrix of prompt surfaces, static template locations, dynamic payload builders, and response contracts, see `docs/reference/LLM_PROMPT_MATRIX.md`.
+For the acceptance checklist used when revising those prompts, see `docs/reference/LLM_PROMPT_EVALUATION_CHECKLIST.md`.
+
+PR template note:
+Use `.github/pull_request_template.md` for normal product, backend, UI, docs, config, and test changes.
+If a PR changes bounded prompt text, prompt payload shape, prompt labels, or LLM response contracts, also use `.github/PULL_REQUEST_TEMPLATE/prompt-change.md` as the review checklist for that PR.
 
 #### Persistence
 
