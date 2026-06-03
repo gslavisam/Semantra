@@ -26,6 +26,48 @@ WORKSPACE_COPILOT_ACTIONS = {
 }
 
 
+def _workspace_scope_caption(scope: dict[str, str | None]) -> str:
+    parts = []
+    if scope.get("source_system"):
+        parts.append(f"source_system={scope['source_system']}")
+    if scope.get("business_domain"):
+        parts.append(f"business_domain={scope['business_domain']}")
+    if scope.get("integration_name"):
+        parts.append(f"integration_name={scope['integration_name']}")
+    return " | ".join(parts)
+
+
+def _render_workspace_context_panel() -> None:
+    scope = current_workspace_scope()
+    st.subheader("2. Workspace Context")
+    st.caption(
+        "Set the source scope once. Review, persistent source-field hints, and future runs reuse this workspace context."
+    )
+    context_columns = st.columns(3)
+    context_columns[0].text_input(
+        "Source system",
+        key="analysis_source_system",
+        placeholder="Example: SAP",
+    )
+    context_columns[1].text_input(
+        "Business domain (optional)",
+        key="analysis_business_domain",
+        placeholder="Example: Procurement",
+    )
+    context_columns[2].text_input(
+        "Integration name (optional)",
+        key="analysis_integration_name",
+        placeholder="Example: Vendor master",
+    )
+    active_scope = _workspace_scope_caption(current_workspace_scope())
+    if active_scope:
+        st.caption(f"Active workspace scope: {active_scope}")
+    else:
+        st.info(
+            "Source system is optional for one-shot Review work, but required before you can save or manage persistent source-field hints."
+        )
+
+
 def _workspace_uploaded_file_or_none(uploaded_file):
     file_name = getattr(uploaded_file, "name", None)
     return uploaded_file if isinstance(file_name, str) and file_name.strip() else None
@@ -1531,7 +1573,9 @@ def _render_workspace_section_content(
         else:
             target_file = st.file_uploader("Target file", type=all_upload_types, key="target_file")
 
-        st.subheader("2. Interpret Files")
+        _render_workspace_context_panel()
+
+        st.subheader("3. Interpret Files")
         source_is_sql = bool(source_file and source_file.name.lower().endswith(".sql"))
         target_is_sql = bool(target_file and target_file.name.lower().endswith(".sql"))
 
@@ -1637,7 +1681,7 @@ def _render_workspace_section_content(
                         sample_label="Sample values column",
                     )
 
-        st.subheader("3. Select Tables")
+        st.subheader("4. Select Tables")
         if inspection_error:
             st.error(f"Upload inspection failed: {inspection_error}")
 
@@ -1726,7 +1770,7 @@ def _render_workspace_section_content(
                     render_dataset_summary("Target", upload_response["target"])
             st.caption(_workspace_target_context_message(upload_response, mapping_response))
 
-            st.subheader("Source Companion Metadata")
+            st.subheader("5. Source Companion Metadata")
             st.caption(
                 "Optionally attach a source-side schema/spec file to enrich the uploaded source dataset with descriptions and declared types by column name."
             )
@@ -1815,7 +1859,7 @@ def _render_workspace_section_content(
                     st.rerun()
 
             if upload_mode != "canonical":
-                st.subheader("Target Companion Metadata")
+                st.subheader("6. Target Companion Metadata")
                 st.caption(
                     "Optionally attach a target-side schema/spec file to enrich the uploaded target dataset with descriptions and declared types by column name."
                 )
@@ -1903,7 +1947,7 @@ def _render_workspace_section_content(
                         }
                         st.rerun()
 
-            st.subheader("3. Review Mapping")
+            st.subheader("7. Review Mapping")
             use_llm = st.checkbox(
                 "Use LLM validation",
                 value=default_llm_validation_enabled(st.session_state),

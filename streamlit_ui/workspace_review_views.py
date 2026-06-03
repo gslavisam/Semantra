@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import streamlit as st
 
+from streamlit_ui.api import current_workspace_scope
 from streamlit_ui.shared_views import render_status_badge_legend
 
 
@@ -122,11 +123,34 @@ def _parse_hint_sample_values(value: str) -> list[str]:
 
 
 def _current_hint_scope() -> tuple[str | None, str | None, str | None]:
-    return (
-        str(st.session_state.get("analysis_source_system") or "").strip() or None,
-        str(st.session_state.get("analysis_business_domain") or "").strip() or None,
-        str(st.session_state.get("analysis_integration_name") or "").strip() or None,
-    )
+    scope = current_workspace_scope()
+    return scope.get("source_system"), scope.get("business_domain"), scope.get("integration_name")
+
+
+def _workspace_scope_caption(
+    source_system: str | None,
+    business_domain: str | None,
+    integration_name: str | None,
+) -> str:
+    parts = []
+    if source_system:
+        parts.append(f"source_system={source_system}")
+    if business_domain:
+        parts.append(f"business_domain={business_domain}")
+    if integration_name:
+        parts.append(f"integration_name={integration_name}")
+    return " | ".join(parts)
+
+
+def _render_workspace_context_setup_cta(*, key: str, message: str) -> None:
+    st.warning(message)
+    if st.button("Open Setup workspace context", key=key, width="stretch"):
+        st.session_state["pending_workspace_section"] = "Setup"
+        st.session_state["last_action"] = {
+            "level": "info",
+            "message": "Workspace Setup is the place to define Source system before saving or reviewing persistent hints.",
+        }
+        st.rerun()
 
 
 def _load_source_field_hint_map(api_request) -> dict[str, dict]:
@@ -259,6 +283,29 @@ def _compose_llm_mapping_refinement_instruction(*parts: str) -> str:
     return "\n\n".join(part.strip() for part in parts if str(part or "").strip())
 
 
+def _is_no_match_refinement_error(error: Exception) -> bool:
+    message = str(error or "").strip().lower()
+    return "no usable mapping refinement" in message
+
+
+def _build_no_match_refinement_response(source: str, reason: str) -> dict:
+    clean_reason = str(reason or "").strip() or "LLM refinement returned no usable mapping for this field."
+    return {
+        "source": source,
+        "selected": {
+            "target": "",
+            "llm_recommendation": {
+                "selected_target": "no_match",
+                "confidence": 0.0,
+                "reasoning": [clean_reason],
+            },
+            "llm_decision_proposition": {
+                "summary": "LLM refine proposes no closed-set match for this review item.",
+            },
+        },
+    }
+
+
 def _remember_llm_mapping_refinement(
     entry: dict,
     *,
@@ -334,6 +381,15 @@ def _render_llm_mapping_refine_panel(
             key="llm_mapping_batch_prompt",
             placeholder="Example: Prefer business meaning over technical abbreviations and choose the target that best represents transaction or operation type.",
         )
+        apply_batch_refine_now = st.checkbox(
+            "Apply refined mappings immediately",
+            key="llm_mapping_batch_apply_now",
+            value=False,
+            help=(
+                "Optional fast-path: when enabled, refined targets are applied to current review rows immediately "
+                "(status stays needs_review). Leave disabled to keep the standard preview-first flow before Decisions."
+            ),
+        )
         if st.button(
             "Batch refine low-confidence rows",
             key="batch_refine_low_confidence_rows",
@@ -342,8 +398,10 @@ def _render_llm_mapping_refine_panel(
             help="Runs the closed-set LLM refine flow for every low-confidence row using the shared batch instruction plus any row-specific hints.",
         ):
             refined_count = 0
+            applied_count = 0
             no_match_count = 0
             skipped_count = 0
+            failed_sources: list[str] = []
             for mapping in low_confidence_rows:
                 source = str(mapping.get("source") or "").strip()
                 if not source:
@@ -396,12 +454,11 @@ def _render_llm_mapping_refine_panel(
                         refinement_instruction=combined_instruction,
                     )
                 except (ValueError, httpx.HTTPError) as error:
-                    st.session_state["last_action"] = {
-                        "level": "error",
-                        "message": f"Batch LLM mapping refine failed on {source}: {error}",
-                    }
-                    st.rerun()
-                    return
+                    if _is_no_match_refinement_error(error):
+                        refinement_response = _build_no_match_refinement_response(source, str(error))
+                    else:
+                        failed_sources.append(source)
+                        continue
 
                 _remember_llm_mapping_refinement(
                     entry,
@@ -413,14 +470,30 @@ def _render_llm_mapping_refine_panel(
                 selected_refinement = refinement_response.get("selected") or {}
                 if str(selected_refinement.get("target") or "").strip():
                     refined_count += 1
+                    if apply_batch_refine_now:
+                        if _apply_llm_mapping_refinement(entry):
+                            applied_count += 1
                 else:
                     no_match_count += 1
+            action_hint = (
+                "Refined targets were applied immediately."
+                if apply_batch_refine_now
+                else "Use Accept refined mapping inside each row to apply a suggestion."
+            )
+            level = "warning" if failed_sources else "success"
+            failure_hint = ""
+            if failed_sources:
+                preview = ", ".join(failed_sources[:3])
+                if len(failed_sources) > 3:
+                    preview += ", ..."
+                failure_hint = f" Failed on {len(failed_sources)} row(s): {preview}."
             st.session_state["last_action"] = {
-                "level": "success",
+                "level": level,
                 "message": (
                     f"Prepared LLM refine previews for {refined_count} row(s); "
+                    f"applied {applied_count} row(s); "
                     f"{no_match_count} returned no_match and {skipped_count} were skipped. "
-                    "Use Accept refined mapping inside each row to apply a suggestion."
+                    f"{action_hint}{failure_hint}"
                 ),
             }
             st.rerun()
@@ -434,7 +507,10 @@ def _render_saved_source_field_hints_panel(api_request) -> None:
     label = "Saved Source Field Hints"
     if not source_system:
         with st.expander(label, expanded=False):
-            st.info("Set Source system in the workspace context to review and manage saved field hints.")
+            _render_workspace_context_setup_cta(
+                key="saved_source_field_hints_open_setup",
+                message="Set Source system in Workspace Setup before reviewing or managing saved field hints.",
+            )
         return
 
     records = _load_source_field_hint_records_for_system(api_request)
@@ -1478,19 +1554,7 @@ def display_trust_layer(
                     if target_labels:
                         st.write(f"- Target concepts: {', '.join(target_labels)}")
 
-            st.write("**Persistent source field hint:**")
             source_system, business_domain, integration_name = _current_hint_scope()
-            if saved_hint:
-                scope_parts = [f"source_system={saved_hint.get('source_system')}"]
-                if saved_hint.get("business_domain"):
-                    scope_parts.append(f"business_domain={saved_hint.get('business_domain')}")
-                if saved_hint.get("integration_name"):
-                    scope_parts.append(f"integration_name={saved_hint.get('integration_name')}")
-                st.caption("Saved hint active for current scope: " + " | ".join(scope_parts))
-            if applied_hint:
-                st.write(
-                    f"- Applied in current run: yes | meaning: {applied_hint.get('meaning_hint') or 'n/a'}"
-                )
             st.write("**LLM mapping refine input:**")
             st.caption(
                 "This text is used only for the one-shot LLM refine action. It is available for every field and is not saved unless you separately save the persistent hint below."
@@ -1501,7 +1565,7 @@ def display_trust_layer(
                 placeholder="Example: This field is a transaction or operation type. Prefer canonical/target fields that encode business event category, not a person or free-text label.",
             )
             st.caption(
-                "Optional manual field context for this refine preview. These values can be used immediately for LLM refine even if you do not save them persistently."
+                "Optional manual field context for this refine preview. These values are used immediately for LLM refine, and you can also promote the same values into a persistent hint below."
             )
             st.text_area(
                 f"Business meaning for {source}",
@@ -1565,9 +1629,47 @@ def display_trust_layer(
                         }
                     st.rerun()
                 except ValueError as error:
+                    if _is_no_match_refinement_error(error):
+                        composed_instruction = _compose_llm_mapping_refinement_instruction(
+                            st.session_state.get("llm_mapping_batch_prompt", ""),
+                            st.session_state.get(f"llm_mapping_prompt_{source}", ""),
+                        )
+                        _remember_llm_mapping_refinement(
+                            entry,
+                            refinement_response=_build_no_match_refinement_response(source, str(error)),
+                            current_target=str(entry.get("target") or mapping.get("target") or ""),
+                            current_status=str(entry.get("status") or "needs_review"),
+                            instruction=composed_instruction,
+                        )
+                        st.session_state["last_action"] = {
+                            "level": "warning",
+                            "message": (
+                                f"LLM refine preview for {source} returned no_match in the current candidate set."
+                            ),
+                        }
+                        st.rerun()
                     st.session_state["last_action"] = {"level": "warning", "message": str(error)}
                     st.rerun()
                 except httpx.HTTPError as error:
+                    if _is_no_match_refinement_error(error):
+                        composed_instruction = _compose_llm_mapping_refinement_instruction(
+                            st.session_state.get("llm_mapping_batch_prompt", ""),
+                            st.session_state.get(f"llm_mapping_prompt_{source}", ""),
+                        )
+                        _remember_llm_mapping_refinement(
+                            entry,
+                            refinement_response=_build_no_match_refinement_response(source, str(error)),
+                            current_target=str(entry.get("target") or mapping.get("target") or ""),
+                            current_status=str(entry.get("status") or "needs_review"),
+                            instruction=composed_instruction,
+                        )
+                        st.session_state["last_action"] = {
+                            "level": "warning",
+                            "message": (
+                                f"LLM refine preview for {source} returned no_match in the current candidate set."
+                            ),
+                        }
+                        st.rerun()
                     st.session_state["last_action"] = {
                         "level": "error",
                         "message": f"LLM mapping refinement failed: {error}",
@@ -1577,11 +1679,31 @@ def display_trust_layer(
             if not llm_runtime_enabled():
                 st.caption("LLM mapping refine is disabled. Enable a runtime provider in backend config to use it.")
 
+            st.write("**Persistent source field hint:**")
+            if saved_hint:
+                scope_parts = [f"source_system={saved_hint.get('source_system')}"]
+                if saved_hint.get("business_domain"):
+                    scope_parts.append(f"business_domain={saved_hint.get('business_domain')}")
+                if saved_hint.get("integration_name"):
+                    scope_parts.append(f"integration_name={saved_hint.get('integration_name')}")
+                st.caption("Saved hint active for current scope: " + " | ".join(scope_parts))
+            elif source_system:
+                st.caption(
+                    "Current workspace scope: "
+                    + _workspace_scope_caption(source_system, business_domain, integration_name)
+                )
+            if applied_hint:
+                st.write(
+                    f"- Applied in current run: yes | meaning: {applied_hint.get('meaning_hint') or 'n/a'}"
+                )
             if not source_system:
-                st.info("Set Source system in the workspace context before saving a persistent field hint.")
+                _render_workspace_context_setup_cta(
+                    key=f"field_hint_open_setup_{source}",
+                    message="Set Source system in Workspace Setup before saving a persistent field hint.",
+                )
             else:
                 st.caption(
-                    "Save field-level business meaning once and Semantra will auto-inject it into future runs for the same scope."
+                    "Save the field meaning typed above once and Semantra will auto-inject it into future runs for the same workspace scope."
                 )
                 if st.button("Save hint for future runs", key=f"save_field_hint_{source}", width="stretch"):
                     try:

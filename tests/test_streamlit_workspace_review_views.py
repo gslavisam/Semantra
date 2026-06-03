@@ -7,6 +7,105 @@ from types import SimpleNamespace
 from streamlit_ui import workspace_review_views
 
 
+class _RerunTriggered(RuntimeError):
+    pass
+
+
+class _FakeContext:
+    def __init__(self, st_obj):
+        self._st = st_obj
+
+    def __enter__(self):
+        return self._st
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+
+class _FakeStreamlit:
+    def __init__(self, *, session_state: dict | None = None, clicked_keys: set[str] | None = None):
+        self.session_state = session_state or {}
+        self._clicked_keys = set(clicked_keys or set())
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def expander(self, *_args, **_kwargs):
+        return _FakeContext(self)
+
+    def columns(self, spec):
+        count = len(spec) if isinstance(spec, list) else int(spec)
+        return [self for _ in range(count)]
+
+    def caption(self, *_args, **_kwargs):
+        return None
+
+    def info(self, *_args, **_kwargs):
+        return None
+
+    def success(self, *_args, **_kwargs):
+        return None
+
+    def warning(self, *_args, **_kwargs):
+        return None
+
+    def error(self, *_args, **_kwargs):
+        return None
+
+    def write(self, *_args, **_kwargs):
+        return None
+
+    def metric(self, *_args, **_kwargs):
+        return None
+
+    def progress(self, *_args, **_kwargs):
+        return None
+
+    def dataframe(self, *_args, **_kwargs):
+        return None
+
+    def subheader(self, *_args, **_kwargs):
+        return None
+
+    def markdown(self, *_args, **_kwargs):
+        return None
+
+    def code(self, *_args, **_kwargs):
+        return None
+
+    def text_input(self, _label, key=None, **kwargs):
+        default_value = kwargs.get("value", "")
+        if key is None:
+            return default_value
+        return self.session_state.setdefault(key, default_value)
+
+    def text_area(self, _label, key=None, **kwargs):
+        default_value = kwargs.get("value", "")
+        if key is None:
+            return default_value
+        return self.session_state.setdefault(key, default_value)
+
+    def checkbox(self, _label, key=None, value=False, **_kwargs):
+        if key is None:
+            return value
+        return self.session_state.setdefault(key, value)
+
+    def selectbox(self, _label, options, key=None, **_kwargs):
+        choice = options[0] if options else None
+        if key is None:
+            return choice
+        return self.session_state.setdefault(key, choice)
+
+    def button(self, _label, key=None, **_kwargs):
+        return bool(key in self._clicked_keys)
+
+    def rerun(self):
+        raise _RerunTriggered("rerun")
+
+
 def test_catalog_review_focus_sources_deduplicate_session_state_entries(monkeypatch) -> None:
     fake_streamlit = SimpleNamespace(session_state={"review_focus_sources": [" KUNNR ", "LAND1", "kunnr", ""]})
     monkeypatch.setattr(workspace_review_views, "st", fake_streamlit)
@@ -570,3 +669,213 @@ def test_canonical_gap_triage_group_rows_flattens_source_examples() -> None:
             "recommended_follow_up": "Approve this alias family before generating new suggestions.",
         }
     ]
+
+
+def test_is_no_match_refinement_error_detects_expected_message() -> None:
+    assert workspace_review_views._is_no_match_refinement_error(
+        ValueError("LLM returned no usable mapping refinement for this field.")
+    )
+    assert workspace_review_views._is_no_match_refinement_error(
+        ValueError("HTTP 400: LLM returned no usable mapping refinement for this field.")
+    )
+    assert not workspace_review_views._is_no_match_refinement_error(ValueError("network timeout"))
+
+
+def test_build_no_match_refinement_response_has_no_match_shape() -> None:
+    response = workspace_review_views._build_no_match_refinement_response(
+        "tipOpe",
+        "LLM returned no usable mapping refinement for this field.",
+    )
+
+    assert response["source"] == "tipOpe"
+    assert response["selected"]["target"] == ""
+    assert response["selected"]["llm_recommendation"]["selected_target"] == "no_match"
+    assert response["selected"]["llm_recommendation"]["confidence"] == 0.0
+    assert "no usable mapping refinement" in response["selected"]["llm_recommendation"]["reasoning"][0]
+
+
+def test_apply_llm_mapping_refinement_updates_entry_for_preview_accept() -> None:
+    entry = {
+        "target": "operation_label",
+        "status": "needs_review",
+        "llm_mapping_refinement": {
+            "selected": {
+                "target": "operation_type_code",
+                "llm_recommendation": {"confidence": 0.91},
+            }
+        },
+    }
+
+    applied_target = workspace_review_views._apply_llm_mapping_refinement(entry)
+
+    assert applied_target == "operation_type_code"
+    assert entry["target"] == "operation_type_code"
+    assert entry["status"] == "needs_review"
+    assert entry["llm_mapping_refinement_applied"] is True
+    assert entry["llm_proposal_confidence"] == 0.91
+    assert entry["llm_proposal_origin"] == "llm_refine"
+    assert entry["llm_proposal_target"] == "operation_type_code"
+    assert entry["llm_proposal_status"] == "needs_review"
+
+
+def test_clear_llm_mapping_refinement_restores_previous_state_and_clears_refine_fields() -> None:
+    entry = {
+        "target": "operation_type_code",
+        "status": "needs_review",
+        "llm_mapping_refinement": {"selected": {"target": "operation_type_code"}},
+        "llm_mapping_refinement_previous_target": "operation_label",
+        "llm_mapping_refinement_previous_status": "accepted",
+        "llm_mapping_refinement_applied": True,
+        "llm_proposal_origin": "llm_refine",
+        "llm_proposal_confidence": 0.91,
+        "llm_proposal_target": "operation_type_code",
+        "llm_proposal_status": "needs_review",
+    }
+
+    workspace_review_views._clear_llm_mapping_refinement(entry, restore_previous=True)
+
+    assert entry["target"] == "operation_label"
+    assert entry["status"] == "accepted"
+    assert "llm_mapping_refinement" not in entry
+    assert "llm_mapping_refinement_previous_target" not in entry
+    assert "llm_mapping_refinement_previous_status" not in entry
+    assert "llm_mapping_refinement_applied" not in entry
+    assert "llm_proposal_origin" not in entry
+    assert "llm_proposal_confidence" not in entry
+    assert "llm_proposal_target" not in entry
+    assert "llm_proposal_status" not in entry
+
+
+def test_build_llm_decision_proposal_from_refine_no_match_becomes_reject() -> None:
+    mapping = {
+        "source": "tipOpe",
+        "target": "operation_label",
+        "status": "needs_review",
+        "signals": {},
+        "explanation": [],
+    }
+    entry = {
+        "target": "operation_label",
+        "status": "needs_review",
+        "llm_mapping_refinement": workspace_review_views._build_no_match_refinement_response(
+            "tipOpe",
+            "LLM returned no usable mapping refinement for this field.",
+        ),
+    }
+
+    proposal = workspace_review_views._build_llm_decision_proposal(mapping, entry)
+
+    assert proposal is not None
+    assert proposal["proposal_type"] == "reject"
+    assert proposal["proposed_status"] == "rejected"
+    assert proposal["proposed_target"] == "operation_label"
+
+
+def test_ui_batch_refine_button_updates_multiple_low_confidence_rows(monkeypatch) -> None:
+    fake_st = _FakeStreamlit(session_state={}, clicked_keys={"batch_refine_low_confidence_rows"})
+    monkeypatch.setattr(workspace_review_views, "st", fake_st)
+
+    editor_state: dict[str, dict] = {}
+
+    def _fake_refine(source: str, *, candidate_targets: list[str], **_: object) -> dict:
+        return {
+            "selected": {
+                "target": candidate_targets[0],
+                "llm_recommendation": {"confidence": 0.9, "reasoning": [f"{source} refined"]},
+                "llm_decision_proposition": {"summary": f"Refine favors {candidate_targets[0]}."},
+            }
+        }
+
+    try:
+        workspace_review_views._render_llm_mapping_refine_panel(
+            trust_rows=[
+                {"source": "tipOpe", "confidence": 0.31, "target": "operation_label"},
+                {"source": "tipStatus", "confidence": 0.42, "target": "status_label"},
+            ],
+            ranked_by_source={
+                "tipOpe": {"candidates": [{"target": "operation_type_code"}]},
+                "tipStatus": {"candidates": [{"target": "status_code"}]},
+            },
+            editor_state=editor_state,
+            source_field_hint_map={},
+            llm_runtime_enabled=lambda: True,
+            request_llm_mapping_refinement=_fake_refine,
+        )
+    except _RerunTriggered:
+        pass
+
+    assert "tipOpe" in editor_state
+    assert "tipStatus" in editor_state
+    assert editor_state["tipOpe"]["llm_mapping_refinement"]["selected"]["target"] == "operation_type_code"
+    assert editor_state["tipStatus"]["llm_mapping_refinement"]["selected"]["target"] == "status_code"
+    assert "Prepared LLM refine previews for 2 row(s)" in str(fake_st.session_state.get("last_action", {}).get("message", ""))
+
+
+def test_ui_preview_refine_button_creates_row_preview_and_sets_success_message(monkeypatch) -> None:
+    fake_st = _FakeStreamlit(
+        session_state={
+            "upload_response": {"mapping_mode": "standard"},
+            "llm_mapping_batch_prompt": "Prefer canonical semantics.",
+        },
+        clicked_keys={"refine_mapping_tipOpe"},
+    )
+    monkeypatch.setattr(workspace_review_views, "st", fake_st)
+
+    mapping_response = {
+        "mapping_runtime": {"code_fingerprint": "build-1", "scoring_profile": "balanced", "description_priority": False},
+        "ranked_mappings": [
+            {
+                "source": "tipOpe",
+                "candidates": [
+                    {"target": "operation_type_code", "confidence": 0.82, "confidence_label": "medium_confidence", "method": "semantic", "explanation": []}
+                ],
+            }
+        ],
+    }
+
+    trust_rows = [
+        {
+            "source": "tipOpe",
+            "target": "operation_label",
+            "confidence": 0.35,
+            "signals": {},
+            "explanation": [],
+            "canonical_details": {},
+            "llm_consulted": False,
+            "transformation_mode": "no_transformation",
+            "suggested_transformation_code": "",
+        }
+    ]
+
+    def _fake_refine(source: str, *, candidate_targets: list[str], **_: object) -> dict:
+        return {
+            "selected": {
+                "target": candidate_targets[0],
+                "llm_recommendation": {"confidence": 0.88, "reasoning": [f"{source} best aligns."]},
+                "llm_decision_proposition": {"summary": "Preview proposes operation_type_code."},
+            }
+        }
+
+    try:
+        workspace_review_views.display_trust_layer(
+            mapping_response,
+            trust_layer_rows=lambda _response: trust_rows,
+            has_knowledge_match=lambda *_args, **_kwargs: False,
+            has_canonical_match=lambda *_args, **_kwargs: False,
+            canonical_concept_labels=lambda *_args, **_kwargs: [],
+            transformation_mode_label=lambda _mode: "No transformation",
+            llm_runtime_enabled=lambda: True,
+            request_llm_mapping_refinement=_fake_refine,
+            request_llm_transformation_suggestion=lambda *_args, **_kwargs: {"transformation_code": "", "reasoning": [], "warnings": []},
+            request_transformation_templates=lambda: [],
+            materialize_transformation_template=lambda *_args, **_kwargs: "",
+            api_request=None,
+        )
+    except _RerunTriggered:
+        pass
+
+    entry = fake_st.session_state.get("mapping_editor_state", {}).get("tipOpe", {})
+    assert entry.get("llm_mapping_refinement", {}).get("selected", {}).get("target") == "operation_type_code"
+    assert "Prepared an LLM refine preview for tipOpe -> operation_type_code." in str(
+        fake_st.session_state.get("last_action", {}).get("message", "")
+    )
