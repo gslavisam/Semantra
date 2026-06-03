@@ -12,13 +12,19 @@ import pytest
 from app.core.config import settings
 from app.models.mapping import (
     AutoMappingResponse,
+    BenchmarkExplanationRequest,
+    CatalogReuseFitRequest,
+    CatalogReuseFitWorkspaceContext,
     MappingAnalysisOptions,
     MappingAnalysisSummaryResponse,
     MappingAnalysisWorkspaceContext,
+    MappingSetDetail,
     ReviewPlanRequest,
     ScoringSignals,
     WorkspaceCopilotProblemStatementRequest,
 )
+from app.services.benchmark_explanation_service import _build_fallback_explanation, build_benchmark_explanation_prompt
+from app.services.catalog_reuse_fit_service import _build_fallback_fit, build_catalog_reuse_fit_prompt
 from app.services.decision_log_service import decision_log_store
 from app.services.evaluation_service import compare_scoring_profiles, evaluate_cases, evaluate_cases_for_profile
 from app.services.llm_service import (
@@ -268,6 +274,8 @@ def test_review_plan_prompt_uses_standard_sections_and_baseline_payload() -> Non
     assert "PAYLOAD:" in prompt
     assert '"baseline_plan"' in prompt
     assert '"fallback_plan"' not in prompt
+    assert "Keep the plan finite and scoped to the current review slice only; do not widen into later workflow stages." in prompt
+    assert "Every cluster, risk, and next action must trace to filtered_rows, attention_summary_rows, filters, or baseline_plan." in prompt
     assert "Merge overlapping issue patterns into one cluster instead of restating similar groups separately." in prompt
     assert "Prioritize clusters by operational blocking impact first and repeated count second." in prompt
 
@@ -285,8 +293,11 @@ def test_workspace_problem_guidance_prompt_uses_standard_sections_and_baseline_p
     assert "PAYLOAD:" in prompt
     assert '"baseline_guidance"' in prompt
     assert '"fallback_guidance"' not in prompt
+    assert "Classify and route the reported problem; do not act like an autonomous solver." in prompt
+    assert "If evidence is insufficient or the request is ambiguous, prefer partial or out_of_scope over pretending certainty." in prompt
     assert "Identify the primary bottleneck or gate before recommending later-stage work." in prompt
     assert "The first recommended step must be immediately actionable in the current workspace state." in prompt
+    assert "Do not recommend code edits, write operations, or actions outside Semantra's current in-app surfaces." in prompt
 
 
 def test_spec_recovery_prompt_uses_standard_sections() -> None:
@@ -302,6 +313,8 @@ def test_spec_recovery_prompt_uses_standard_sections() -> None:
     assert "TASK:" in prompt
     assert "PAYLOAD:" in prompt
     assert '"candidate_blocks"' in prompt
+    assert "Recover only the maximal valid subset supported by the payload and contract notes." in prompt
+    assert "Prefer null for any uncertain optional field rather than guessing." in prompt
 
 
 def test_mapping_analysis_prompt_uses_standard_sections_and_payload() -> None:
@@ -331,7 +344,70 @@ def test_mapping_analysis_narration_prompt_uses_standard_sections_and_overview_l
     assert "SYSTEM:" in prompt
     assert "TASK:" in prompt
     assert "OVERVIEW:" in prompt
+    assert "Do not re-analyze, re-score, or add findings that are not already present in the overview." in prompt
+    assert "If you mention next actions, use only the recommended_next_actions already present in the overview." in prompt
     assert "Wrap the final answer only inside <final_script> and </final_script>." in prompt
+
+
+def test_catalog_reuse_fit_prompt_uses_grounded_evidence_guardrails() -> None:
+    request = CatalogReuseFitRequest(
+        mapping_set_detail=MappingSetDetail(
+            mapping_set_id=7,
+            name="vendor-master-approved",
+            status="approved",
+            source_system="SAP",
+            target_system="Snowflake",
+            business_domain="Procurement",
+            artifact_type="standard",
+            canonical_concepts=["vendor.id"],
+        ),
+        workspace_context=CatalogReuseFitWorkspaceContext(
+            workspace_loaded=True,
+            mapping_mode="standard",
+            source_system="SAP",
+            target_system="Snowflake",
+            business_domain="Procurement",
+        ),
+    )
+
+    prompt = build_catalog_reuse_fit_prompt(request, _build_fallback_fit(request))
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"baseline_fit"' in prompt
+    assert "Treat key_matches and risks as evidence-backed statements, not generic advice." in prompt
+    assert "If fit is mixed or evidence is incomplete, prefer partial_fit over overstating certainty." in prompt
+
+
+def test_benchmark_explanation_prompt_uses_grounded_metric_guardrails() -> None:
+    request = BenchmarkExplanationRequest(
+        dataset_name="email-case",
+        profile_comparison={
+            "profiles": [
+                {
+                    "profile": "balanced",
+                    "total_cases": 1,
+                    "total_fields": 1,
+                    "correct_matches": 1,
+                    "top1_accuracy": 1.0,
+                    "accuracy": 1.0,
+                    "confidence_by_bucket": {"high_confidence": 1.0},
+                }
+            ],
+            "recommended_profile": "balanced",
+            "recommendation_reason": "No decisive winner.",
+        },
+    )
+
+    prompt = build_benchmark_explanation_prompt(request, _build_fallback_explanation(request))
+
+    assert "SYSTEM:" in prompt
+    assert "TASK:" in prompt
+    assert "PAYLOAD:" in prompt
+    assert '"baseline_explanation"' in prompt
+    assert "Every metric, comparison, and percentage must come directly from the payload or its baseline explanation." in prompt
+    assert "If baseline data is missing, tied, or inconclusive, say that directly instead of inferring causes." in prompt
 
 
 def test_transformation_prompt_includes_description_aware_context() -> None:
