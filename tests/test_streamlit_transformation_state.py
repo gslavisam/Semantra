@@ -1088,3 +1088,38 @@ def test_apply_imported_mapping_payload_restores_mapping_decision_audit() -> Non
             "details": {"mode": "switch_target", "confidence": 0.91},
         }
     }
+
+
+def test_apply_imported_mapping_payload_normalizes_null_transformation_code() -> None:
+    fake_streamlit, functions = load_streamlit_functions(
+        "schema_column_names",
+        "apply_imported_mapping_payload",
+    )
+    apply_imported_mapping_payload = functions[-1]
+
+    fake_streamlit.session_state.update(
+        {
+            "upload_response": {
+                "source": {
+                    "schema_profile": {
+                        "columns": [
+                            {"name": "cust_id"},
+                        ]
+                    }
+                }
+            },
+            "mapping_editor_state": {},
+        }
+    )
+
+    payload = {
+        "mapping_decisions": [
+            {"source": "cust_id", "target": "customer_id", "status": "accepted", "transformation_code": None},
+        ]
+    }
+
+    apply_imported_mapping_payload(json.dumps(payload).encode("utf-8"))
+
+    assert fake_streamlit.session_state["mapping_editor_state"]["cust_id"]["manual_transformation_code"] == ""
+    assert fake_streamlit.session_state["manual_transform_cust_id"] == ""
+    assert fake_streamlit.session_state["manual_apply_cust_id"] is False

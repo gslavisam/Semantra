@@ -19,6 +19,37 @@ def _saved_mapping_set_apply_block_reason(saved_mapping_set: dict) -> str:
     )
 
 
+def _mapping_set_status_guidance(status: str | None) -> str:
+    normalized = str(status or "").strip().lower()
+    if normalized in {"approved", "archived"}:
+        return (
+            "Approved and archived are governance outcomes. This status control remains available here as a direct shortcut, "
+            "but the primary home for approval is Governance > Stewardship."
+        )
+    return (
+        "Draft and review are working states in Decisions. When the mapping set is ready for sign-off, continue in "
+        "Governance > Stewardship for approval."
+    )
+
+
+def _open_mapping_set_governance_handoff(mapping_set: dict | None) -> None:
+    current = mapping_set if isinstance(mapping_set, dict) else {}
+    name = str(current.get("name") or "mapping set").strip() or "mapping set"
+    version = int(current.get("version") or 0)
+    status = str(current.get("status") or "draft").strip() or "draft"
+    st.session_state["pending_top_level_area"] = "Governance"
+    st.session_state["pending_governance_section"] = "Stewardship"
+    st.session_state["last_action"] = {
+        "level": "info",
+        "message": (
+            f"Opened Governance > Stewardship for '{name}'"
+            f" version {version if version else '?'} (current status: {status}). "
+            "Use that surface as the main approval path."
+        ),
+    }
+    st.rerun()
+
+
 def _section_label(title: str, detail: str | None = None) -> str:
     detail_text = str(detail or "").strip()
     return f"{title} · {detail_text}" if detail_text else title
@@ -1205,7 +1236,10 @@ def render_mapping_set_versions_panel(
         _section_label("Mapping Set Versions", f"{len(saved_mapping_sets)} loaded" if saved_mapping_sets else None),
         expanded=False,
     ):
-        st.caption("Save a versioned mapping set to the backend or reload a saved version into the current review state.")
+        st.caption(
+            "Save and reload durable mapping sets here. Final approval belongs in Governance > Stewardship, even though "
+            "status shortcuts remain available in this panel during the current pilot/dev flow."
+        )
         mapping_set_columns = st.columns([2, 2])
         mapping_set_name = mapping_set_columns[0].text_input(
             "Mapping set name",
@@ -1359,12 +1393,20 @@ def render_mapping_set_versions_panel(
             if apply_block_reason:
                 st.caption(apply_block_reason)
 
-            target_status = saved_mapping_set_actions[1].selectbox(
-                "Saved mapping set status",
+            if saved_mapping_set_actions[1].button(
+                "Open Governance Stewardship",
+                width="stretch",
+                key="open_mapping_set_governance_handoff",
+            ):
+                _open_mapping_set_governance_handoff(selected_mapping_set)
+
+            target_status = st.selectbox(
+                "Saved mapping set status shortcut",
                 ["draft", "review", "approved", "archived"],
                 index=["draft", "review", "approved", "archived"].index(selected_mapping_set.get("status", "draft")),
                 key="selected_saved_mapping_set_status",
             )
+            st.caption(_mapping_set_status_guidance(target_status))
             if st.button(
                 "Update saved mapping set status",
                 width="stretch",

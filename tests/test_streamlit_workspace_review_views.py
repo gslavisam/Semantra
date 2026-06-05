@@ -202,6 +202,22 @@ def test_llm_proposal_percent_label_hides_missing_values() -> None:
     assert workspace_review_views._llm_proposal_percent_label(0.66) == "66%"
 
 
+def test_split_mapping_explanation_lines_separates_llm_and_non_llm_content() -> None:
+    general_lines, llm_lines = workspace_review_views._split_mapping_explanation_lines(
+        [
+            "Canonical glossary aligns both fields to business concept 'Supplier ID'.",
+            "LLM validator re-ranked this candidate within the closed candidate set.",
+            "LLM: Sample values align strongly with the selected target.",
+        ]
+    )
+
+    assert general_lines == ["Canonical glossary aligns both fields to business concept 'Supplier ID'."]
+    assert llm_lines == [
+        "LLM validator re-ranked this candidate within the closed candidate set.",
+        "LLM: Sample values align strongly with the selected target.",
+    ]
+
+
 def test_selected_mapping_display_rows_leave_llm_proposal_blank_without_review_generated_state() -> None:
     rows = workspace_review_views._selected_mapping_display_rows(
         [

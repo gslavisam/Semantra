@@ -68,6 +68,33 @@ def test_saved_mapping_set_apply_block_reason_requires_approved_status() -> None
     )
 
 
+def test_mapping_set_status_guidance_routes_approval_to_governance() -> None:
+    assert "Governance > Stewardship" in workspace_decision_views._mapping_set_status_guidance("review")
+    assert "direct shortcut" in workspace_decision_views._mapping_set_status_guidance("approved")
+
+
+def test_open_mapping_set_governance_handoff_sets_pending_governance_state() -> None:
+    session_state: dict = {}
+
+    with (
+        patch.object(workspace_decision_views.st, "session_state", session_state),
+        patch.object(workspace_decision_views.st, "rerun", side_effect=RuntimeError("rerun")),
+    ):
+        try:
+            workspace_decision_views._open_mapping_set_governance_handoff(
+                {"name": "customer_master", "version": 2, "status": "review"}
+            )
+        except RuntimeError as error:
+            assert str(error) == "rerun"
+        else:
+            raise AssertionError("Expected governance handoff helper to request a rerun.")
+
+    assert session_state["pending_top_level_area"] == "Governance"
+    assert session_state["pending_governance_section"] == "Stewardship"
+    assert session_state["last_action"]["level"] == "info"
+    assert "customer_master" in session_state["last_action"]["message"]
+
+
 def test_apply_llm_decision_proposal_switches_target_and_accepts() -> None:
     editor_state = {"op_type": {"target": "operation_label", "status": "needs_review"}}
 

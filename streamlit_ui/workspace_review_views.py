@@ -29,6 +29,25 @@ def _llm_proposal_percent_label(value: object) -> str:
         return ""
 
 
+def _split_mapping_explanation_lines(value: object) -> tuple[list[str], list[str]]:
+    if isinstance(value, str):
+        lines = [value.strip()] if value.strip() else []
+    elif isinstance(value, list):
+        lines = [str(item).strip() for item in value if str(item).strip()]
+    else:
+        lines = []
+
+    general_lines: list[str] = []
+    llm_lines: list[str] = []
+    for line in lines:
+        lowered = line.lower()
+        if lowered.startswith("llm:") or lowered.startswith("llm validator"):
+            llm_lines.append(line)
+        else:
+            general_lines.append(line)
+    return general_lines, llm_lines
+
+
 def _mapping_llm_proposal_confidence(
     row: dict,
     entry: dict,
@@ -1440,33 +1459,44 @@ def display_trust_layer(
         with st.expander(f"⚙️ Details and Transformation for {source}"):
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
             reason = mapping.get("explanation", []) or mapping.get("reason", [])
-            if isinstance(reason, str):
-                st.write(f"**Reasoning:** {reason}")
-            elif reason:
+            reasoning_lines, legacy_llm_reasoning_lines = _split_mapping_explanation_lines(reason)
+            if isinstance(reason, str) and reasoning_lines:
+                st.write(f"**Reasoning:** {reasoning_lines[0]}")
+            elif reasoning_lines:
                 st.write("**Reasoning:**")
-                for reason_line in reason:
+                for reason_line in reasoning_lines:
                     st.write(f"- {reason_line}")
             else:
                 st.write("No explanation provided.")
 
-            if mapping.get("llm_consulted") and llm_decision_proposition:
-                st.write("**LLM decision proposition:**")
-                st.write(f"- Summary: {llm_decision_proposition.get('summary') or 'LLM provided an additional decision proposition.'}")
-                st.write(f"- Proposition type: {llm_decision_proposition.get('proposition_type') or 'n/a'}")
+            if (mapping.get("llm_consulted") or refinement_applied) and llm_recommendation:
+                st.write("**LLM validation:**")
+                if llm_decision_proposition:
+                    st.write(
+                        f"- Summary: {llm_decision_proposition.get('summary') or 'LLM provided an additional decision proposition.'}"
+                    )
+                    st.write(f"- Proposition type: {llm_decision_proposition.get('proposition_type') or 'n/a'}")
                 st.write(
-                    f"- Proposed target: {llm_decision_proposition.get('proposed_target') or 'no_match'} | "
-                    f"Final target: {llm_decision_proposition.get('final_target') or 'unmapped'} | "
-                    f"Confidence: {round(float(llm_decision_proposition.get('confidence', 0.0) or 0.0) * 100)}%"
+                    f"- Recommended target: {llm_recommendation.get('selected_target') or 'unmapped'} "
+                    f"({round(float(llm_recommendation.get('confidence', 0.0) or 0.0) * 100)}%)"
                 )
-                st.write(
-                    f"- Applied to final decision: {'yes' if llm_decision_proposition.get('applied_to_final_decision') else 'no'}"
-                )
-                considered_targets = llm_decision_proposition.get("considered_targets") or []
-                if considered_targets:
-                    st.write(f"- Considered targets: {', '.join(str(item) for item in considered_targets)}")
-                rejected_targets = llm_decision_proposition.get("rejected_targets") or []
-                if rejected_targets:
-                    st.write(f"- Rejected targets: {', '.join(str(item) for item in rejected_targets)}")
+                if llm_decision_proposition:
+                    st.write(
+                        f"- Proposed target: {llm_decision_proposition.get('proposed_target') or 'no_match'} | "
+                        f"Final target: {llm_decision_proposition.get('final_target') or 'unmapped'} | "
+                        f"Applied to final decision: {'yes' if llm_decision_proposition.get('applied_to_final_decision') else 'no'}"
+                    )
+                    considered_targets = llm_decision_proposition.get("considered_targets") or []
+                    if considered_targets:
+                        st.write(f"- Considered targets: {', '.join(str(item) for item in considered_targets)}")
+                    rejected_targets = llm_decision_proposition.get("rejected_targets") or []
+                    if rejected_targets:
+                        st.write(f"- Rejected targets: {', '.join(str(item) for item in rejected_targets)}")
+                for reason_line in llm_recommendation.get("reasoning", []) or []:
+                    st.write(f"- LLM: {reason_line}")
+                for reason_line in legacy_llm_reasoning_lines:
+                    if reason_line not in {f"LLM: {item}" for item in (llm_recommendation.get('reasoning', []) or [])}:
+                        st.write(f"- {reason_line}")
 
             if refinement_result:
                 st.write("**LLM mapping refinement:**")
@@ -1517,15 +1547,6 @@ def display_trust_layer(
                             "message": f"Reverted the accepted LLM refined mapping for {source}.",
                         }
                         st.rerun()
-
-            if (mapping.get("llm_consulted") or refinement_applied) and llm_recommendation:
-                st.write("**LLM review:**")
-                st.write(
-                    f"- Recommended target: {llm_recommendation.get('selected_target') or 'unmapped'} "
-                    f"({round(float(llm_recommendation.get('confidence', 0.0) or 0.0) * 100)}%)"
-                )
-                for reason_line in llm_recommendation.get("reasoning", []) or []:
-                    st.write(f"- LLM: {reason_line}")
 
             canonical_details = mapping.get("canonical_details") or {}
             shared_concepts = canonical_details.get("shared_concepts") or []

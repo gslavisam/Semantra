@@ -667,6 +667,17 @@ def _workspace_preview_advisory_message(mapping_decisions: list[dict]) -> str:
     )
 
 
+def _workspace_preview_context_block_reason(upload_response: dict | None) -> str:
+    current_upload = upload_response if isinstance(upload_response, dict) else {}
+    source_snapshot = current_upload.get("source") or {}
+    if str(source_snapshot.get("dataset_id") or "").strip():
+        return ""
+    return (
+        "Preview requires a live source dataset snapshot in Workspace. "
+        "If you opened a saved reviewed artifact, load the source dataset in Setup or continue a saved draft first."
+    )
+
+
 def should_show_table_selector(available_tables: list[str], upload_mode: str, *, is_sql: bool) -> bool:
     """Return whether the UI should show table selection for the current upload mode."""
 
@@ -2160,6 +2171,7 @@ def _render_workspace_section_content(
             st.caption(_workspace_target_context_message(upload_response, mapping_response))
             canonical_output_mode = (upload_response or {}).get("mapping_mode") == "canonical"
             mapping_decisions = build_mapping_decisions()
+            preview_context_block_reason = _workspace_preview_context_block_reason(upload_response)
             if canonical_output_mode:
                 st.caption(
                     "Canonical mode supports code generation against canonical concept IDs, but preview stays unavailable because there is no concrete target dataset to materialize against."
@@ -2191,7 +2203,7 @@ def _render_workspace_section_content(
                         "Preview is unavailable in canonical mode. Use code generation to produce Pandas, PySpark, or dbt scaffolding against canonical targets."
                     )
                 else:
-                    if st.button("Generate preview"):
+                    if st.button("Generate preview", disabled=bool(preview_context_block_reason)):
                         if not mapping_decisions:
                             st.session_state["last_action"] = {
                                 "level": "warning",
@@ -2223,7 +2235,9 @@ def _render_workspace_section_content(
                                 "message": api_error_message(error, default_prefix="Preview failed"),
                             }
                             st.rerun()
-                    if preview_advisory_message:
+                    if preview_context_block_reason:
+                        st.caption(preview_context_block_reason)
+                    elif preview_advisory_message:
                         st.caption(preview_advisory_message)
             with actions_right:
                 if st.button(_workspace_codegen_button_label(codegen_mode), disabled=bool(codegen_block_reason)):

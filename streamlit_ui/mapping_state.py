@@ -265,21 +265,22 @@ def apply_imported_mapping_payload(
         if valid_sources and source not in valid_sources:
             continue
         current_entry = editor_state.get(source, {})
+        transformation_code = str(decision.get("transformation_code") or "")
         editor_state[source] = {
             "target": decision["target"],
             "status": decision.get("status", "accepted"),
             "suggested_target": current_entry.get("suggested_target", ""),
             "suggested_transformation_code": current_entry.get("suggested_transformation_code", ""),
-            "manual_transformation_code": decision.get("transformation_code", ""),
+            "manual_transformation_code": transformation_code,
             "llm_transformation_instruction": current_entry.get("llm_transformation_instruction", ""),
             "generated_transformation_reasoning": current_entry.get("generated_transformation_reasoning", []),
             "generated_transformation_warnings": current_entry.get("generated_transformation_warnings", []),
             "apply_transformation": False,
-            "manual_apply_transformation": bool(decision.get("transformation_code")),
+            "manual_apply_transformation": bool(transformation_code),
             "manual": source not in editor_state or current_entry.get("manual", False),
         }
-        session_state[f"manual_transform_{source}"] = decision.get("transformation_code", "")
-        session_state[f"manual_apply_{source}"] = bool(decision.get("transformation_code"))
+        session_state[f"manual_transform_{source}"] = transformation_code
+        session_state[f"manual_apply_{source}"] = bool(transformation_code)
     session_state["mapping_editor_state"] = editor_state
 
     sanitized_audit: dict[str, dict] = {}

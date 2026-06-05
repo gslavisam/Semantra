@@ -31,6 +31,7 @@ from streamlit_ui.workspace_views import (
     _workspace_llm_refinement_enabled,
     _workspace_output_section_label,
     _workspace_preview_advisory_message,
+    _workspace_preview_context_block_reason,
     _workspace_ready_transformation_spec,
     _workspace_refinement_source_response,
     _workspace_reset_transformation_design_state,
@@ -386,6 +387,11 @@ def test_workspace_preview_advisory_message_keeps_preview_available() -> None:
         "Preview is using active mapping decisions that are not fully approved yet. "
         "Review statuses: needs_review. Use it to inspect the current mapping before final approval."
     )
+
+
+def test_workspace_preview_context_block_reason_requires_live_upload_snapshot() -> None:
+    assert _workspace_preview_context_block_reason({"source": {"dataset_id": "src-1"}}) == ""
+    assert "live source dataset snapshot" in _workspace_preview_context_block_reason(None)
 
 
 def test_default_llm_validation_enabled_defaults_off_but_preserves_user_choice() -> None:
