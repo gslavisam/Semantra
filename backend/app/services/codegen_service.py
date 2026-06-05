@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from app.models.mapping import GeneratedArtifact, MappingDecision, TransformationSpec
-from app.services.transformation_spec_service import summarize_transformation_spec
+from app.services.transformation_spec_service import is_runtime_active_mapping, summarize_transformation_spec
 from app.services.dbt_codegen_profile import current_dbt_codegen_profile, dbt_identifier, dbt_source_relation
 from app.services.transformation_service import (
     build_mapping_privacy_warnings,
@@ -28,15 +28,15 @@ def generate_pandas_code(
     warnings = []
 
     for decision in mapping_decisions:
-        if decision.status == "rejected":
+        if decision.status == "rejected" or not is_runtime_active_mapping(decision):
             warnings.append(
                 build_transformation_warning(
                     code="skipped_rejected_mapping",
-                    message=f"Skipped rejected mapping: {decision.source} -> {decision.target}",
+                    message=f"Skipped inactive mapping: {decision.source} -> {decision.target}",
                     source=decision.source,
                     target=decision.target,
                     stage="codegen",
-                    details={"decision_status": decision.status},
+                    details={"decision_status": decision.status, "resolution_type": decision.resolution_type},
                 )
             )
             continue
@@ -125,15 +125,15 @@ def generate_pyspark_code(
     select_lines: list[str] = []
 
     for decision in mapping_decisions:
-        if decision.status == "rejected":
+        if decision.status == "rejected" or not is_runtime_active_mapping(decision):
             warnings.append(
                 build_transformation_warning(
                     code="skipped_rejected_mapping",
-                    message=f"Skipped rejected mapping: {decision.source} -> {decision.target}",
+                    message=f"Skipped inactive mapping: {decision.source} -> {decision.target}",
                     source=decision.source,
                     target=decision.target,
                     stage="codegen",
-                    details={"decision_status": decision.status},
+                    details={"decision_status": decision.status, "resolution_type": decision.resolution_type},
                 )
             )
             continue
@@ -212,15 +212,15 @@ def generate_dbt_code(
     select_lines: list[str] = []
 
     for decision in mapping_decisions:
-        if decision.status == "rejected":
+        if decision.status == "rejected" or not is_runtime_active_mapping(decision):
             warnings.append(
                 build_transformation_warning(
                     code="skipped_rejected_mapping",
-                    message=f"Skipped rejected mapping: {decision.source} -> {decision.target}",
+                    message=f"Skipped inactive mapping: {decision.source} -> {decision.target}",
                     source=decision.source,
                     target=decision.target,
                     stage="codegen",
-                    details={"decision_status": decision.status},
+                    details={"decision_status": decision.status, "resolution_type": decision.resolution_type},
                 )
             )
             continue

@@ -238,6 +238,24 @@ Workspace UX/stability zapažanja koja su već zatvorena:
 
 - [x] Review/Decisions draft-state panel adapter mismatch (`unexpected keyword argument 'api_request'`) je popravljen i browser-potvrđen.
 - [x] Saved draft-session picker više ne ostaje zalepljen za stariji entry sa istim imenom; selector sada prati aktivni `draft_session_id`.
+
+### 6. Workspace Modelling derived-first V1
+
+Status: active execution focus.
+
+Napomena:
+
+- `Modelling` kreće kao `derived-first` površina, ne kao blank-canvas authoring studio
+- prvi implementacioni cilj je da `Workspace` prikaže konceptualni model koji već proizlazi iz aktivnih odluka i `Transformation Design` state-a
+- korekcije modela moraju ostati bounded i ne smeju tiho da prepišu runtime mapping odluke
+
+- [ ] Dodati `Workspace > Modelling` section shell u postojeći Workspace tok.
+- [ ] Izvesti početni koncept model iz aktivnog `mapping_decisions` i `Transformation Design` state-a.
+- [ ] Dodati osnovni `derived-first` editing sloj za object/grain/dodatne atribute i required flagove.
+- [ ] Prikazati drift između koncept modela i aktivnog Workspace mapping state-a.
+- [ ] Prikazati bounded modelling hints bez tihog menjanja `Decisions` ili `Output` stanja.
+- [ ] Pokriti modelling helper logiku fokusiranim `Workspace` testovima.
+- [ ] Validirati prvi slice fokusiranim pytest prolazom.
 - [x] `API Base URL` switch više ne ostavlja UI zalepljen na starom top-level tabu; reset sada ide i kroz `pending_top_level_area` / `pending_workspace_section` handoff pa se live UI vraća na `Workspace > Setup` umesto da zadrži stari `Catalog` radio izbor.
 
 Workspace Copilot bounded closure/output mini-slice je zatvoren:

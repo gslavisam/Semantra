@@ -9,6 +9,54 @@ from streamlit_ui.api import current_workspace_scope
 from streamlit_ui.shared_views import render_status_badge_legend
 
 
+DEFAULT_RESOLUTION_TYPE = "direct_mapping"
+EDITABLE_RESOLUTION_TYPES = ["direct_mapping", "derived_value", "fixed_value", "out_of_scope", "target_managed"]
+RESOLUTION_TYPE_LABELS = {
+    "direct_mapping": "Direct mapping",
+    "derived_value": "Derived value",
+    "fixed_value": "Fixed value",
+    "out_of_scope": "N/A",
+    "target_managed": "Target managed",
+}
+
+
+def _normalized_resolution_type(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in RESOLUTION_TYPE_LABELS else DEFAULT_RESOLUTION_TYPE
+
+
+def _normalized_resolution_payload(resolution_type: object, payload: object) -> dict[str, str]:
+    current_type = _normalized_resolution_type(resolution_type)
+    current_payload = payload if isinstance(payload, dict) else {}
+    if current_type == "fixed_value":
+        value = str(current_payload.get("value") or "").strip()
+        return {"value": value} if value else {}
+    if current_type == "derived_value":
+        rule = str(current_payload.get("rule") or "").strip()
+        return {"rule": rule} if rule else {}
+    if current_type == "out_of_scope":
+        reason = str(current_payload.get("reason") or "").strip()
+        return {"reason": reason} if reason else {}
+    if current_type == "target_managed":
+        reason = str(current_payload.get("reason") or "").strip()
+        return {"reason": reason} if reason else {}
+    return {}
+
+
+def _mapping_decision_detail_lines(entry: dict | None) -> list[str]:
+    current_entry = entry if isinstance(entry, dict) else {}
+    resolution_type = _normalized_resolution_type(current_entry.get("resolution_type"))
+    resolution_payload = _normalized_resolution_payload(resolution_type, current_entry.get("resolution_payload"))
+    lines = [f"Decision type: {RESOLUTION_TYPE_LABELS.get(resolution_type, resolution_type.replace('_', ' ').title())}"]
+    if resolution_type == "fixed_value" and resolution_payload.get("value"):
+        lines.append(f"Fixed value: {resolution_payload['value']}")
+    elif resolution_type == "derived_value" and resolution_payload.get("rule"):
+        lines.append(f"Derivation rule: {resolution_payload['rule']}")
+    elif resolution_type in {"out_of_scope", "target_managed"} and resolution_payload.get("reason"):
+        lines.append(f"Reason: {resolution_payload['reason']}")
+    return lines
+
+
 def _normalized_text(value: str | None) -> str:
     return str(value or "").strip().lower()
 
@@ -1458,6 +1506,11 @@ def display_trust_layer(
                 st.caption("Tracked separately from the ranking score.")
         with st.expander(f"⚙️ Details and Transformation for {source}"):
             st.caption(transformation_mode_label(mapping["transformation_mode"]))
+            decision_detail_lines = _mapping_decision_detail_lines(entry)
+            if decision_detail_lines:
+                st.write(f"**{decision_detail_lines[0]}**")
+                for detail_line in decision_detail_lines[1:]:
+                    st.write(f"- {detail_line}")
             reason = mapping.get("explanation", []) or mapping.get("reason", [])
             reasoning_lines, legacy_llm_reasoning_lines = _split_mapping_explanation_lines(reason)
             if isinstance(reason, str) and reasoning_lines:
@@ -2413,12 +2466,28 @@ def render_mapping_editor(mapping_response: dict, *, selected_target_options) ->
         _section_label("Manual Review", f"{open_item_count} items" if open_item_count else None),
         expanded=open_item_count > 0,
     ):
-        st.caption("Adjust the selected target and mark each mapping as accepted, needs review, or rejected.")
+        st.caption(
+            "Adjust the selected target, keep the 3 review statuses, and optionally classify accepted mappings as direct, derived, fixed-value, N/A, or target-managed. "
+            "Use transformation rules/code to define the actual fixed or derived logic. N/A and target-managed paths are excluded from generated output."
+        )
 
         for ranked in mapping_response["ranked_mappings"]:
             source = ranked["source"]
             options = selected_target_options(ranked)
-            current = editor_state.get(source, {"target": options[0] if options else "", "status": "needs_review"})
+            current = editor_state.get(
+                source,
+                {
+                    "target": options[0] if options else "",
+                    "status": "needs_review",
+                    "resolution_type": DEFAULT_RESOLUTION_TYPE,
+                    "resolution_payload": {},
+                },
+            )
+            current["resolution_type"] = _normalized_resolution_type(current.get("resolution_type"))
+            current["resolution_payload"] = _normalized_resolution_payload(
+                current.get("resolution_type"),
+                current.get("resolution_payload"),
+            )
             editor_state[source] = current
 
             with st.container(border=True):
@@ -2447,11 +2516,79 @@ def render_mapping_editor(mapping_response: dict, *, selected_target_options) ->
                         label_visibility="collapsed",
                     )
                 with columns[2]:
-                    selected_candidate = next(
-                        (candidate for candidate in ranked["candidates"] if candidate["target"] == editor_state[source]["target"]),
-                        None,
+                    editor_state[source]["resolution_type"] = st.selectbox(
+                        f"Decision type for {source}",
+                        EDITABLE_RESOLUTION_TYPES,
+                        index=EDITABLE_RESOLUTION_TYPES.index(_normalized_resolution_type(current.get("resolution_type"))),
+                        key=f"resolution_type_choice_{source}",
+                        format_func=lambda option: RESOLUTION_TYPE_LABELS.get(option, option.replace("_", " ").title()),
+                        label_visibility="collapsed",
                     )
-                    if selected_candidate and selected_candidate["explanation"]:
-                        st.caption(" | ".join(selected_candidate["explanation"]))
-                    elif ranked["candidates"]:
-                        st.caption("No explanation available for the selected candidate.")
+                selected_candidate = next(
+                    (candidate for candidate in ranked["candidates"] if candidate["target"] == editor_state[source]["target"]),
+                    None,
+                )
+                if selected_candidate and selected_candidate["explanation"]:
+                    st.caption(" | ".join(selected_candidate["explanation"]))
+                elif ranked["candidates"]:
+                    st.caption("No explanation available for the selected candidate.")
+                resolution_type = editor_state[source]["resolution_type"]
+                current_payload = _normalized_resolution_payload(
+                    resolution_type,
+                    editor_state[source].get("resolution_payload"),
+                )
+                if resolution_type == "fixed_value":
+                    widget_key = f"resolution_payload_value_{source}"
+                    current_value = current_payload.get("value", "")
+                    if st.session_state.get(widget_key) != current_value:
+                        st.session_state[widget_key] = current_value
+                    fixed_value = st.text_input(
+                        f"Fixed target value for {source}",
+                        key=widget_key,
+                        placeholder="Example: CUSTOMER",
+                    )
+                    editor_state[source]["resolution_payload"] = {"value": fixed_value.strip()} if fixed_value.strip() else {}
+                    if not fixed_value.strip():
+                        st.caption("Fixed-value decision: enter the constant that should populate the target field.")
+                elif resolution_type == "derived_value":
+                    widget_key = f"resolution_payload_rule_{source}"
+                    current_rule = current_payload.get("rule", "")
+                    if st.session_state.get(widget_key) != current_rule:
+                        st.session_state[widget_key] = current_rule
+                    derived_rule = st.text_area(
+                        f"Derivation rule for {source}",
+                        key=widget_key,
+                        placeholder="Example: Concatenate fname + ' ' + lname and trim extra spaces.",
+                        height=80,
+                    )
+                    editor_state[source]["resolution_payload"] = {"rule": derived_rule.strip()} if derived_rule.strip() else {}
+                    if not derived_rule.strip():
+                        st.caption("Derived-value decision: describe the rule that should compute the target field.")
+                elif resolution_type == "out_of_scope":
+                    widget_key = f"resolution_payload_reason_{source}"
+                    current_reason = current_payload.get("reason", "")
+                    if st.session_state.get(widget_key) != current_reason:
+                        st.session_state[widget_key] = current_reason
+                    out_of_scope_reason = st.text_area(
+                        f"Why N/A for {source}",
+                        key=widget_key,
+                        placeholder="Example: This source field is a staging/technical artifact and should not populate the target contract.",
+                        height=80,
+                    )
+                    editor_state[source]["resolution_payload"] = {"reason": out_of_scope_reason.strip()} if out_of_scope_reason.strip() else {}
+                    st.caption("N/A excludes this source-to-target path from preview, code generation, and transformation-spec target coverage.")
+                elif resolution_type == "target_managed":
+                    widget_key = f"resolution_payload_target_managed_reason_{source}"
+                    current_reason = current_payload.get("reason", "")
+                    if st.session_state.get(widget_key) != current_reason:
+                        st.session_state[widget_key] = current_reason
+                    target_managed_reason = st.text_area(
+                        f"Why target managed for {source}",
+                        key=widget_key,
+                        placeholder="Example: The destination system assigns this value automatically during record creation.",
+                        height=80,
+                    )
+                    editor_state[source]["resolution_payload"] = {"reason": target_managed_reason.strip()} if target_managed_reason.strip() else {}
+                    st.caption("Target-managed means the destination system populates this field, so this source-to-target path is excluded from generated output.")
+                else:
+                    editor_state[source]["resolution_payload"] = {}

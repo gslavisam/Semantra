@@ -11,6 +11,7 @@ from app.models.schema import DatasetHandle
 
 ConfidenceLabel = Literal["high_confidence", "medium_confidence", "low_confidence"]
 DecisionStatus = Literal["accepted", "needs_review", "rejected"]
+MappingResolutionType = Literal["direct_mapping", "derived_value", "fixed_value", "target_managed", "out_of_scope"]
 UserCorrectionStatus = Literal["accepted", "rejected", "overridden"]
 ReusableCorrectionRuleStatus = Literal["accepted", "rejected", "overridden"]
 MappingSetStatus = Literal["draft", "review", "approved", "archived"]
@@ -139,6 +140,8 @@ class MappingDecision(BaseModel):
     source: str
     target: str
     status: DecisionStatus = "accepted"
+    resolution_type: MappingResolutionType = "direct_mapping"
+    resolution_payload: dict[str, Any] = Field(default_factory=dict)
     transformation_code: str | None = None
 
 
@@ -843,6 +846,8 @@ class DraftSessionEditorEntry(BaseModel):
 
     target: str = ""
     status: DecisionStatus = "needs_review"
+    resolution_type: MappingResolutionType = "direct_mapping"
+    resolution_payload: dict[str, Any] = Field(default_factory=dict)
     suggested_target: str = ""
     suggested_transformation_code: str = ""
     manual_transformation_code: str = ""

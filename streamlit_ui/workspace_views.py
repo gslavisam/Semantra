@@ -16,13 +16,20 @@ from streamlit_ui.workspace_decision_views import (
 )
 
 
-WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output")
+WORKSPACE_SECTIONS = ("Setup", "Review", "Decisions", "Output", "Modelling Overview")
 WORKSPACE_CODEGEN_MODES = ("pandas", "pyspark", "dbt")
 WORKSPACE_COPILOT_ACTIONS = {
     "Setup": ("What unlocks Review?",),
     "Review": ("Summarize current mapping state", "Summarize Review -> Decisions risks"),
     "Decisions": ("What still needs a decision?", "Am I ready for Output?"),
     "Output": ("Why is codegen blocked?", "Explain output gating and warning priority"),
+}
+WORKSPACE_MODELLING_RESOLUTION_LABELS = {
+    "direct_mapping": "Direct mapping",
+    "fixed_value": "Fixed value",
+    "derived_value": "Derived value",
+    "target_managed": "Target managed",
+    "out_of_scope": "N/A",
 }
 
 
@@ -280,16 +287,1582 @@ def _workspace_output_section_label(title: str, detail: str | None = None) -> st
     return f"{title} · {detail_text}" if detail_text else title
 
 
+def _workspace_modelling_parse_lines(value: object) -> list[str]:
+    items: list[str] = []
+    seen: set[str] = set()
+    for raw_line in str(value or "").splitlines():
+        item = raw_line.strip()
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        items.append(item)
+    return items
+
+
+def _workspace_modelling_group_label(attribute_name: object) -> str:
+    normalized = str(attribute_name or "").strip().lower()
+    if not normalized:
+        return "General"
+    if any(token in normalized for token in ("id", "code", "key", "number", "identifier")):
+        return "Identity"
+    if any(token in normalized for token in ("status", "state", "flag", "type", "category", "segment")):
+        return "Classification"
+    if any(token in normalized for token in ("date", "time", "timestamp", "created", "updated")):
+        return "Dates"
+    if any(token in normalized for token in ("phone", "email", "address", "street", "city", "country", "contact")):
+        return "Contact"
+    if any(token in normalized for token in ("amount", "total", "balance", "price", "cost", "currency", "credit", "debit")):
+        return "Financials"
+    if any(token in normalized for token in ("parent", "child", "manager", "owner", "reference")):
+        return "References"
+    return "General"
+
+
+def _workspace_modelling_resolution_label(value: object) -> str:
+    normalized = str(value or "direct_mapping").strip().lower() or "direct_mapping"
+    return WORKSPACE_MODELLING_RESOLUTION_LABELS.get(normalized, normalized.replace("_", " ").title())
+
+
+def _workspace_modelling_inferred_targets(mapping_decisions: list[dict], session_state: dict) -> list[str]:
+    targets: list[str] = []
+    seen: set[str] = set()
+    for item in mapping_decisions:
+        target = str(item.get("target") or "").strip()
+        if not target or target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
+    for key in session_state.keys():
+        key_text = str(key)
+        if not key_text.startswith("workspace_transformation_rule::"):
+            continue
+        target = key_text.split("::", 1)[1].strip()
+        if not target or target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
+    return targets
+
+
+def _workspace_modelling_object_name(upload_response: dict | None, session_state: dict) -> str:
+    upload_payload = upload_response or {}
+    mapping_mode = str(upload_payload.get("mapping_mode") or session_state.get("mapping_mode") or "standard").strip().lower()
+    if mapping_mode == "canonical":
+        canonical_target = str(
+            session_state.get("canonical_target_intent")
+            or session_state.get("canonical_target_profile")
+            or upload_payload.get("target_intent_label")
+            or upload_payload.get("target_profile")
+            or ""
+        ).strip()
+        return canonical_target or "Canonical target model"
+    target_payload = upload_payload.get("target") if isinstance(upload_payload.get("target"), dict) else {}
+    for key in ("dataset_name", "name", "file_name", "filename"):
+        value = str(target_payload.get(key) or "").strip()
+        if value:
+            return value.rsplit(".", 1)[0]
+    return "Target model"
+
+
+def _workspace_build_inferred_concept_model(
+    mapping_decisions: list[dict],
+    session_state: dict,
+    upload_response: dict | None = None,
+) -> dict:
+    inferred_targets = _workspace_modelling_inferred_targets(mapping_decisions, session_state)
+    decisions_by_target: dict[str, list[dict]] = {}
+    for item in mapping_decisions:
+        target = str(item.get("target") or "").strip()
+        if not target:
+            continue
+        decisions_by_target.setdefault(target, []).append(item)
+
+    business_rules = _workspace_modelling_parse_lines(
+        "\n".join(
+            value
+            for value in (
+                str(session_state.get("workspace_transformation_global_rules") or "").strip(),
+                str(session_state.get("workspace_transformation_defaults") or "").strip(),
+                str(session_state.get("workspace_transformation_examples") or "").strip(),
+            )
+            if value
+        )
+    )
+    attributes: list[dict] = []
+    concept_groups: list[dict] = []
+    seen_groups: set[str] = set()
+    for target in inferred_targets:
+        target_decisions = decisions_by_target.get(target, [])
+        statuses = [str(item.get("status") or "needs_review").strip().lower() or "needs_review" for item in target_decisions]
+        resolution_types = [
+            str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+            for item in target_decisions
+        ]
+        resolution_type = resolution_types[0] if resolution_types else "direct_mapping"
+        if "target_managed" in resolution_types:
+            coverage_status = "target_managed"
+        elif "out_of_scope" in resolution_types:
+            coverage_status = "excluded"
+        elif not target_decisions:
+            coverage_status = "modeled_only"
+        elif "accepted" in statuses:
+            coverage_status = "mapped"
+        else:
+            coverage_status = "unresolved"
+        group_label = _workspace_modelling_group_label(target)
+        if group_label not in seen_groups:
+            seen_groups.add(group_label)
+            concept_groups.append({"id": group_label.lower().replace(" ", "_"), "label": group_label})
+        attributes.append(
+            {
+                "name": target,
+                "group": group_label,
+                "required": False,
+                "expected_resolution_type": resolution_type,
+                "mapped_target": target,
+                "current_mapping_status": " / ".join(sorted(set(statuses))) if statuses else "unmapped",
+                "coverage_status": coverage_status,
+                "origin": "inferred",
+                "notes": "",
+            }
+        )
+
+    return {
+        "source_mode": "derived_from_workspace",
+        "source_snapshot": {
+            "mapping_decision_count": len(mapping_decisions),
+            "transformation_spec_present": bool(str(session_state.get("workspace_transformation_target_grain") or "").strip()),
+        },
+        "object_name": _workspace_modelling_object_name(upload_response, session_state),
+        "description": "",
+        "business_purpose": "",
+        "target_grain": str(session_state.get("workspace_transformation_target_grain") or "").strip(),
+        "concept_groups": concept_groups,
+        "attributes": attributes,
+        "relationships": [],
+        "business_rules": business_rules,
+    }
+
+
+def _workspace_seed_modelling_editor_state(concept_model: dict, session_state: dict, *, force: bool = False) -> None:
+    defaults = {
+        "workspace_modelling_object_name": str(concept_model.get("object_name") or "").strip(),
+        "workspace_modelling_description": str(concept_model.get("description") or "").strip(),
+        "workspace_modelling_business_purpose": str(concept_model.get("business_purpose") or "").strip(),
+        "workspace_modelling_target_grain": str(concept_model.get("target_grain") or "").strip(),
+        "workspace_modelling_additional_attributes": "",
+        "workspace_modelling_required_attributes": "",
+        "workspace_modelling_business_rules": "\n".join(concept_model.get("business_rules") or []),
+    }
+    for key, value in defaults.items():
+        if force or key not in session_state:
+            session_state[key] = value
+
+
+def _workspace_build_concept_model(inferred_model: dict, session_state: dict) -> dict:
+    concept_model = {key: value for key, value in inferred_model.items() if key != "attributes"}
+    attributes = [dict(item) for item in (inferred_model.get("attributes") or []) if isinstance(item, dict)]
+    required_attributes = set(_workspace_modelling_parse_lines(session_state.get("workspace_modelling_required_attributes")))
+    for item in attributes:
+        item["required"] = str(item.get("name") or "").strip() in required_attributes
+    known_names = {str(item.get("name") or "").strip() for item in attributes}
+    for attribute_name in _workspace_modelling_parse_lines(session_state.get("workspace_modelling_additional_attributes")):
+        if attribute_name in known_names:
+            continue
+        known_names.add(attribute_name)
+        attributes.append(
+            {
+                "name": attribute_name,
+                "group": _workspace_modelling_group_label(attribute_name),
+                "required": attribute_name in required_attributes,
+                "expected_resolution_type": "direct_mapping",
+                "mapped_target": "",
+                "current_mapping_status": "unmapped",
+                "coverage_status": "modeled_only",
+                "origin": "user_added",
+                "notes": "",
+            }
+        )
+
+    concept_model.update(
+        {
+            "object_name": str(session_state.get("workspace_modelling_object_name") or concept_model.get("object_name") or "").strip(),
+            "description": str(session_state.get("workspace_modelling_description") or concept_model.get("description") or "").strip(),
+            "business_purpose": str(session_state.get("workspace_modelling_business_purpose") or concept_model.get("business_purpose") or "").strip(),
+            "target_grain": str(session_state.get("workspace_modelling_target_grain") or concept_model.get("target_grain") or "").strip(),
+            "attributes": attributes,
+            "business_rules": _workspace_modelling_parse_lines(session_state.get("workspace_modelling_business_rules")),
+        }
+    )
+    return concept_model
+
+
+def _workspace_concept_model_drift_summary(concept_model: dict, mapping_decisions: list[dict]) -> dict:
+    model_attributes = [item for item in (concept_model.get("attributes") or []) if isinstance(item, dict)]
+    model_names = {str(item.get("name") or "").strip() for item in model_attributes if str(item.get("name") or "").strip()}
+    active_targets = {str(item.get("target") or "").strip() for item in mapping_decisions if str(item.get("target") or "").strip()}
+    resolution_by_target = {
+        str(item.get("target") or "").strip(): str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+        for item in mapping_decisions
+        if str(item.get("target") or "").strip()
+    }
+    modeled_but_unmapped = sorted(name for name in model_names if name not in active_targets)
+    unmodeled_targets = sorted(target for target in active_targets if target not in model_names)
+    required_unresolved = sorted(
+        str(item.get("name") or "").strip()
+        for item in model_attributes
+        if item.get("required") and str(item.get("coverage_status") or "").strip().lower() in {"modeled_only", "unresolved", "excluded"}
+    )
+    resolution_mismatches = sorted(
+        str(item.get("name") or "").strip()
+        for item in model_attributes
+        if str(item.get("name") or "").strip() in resolution_by_target
+        and str(item.get("expected_resolution_type") or "direct_mapping").strip().lower() != resolution_by_target[str(item.get("name") or "").strip()]
+    )
+    return {
+        "status": "drift" if (modeled_but_unmapped or unmodeled_targets or required_unresolved or resolution_mismatches) else "in_sync",
+        "modeled_but_unmapped": modeled_but_unmapped,
+        "unmodeled_targets": unmodeled_targets,
+        "required_unresolved": required_unresolved,
+        "resolution_mismatches": resolution_mismatches,
+    }
+
+
+def _workspace_modelling_review_summary(concept_model: dict, mapping_decisions: list[dict], session_state: dict) -> dict:
+    status_counts = {"accepted": 0, "needs_review": 0, "rejected": 0}
+    resolution_counts = {
+        "direct_mapping": 0,
+        "fixed_value": 0,
+        "derived_value": 0,
+        "target_managed": 0,
+        "out_of_scope": 0,
+    }
+    for item in mapping_decisions:
+        status = str(item.get("status") or "needs_review").strip().lower() or "needs_review"
+        if status in status_counts:
+            status_counts[status] += 1
+        resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+        if resolution_type in resolution_counts:
+            resolution_counts[resolution_type] += 1
+
+    coverage_counts = {
+        "mapped": 0,
+        "unresolved": 0,
+        "excluded": 0,
+        "target_managed": 0,
+        "modeled_only": 0,
+    }
+    group_counts: dict[str, int] = {}
+    for item in concept_model.get("attributes") or []:
+        if not isinstance(item, dict):
+            continue
+        coverage_status = str(item.get("coverage_status") or "").strip().lower()
+        if coverage_status in coverage_counts:
+            coverage_counts[coverage_status] += 1
+        group_label = str(item.get("group") or "General").strip() or "General"
+        group_counts[group_label] = group_counts.get(group_label, 0) + 1
+
+    transformation_rule_count = sum(
+        1 for key in session_state.keys() if str(key).startswith("workspace_transformation_rule::") and str(session_state.get(key) or "").strip()
+    )
+    return {
+        "active_decisions": len(mapping_decisions),
+        "status_counts": status_counts,
+        "resolution_counts": resolution_counts,
+        "coverage_counts": coverage_counts,
+        "concept_group_counts": group_counts,
+        "business_rule_count": len(concept_model.get("business_rules") or []),
+        "transformation_rule_count": transformation_rule_count,
+        "target_grain_present": bool(str(concept_model.get("target_grain") or "").strip()),
+    }
+
+
+def _workspace_modelling_overview_summary(
+    concept_model: dict,
+    mapping_decisions: list[dict],
+    session_state: dict,
+    *,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    drift_summary: dict,
+    workspace_scope: dict | None = None,
+) -> dict:
+    review_summary = _workspace_modelling_review_summary(concept_model, mapping_decisions, session_state)
+    transformation_spec = _workspace_build_transformation_spec(mapping_decisions, session_state)
+    transformation_status = _workspace_transformation_spec_status(transformation_spec)
+    scope_caption = _workspace_scope_caption(workspace_scope or current_workspace_scope())
+    target_context_message = _workspace_target_context_message(upload_response, mapping_response)
+    preview_block_reason = _workspace_preview_context_block_reason(upload_response)
+    preview_advisory = _workspace_preview_advisory_message(mapping_decisions)
+    codegen_block_reason = _workspace_codegen_block_reason(mapping_decisions)
+    excluded_output_summary = _workspace_excluded_output_summary(mapping_decisions)
+
+    connected_results = [
+        {
+            "signal": "Workspace scope",
+            "status": "ready" if scope_caption else "info",
+            "result": scope_caption or "No explicit workspace scope yet.",
+        },
+        {
+            "signal": "Target context",
+            "status": "ready" if target_context_message else "info",
+            "result": target_context_message or "Target context is not fully established yet.",
+        },
+        {
+            "signal": "Decision closure",
+            "status": "ready" if not review_summary["status_counts"]["needs_review"] and not review_summary["status_counts"]["rejected"] else "attention",
+            "result": (
+                f"accepted={review_summary['status_counts']['accepted']}, "
+                f"needs_review={review_summary['status_counts']['needs_review']}, "
+                f"rejected={review_summary['status_counts']['rejected']}"
+            ),
+        },
+        {
+            "signal": "Concept coverage",
+            "status": "ready"
+            if not review_summary["coverage_counts"]["unresolved"] and not review_summary["coverage_counts"]["modeled_only"]
+            else "attention",
+            "result": (
+                f"mapped={review_summary['coverage_counts']['mapped']}, "
+                f"unresolved={review_summary['coverage_counts']['unresolved']}, "
+                f"modeled_only={review_summary['coverage_counts']['modeled_only']}, "
+                f"excluded={review_summary['coverage_counts']['excluded']}, "
+                f"target_managed={review_summary['coverage_counts']['target_managed']}"
+            ),
+        },
+        {
+            "signal": "Output contract",
+            "status": "ready" if transformation_status.get("state") == "ready" else "attention",
+            "result": str(transformation_status.get("message") or "No output contract summary available."),
+        },
+        {
+            "signal": "Output gating",
+            "status": "ready" if not codegen_block_reason else "attention",
+            "result": codegen_block_reason or "No status-based output block is currently open.",
+        },
+    ]
+
+    top_findings: list[str] = []
+    if review_summary["status_counts"]["needs_review"]:
+        top_findings.append(
+            f"{review_summary['status_counts']['needs_review']} decision(s) still need review before the workspace result is fully closed."
+        )
+    if review_summary["status_counts"]["rejected"]:
+        top_findings.append(
+            f"{review_summary['status_counts']['rejected']} decision(s) are rejected and keep the final result open."
+        )
+    if drift_summary.get("required_unresolved"):
+        top_findings.append(
+            "Required modeled attributes are still unresolved: " + ", ".join(drift_summary["required_unresolved"])
+        )
+    if drift_summary.get("unmodeled_targets"):
+        top_findings.append(
+            "Current targets are missing from the concept model: " + ", ".join(drift_summary["unmodeled_targets"])
+        )
+    if transformation_status.get("state") != "ready":
+        top_findings.append(str(transformation_status.get("message") or "Output contract is not ready yet."))
+    if preview_block_reason:
+        top_findings.append(preview_block_reason)
+    elif preview_advisory:
+        top_findings.append(preview_advisory)
+    if excluded_output_summary:
+        top_findings.append(excluded_output_summary)
+
+    deduped_findings: list[str] = []
+    seen_findings: set[str] = set()
+    for finding in top_findings:
+        if finding in seen_findings:
+            continue
+        seen_findings.add(finding)
+        deduped_findings.append(finding)
+
+    return {
+        "review_summary": review_summary,
+        "transformation_status": transformation_status,
+        "connected_results": connected_results,
+        "top_findings": deduped_findings,
+        "target_context_message": target_context_message,
+        "scope_caption": scope_caption,
+        "excluded_output_summary": excluded_output_summary,
+    }
+
+
+def _workspace_modelling_graph_source_label(mapping_decision: dict) -> str:
+    source_name = str(mapping_decision.get("source") or "").strip()
+    if source_name:
+        return source_name
+    resolution_type = str(mapping_decision.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+    payload = mapping_decision.get("resolution_payload") if isinstance(mapping_decision.get("resolution_payload"), dict) else {}
+    if resolution_type == "fixed_value":
+        for key in ("value", "fixed_value", "literal"):
+            value = str(payload.get(key) or "").strip()
+            if value:
+                return f"Fixed value: {value}"
+        return "Fixed value"
+    if resolution_type == "derived_value":
+        for key in ("expression", "formula", "derivation_rule", "description"):
+            value = str(payload.get(key) or "").strip()
+            if value:
+                return f"Derived: {value}"
+        return "Derived rule"
+    return _workspace_modelling_resolution_label(resolution_type)
+
+
+def _workspace_modelling_graph_summary(concept_model: dict, mapping_decisions: list[dict], *, max_edges: int = 18) -> dict:
+    attributes_by_name = {
+        str(item.get("name") or "").strip(): item
+        for item in (concept_model.get("attributes") or [])
+        if isinstance(item, dict) and str(item.get("name") or "").strip()
+    }
+    graph_rows: list[dict] = []
+    seen_rows: set[tuple[str, str, str, str]] = set()
+
+    for item in mapping_decisions:
+        target_name = str(item.get("target") or "").strip()
+        if not target_name:
+            continue
+        attribute = attributes_by_name.get(target_name) or {}
+        concept_label = f"{target_name} [{str(attribute.get('group') or _workspace_modelling_group_label(target_name)).strip() or 'General'}]"
+        source_label = _workspace_modelling_graph_source_label(item)
+        resolution_label = _workspace_modelling_resolution_label(item.get("resolution_type"))
+        row_key = (source_label, concept_label, target_name, resolution_label)
+        if row_key in seen_rows:
+            continue
+        seen_rows.add(row_key)
+        graph_rows.append(
+            {
+                "source": source_label,
+                "concept": concept_label,
+                "target": target_name,
+                "decision_type": resolution_label,
+            }
+        )
+
+    mapped_targets = {str(item.get("target") or "").strip() for item in mapping_decisions if str(item.get("target") or "").strip()}
+    for attribute_name, attribute in attributes_by_name.items():
+        if attribute_name in mapped_targets:
+            continue
+        concept_label = f"{attribute_name} [{str(attribute.get('group') or _workspace_modelling_group_label(attribute_name)).strip() or 'General'}]"
+        row_key = ("Modeled only", concept_label, attribute_name, "Modeled only")
+        if row_key in seen_rows:
+            continue
+        seen_rows.add(row_key)
+        graph_rows.append(
+            {
+                "source": "Modeled only",
+                "concept": concept_label,
+                "target": attribute_name,
+                "decision_type": "Modeled only",
+            }
+        )
+
+    displayed_rows = graph_rows[:max_edges]
+    source_nodes: dict[str, str] = {}
+    concept_nodes: dict[str, str] = {}
+    target_nodes: dict[str, str] = {}
+    mermaid_lines = ["flowchart LR", "    subgraph Source", "    direction TB"]
+
+    def _node_id(prefix: str, index: int) -> str:
+        return f"{prefix}_{index}"
+
+    for row in displayed_rows:
+        if row["source"] not in source_nodes:
+            source_nodes[row["source"]] = _node_id("src", len(source_nodes))
+    for label, node_id in source_nodes.items():
+        mermaid_lines.append(f'        {node_id}["{label}"]')
+    mermaid_lines.extend(["    end", "    subgraph Concept", "    direction TB"])
+
+    for row in displayed_rows:
+        if row["concept"] not in concept_nodes:
+            concept_nodes[row["concept"]] = _node_id("concept", len(concept_nodes))
+    for label, node_id in concept_nodes.items():
+        mermaid_lines.append(f'        {node_id}["{label}"]')
+    mermaid_lines.extend(["    end", "    subgraph Target", "    direction TB"])
+
+    for row in displayed_rows:
+        if row["target"] not in target_nodes:
+            target_nodes[row["target"]] = _node_id("target", len(target_nodes))
+    for label, node_id in target_nodes.items():
+        mermaid_lines.append(f'        {node_id}["{label}"]')
+    mermaid_lines.append("    end")
+
+    for row in displayed_rows:
+        mermaid_lines.append(
+            f"    {source_nodes[row['source']]} -->|{row['decision_type']}| {concept_nodes[row['concept']]}"
+        )
+        mermaid_lines.append(f"    {concept_nodes[row['concept']]} --> {target_nodes[row['target']]}")
+
+    return {
+        "rows": graph_rows,
+        "displayed_rows": displayed_rows,
+        "mermaid": "\n".join(mermaid_lines),
+        "truncated": len(graph_rows) > len(displayed_rows),
+        "total_edges": len(graph_rows),
+        "displayed_edges": len(displayed_rows),
+    }
+
+
+def _workspace_modelling_list_text(value: object) -> list[str]:
+    if isinstance(value, str):
+        text = value.strip()
+        return [text] if text else []
+    if isinstance(value, (list, tuple, set)):
+        items: list[str] = []
+        for entry in value:
+            text = str(entry or "").strip()
+            if text:
+                items.append(text)
+        return items
+    return []
+
+
+def _workspace_modelling_decision_rationale(mapping_decision: dict) -> str:
+    for key in ("explanation", "reasoning"):
+        values = _workspace_modelling_list_text(mapping_decision.get(key))
+        if values:
+            return values[0]
+    for key in ("reason", "notes"):
+        text = str(mapping_decision.get(key) or "").strip()
+        if text:
+            return text
+
+    resolution_type = str(mapping_decision.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+    payload = mapping_decision.get("resolution_payload") if isinstance(mapping_decision.get("resolution_payload"), dict) else {}
+    if resolution_type == "fixed_value":
+        value = str(payload.get("value") or payload.get("fixed_value") or payload.get("literal") or "").strip()
+        if value:
+            return f"Uses fixed value `{value}`."
+    if resolution_type == "derived_value":
+        expression = str(
+            payload.get("expression") or payload.get("formula") or payload.get("derivation_rule") or payload.get("description") or ""
+        ).strip()
+        if expression:
+            return f"Derived using `{expression}`."
+    if resolution_type == "target_managed":
+        return "Value is expected to be managed by the target system."
+    if resolution_type == "out_of_scope":
+        return "Attribute is intentionally excluded from generated output."
+    return ""
+
+
+def _workspace_modelling_key_decision_lines(mapping_decisions: list[dict], *, active_mapping_rows: list[dict] | None = None, max_items: int = 8) -> list[str]:
+    def _priority(item: dict) -> tuple[int, int]:
+        status = str(item.get("status") or "needs_review").strip().lower() or "needs_review"
+        resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+        significant = int(status != "accepted" or resolution_type != "direct_mapping")
+        resolution_weight = 0 if resolution_type in {"fixed_value", "derived_value", "out_of_scope", "target_managed"} else 1
+        status_weight = 0 if status != "accepted" else 1
+        return (significant, -(2 - status_weight + (1 - min(resolution_weight, 1))))
+
+    active_rows = active_mapping_rows or []
+    active_lookup = {
+        (str(item.get("source") or "").strip(), str(item.get("target") or "").strip()): item
+        for item in active_rows
+        if str(item.get("source") or "").strip() and str(item.get("target") or "").strip()
+    }
+
+    ordered = sorted(mapping_decisions, key=_priority, reverse=True)
+    selected = ordered[:max_items]
+    lines: list[str] = []
+    for item in selected:
+        source_name = _workspace_modelling_graph_source_label(item)
+        target_name = str(item.get("target") or "unassigned").strip() or "unassigned"
+        status = str(item.get("status") or "needs_review").strip().lower() or "needs_review"
+        decision_type = _workspace_modelling_resolution_label(item.get("resolution_type"))
+        rationale = _workspace_modelling_decision_rationale(item)
+        line = f"- `{source_name} -> {target_name}` ({status}; {decision_type})"
+        if rationale:
+            line += f": {rationale}"
+        active_row = active_lookup.get((source_name, target_name))
+        signal_summary = _workspace_modelling_signal_summary_text(active_row.get("signals") if isinstance(active_row, dict) else {}) if active_row else ""
+        if signal_summary:
+            line += f" [{signal_summary}]"
+        lines.append(line)
+    return lines
+
+
+def _workspace_modelling_next_steps(overview_summary: dict, drift_summary: dict) -> list[str]:
+    steps: list[str] = []
+    review_summary = overview_summary.get("review_summary") or {}
+    transformation_status = overview_summary.get("transformation_status") or {}
+    status_counts = review_summary.get("status_counts") or {}
+    coverage_counts = review_summary.get("coverage_counts") or {}
+    if int(status_counts.get("needs_review") or 0):
+        steps.append("Return to Decisions to close the remaining open review items.")
+    if int(status_counts.get("rejected") or 0):
+        steps.append("Resolve rejected decisions before treating the workspace result as a stable handoff artifact.")
+    if drift_summary.get("required_unresolved") or int(coverage_counts.get("modeled_only") or 0):
+        steps.append("Refine the concept model and/or decisions so all required attributes are represented by a closed mapping outcome.")
+    if str(transformation_status.get("state") or "") != "ready":
+        steps.append("Return to Output and complete the transformation contract so preview/code generation can rely on a governed result.")
+    if not steps:
+        steps.append("Workspace result is coherent; the next step is export, handoff, or governance review.")
+    return steps
+
+
+def _workspace_modelling_conclusion(overview_summary: dict, drift_summary: dict) -> str:
+    review_summary = overview_summary.get("review_summary") or {}
+    status_counts = review_summary.get("status_counts") or {}
+    transformation_status = overview_summary.get("transformation_status") or {}
+    if (
+        not int(status_counts.get("needs_review") or 0)
+        and not int(status_counts.get("rejected") or 0)
+        and str(transformation_status.get("state") or "") == "ready"
+        and str(drift_summary.get("status") or "") == "in_sync"
+    ):
+        return "The workspace result is coherent across context, decisions, concept coverage, and output contract readiness."
+    if int(status_counts.get("needs_review") or 0) or int(status_counts.get("rejected") or 0):
+        return "The workspace result is materially defined, but decision closure is still incomplete."
+    if str(transformation_status.get("state") or "") != "ready":
+        return "The analytical result is present, but the output contract is not ready yet."
+    return "The workspace result is useful as a review artifact, but it still has alignment gaps before it becomes a closed handoff."
+
+
+def _workspace_modelling_signal_breakdown_text(signals: object) -> str:
+    signal_values = signals if isinstance(signals, dict) else {}
+    ordered_keys = [
+        ("name", "name"),
+        ("semantic", "semantic"),
+        ("knowledge", "knowledge"),
+        ("canonical", "canonical"),
+        ("pattern", "pattern"),
+        ("statistical", "stat"),
+        ("overlap", "overlap"),
+        ("embedding", "embedding"),
+        ("correction", "correction"),
+        ("llm", "llm"),
+    ]
+    parts: list[str] = []
+    for source_key, label in ordered_keys:
+        try:
+            value = float(signal_values.get(source_key) or 0.0)
+        except (TypeError, ValueError):
+            value = 0.0
+        parts.append(f"{label}={value:.2f}")
+    return "Signal breakdown: " + ", ".join(parts) + "."
+
+
+def _workspace_modelling_signal_summary_text(signals: object, *, max_parts: int = 3) -> str:
+    signal_values = signals if isinstance(signals, dict) else {}
+    numeric_values: list[tuple[str, float]] = []
+    for key, label in [
+        ("canonical", "canonical"),
+        ("semantic", "semantic"),
+        ("pattern", "pattern"),
+        ("name", "name"),
+        ("knowledge", "knowledge"),
+        ("statistical", "stat"),
+        ("overlap", "overlap"),
+        ("embedding", "embedding"),
+        ("correction", "correction"),
+        ("llm", "llm"),
+    ]:
+        try:
+            value = float(signal_values.get(key) or 0.0)
+        except (TypeError, ValueError):
+            value = 0.0
+        numeric_values.append((label, value))
+    top_signals = [f"{label}={value:.2f}" for label, value in sorted(numeric_values, key=lambda item: item[1], reverse=True)[:max_parts] if value > 0.0]
+    return "signals: " + ", ".join(top_signals) if top_signals else ""
+
+
+def _workspace_modelling_canonical_path_text(mapping_row: dict) -> str:
+    canonical_path = str(mapping_row.get("canonical_path") or "").strip()
+    if canonical_path:
+        return canonical_path
+    canonical_details = mapping_row.get("canonical_details") if isinstance(mapping_row.get("canonical_details"), dict) else {}
+    shared_concepts = canonical_details.get("shared_concepts") or []
+    if shared_concepts:
+        labels = [str((item or {}).get("display_name") or "").strip() for item in shared_concepts if str((item or {}).get("display_name") or "").strip()]
+        if labels:
+            source_name = str(mapping_row.get("source") or "").strip() or "source"
+            target_name = str(mapping_row.get("target") or "").strip() or "target"
+            return f"{source_name} -> {', '.join(labels)} -> {target_name}"
+    return ""
+
+
+def _workspace_modelling_review_conclusion_text(mapping_row: dict) -> str:
+    explanation_lines = _workspace_modelling_list_text(mapping_row.get("explanation"))
+    if explanation_lines:
+        return " | ".join(explanation_lines)
+    rationale = _workspace_modelling_decision_rationale(mapping_row)
+    return rationale
+
+
+def _workspace_modelling_active_mapping_rows(mapping_response: dict | None, session_state: dict) -> list[dict]:
+    current_response = mapping_response or {}
+    selected_rows = [item for item in (current_response.get("selected_mapping") or []) if isinstance(item, dict)]
+    if selected_rows:
+        return selected_rows
+
+    mappings = [item for item in (current_response.get("mappings") or []) if isinstance(item, dict)]
+    ranked_mappings = [item for item in (current_response.get("ranked_mappings") or []) if isinstance(item, dict)]
+    if not ranked_mappings:
+        return mappings
+
+    try:
+        from streamlit_ui.mapping_helpers import suggested_mapping_by_source
+
+        selected_by_source = suggested_mapping_by_source(current_response)
+    except Exception:
+        selected_by_source = {
+            str(item.get("source") or "").strip(): item
+            for item in mappings
+            if str(item.get("source") or "").strip()
+        }
+
+    editor_state = session_state.get("mapping_editor_state") or {}
+    active_rows: list[dict] = []
+    for ranked in ranked_mappings:
+        source_name = str(ranked.get("source") or "").strip()
+        if not source_name:
+            continue
+        selected_row = selected_by_source.get(source_name) or {}
+        current_entry = editor_state.get(source_name) if isinstance(editor_state, dict) else {}
+        if not isinstance(current_entry, dict):
+            current_entry = {}
+        fallback_selected = (ranked.get("selected") or {}) if isinstance(ranked.get("selected"), dict) else {}
+        current_target = str(
+            current_entry.get("target")
+            or selected_row.get("target")
+            or fallback_selected.get("target")
+            or ""
+        ).strip()
+        if not current_target:
+            continue
+        selected_candidate = next(
+            (
+                candidate
+                for candidate in (ranked.get("candidates") or [])
+                if isinstance(candidate, dict) and str(candidate.get("target") or "").strip() == current_target
+            ),
+            None,
+        )
+        base_row = (
+            selected_candidate
+            or (selected_row if str(selected_row.get("target") or "").strip() == current_target else {})
+            or (fallback_selected if str(fallback_selected.get("target") or "").strip() == current_target else {})
+            or selected_row
+            or fallback_selected
+        )
+        merged_row = dict(base_row)
+        merged_row["source"] = source_name
+        merged_row["target"] = current_target
+        merged_row["status"] = str(
+            current_entry.get("status")
+            or merged_row.get("status")
+            or selected_row.get("status")
+            or fallback_selected.get("status")
+            or "needs_review"
+        ).strip() or "needs_review"
+        if current_entry.get("resolution_type") and not merged_row.get("resolution_type"):
+            merged_row["resolution_type"] = current_entry.get("resolution_type")
+        if current_entry.get("resolution_payload") and not merged_row.get("resolution_payload"):
+            merged_row["resolution_payload"] = current_entry.get("resolution_payload")
+        if current_entry.get("manual_transformation_code") and not merged_row.get("transformation_code"):
+            merged_row["transformation_code"] = current_entry.get("manual_transformation_code")
+        active_rows.append(merged_row)
+    return active_rows or mappings
+
+
+def _workspace_modelling_review_evidence_sort_key(item: dict) -> tuple[int, int, float, str]:
+    status = str(item.get("status") or "needs_review").strip().lower() or "needs_review"
+    resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+    unresolved = int(status != "accepted")
+    direct = int(resolution_type == "direct_mapping")
+    confidence = float(item.get("confidence") or 0.0)
+    canonical = 0 if _workspace_modelling_canonical_path_text(item) else 1
+    return (unresolved, canonical, -confidence, str(item.get("source") or ""))
+
+
+def _workspace_modelling_review_evidence_rows(mapping_response: dict | None, session_state: dict, *, max_items: int = 5) -> list[dict]:
+    rows = _workspace_modelling_active_mapping_rows(mapping_response, session_state)
+    ranked = sorted(rows, key=_workspace_modelling_review_evidence_sort_key)
+    evidence_rows: list[dict] = []
+    for item in ranked:
+        evidence_rows.append(
+            {
+                "source": str(item.get("source") or "").strip(),
+                "target": str(item.get("target") or "").strip(),
+                "canonical_path": _workspace_modelling_canonical_path_text(item),
+                "signal_breakdown": _workspace_modelling_signal_breakdown_text(item.get("signals")),
+                "review_conclusion": _workspace_modelling_review_conclusion_text(item),
+                "status": str(item.get("status") or "needs_review").strip().lower() or "needs_review",
+                "confidence": float(item.get("confidence") or 0.0),
+                "has_canonical": bool(_workspace_modelling_canonical_path_text(item)),
+            }
+        )
+        if len(evidence_rows) >= max_items:
+            break
+    return evidence_rows
+
+
+def _workspace_modelling_review_evidence_metrics(mapping_response: dict | None, session_state: dict) -> list[str]:
+    rows = _workspace_modelling_active_mapping_rows(mapping_response, session_state)
+    total = len(rows)
+    canonical_count = sum(1 for item in rows if bool(_workspace_modelling_canonical_path_text(item)))
+    accepted_count = sum(1 for item in rows if str(item.get("status") or "").strip().lower() == "accepted")
+    unresolved_count = sum(1 for item in rows if str(item.get("status") or "").strip().lower() != "accepted")
+    high_confidence = sum(1 for item in rows if float(item.get("confidence") or 0.0) >= 0.85)
+    low_confidence = sum(1 for item in rows if float(item.get("confidence") or 0.0) < 0.85)
+    metrics: list[str] = []
+    metrics.append(f"Evidence rows: {total}")
+    metrics.append(f"Canonical path coverage: {canonical_count} / {total}")
+    metrics.append(f"Accepted decisions: {accepted_count}")
+    if unresolved_count:
+        metrics.append(f"Open review items: {unresolved_count}")
+    if total:
+        metrics.append(f"Confidence profile: {high_confidence} high, {low_confidence} low")
+    return metrics
+
+
+def _workspace_modelling_graph_evidence_rows(
+    mapping_response: dict | None,
+    session_state: dict,
+    graph_summary: dict,
+    *,
+    max_items: int = 18,
+) -> list[dict]:
+    selected_rows = _workspace_modelling_active_mapping_rows(mapping_response, session_state)
+    if not selected_rows:
+        return []
+
+    row_lookup: dict[tuple[str, str], dict] = {}
+    for row in selected_rows:
+        source_name = _workspace_modelling_graph_source_label(row)
+        target_name = str(row.get("target") or "").strip()
+        if not target_name:
+            continue
+        row_lookup[(source_name, target_name)] = row
+
+    evidence_rows: list[dict] = []
+    for graph_row in (graph_summary.get("displayed_rows") or [])[:max_items]:
+        source_name = str((graph_row or {}).get("source") or "").strip()
+        target_name = str((graph_row or {}).get("target") or "").strip()
+        mapping_row = row_lookup.get((source_name, target_name))
+        if not mapping_row:
+            continue
+        evidence_rows.append(
+            {
+                "source": source_name,
+                "target": target_name,
+                "canonical_path": _workspace_modelling_canonical_path_text(mapping_row),
+                "signal_breakdown": _workspace_modelling_signal_breakdown_text(mapping_row.get("signals")),
+                "review_conclusion": _workspace_modelling_review_conclusion_text(mapping_row),
+                "decision_type": _workspace_modelling_resolution_label(mapping_row.get("resolution_type")),
+            }
+        )
+    return evidence_rows
+
+
+def _workspace_modelling_business_intent_lines(
+    concept_model: dict,
+    session_state: dict,
+    *,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+) -> list[str]:
+    lines: list[str] = []
+    description = str(concept_model.get("description") or "").strip()
+    if description:
+        lines.append(f"Object description: {description}")
+    business_purpose = str(concept_model.get("business_purpose") or "").strip()
+    if business_purpose:
+        lines.append(f"Business purpose: {business_purpose}")
+    target_context_message = _workspace_target_context_message(upload_response, mapping_response)
+    if target_context_message:
+        lines.append(target_context_message)
+    for label, key in (
+        ("Target grain assumption", "workspace_transformation_target_grain"),
+        ("Default handling", "workspace_transformation_defaults"),
+        ("Global rule context", "workspace_transformation_global_rules"),
+        ("Examples / edge cases", "workspace_transformation_examples"),
+    ):
+        text = str(session_state.get(key) or "").strip()
+        if text:
+            lines.append(f"{label}: {text}")
+    return lines
+
+
+def _workspace_modelling_decision_override_lines(session_state: dict) -> list[str]:
+    audit_map = session_state.get("mapping_decision_audit") or {}
+    if not isinstance(audit_map, dict):
+        return []
+    lines: list[str] = []
+    for source, metadata in audit_map.items():
+        current = metadata if isinstance(metadata, dict) else {}
+        origin = str(current.get("origin") or "manual_or_imported").strip() or "manual_or_imported"
+        details = current.get("details") if isinstance(current.get("details"), dict) else {}
+        detail_parts: list[str] = []
+        for key in ("mode", "target", "status", "resolution_type", "proposal_origin"):
+            text = str(details.get(key) or "").strip()
+            if text:
+                detail_parts.append(f"{key}={text}")
+        confidence = details.get("confidence")
+        if confidence not in (None, ""):
+            try:
+                detail_parts.append(f"confidence={float(confidence):.2f}")
+            except (TypeError, ValueError):
+                pass
+        payload = details.get("resolution_payload") if isinstance(details.get("resolution_payload"), dict) else {}
+        if payload:
+            detail_parts.append("payload=" + ", ".join(f"{key}={value}" for key, value in payload.items()))
+        lines.append(f"{source}: origin={origin}" + (f"; {'; '.join(detail_parts)}" if detail_parts else ""))
+    return lines
+
+
+def _workspace_modelling_transformation_rationale_lines(session_state: dict, mapping_decisions: list[dict], codegen_response: dict | None) -> list[str]:
+    lines: list[str] = []
+    editor_state = session_state.get("mapping_editor_state") or {}
+    decision_target_map: dict[str, str] = {}
+    for decision in mapping_decisions:
+        if not isinstance(decision, dict):
+            continue
+        source_name = str(decision.get("source") or "").strip()
+        target_name = str(decision.get("target") or "").strip()
+        if source_name and target_name:
+            decision_target_map[source_name] = target_name
+    if isinstance(editor_state, dict):
+        for source, entry in editor_state.items():
+            current = entry if isinstance(entry, dict) else {}
+            target = str(current.get("target") or decision_target_map.get(str(source).strip()) or "").strip()
+            if not target:
+                continue
+            detail_parts: list[str] = []
+            transform_rule = str(session_state.get(f"workspace_transformation_rule::{target}") or "").strip()
+            if transform_rule:
+                detail_parts.append(f"rule={transform_rule}")
+            llm_instruction = str(current.get("llm_transformation_instruction") or "").strip()
+            if llm_instruction:
+                detail_parts.append(f"instruction={llm_instruction}")
+            manual_code = str(current.get("manual_transformation_code") or "").strip()
+            if manual_code:
+                detail_parts.append("custom transformation present")
+            reasoning = [str(item).strip() for item in (current.get("generated_transformation_reasoning") or []) if str(item).strip()]
+            if reasoning:
+                detail_parts.append("reasoning=" + " | ".join(reasoning))
+            if detail_parts:
+                lines.append(f"{source} -> {target}: " + "; ".join(detail_parts))
+    codegen_reasoning = [str(item).strip() for item in ((codegen_response or {}).get("reasoning") or []) if str(item).strip()]
+    if codegen_reasoning:
+        lines.append("Generated artifact reasoning: " + " | ".join(codegen_reasoning))
+    return lines
+
+
+def _workspace_modelling_analyst_notes_lines(session_state: dict, hints: list[str]) -> list[str]:
+    lines: list[str] = []
+    for label, key in (
+        ("Version note", "mapping_set_note"),
+        ("Review note", "mapping_set_review_note"),
+        ("Owner", "mapping_set_owner"),
+        ("Assignee", "mapping_set_assignee"),
+    ):
+        text = str(session_state.get(key) or "").strip()
+        if text:
+            lines.append(f"{label}: {text}")
+    last_action = session_state.get("last_action") if isinstance(session_state.get("last_action"), dict) else {}
+    last_message = str(last_action.get("message") or "").strip()
+    if last_message:
+        lines.append(f"Latest workspace note: {last_message}")
+    if hints:
+        lines.append("Current modelling notes: " + " | ".join(hints[:5]))
+    return lines
+
+
+def _workspace_modelling_governance_readiness_lines(session_state: dict, overview_summary: dict, drift_summary: dict) -> list[str]:
+    lines: list[str] = []
+    selected_status = str(session_state.get("selected_saved_mapping_set_status") or "").strip()
+    if selected_status:
+        lines.append(f"Current mapping-set status shortcut: {selected_status}")
+    review_summary = overview_summary.get("review_summary") or {}
+    transformation_status = overview_summary.get("transformation_status") or {}
+    status_counts = review_summary.get("status_counts") or {}
+    if int(status_counts.get("needs_review") or 0) or int(status_counts.get("rejected") or 0):
+        lines.append("Decision closure is not complete, so the result is not ready for final approval.")
+    else:
+        lines.append("Decision closure is complete for the current active mapping set.")
+    if str(transformation_status.get("state") or "") == "ready":
+        lines.append("Output contract is ready for governed handoff.")
+    else:
+        lines.append("Output contract is still open and should be completed before governance approval.")
+    if str(drift_summary.get("status") or "") != "in_sync":
+        lines.append("Concept drift is still present between the model and operational decisions.")
+    else:
+        lines.append("Concept model is aligned with the current operational decision state.")
+    lines.append("Primary approval path remains Governance > Stewardship.")
+    return lines
+
+
+def _workspace_modelling_report_mapping_rows(mapping_response: dict | None, session_state: dict) -> list[dict]:
+    try:
+        from streamlit_ui.workspace_review_views import _selected_mapping_display_rows
+
+        base_rows = _selected_mapping_display_rows(
+            _workspace_modelling_active_mapping_rows(mapping_response, session_state),
+            session_state.get("mapping_editor_state") or {},
+            pending_proposals=session_state.get("llm_decision_proposals") or [],
+        )
+    except Exception:
+        base_rows = []
+
+    report_rows: list[dict] = []
+    for row in base_rows:
+        target_name = str(row.get("target") or "").strip()
+        entry = (session_state.get("mapping_editor_state") or {}).get(str(row.get("source") or "").strip()) or {}
+        decision_type = _workspace_modelling_resolution_label(entry.get("resolution_type"))
+        transformation_rule = str(session_state.get(f"workspace_transformation_rule::{target_name}") or "").strip()
+        report_rows.append(
+            {
+                "source": str(row.get("source") or "").strip(),
+                "target": target_name,
+                "confidence": str(row.get("original_confidence") or ""),
+                "llm": str(row.get("llm_proposal_confidence") or ""),
+                "status": str(entry.get("status") or row.get("status") or "").strip(),
+                "validator": str(row.get("validator") or "").strip(),
+                "canonical_status": str(row.get("canonical_status") or "").strip(),
+                "shared_concepts": str(row.get("shared_concepts") or "").strip(),
+                "source_concepts": str(row.get("source_concepts") or "").strip(),
+                "target_concepts": str(row.get("target_concepts") or "").strip(),
+                "canonical_path": str(row.get("canonical_path") or "").strip(),
+                "decision_type": decision_type,
+                "transformation_rule": transformation_rule,
+                "llm_consulted": str(row.get("llm_consulted") or "").strip(),
+            }
+        )
+    return report_rows
+
+
+def _workspace_modelling_report_table_cell(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return "-"
+    return text.replace("|", "/").replace("\n", " ")
+
+
+def _workspace_modelling_markdown_table(rows: list[dict], columns: list[tuple[str, str]]) -> str:
+    if not rows:
+        return ""
+    header = "| " + " | ".join(label for _key, label in columns) + " |"
+    separator = "| " + " | ".join("---" for _key, _label in columns) + " |"
+    lines = [header, separator]
+    for row in rows:
+        values = [_workspace_modelling_report_table_cell(row.get(key)) for key, _label in columns]
+        lines.append("| " + " | ".join(values) + " |")
+    return "\n".join(lines)
+
+
+def _workspace_modelling_default_code_block(mapping_decisions: list[dict], session_state: dict, *, mode: str = "dbt") -> tuple[str, str, str]:
+    normalized_mode = str(mode or "dbt").strip().lower() or "dbt"
+    target_fields = _workspace_transformation_target_fields(mapping_decisions)
+    if not target_fields:
+        target_fields = [
+            str(item).strip()
+            for item in _workspace_modelling_parse_lines(session_state.get("workspace_modelling_required_attributes"))
+            if str(item).strip()
+        ]
+    if normalized_mode == "pyspark":
+        lines = [
+            "# Suggested starter only. Generate Output to replace this with governed code.",
+            "from pyspark.sql import functions as F",
+            "",
+            "result_df = source_df.select(",
+        ]
+        for field in target_fields or ["target_field"]:
+            lines.append(f"    F.lit(None).alias(\"{field}\"),")
+        lines.append(")")
+        return ("pyspark", "python", "\n".join(lines))
+    if normalized_mode == "pandas":
+        lines = [
+            "# Suggested starter only. Generate Output to replace this with governed code.",
+            "result_df = source_df.assign(",
+        ]
+        for field in target_fields or ["target_field"]:
+            lines.append(f"    {field}=None,")
+        lines.append(")")
+        return ("pandas", "python", "\n".join(lines))
+    select_lines = ["-- Suggested starter only. Generate Output to replace this with governed dbt SQL.", "select"]
+    if target_fields:
+        for index, field in enumerate(target_fields):
+            suffix = "," if index < len(target_fields) - 1 else ""
+            select_lines.append(f"    cast(null as string) as {field}{suffix}")
+    else:
+        select_lines.append("    cast(null as string) as target_field")
+    return ("dbt", "sql", "\n".join(select_lines))
+
+
+def _workspace_build_mapping_report_markdown(
+    concept_model: dict,
+    mapping_decisions: list[dict],
+    session_state: dict,
+    *,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    codegen_response: dict | None = None,
+    workspace_scope: dict | None = None,
+) -> str:
+    drift_summary = _workspace_concept_model_drift_summary(concept_model, mapping_decisions)
+    overview_summary = _workspace_modelling_overview_summary(
+        concept_model,
+        mapping_decisions,
+        session_state,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        drift_summary=drift_summary,
+        workspace_scope=workspace_scope,
+    )
+    graph_summary = _workspace_modelling_graph_summary(concept_model, mapping_decisions)
+    hints = _workspace_modelling_hints(concept_model, drift_summary)
+    pending_hints = [str(item).strip() for item in (session_state.get("workspace_modelling_pending_hints") or []) if str(item).strip()]
+    review_summary = overview_summary["review_summary"]
+    target_context = _workspace_target_context(upload_response, mapping_response) or {}
+    source_snapshot = (upload_response or {}).get("source") if isinstance((upload_response or {}).get("source"), dict) else {}
+    scope_caption = overview_summary.get("scope_caption") or "No explicit workspace scope yet."
+    graph_note = ""
+    if graph_summary["truncated"]:
+        graph_note = f"Showing {graph_summary['displayed_edges']} of {graph_summary['total_edges']} paths in the graph to keep the report readable."
+
+    required_attributes = [
+        str(item.get("name") or "").strip()
+        for item in (concept_model.get("attributes") or [])
+        if isinstance(item, dict) and item.get("required") and str(item.get("name") or "").strip()
+    ]
+    concept_group_lines = [
+        f"- {group}: {count}"
+        for group, count in (review_summary.get("concept_group_counts") or {}).items()
+    ] or ["- No concept groups are currently inferred."]
+    business_rules = [str(item).strip() for item in (concept_model.get("business_rules") or []) if str(item).strip()]
+    business_rule_lines = [f"- {rule}" for rule in business_rules] or ["- No explicit business rules captured yet."]
+    active_mapping_rows = _workspace_modelling_active_mapping_rows(mapping_response, session_state)
+    key_decision_lines = _workspace_modelling_key_decision_lines(mapping_decisions, active_mapping_rows=active_mapping_rows)
+    if len(mapping_decisions) > len(key_decision_lines):
+        key_decision_lines.append(f"- Additional decision rows not shown in this report summary: {len(mapping_decisions) - len(key_decision_lines)}")
+
+    top_finding_lines = [f"- {item}" for item in (overview_summary.get("top_findings") or [])] or ["- No blocking findings are currently open."]
+    next_step_lines = [f"- {item}" for item in _workspace_modelling_next_steps(overview_summary, drift_summary)]
+    connected_result_lines = [
+        f"- {item['signal']} ({item['status']}): {item['result']}"
+        for item in (overview_summary.get("connected_results") or [])
+    ]
+    review_evidence_rows = _workspace_modelling_review_evidence_rows(mapping_response, session_state)
+    review_evidence_metrics = _workspace_modelling_review_evidence_metrics(mapping_response, session_state)
+    review_evidence_lines: list[str] = []
+    for row in review_evidence_rows:
+        review_evidence_lines.extend(
+            [
+                f"### {row['source']} -> {row['target']}",
+                f"- Canonical path: {row['canonical_path'] or 'No shared canonical path.'}",
+                f"- {row['signal_breakdown']}",
+                f"- Review conclusion: {row['review_conclusion'] or 'No detailed review explanation is currently available.'}",
+                "",
+            ]
+        )
+    mapping_report_rows = _workspace_modelling_report_mapping_rows(mapping_response, session_state)
+    mapping_report_table = _workspace_modelling_markdown_table(
+        mapping_report_rows,
+        [
+            ("source", "Source"),
+            ("target", "Target"),
+            ("confidence", "Confidence"),
+            ("llm", "LLM"),
+            ("status", "Status"),
+            ("validator", "Validator"),
+            ("canonical_status", "Canonical status"),
+            ("shared_concepts", "Shared concepts"),
+            ("source_concepts", "Source concepts"),
+            ("target_concepts", "Target concepts"),
+            ("canonical_path", "Canonical path"),
+            ("decision_type", "Decision type"),
+            ("transformation_rule", "Transformation rule"),
+            ("llm_consulted", "LLM consulted"),
+        ],
+    )
+    transformation_spec = _workspace_build_transformation_spec(mapping_decisions, session_state)
+    transformation_rows = [
+        {
+            "target_field": str((item or {}).get("target_field") or "").strip(),
+            "rule": str((item or {}).get("rule") or "").strip(),
+        }
+        for item in (transformation_spec.get("field_rules") or [])
+        if str((item or {}).get("target_field") or "").strip() or str((item or {}).get("rule") or "").strip()
+    ]
+    transformation_table = _workspace_modelling_markdown_table(
+        transformation_rows,
+        [("target_field", "Target field"), ("rule", "Transformation rule")],
+    )
+    business_intent_lines = _workspace_modelling_business_intent_lines(
+        concept_model,
+        session_state,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+    )
+    decision_override_lines = _workspace_modelling_decision_override_lines(session_state)
+    transformation_rationale_lines = _workspace_modelling_transformation_rationale_lines(session_state, mapping_decisions, codegen_response)
+    analyst_note_lines = _workspace_modelling_analyst_notes_lines(session_state, hints)
+    governance_readiness_lines = _workspace_modelling_governance_readiness_lines(session_state, overview_summary, drift_summary)
+    graph_evidence_rows = _workspace_modelling_graph_evidence_rows(mapping_response, session_state, graph_summary)
+    graph_evidence_lines: list[str] = []
+    for row in graph_evidence_rows:
+        graph_evidence_lines.extend(
+            [
+                f"### {row['source']} -> {row['target']}",
+                f"- Decision type: {row['decision_type']}",
+                f"- Canonical path: {row['canonical_path'] or 'No shared canonical path.'}",
+                f"- {row['signal_breakdown']}",
+                f"- Review reasoning: {row['review_conclusion'] or 'No detailed review explanation is currently available.'}",
+                "",
+            ]
+        )
+    generated_code = str((codegen_response or {}).get("code") or "").strip()
+    generated_language = str((codegen_response or {}).get("language") or "").strip()
+    if generated_code:
+        code_mode = "dbt" if generated_language == "sql-dbt" else "pyspark" if generated_language == "python-pyspark" else "pandas"
+        code_language = _workspace_generated_artifact_code_language(generated_language)
+        code_title = _workspace_generated_artifact_header(generated_language)
+        code_block = generated_code
+    else:
+        code_mode, code_language, code_block = _workspace_modelling_default_code_block(mapping_decisions, session_state, mode="dbt")
+        code_title = f"Suggested {_workspace_codegen_format_label(code_mode)}"
+
+    report_sections = [
+        "# BA Mapping Report",
+        "",
+        "## Executive Summary",
+        _workspace_modelling_conclusion(overview_summary, drift_summary),
+        "",
+        f"- Target object: {concept_model.get('object_name') or 'n/a'}",
+        f"- Target context: {overview_summary.get('target_context_message') or 'Not established yet.'}",
+        f"- Active decisions: {review_summary.get('active_decisions')}",
+        (
+            f"- Coverage: mapped={review_summary['coverage_counts']['mapped']}, "
+            f"unresolved={review_summary['coverage_counts']['unresolved']}, "
+            f"modeled_only={review_summary['coverage_counts']['modeled_only']}, "
+            f"excluded={review_summary['coverage_counts']['excluded']}, "
+            f"target_managed={review_summary['coverage_counts']['target_managed']}"
+        ),
+        f"- Output contract: {str((overview_summary.get('transformation_status') or {}).get('message') or 'No output contract summary available.')}",
+        "",
+        "## Starting Point and Scope",
+        f"- Workspace scope: {scope_caption}",
+        f"- Mapping mode: {str(target_context.get('mapping_mode') or 'unknown')}",
+        f"- Projection: {str(target_context.get('projection_label') or 'n/a')}",
+        f"- Source dataset snapshot: {'loaded' if str(source_snapshot.get('dataset_id') or '').strip() else 'not loaded'}",
+        "",
+        "## Source and Target Landscape",
+        f"- Source artifact: {str(source_snapshot.get('dataset_name') or source_snapshot.get('file_name') or source_snapshot.get('filename') or 'Current workspace source snapshot')}",
+        f"- Target object: {concept_model.get('object_name') or 'n/a'}",
+        f"- Target grain: {concept_model.get('target_grain') or 'Not defined yet.'}",
+        f"- Target profile: {str(target_context.get('target_profile') or target_context.get('target_dataset_name') or 'n/a')}",
+        "",
+        "## Business Intent and Assumptions",
+        *([f"- {line}" for line in business_intent_lines] or ["- No additional business intent or assumption notes are currently captured."]),
+        "",
+        "## Mapping Outcome Summary",
+        f"- Decision closure: accepted={review_summary['status_counts']['accepted']}, needs_review={review_summary['status_counts']['needs_review']}, rejected={review_summary['status_counts']['rejected']}",
+        (
+            f"- Resolution types: direct={review_summary['resolution_counts']['direct_mapping']}, "
+            f"fixed={review_summary['resolution_counts']['fixed_value']}, "
+            f"derived={review_summary['resolution_counts']['derived_value']}, "
+            f"target_managed={review_summary['resolution_counts']['target_managed']}, "
+            f"n/a={review_summary['resolution_counts']['out_of_scope']}"
+        ),
+        *connected_result_lines,
+        "",
+        "## Key Decisions and Rationale",
+        *(key_decision_lines or ["- No active mapping decisions are currently available."]),
+        "",
+        "## Review Evidence Highlights",
+        *([f"- {line}" for line in review_evidence_metrics] or ["- No review evidence summary is currently available."]),
+        *(review_evidence_lines or ["- No review evidence highlights are currently available.", ""]),
+        *( ["", "### Field-level Signals and Review Reasoning", *graph_evidence_lines] if graph_evidence_lines else [] ),
+        "## Selected Mapping and Transformation Summary",
+        *(["- The table below summarizes active selected mappings, decision status, and transformation rule guidance.", ""] if mapping_report_table else []),
+        *( [mapping_report_table, ""] if mapping_report_table else ["- No selected-mapping rows are currently available.", ""] ),
+        "## Decision Rationale Overrides",
+        *([f"- {line}" for line in decision_override_lines] or ["- No explicit decision overrides or audit events are currently recorded."]),
+        "",
+        "## Transformation Rationale By Field",
+        *([f"- {line}" for line in transformation_rationale_lines] or ["- No field-level transformation rationale is currently captured."]),
+        "",
+        "## Implementation Artifact",
+        f"- Preferred code view: {code_mode}",
+        f"- Artifact section: {code_title}",
+        f"```{code_language}",
+        code_block,
+        "```",
+        "",
+        "## Concept Model Result",
+        f"- Business object: {concept_model.get('object_name') or 'n/a'}",
+        f"- Description: {concept_model.get('description') or 'n/a'}",
+        f"- Business purpose: {concept_model.get('business_purpose') or 'n/a'}",
+        f"- Target grain: {concept_model.get('target_grain') or 'Not defined yet.'}",
+        "",
+        "### Concept Groups",
+        *concept_group_lines,
+        "",
+        "### Required Attributes",
+        *([f"- {name}" for name in required_attributes] or ["- No required attributes flagged yet."]),
+        "",
+        "### Business Rules",
+        *business_rule_lines,
+        "",
+        "## Source -> Concept -> Target Graph",
+        graph_note,
+        "```mermaid",
+        graph_summary["mermaid"],
+        "```",
+        "## Output Contract Summary",
+        f"- Contract state: {str((overview_summary.get('transformation_status') or {}).get('state') or 'n/a')}",
+        f"- Contract detail: {str((overview_summary.get('transformation_status') or {}).get('message') or 'No detail available.')}",
+        f"- Transformation carry-over: field_rules={review_summary['transformation_rule_count']}, business_rules={review_summary['business_rule_count']}",
+        f"- Excluded output summary: {overview_summary.get('excluded_output_summary') or 'None.'}",
+        "",
+        "## Open Analyst Notes",
+        *([f"- {line}" for line in analyst_note_lines] or ["- No additional analyst notes are currently captured."]),
+        "",
+        "## Approval and Governance Readiness",
+        *([f"- {line}" for line in governance_readiness_lines] or ["- Governance readiness is not yet available."]),
+        "",
+        "## Risks, Gaps, and Open Questions",
+        *top_finding_lines,
+        *( [f"- Prepared decision hints: {', '.join(pending_hints)}"] if pending_hints else [] ),
+        *( [f"- Additional modelling hints: {', '.join(hints)}"] if hints else [] ),
+        "",
+        "## Recommended Next Steps",
+        *next_step_lines,
+        "",
+    ]
+    return "\n".join(line for line in report_sections if line is not None)
+
+
+def _workspace_modelling_hints(concept_model: dict, drift_summary: dict) -> list[str]:
+    hints: list[str] = []
+    for attribute_name in drift_summary.get("required_unresolved") or []:
+        hints.append(f"Required modeled attribute still has no closed mapping: {attribute_name}.")
+    for attribute_name in drift_summary.get("unmodeled_targets") or []:
+        hints.append(f"Current decision target is not represented in the concept model: {attribute_name}.")
+    for attribute_name in drift_summary.get("resolution_mismatches") or []:
+        hints.append(f"Expected decision type differs from current decision type for: {attribute_name}.")
+    for item in concept_model.get("attributes") or []:
+        if not isinstance(item, dict):
+            continue
+        coverage_status = str(item.get("coverage_status") or "").strip().lower()
+        attribute_name = str(item.get("name") or "").strip()
+        if coverage_status == "target_managed":
+            hints.append(f"Target-managed attribute stays outside generated output: {attribute_name}.")
+        elif coverage_status == "excluded":
+            hints.append(f"N/A attribute stays outside generated output: {attribute_name}.")
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for hint in hints:
+        if hint in seen:
+            continue
+        seen.add(hint)
+        deduped.append(hint)
+    return deduped
+
+
+def _render_workspace_modelling_section(
+    *,
+    session_state: dict,
+    upload_response: dict | None,
+    mapping_response: dict | None,
+    codegen_response: dict | None,
+    mapping_decisions: list[dict],
+) -> None:
+    inferred_targets = _workspace_modelling_inferred_targets(mapping_decisions, session_state)
+    if not inferred_targets:
+        st.info(
+            "Generate or restore mapping state first. Modelling derives the initial concept model from current Workspace decisions and Transformation Design context."
+        )
+        return
+
+    generate_col, refresh_col, apply_col, drift_col = st.columns(4)
+    generated = bool(session_state.get("workspace_concept_model_generated"))
+    if generate_col.button("Generate model from current workspace", key="workspace_modelling_generate", width="stretch"):
+        inferred_model = _workspace_build_inferred_concept_model(mapping_decisions, session_state, upload_response)
+        session_state["workspace_concept_model_inferred"] = inferred_model
+        session_state["workspace_concept_model_generated"] = True
+        session_state["workspace_modelling_show_drift"] = False
+        _workspace_seed_modelling_editor_state(inferred_model, session_state, force=True)
+        st.rerun()
+    if refresh_col.button("Refresh from workspace", key="workspace_modelling_refresh", width="stretch", disabled=not generated):
+        inferred_model = _workspace_build_inferred_concept_model(mapping_decisions, session_state, upload_response)
+        session_state["workspace_concept_model_inferred"] = inferred_model
+        session_state["workspace_concept_model_generated"] = True
+        session_state["workspace_modelling_show_drift"] = True
+        _workspace_seed_modelling_editor_state(inferred_model, session_state, force=False)
+        st.rerun()
+    if drift_col.button("Show drift", key="workspace_modelling_show_drift_button", width="stretch", disabled=not generated):
+        session_state["workspace_modelling_show_drift"] = True
+        st.rerun()
+
+    if not generated:
+        st.caption(
+            "Use Generate model from current workspace to create the first derived conceptual model from active mapping decisions and Transformation Design context."
+        )
+        return
+
+    inferred_model = session_state.get("workspace_concept_model_inferred") or _workspace_build_inferred_concept_model(
+        mapping_decisions,
+        session_state,
+        upload_response,
+    )
+    _workspace_seed_modelling_editor_state(inferred_model, session_state, force=False)
+    concept_model = _workspace_build_concept_model(inferred_model, session_state)
+    drift_summary = _workspace_concept_model_drift_summary(concept_model, mapping_decisions)
+    hints = _workspace_modelling_hints(concept_model, drift_summary)
+    overview_summary = _workspace_modelling_overview_summary(
+        concept_model,
+        mapping_decisions,
+        session_state,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        drift_summary=drift_summary,
+    )
+    report_markdown = _workspace_build_mapping_report_markdown(
+        concept_model,
+        mapping_decisions,
+        session_state,
+        upload_response=upload_response,
+        mapping_response=mapping_response,
+        codegen_response=codegen_response,
+    )
+    session_state["workspace_concept_model"] = concept_model
+    session_state["workspace_concept_model_drift_summary"] = drift_summary
+    session_state["workspace_mapping_report_markdown"] = report_markdown
+    if apply_col.button("Apply model hints to decisions", key="workspace_modelling_apply_hints", width="stretch"):
+        session_state["workspace_modelling_pending_hints"] = hints
+        session_state["last_action"] = {
+            "level": "info",
+            "message": (
+                f"Prepared {len(hints)} modelling hint(s) for Decisions. "
+                "This first slice keeps them read-only and does not mutate active mapping decisions."
+            ),
+        }
+        st.rerun()
+
+    st.subheader("BA Mapping Report")
+    st.caption(
+        "Report-first overview of the current workspace result. It synthesizes signals and outcomes across Setup, Review, Decisions, Output, and the concept model into one exportable narrative artifact."
+    )
+    try:
+        from streamlit_ui.shared_views import render_reference_markdown
+
+        render_reference_markdown(report_markdown)
+    except Exception:
+        st.markdown(report_markdown)
+
+    with st.expander("Refine concept model and inspect diagnostics", expanded=False):
+        left_col, right_col = st.columns([3, 2])
+        with left_col:
+            st.subheader("Concept Model")
+            st.caption(
+                "Derived-first conceptual contract for the current workspace result. Refine it only where the inferred model is incomplete or conceptually off."
+            )
+            st.text_input("Target object", key="workspace_modelling_object_name", placeholder="Customer master / Vendor master / Invoice header")
+            st.text_area("Description", key="workspace_modelling_description", placeholder="What business object is this workspace building?", height=88)
+            st.text_area("Business purpose", key="workspace_modelling_business_purpose", placeholder="Why does this target object exist and who uses it?", height=88)
+            st.text_input("Target grain", key="workspace_modelling_target_grain", placeholder="One row per customer / order / invoice line")
+            st.text_area(
+                "Additional modeled attributes (one per line)",
+                key="workspace_modelling_additional_attributes",
+                placeholder="record_source\ncustomer_segment",
+                height=104,
+            )
+            st.text_area(
+                "Required modeled attributes (one per line)",
+                key="workspace_modelling_required_attributes",
+                placeholder="customer_id\nrecord_source",
+                height=104,
+            )
+            st.text_area(
+                "Business rules",
+                key="workspace_modelling_business_rules",
+                placeholder="Keep only active customers.\nDeduplicate by customer_id and keep the newest record.",
+                height=120,
+            )
+            st.caption("Current modeled attributes")
+            st.dataframe(
+                [
+                    {
+                        "attribute": item.get("name"),
+                        "group": item.get("group"),
+                        "required": bool(item.get("required")),
+                        "coverage": item.get("coverage_status"),
+                        "decision type": _workspace_modelling_resolution_label(item.get("expected_resolution_type")),
+                        "origin": item.get("origin"),
+                    }
+                    for item in concept_model.get("attributes") or []
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
+        with right_col:
+            st.subheader("Working Diagnostics")
+            st.caption(f"Source: {concept_model.get('source_mode') or 'derived'}")
+            top_metrics = st.columns(4)
+            top_metrics[0].metric("Decisions", overview_summary["review_summary"]["active_decisions"])
+            top_metrics[1].metric("Open review", overview_summary["review_summary"]["status_counts"]["needs_review"])
+            top_metrics[2].metric("Excluded", overview_summary["review_summary"]["coverage_counts"]["excluded"])
+            top_metrics[3].metric("Target managed", overview_summary["review_summary"]["coverage_counts"]["target_managed"])
+            if hints:
+                st.caption("Current modelling hints")
+                for hint in hints:
+                    st.write(f"- {hint}")
+            else:
+                st.info("No modelling hints are currently open for this workspace state.")
+
+            if session_state.get("workspace_modelling_show_drift"):
+                st.caption("Drift summary")
+                if drift_summary.get("status") == "in_sync":
+                    st.success("Concept model is aligned with the current workspace state.")
+                else:
+                    if drift_summary.get("modeled_but_unmapped"):
+                        st.warning("Modeled but unmapped: " + ", ".join(drift_summary["modeled_but_unmapped"]))
+                    if drift_summary.get("unmodeled_targets"):
+                        st.warning("Mapped but unmodeled: " + ", ".join(drift_summary["unmodeled_targets"]))
+                    if drift_summary.get("required_unresolved"):
+                        st.warning("Required but unresolved: " + ", ".join(drift_summary["required_unresolved"]))
+                    if drift_summary.get("resolution_mismatches"):
+                        st.warning("Resolution mismatches: " + ", ".join(drift_summary["resolution_mismatches"]))
+
+            pending_hints = session_state.get("workspace_modelling_pending_hints") or []
+            if pending_hints:
+                st.caption("Prepared for Decisions")
+                for hint in pending_hints:
+                    st.write(f"- {hint}")
+
+
 def _workspace_transformation_target_fields(mapping_decisions: list[dict]) -> list[str]:
     targets: list[str] = []
     seen_targets: set[str] = set()
     for item in mapping_decisions:
+        resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+        if resolution_type in {"out_of_scope", "target_managed"}:
+            continue
         target = str(item.get("target") or "").strip()
         if not target or target in seen_targets:
             continue
         seen_targets.add(target)
         targets.append(target)
     return targets
+
+
+def _workspace_excluded_output_summary(mapping_decisions: list[dict]) -> str:
+    counts = {"out_of_scope": 0, "target_managed": 0}
+    for item in mapping_decisions:
+        resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+        if resolution_type in counts:
+            counts[resolution_type] += 1
+    parts: list[str] = []
+    if counts["out_of_scope"]:
+        parts.append(f"N/A={counts['out_of_scope']}")
+    if counts["target_managed"]:
+        parts.append(f"Target managed={counts['target_managed']}")
+    if not parts:
+        return ""
+    return "Excluded from generated output: " + ", ".join(parts)
 
 
 def _workspace_build_transformation_spec(mapping_decisions: list[dict], session_state: dict) -> dict:
@@ -2130,6 +3703,16 @@ def _render_workspace_section_content(
             else:
                 st.info("Upload and profile both datasets to unlock review, decision, and output sections.")
 
+    if selected_workspace_section == "Modelling Overview":
+        mapping_decisions = build_mapping_decisions() if mapping_response else []
+        _render_workspace_modelling_section(
+            session_state=st.session_state,
+            upload_response=upload_response,
+            mapping_response=mapping_response,
+            codegen_response=codegen_response,
+            mapping_decisions=mapping_decisions,
+        )
+
     if selected_workspace_section == "Review":
         if mapping_response:
             st.caption(_workspace_target_context_message(upload_response, mapping_response))
@@ -2172,10 +3755,13 @@ def _render_workspace_section_content(
             canonical_output_mode = (upload_response or {}).get("mapping_mode") == "canonical"
             mapping_decisions = build_mapping_decisions()
             preview_context_block_reason = _workspace_preview_context_block_reason(upload_response)
+            excluded_output_summary = _workspace_excluded_output_summary(mapping_decisions)
             if canonical_output_mode:
                 st.caption(
                     "Canonical mode supports code generation against canonical concept IDs, but preview stays unavailable because there is no concrete target dataset to materialize against."
                 )
+            if excluded_output_summary:
+                st.caption(excluded_output_summary)
             _render_workspace_transformation_design(mapping_decisions, api_request=api_request)
             st.subheader("Artifact Generation")
             codegen_mode = st.radio(

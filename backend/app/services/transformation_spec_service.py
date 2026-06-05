@@ -7,10 +7,23 @@ from typing import Any
 from app.models.mapping import MappingDecision, TransformationSpec, TransformationSpecSummary
 
 
+NON_RUNTIME_RESOLUTION_TYPES = {"out_of_scope", "target_managed"}
+
+
 def _decision_target(item: MappingDecision | dict[str, Any]) -> str:
     if isinstance(item, dict):
         return str(item.get("target") or "").strip()
     return str(item.target or "").strip()
+
+
+def _decision_resolution_type(item: MappingDecision | dict[str, Any]) -> str:
+    if isinstance(item, dict):
+        return str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
+    return str(item.resolution_type or "direct_mapping").strip().lower() or "direct_mapping"
+
+
+def is_runtime_active_mapping(item: MappingDecision | dict[str, Any]) -> bool:
+    return _decision_resolution_type(item) not in NON_RUNTIME_RESOLUTION_TYPES
 
 
 def transformation_spec_target_fields(mapping_decisions: list[MappingDecision] | list[dict[str, Any]]) -> list[str]:
@@ -19,6 +32,8 @@ def transformation_spec_target_fields(mapping_decisions: list[MappingDecision] |
     targets: list[str] = []
     seen_targets: set[str] = set()
     for item in mapping_decisions:
+        if not is_runtime_active_mapping(item):
+            continue
         target = _decision_target(item)
         if not target or target in seen_targets:
             continue

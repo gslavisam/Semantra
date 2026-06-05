@@ -9,6 +9,60 @@ from io import BytesIO
 from openpyxl import Workbook
 
 
+DEFAULT_RESOLUTION_TYPE = "direct_mapping"
+VALID_RESOLUTION_TYPES = {
+    "direct_mapping",
+    "derived_value",
+    "fixed_value",
+    "target_managed",
+    "out_of_scope",
+}
+
+
+def normalized_resolution_type(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in VALID_RESOLUTION_TYPES else DEFAULT_RESOLUTION_TYPE
+
+
+def serialized_resolution_payload(payload: object) -> dict[str, str]:
+    current = payload if isinstance(payload, dict) else {}
+    serialized: dict[str, str] = {}
+    for key in ("value", "rule", "reason"):
+        current_value = str(current.get(key) or "").strip()
+        if current_value:
+            serialized[key] = current_value
+    return serialized
+
+
+def normalized_mapping_resolution_payload(resolution_type: object, payload: object) -> dict[str, str]:
+    serialized = serialized_resolution_payload(payload)
+    normalized_type = normalized_resolution_type(resolution_type)
+    if normalized_type == "fixed_value":
+        value = serialized.get("value", "")
+        return {"value": value} if value else {}
+    if normalized_type == "derived_value":
+        rule = serialized.get("rule", "")
+        return {"rule": rule} if rule else {}
+    if normalized_type == "out_of_scope":
+        reason = serialized.get("reason", "")
+        return {"reason": reason} if reason else {}
+    if normalized_type == "target_managed":
+        reason = serialized.get("reason", "")
+        return {"reason": reason} if reason else {}
+    return {}
+
+
+def resolution_payload_summary(resolution_type: object, payload: object) -> str:
+    normalized_payload = normalized_mapping_resolution_payload(resolution_type, payload)
+    if "value" in normalized_payload:
+        return normalized_payload["value"]
+    if "rule" in normalized_payload:
+        return normalized_payload["rule"]
+    if "reason" in normalized_payload:
+        return normalized_payload["reason"]
+    return ""
+
+
 def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> dict[str, str | bool]:
     """Build the default editor-state entry for one ranked source field."""
 
@@ -24,6 +78,8 @@ def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> 
     return {
         "target": selected_target or "",
         "status": selected_status,
+        "resolution_type": normalized_resolution_type(selected_mapping.get("resolution_type")),
+        "resolution_payload": serialized_resolution_payload(selected_mapping.get("resolution_payload")),
         "suggested_target": selected_target or "",
         "suggested_transformation_code": selected_mapping.get("transformation_code") or "",
         "manual_transformation_code": "",
@@ -64,7 +120,14 @@ def ranked_sources(mapping_response: dict) -> set[str]:
     return {ranked["source"] for ranked in mapping_response["ranked_mappings"]}
 
 
-def upsert_manual_mapping(source: str, target: str, status: str, session_state: dict) -> None:
+def upsert_manual_mapping(
+    source: str,
+    target: str,
+    status: str,
+    resolution_type: str,
+    resolution_payload: dict[str, str] | None,
+    session_state: dict,
+) -> None:
     """Insert or update one manual mapping override in editor session state."""
 
     editor_state = session_state.setdefault("mapping_editor_state", {})
@@ -72,6 +135,8 @@ def upsert_manual_mapping(source: str, target: str, status: str, session_state: 
     editor_state[source] = {
         "target": target,
         "status": status,
+        "resolution_type": normalized_resolution_type(resolution_type),
+        "resolution_payload": serialized_resolution_payload(resolution_payload),
         "suggested_target": current_entry.get("suggested_target", ""),
         "manual": True,
     }
@@ -121,6 +186,8 @@ def manual_mapping_rows(
                 "source": source,
                 "target": target,
                 "status": status,
+                "resolution_type": normalized_resolution_type(entry.get("resolution_type")),
+                "resolution_detail": resolution_payload_summary(entry.get("resolution_type"), entry.get("resolution_payload")) or None,
                 "suggested_target": entry.get("suggested_target") or None,
                 "mode": "manual_override" if source in auto_sources else "manual_addition",
             }
@@ -143,7 +210,18 @@ def build_mapping_decisions(
         if not target or status == "rejected":
             continue
         transformation_code = effective_transformation_code(source, resolve_suggested_transformation_code(entry))
-        decision = {"source": source, "target": target, "status": status}
+        decision = {
+            "source": source,
+            "target": target,
+            "status": status,
+            "resolution_type": normalized_resolution_type(entry.get("resolution_type")),
+        }
+        resolution_payload = normalized_mapping_resolution_payload(
+            entry.get("resolution_type"),
+            entry.get("resolution_payload"),
+        )
+        if resolution_payload:
+            decision["resolution_payload"] = resolution_payload
         if transformation_code:
             decision["transformation_code"] = transformation_code
         decisions.append(decision)
@@ -171,7 +249,7 @@ def export_mapping_excel_bytes(session_state: dict, *, build_mapping_decisions_f
     workbook = Workbook()
     worksheet = workbook.active
     worksheet.title = "mapping_decisions"
-    worksheet.append(["source", "target", "status", "transformation_code"])
+    worksheet.append(["source", "target", "status", "resolution_type", "resolution_payload", "transformation_code"])
 
     for decision in build_mapping_decisions_func():
         worksheet.append(
@@ -179,6 +257,8 @@ def export_mapping_excel_bytes(session_state: dict, *, build_mapping_decisions_f
                 decision.get("source", ""),
                 decision.get("target", ""),
                 decision.get("status", ""),
+                decision.get("resolution_type", DEFAULT_RESOLUTION_TYPE),
+                json.dumps(decision.get("resolution_payload", {}), ensure_ascii=True) if decision.get("resolution_payload") else "",
                 decision.get("transformation_code", "") or "",
             ]
         )
@@ -266,9 +346,13 @@ def apply_imported_mapping_payload(
             continue
         current_entry = editor_state.get(source, {})
         transformation_code = str(decision.get("transformation_code") or "")
+        resolution_type = normalized_resolution_type(decision.get("resolution_type"))
+        resolution_payload = normalized_mapping_resolution_payload(resolution_type, decision.get("resolution_payload"))
         editor_state[source] = {
             "target": decision["target"],
             "status": decision.get("status", "accepted"),
+            "resolution_type": resolution_type,
+            "resolution_payload": resolution_payload,
             "suggested_target": current_entry.get("suggested_target", ""),
             "suggested_transformation_code": current_entry.get("suggested_transformation_code", ""),
             "manual_transformation_code": transformation_code,

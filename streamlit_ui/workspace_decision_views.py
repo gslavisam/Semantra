@@ -12,6 +12,40 @@ from streamlit_ui.governance import api_error_message, mapping_set_workspace_blo
 from streamlit_ui.shared_views import render_status_badge_legend
 
 
+DEFAULT_RESOLUTION_TYPE = "direct_mapping"
+EDITABLE_RESOLUTION_TYPES = ["direct_mapping", "derived_value", "fixed_value", "out_of_scope", "target_managed"]
+RESOLUTION_TYPE_LABELS = {
+    "direct_mapping": "Direct mapping",
+    "derived_value": "Derived value",
+    "fixed_value": "Fixed value",
+    "out_of_scope": "N/A",
+    "target_managed": "Target managed",
+}
+
+
+def _normalized_resolution_type(value: object) -> str:
+    normalized = str(value or "").strip().lower()
+    return normalized if normalized in RESOLUTION_TYPE_LABELS else DEFAULT_RESOLUTION_TYPE
+
+
+def _normalized_resolution_payload(resolution_type: object, payload: object) -> dict[str, str]:
+    current_type = _normalized_resolution_type(resolution_type)
+    current_payload = payload if isinstance(payload, dict) else {}
+    if current_type == "fixed_value":
+        value = str(current_payload.get("value") or "").strip()
+        return {"value": value} if value else {}
+    if current_type == "derived_value":
+        rule = str(current_payload.get("rule") or "").strip()
+        return {"rule": rule} if rule else {}
+    if current_type == "out_of_scope":
+        reason = str(current_payload.get("reason") or "").strip()
+        return {"reason": reason} if reason else {}
+    if current_type == "target_managed":
+        reason = str(current_payload.get("reason") or "").strip()
+        return {"reason": reason} if reason else {}
+    return {}
+
+
 def _saved_mapping_set_apply_block_reason(saved_mapping_set: dict) -> str:
     return mapping_set_workspace_block_reason(
         saved_mapping_set.get("status"),
@@ -130,6 +164,11 @@ def _serialized_mapping_editor_state() -> dict[str, dict]:
         str(source): {
             "target": str(entry.get("target") or ""),
             "status": str(entry.get("status") or "needs_review"),
+            "resolution_type": _normalized_resolution_type(entry.get("resolution_type")),
+            "resolution_payload": _normalized_resolution_payload(
+                entry.get("resolution_type"),
+                entry.get("resolution_payload"),
+            ),
             "suggested_target": str(entry.get("suggested_target") or ""),
             "suggested_transformation_code": str(entry.get("suggested_transformation_code") or ""),
             "manual_transformation_code": str(entry.get("manual_transformation_code") or ""),
@@ -546,11 +585,14 @@ def _build_draft_session_mapping_response(draft_session_detail: dict) -> dict:
         entry = editor_state.get(source) or {}
         target = str(entry.get("target") or "").strip()
         status = str(entry.get("status") or "needs_review").strip() or "needs_review"
+        resolution_type = _normalized_resolution_type(entry.get("resolution_type"))
+        resolution_payload = _normalized_resolution_payload(resolution_type, entry.get("resolution_payload"))
         transformation_code = str(entry.get("manual_transformation_code") or "").strip()
         confidence = 0.95 if target and status == "accepted" else 0.7 if target else 0.35
         selected = {
             "target": target,
             "status": status,
+            "resolution_type": resolution_type,
             "confidence": confidence,
             "confidence_label": _draft_session_confidence_label(confidence),
             "method": "draft_restore",
@@ -569,6 +611,8 @@ def _build_draft_session_mapping_response(draft_session_detail: dict) -> dict:
             },
             "canonical_details": {"source_concepts": [], "target_concepts": [], "shared_concepts": []},
         }
+        if resolution_payload:
+            selected["resolution_payload"] = resolution_payload
         if transformation_code:
             selected["transformation_code"] = transformation_code
         if target:
@@ -1100,10 +1144,12 @@ def render_manual_mapping_panel(
     ):
         st.caption(
             "Add or override a source-to-target pair even when the auto-mapper did not propose it. "
-            "In canonical mode, targets are canonical concept IDs from the virtual glossary target."
+            "In canonical mode, targets are canonical concept IDs from the virtual glossary target. "
+            "This slice also lets you classify the decision as direct, derived, fixed-value, N/A, or target-managed. "
+            "Fixed/derived logic still belongs in transformation rules/code. N/A and target-managed paths are excluded from generated output."
         )
 
-        form_columns = st.columns([2, 2, 1, 1])
+        form_columns = st.columns([2, 2, 1, 2, 1])
         selected_source = form_columns[0].selectbox(
             "Manual source column",
             source_options,
@@ -1119,18 +1165,84 @@ def render_manual_mapping_panel(
             ["accepted", "needs_review"],
             key="manual_mapping_status",
         )
-        if form_columns[3].button("Add mapping", width="stretch", key="manual_mapping_add"):
-            upsert_manual_mapping(selected_source, selected_target, selected_status)
+        selected_resolution_type = form_columns[3].selectbox(
+            "Decision type",
+            EDITABLE_RESOLUTION_TYPES,
+            key="manual_mapping_resolution_type",
+            format_func=lambda option: RESOLUTION_TYPE_LABELS.get(option, option.replace("_", " ").title()),
+        )
+        resolution_payload: dict[str, str] = {}
+        add_block_reason = ""
+        if selected_resolution_type == "fixed_value":
+            fixed_value = st.text_input(
+                "Fixed target value",
+                key="manual_mapping_fixed_value",
+                placeholder="Example: CUSTOMER",
+            )
+            if fixed_value.strip():
+                resolution_payload = {"value": fixed_value.strip()}
+            else:
+                add_block_reason = "Fixed-value decisions require a constant value."
+        elif selected_resolution_type == "derived_value":
+            derived_rule = st.text_area(
+                "Derivation rule",
+                key="manual_mapping_derived_rule",
+                placeholder="Example: Concatenate fname + ' ' + lname and trim extra spaces.",
+                height=80,
+            )
+            if derived_rule.strip():
+                resolution_payload = {"rule": derived_rule.strip()}
+            else:
+                add_block_reason = "Derived-value decisions require a derivation rule."
+        elif selected_resolution_type == "out_of_scope":
+            out_of_scope_reason = st.text_area(
+                "Why N/A?",
+                key="manual_mapping_out_of_scope_reason",
+                placeholder="Example: Source field is only a staging artifact and should not populate any business target field.",
+                height=80,
+            )
+            if out_of_scope_reason.strip():
+                resolution_payload = {"reason": out_of_scope_reason.strip()}
+            st.caption("N/A excludes this source-to-target path from generated output.")
+        elif selected_resolution_type == "target_managed":
+            target_managed_reason = st.text_area(
+                "Why target managed?",
+                key="manual_mapping_target_managed_reason",
+                placeholder="Example: This target field is populated by the destination system during create/update.",
+                height=80,
+            )
+            if target_managed_reason.strip():
+                resolution_payload = {"reason": target_managed_reason.strip()}
+            st.caption("Target-managed fields are excluded from generated output because the destination system populates them.")
+        if form_columns[4].button("Add mapping", width="stretch", key="manual_mapping_add"):
+            if add_block_reason:
+                st.session_state["last_action"] = {"level": "warning", "message": add_block_reason}
+                st.rerun()
+            upsert_manual_mapping(
+                selected_source,
+                selected_target,
+                selected_status,
+                selected_resolution_type,
+                resolution_payload,
+            )
             _record_decision_audit(
                 selected_source,
                 origin="manual_mapping",
-                details={"mode": "add_mapping", "status": selected_status, "target": selected_target},
+                details={
+                    "mode": "add_mapping",
+                    "status": selected_status,
+                    "target": selected_target,
+                    "resolution_type": selected_resolution_type,
+                    "resolution_payload": dict(resolution_payload),
+                },
             )
             st.session_state["last_action"] = {
                 "level": "success",
                 "message": f"Added manual mapping {selected_source} -> {selected_target}.",
             }
             st.rerun()
+        if add_block_reason:
+            st.caption(add_block_reason)
 
         if manual_rows:
             st.caption("Manual additions and overrides")

@@ -1113,6 +1113,8 @@ def _build_catalog_reuse_mapping_response(mapping_set_detail: dict[str, Any]) ->
             continue
         target = str(decision.get("target") or "").strip()
         status = str(decision.get("status") or "needs_review").strip() or "needs_review"
+        resolution_type = str(decision.get("resolution_type") or "direct_mapping").strip() or "direct_mapping"
+        resolution_payload = dict(decision.get("resolution_payload") or {}) if isinstance(decision.get("resolution_payload"), dict) else {}
         transformation_code = str(decision.get("transformation_code") or "").strip()
         if target:
             matched_sources += 1
@@ -1120,6 +1122,8 @@ def _build_catalog_reuse_mapping_response(mapping_set_detail: dict[str, Any]) ->
         candidate_payload: dict[str, Any] = {
             "target": target,
             "status": status,
+            "resolution_type": resolution_type,
+            "resolution_payload": resolution_payload,
             "confidence": confidence,
             "confidence_label": _confidence_label(confidence),
             "method": "manual_review",
@@ -1198,10 +1202,14 @@ def _apply_mapping_set_detail_to_workspace(mapping_set_detail: dict[str, Any]) -
             continue
         target = str(decision.get("target") or "").strip()
         status = str(decision.get("status") or "needs_review").strip() or "needs_review"
+        resolution_type = str(decision.get("resolution_type") or "direct_mapping").strip() or "direct_mapping"
+        resolution_payload = dict(decision.get("resolution_payload") or {}) if isinstance(decision.get("resolution_payload"), dict) else {}
         transformation_code = str(decision.get("transformation_code") or "").strip()
         editor_state[source] = {
             "target": target,
             "status": status,
+            "resolution_type": resolution_type,
+            "resolution_payload": resolution_payload,
             "suggested_target": target,
             "suggested_transformation_code": transformation_code,
             "manual_transformation_code": transformation_code,
@@ -1215,6 +1223,8 @@ def _apply_mapping_set_detail_to_workspace(mapping_set_detail: dict[str, Any]) -
         st.session_state[f"transform_{source}"] = False
         st.session_state[f"manual_transform_{source}"] = transformation_code
         st.session_state[f"manual_apply_{source}"] = bool(transformation_code)
+        st.session_state[f"resolution_payload_value_{source}"] = str(resolution_payload.get("value") or "")
+        st.session_state[f"resolution_payload_rule_{source}"] = str(resolution_payload.get("rule") or "")
 
     st.session_state["mapping_response"] = mapping_response
     st.session_state["mapping_editor_state"] = editor_state
@@ -1409,6 +1419,8 @@ def _merge_mapping_set_fields_into_workspace(
             continue
         target = _normalized_text((decision or {}).get("target"))
         status = _normalized_text((decision or {}).get("status")) or "needs_review"
+        resolution_type = _normalized_text((decision or {}).get("resolution_type")) or "direct_mapping"
+        resolution_payload = dict((decision or {}).get("resolution_payload") or {}) if isinstance((decision or {}).get("resolution_payload"), dict) else {}
         transformation_code = _normalized_text((decision or {}).get("transformation_code"))
         current_entry = editor_state.get(source, {})
         previous_editor_state[source] = dict(current_entry) if source in editor_state else None
@@ -1419,6 +1431,8 @@ def _merge_mapping_set_fields_into_workspace(
         editor_state[source] = {
             "target": target,
             "status": status,
+            "resolution_type": resolution_type,
+            "resolution_payload": resolution_payload,
             "suggested_target": current_entry.get("suggested_target", ""),
             "suggested_transformation_code": current_entry.get("suggested_transformation_code", ""),
             "manual_transformation_code": transformation_code,
@@ -1432,6 +1446,8 @@ def _merge_mapping_set_fields_into_workspace(
         st.session_state[f"transform_{source}"] = False
         st.session_state[f"manual_transform_{source}"] = transformation_code
         st.session_state[f"manual_apply_{source}"] = bool(transformation_code)
+        st.session_state[f"resolution_payload_value_{source}"] = str(resolution_payload.get("value") or "")
+        st.session_state[f"resolution_payload_rule_{source}"] = str(resolution_payload.get("rule") or "")
         decision_audit[source] = {
             "origin": "catalog_field_reuse",
             "applied_at": datetime.now(UTC).isoformat(),

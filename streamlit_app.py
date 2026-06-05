@@ -495,10 +495,16 @@ def render_canonical_gap_assistant(mapping_response: dict) -> None:
     return _impl(mapping_response, api_request=api_request)
 
 
-def upsert_manual_mapping(source: str, target: str, status: str) -> None:
+def upsert_manual_mapping(
+    source: str,
+    target: str,
+    status: str,
+    resolution_type: str = "direct_mapping",
+    resolution_payload: dict[str, str] | None = None,
+) -> None:
     from streamlit_ui.mapping_state import upsert_manual_mapping as _impl
 
-    return _impl(source, target, status, st.session_state)
+    return _impl(source, target, status, resolution_type, resolution_payload, st.session_state)
 
 
 def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> dict[str, str | bool]:

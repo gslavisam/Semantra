@@ -168,6 +168,8 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
             "cust_id": {
                 "target": "customer_id",
                 "status": "accepted",
+                "resolution_type": "fixed_value",
+                "resolution_payload": {"value": "CUSTOMER"},
                 "suggested_target": "customer_id",
                 "suggested_transformation_code": "",
                 "manual_transformation_code": "",
@@ -212,6 +214,8 @@ def test_build_draft_session_request_payload_uses_current_workspace_state() -> N
     assert payload["source_handle"]["dataset_name"] == "source.csv"
     assert payload["target_handle"]["dataset_name"] == "target.csv"
     assert payload["mapping_editor_state"]["cust_id"]["status"] == "accepted"
+    assert payload["mapping_editor_state"]["cust_id"]["resolution_type"] == "fixed_value"
+    assert payload["mapping_editor_state"]["cust_id"]["resolution_payload"] == {"value": "CUSTOMER"}
     assert payload["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
     assert payload["transformation_spec"]["target_grain"] == "One row per customer"
     assert payload["output_state"]["preview_response"]["preview"][0]["values"]["customer_id"] == "1"
@@ -272,12 +276,16 @@ def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clear
             "cust_id": {
                 "target": "customer_id",
                 "status": "accepted",
+                "resolution_type": "fixed_value",
+                "resolution_payload": {"value": "CUSTOMER"},
                 "suggested_target": "customer_id",
                 "manual_transformation_code": "",
             },
             "phone": {
                 "target": "phone_number",
                 "status": "needs_review",
+                "resolution_type": "derived_value",
+                "resolution_payload": {"rule": "trim and normalize phone"},
                 "suggested_target": "phone_number",
                 "manual_transformation_code": "value.strip()",
             },
@@ -306,6 +314,8 @@ def test_apply_draft_session_detail_to_workspace_restores_review_state_and_clear
     assert session_state["pending_top_level_area"] == "Workspace"
     assert session_state["pending_workspace_section"] == "Review"
     assert session_state["mapping_editor_state"]["phone"]["manual_transformation_code"] == "value.strip()"
+    assert session_state["mapping_editor_state"]["cust_id"]["resolution_payload"] == {"value": "CUSTOMER"}
+    assert session_state["mapping_response"]["ranked_mappings"][0]["selected"]["resolution_payload"] == {"value": "CUSTOMER"}
     assert session_state["mapping_decision_audit"]["cust_id"]["origin"] == "manual_mapping"
     assert session_state["workspace_transformation_target_grain"] == "One row per customer"
     assert session_state["workspace_transformation_rule::customer_id"] == "Cast source code to string."

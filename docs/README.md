@@ -15,6 +15,12 @@ Koristi ga za:
 
 - `vision/KNOWLEDGE_EXPANSION_WAVE.md`
 	- why-now, boundary, phase model i exit criteria za SAP-first vendor knowledge wave
+- `vision/WORKSPACE_MODELLING_CONCEPT.md`
+	- bounded product memo za novi `Workspace > Modelling` podtab: scope, V1 contract model, izvodljivost i phase plan
+- `reference/WORKSPACE_MODELLING_V1_UX_SPEC.md`
+	- konkretan V1 UX spec za `derived-first` modelling tab: sekcije, akcije, drift pravila i bounded sync sa Workspace tokom
+- `reference/WORKSPACE_BA_MAPPING_REPORT_SPEC.md`
+	- ciljna report-first struktura za `Workspace > Modelling Overview`: kako da tab postane `BA Mapping Report` koji se kasnije može eksportovati kao dokument
 - `reference/VENDOR_KNOWLEDGE_INGEST_AND_SOURCE_INVENTORY.md`
 	- konkretan source inventory, staging schema i predloženi folder layout za raw/staged/generated vendor knowledge ingest
 - `reference/KNOWLEDGE_CANONICAL_AUTHORITY_MATRIX.md`

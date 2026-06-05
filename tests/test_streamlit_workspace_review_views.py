@@ -218,6 +218,24 @@ def test_split_mapping_explanation_lines_separates_llm_and_non_llm_content() -> 
     ]
 
 
+def test_mapping_decision_detail_lines_include_type_and_reason() -> None:
+    assert workspace_review_views._mapping_decision_detail_lines(
+        {
+            "resolution_type": "out_of_scope",
+            "resolution_payload": {"reason": "Staging-only helper field."},
+        }
+    ) == ["Decision type: N/A", "Reason: Staging-only helper field."]
+
+
+def test_mapping_decision_detail_lines_include_fixed_value() -> None:
+    assert workspace_review_views._mapping_decision_detail_lines(
+        {
+            "resolution_type": "fixed_value",
+            "resolution_payload": {"value": "CUSTOMER"},
+        }
+    ) == ["Decision type: Fixed value", "Fixed value: CUSTOMER"]
+
+
 def test_selected_mapping_display_rows_leave_llm_proposal_blank_without_review_generated_state() -> None:
     rows = workspace_review_views._selected_mapping_display_rows(
         [
