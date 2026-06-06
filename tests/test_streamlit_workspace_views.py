@@ -585,7 +585,6 @@ def test_workspace_build_mapping_report_markdown_structures_report() -> None:
     assert "- Canonical path: cust_id -> Customer ID (customer.id) -> customer_id" in report
     assert "- Signal breakdown: name=1.00, semantic=1.00, knowledge=1.00, canonical=1.00, pattern=1.00, stat=1.00, overlap=1.00, embedding=0.00, correction=0.00, llm=0.00." in report
     assert "- Review conclusion: Strong pattern alignment: source integer, numeric_id matches target integer, numeric_id." in report
-    assert "### Field-level Signals and Review Reasoning" in report
     assert "## Selected Mapping and Transformation Summary" in report
     assert "- The table below summarizes active selected mappings, decision status, and transformation rule guidance." in report
     assert "| Source | Target | Confidence | LLM | Status | Validator | Canonical status |" in report
@@ -606,7 +605,6 @@ def test_workspace_build_mapping_report_markdown_structures_report() -> None:
     assert "Added explicit string casting for downstream key stability." in report
     assert "## Source -> Concept -> Target Graph" in report
     assert "```mermaid" in report
-    assert "- Review reasoning: Strong pattern alignment: source integer, numeric_id matches target integer, numeric_id." in report
     assert "## Open Analyst Notes" in report
     assert "- Version note: Ready for stakeholder walkthrough." in report
     assert "- Review note: Strong candidate for governance handoff." in report
@@ -704,9 +702,6 @@ def test_workspace_build_mapping_report_markdown_uses_active_mappings_when_selec
     assert "## Review Evidence Highlights" in report
     assert "### cust_id -> customer_id" in report
     assert "Signal breakdown: name=1.00, semantic=1.00" in report
-    assert "### Field-level Signals and Review Reasoning" in report
-    assert "### phone -> phone_number" in report
-    assert "Review reasoning: Phone pattern aligns with the target field." in report
     assert "## Selected Mapping and Transformation Summary" in report
     assert "- The table below summarizes active selected mappings, decision status, and transformation rule guidance." in report
     assert "| cust_id | customer_id | 99% |" in report

@@ -1499,19 +1499,6 @@ def _workspace_build_mapping_report_markdown(
     transformation_rationale_lines = _workspace_modelling_transformation_rationale_lines(session_state, mapping_decisions, codegen_response)
     analyst_note_lines = _workspace_modelling_analyst_notes_lines(session_state, hints)
     governance_readiness_lines = _workspace_modelling_governance_readiness_lines(session_state, overview_summary, drift_summary)
-    graph_evidence_rows = _workspace_modelling_graph_evidence_rows(mapping_response, session_state, graph_summary)
-    graph_evidence_lines: list[str] = []
-    for row in graph_evidence_rows:
-        graph_evidence_lines.extend(
-            [
-                f"### {row['source']} -> {row['target']}",
-                f"- Decision type: {row['decision_type']}",
-                f"- Canonical path: {row['canonical_path'] or 'No shared canonical path.'}",
-                f"- {row['signal_breakdown']}",
-                f"- Review reasoning: {row['review_conclusion'] or 'No detailed review explanation is currently available.'}",
-                "",
-            ]
-        )
     generated_code = str((codegen_response or {}).get("code") or "").strip()
     generated_language = str((codegen_response or {}).get("language") or "").strip()
     if generated_code:
@@ -1573,7 +1560,6 @@ def _workspace_build_mapping_report_markdown(
         "## Review Evidence Highlights",
         *([f"- {line}" for line in review_evidence_metrics] or ["- No review evidence summary is currently available."]),
         *(review_evidence_lines or ["- No review evidence highlights are currently available.", ""]),
-        *( ["", "### Field-level Signals and Review Reasoning", *graph_evidence_lines] if graph_evidence_lines else [] ),
         "## Selected Mapping and Transformation Summary",
         *(["- The table below summarizes active selected mappings, decision status, and transformation rule guidance.", ""] if mapping_report_table else []),
         *( [mapping_report_table, ""] if mapping_report_table else ["- No selected-mapping rows are currently available.", ""] ),
