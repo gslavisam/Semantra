@@ -391,9 +391,18 @@ def current_mapping_rows(
         use_selected_row = current_target == selected_row.get("target")
         active_row = selected_row if use_selected_row or not selected_candidate else selected_candidate
         canonical_details = active_row.get("canonical_details", {})
+        manual_canonical_concept = str(current_state.get("manual_canonical_concept") or "").strip()
         shared_labels = canonical_scope_labels(canonical_details, "shared_concepts")
         source_labels = canonical_scope_labels(canonical_details, "source_concepts")
         target_labels = canonical_scope_labels(canonical_details, "target_concepts")
+        canonical_path = canonical_path_label_func(source, current_target, canonical_details)
+        canonical_status = canonical_match_status(canonical_details)
+        canonical_status_label = canonical_match_status_label(canonical_status)
+        if manual_canonical_concept:
+            shared_labels = [manual_canonical_concept]
+            canonical_path = f"{source} -> {manual_canonical_concept} -> {current_target}"
+            canonical_status = "shared_match"
+            canonical_status_label = canonical_match_status_label(canonical_status)
         rows.append(
             {
                 "source": source,
@@ -402,12 +411,12 @@ def current_mapping_rows(
                 "confidence_label": active_row.get("confidence_label", "low_confidence"),
                 "status": current_state.get("status", selected_row.get("status", "needs_review")),
                 "validator": validator_badge(active_row.get("method", "manual_review")),
-                "canonical_status": canonical_match_status(canonical_details),
-                "canonical_status_label": canonical_match_status_label(canonical_match_status(canonical_details)),
+                "canonical_status": canonical_status,
+                "canonical_status_label": canonical_status_label,
                 "shared_concepts": " | ".join(shared_labels),
                 "source_concepts": " | ".join(source_labels),
                 "target_concepts": " | ".join(target_labels),
-                "canonical_path": canonical_path_label_func(source, current_target, canonical_details),
+                "canonical_path": canonical_path,
                 "llm_consulted": bool(selected_row.get("llm_consulted", False)) if use_selected_row else False,
                 "llm_recommendation": selected_row.get("llm_recommendation") if use_selected_row else None,
             }

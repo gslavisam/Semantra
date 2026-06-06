@@ -1295,15 +1295,26 @@ def _workspace_modelling_governance_readiness_lines(session_state: dict, overvie
 
 def _workspace_modelling_report_mapping_rows(mapping_response: dict | None, session_state: dict) -> list[dict]:
     try:
-        from streamlit_ui.workspace_review_views import _selected_mapping_display_rows
+        from streamlit_ui.mapping_helpers import current_mapping_rows
+        from streamlit_ui.shared_views import _workspace_copilot_validator_badge
+        from streamlit_ui.workspace_review_views import _confidence_percent_label
 
-        base_rows = _selected_mapping_display_rows(
-            _workspace_modelling_active_mapping_rows(mapping_response, session_state),
-            session_state.get("mapping_editor_state") or {},
-            pending_proposals=session_state.get("llm_decision_proposals") or [],
+        base_rows = current_mapping_rows(
+            mapping_response or {},
+            session_state or {},
+            validator_badge=_workspace_copilot_validator_badge,
         )
     except Exception:
-        base_rows = []
+        try:
+            from streamlit_ui.workspace_review_views import _selected_mapping_display_rows
+
+            base_rows = _selected_mapping_display_rows(
+                _workspace_modelling_active_mapping_rows(mapping_response, session_state),
+                session_state.get("mapping_editor_state") or {},
+                pending_proposals=session_state.get("llm_decision_proposals") or [],
+            )
+        except Exception:
+            base_rows = []
 
     report_rows: list[dict] = []
     for row in base_rows:
@@ -1315,12 +1326,10 @@ def _workspace_modelling_report_mapping_rows(mapping_response: dict | None, sess
             {
                 "source": str(row.get("source") or "").strip(),
                 "target": target_name,
-                "confidence": str(row.get("original_confidence") or ""),
+                "confidence": _confidence_percent_label(row.get("confidence")) if row.get("confidence") not in (None, "") else str(row.get("original_confidence") or ""),
                 "llm": str(row.get("llm_proposal_confidence") or ""),
                 "status": str(entry.get("status") or row.get("status") or "").strip(),
                 "validator": str(row.get("validator") or "").strip(),
-                "canonical_status": str(row.get("canonical_status") or "").strip(),
-                "shared_concepts": str(row.get("shared_concepts") or "").strip(),
                 "source_concepts": str(row.get("source_concepts") or "").strip(),
                 "target_concepts": str(row.get("target_concepts") or "").strip(),
                 "canonical_path": str(row.get("canonical_path") or "").strip(),
@@ -1466,8 +1475,6 @@ def _workspace_build_mapping_report_markdown(
             ("llm", "LLM"),
             ("status", "Status"),
             ("validator", "Validator"),
-            ("canonical_status", "Canonical status"),
-            ("shared_concepts", "Shared concepts"),
             ("source_concepts", "Source concepts"),
             ("target_concepts", "Target concepts"),
             ("canonical_path", "Canonical path"),

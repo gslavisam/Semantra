@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from streamlit_ui import workspace_review_views
+from streamlit_ui.mapping_helpers import current_mapping_rows
 
 
 class _RerunTriggered(RuntimeError):
@@ -215,6 +216,116 @@ def test_split_mapping_explanation_lines_separates_llm_and_non_llm_content() -> 
     assert llm_lines == [
         "LLM validator re-ranked this candidate within the closed candidate set.",
         "LLM: Sample values align strongly with the selected target.",
+    ]
+
+
+def test_auto_canonical_concept_label_prefers_shared_concepts_first() -> None:
+    canonical_details = {
+        "shared_concepts": [{"concept_id": "customer.id", "display_name": "Customer ID"}],
+        "source_concepts": [{"concept_id": "customer.name", "display_name": "Customer Name"}],
+    }
+
+    assert workspace_review_views._auto_canonical_concept_label(canonical_details) == "Customer ID (customer.id)"
+
+
+def test_canonical_concept_override_options_collects_labels_from_mapping_and_candidates() -> None:
+    mapping = {
+        "canonical_details": {
+            "source_concepts": [{"concept_id": "address.city", "display_name": "Address City"}],
+        }
+    }
+    candidates = [
+        {
+            "canonical_details": {
+                "target_concepts": [{"concept_id": "city.name", "display_name": "City Name"}],
+            }
+        }
+    ]
+
+    options = workspace_review_views._canonical_concept_override_options(mapping, candidates)
+
+    assert "Address City (address.city)" in options
+    assert "City Name (city.name)" in options
+
+
+def test_current_mapping_rows_uses_manual_canonical_concept_for_canonical_path() -> None:
+    fake_streamlit = _FakeStreamlit(session_state={
+        "mapping_editor_state": {
+            "CITY": {
+                "target": "city_name",
+                "status": "needs_review",
+                "manual_canonical_concept": "Address City (address.city)",
+            }
+        }
+    })
+
+    rows = current_mapping_rows(
+        {
+            "mappings": [
+                {
+                    "source": "CITY",
+                    "target": "city_name",
+                    "confidence": 0.61,
+                    "confidence_label": "low_confidence",
+                    "status": "needs_review",
+                }
+            ],
+            "ranked_mappings": [
+                {
+                    "source": "CITY",
+                    "candidates": [
+                        {
+                            "target": "city_name",
+                            "confidence": 0.61,
+                            "confidence_label": "low_confidence",
+                            "method": "multi_signal_heuristic",
+                            "canonical_details": {
+                                "source_concepts": [
+                                    {
+                                        "concept_id": "address.city",
+                                        "display_name": "Address City",
+                                        "strength": 0.5,
+                                    }
+                                ],
+                                "target_concepts": [],
+                                "shared_concepts": [],
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+        fake_streamlit.session_state,
+        validator_badge=lambda method: method,
+    )
+
+    assert rows[0]["canonical_path"] == "CITY -> Address City (address.city) -> city_name"
+    assert rows[0]["canonical_status"] == "shared_match"
+
+
+def test_shared_canonical_target_candidates_filters_same_concept_targets() -> None:
+    ranked = {
+        "candidates": [
+            {
+                "target": "customer_id",
+                "canonical_details": {"shared_concepts": ["customer.id"]},
+            },
+            {
+                "target": "ledger_id",
+                "canonical_details": {"shared_concepts": []},
+            },
+            {
+                "target": "customer_number",
+                "canonical_details": {"shared_concepts": ["customer.id"]},
+            },
+        ]
+    }
+
+    result = workspace_review_views._shared_canonical_target_candidates(ranked)
+
+    assert result == [
+        ("customer_id", "customer.id"),
+        ("customer_number", "customer.id"),
     ]
 
 

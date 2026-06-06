@@ -144,12 +144,12 @@ Use `Review` to inspect:
 	- optionally, it can run live bounded LLM fill for rows without cached propositions
 	- it does not change active decisions until apply actions are executed in `Decisions`
 - canonical path information
+- manual canonical override in the Review detail pane, with the selected canonical concept reflected in summary rows and canonical path text
 - `Mapping Analysis Overview` for a technical summary of the current mapping state
 - optional narration and audio generation for the mapping analysis
 - `Review Queue Plan` for queue-level prioritization over the currently filtered review set
 - `Selected Mapping Details`, including canonical-mismatch details, source-only concept rows, and target-side concept rows
-- canonical-gap suggestion flows for rows that look semantically right but still have missing canonical coverage
-- `Gap Queue Summary` for repeated canonical-gap families before you review candidates one by one
+- canonical-gap suggestion flows for rows that look semantically right but still have missing canonical coverage- manual canonical override selection in the Review details panel, with the selected canonical concept reflected in summary rows and canonical path text- `Gap Queue Summary` for repeated canonical-gap families before you review candidates one by one
 
 This is the main place where you decide whether the engine output makes sense before you persist or generate artifacts.
 

@@ -143,6 +143,7 @@ Ovde vidiš:
 	- opciono može da uradi live bounded LLM fill za redove bez cached proposition-a
 	- ne menja odluke dok ne odeš na apply u `Decisions`
 - canonical path pregled
+- manualni canonical override u Review detaljima, koji se odražava u redovima sažetka i u tekstu canonical path-a
 - `Mapping Analysis Overview` za tehnički sažetak trenutnog mapping stanja
 - opcioni audio narativ za generated mapping analysis
 - `Review Queue Plan` za grupisanje review reda po prioritetima i obrascima

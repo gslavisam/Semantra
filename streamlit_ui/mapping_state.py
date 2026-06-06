@@ -83,6 +83,7 @@ def default_editor_entry(ranked: dict, selected_mapping: dict | None = None) -> 
         "suggested_target": selected_target or "",
         "suggested_transformation_code": selected_mapping.get("transformation_code") or "",
         "manual_transformation_code": "",
+        "manual_canonical_concept": "",
         "llm_transformation_instruction": "",
         "generated_transformation_reasoning": [],
         "generated_transformation_warnings": [],
@@ -138,6 +139,7 @@ def upsert_manual_mapping(
         "resolution_type": normalized_resolution_type(resolution_type),
         "resolution_payload": serialized_resolution_payload(resolution_payload),
         "suggested_target": current_entry.get("suggested_target", ""),
+        "manual_canonical_concept": current_entry.get("manual_canonical_concept", ""),
         "manual": True,
     }
     session_state["mapping_editor_state"] = editor_state

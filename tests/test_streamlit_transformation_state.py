@@ -631,6 +631,29 @@ def test_default_editor_entry_preserves_unmapped_selected_result() -> None:
     assert entry["target"] == ""
     assert entry["status"] == "needs_review"
     assert entry["suggested_target"] == ""
+    assert entry["manual_canonical_concept"] == ""
+
+
+def test_default_editor_entry_initializes_manual_canonical_concept_blank() -> None:
+    _, [default_editor_entry] = load_streamlit_functions("default_editor_entry")
+
+    entry = default_editor_entry(
+        {
+            "selected": {
+                "target": "customer_id",
+                "status": "accepted",
+                "resolution_type": "direct_mapping",
+                "resolution_payload": {},
+            },
+            "candidates": [
+                {
+                    "target": "customer_id",
+                }
+            ],
+        }
+    )
+
+    assert entry["manual_canonical_concept"] == ""
 
 
 def test_selected_target_options_include_unmapped_for_no_match_selection() -> None:

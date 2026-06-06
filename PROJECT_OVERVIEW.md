@@ -135,6 +135,7 @@ Implemented today:
 - Mapping Analysis Overview with technical summary, recommended actions, and optional narration/audio
 - Review Queue Plan for the currently filtered review set
 - grouped review-attention summary for repeated unmatched or low-confidence patterns
+- manual canonical override selection in the Review details panel, with the selected canonical concept reflected in the row summary and canonical path
 - Workspace Copilot `Review -> Decisions` risk/closure summary in both the sidebar `WS Copilot` and the main `Workspace Copilot` panel
 - Canonical Gap Suggestions plus Gap Queue Summary for queue-level canonical stewardship guidance
 

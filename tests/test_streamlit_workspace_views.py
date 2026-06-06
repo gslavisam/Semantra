@@ -587,9 +587,8 @@ def test_workspace_build_mapping_report_markdown_structures_report() -> None:
     assert "- Review conclusion: Strong pattern alignment: source integer, numeric_id matches target integer, numeric_id." in report
     assert "## Selected Mapping and Transformation Summary" in report
     assert "- The table below summarizes active selected mappings, decision status, and transformation rule guidance." in report
-    assert "| Source | Target | Confidence | LLM | Status | Validator | Canonical status |" in report
+    assert "| Source | Target | Confidence | LLM | Status | Validator | Source concepts | Target concepts | Canonical path | Decision type | Transformation rule | LLM consulted |" in report
     assert "| cust_id | customer_id | 100% |" in report
-    assert "Shared canonical concept" in report
     assert "cust_id -> Customer ID (customer.id) -> customer_id" in report
     assert "Cast source code to string." in report
     assert "Normalize phone formatting." in report

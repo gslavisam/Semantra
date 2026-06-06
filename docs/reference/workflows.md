@@ -124,11 +124,12 @@ Korisnik razume zasto je mapping predlozen, gde su rizici i kojim redom treba da
 **Glavni tok:**
 
 1. U `Workspace > Review` proveri `Selected Mapping`, trust layer i canonical path.
-2. Po potrebi koristi per-row ili batch `LLM refine` da proveris sporne redove unutar bounded candidate seta.
-3. Generisi `Mapping Analysis Overview` za jedan tehnicki sazetak trenutnog mapping stanja.
-4. Ako je review red velik ili sumovit, generisi `Review Queue Plan`.
-5. Ako radis sa canonical gap kandidatima, generisi `Gap Queue Summary` pre candidate-by-candidate trijaze.
-6. Po potrebi materializuj `LLM Decision Proposals` za trenutni `needs_review` slice.
+2. Ako je potrebno, koristi manualni canonical override u detaljima reda; izabrani canonical koncept se zatim reflektuje u sažetku reda i canonical path tekstu.
+3. Po potrebi koristi per-row ili batch `LLM refine` da proveris sporne redove unutar bounded candidate seta.
+4. Generisi `Mapping Analysis Overview` za jedan tehnicki sazetak trenutnog mapping stanja.
+5. Ako je review red velik ili sumovit, generisi `Review Queue Plan`.
+6. Ako radis sa canonical gap kandidatima, generisi `Gap Queue Summary` pre candidate-by-candidate trijaze.
+7. Po potrebi materializuj `LLM Decision Proposals` za trenutni `needs_review` slice.
 
 **Vazna pravila:**
 

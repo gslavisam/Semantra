@@ -6,6 +6,7 @@ import httpx
 import streamlit as st
 
 from streamlit_ui.api import current_workspace_scope
+from streamlit_ui.mapping_helpers import canonical_concept_labels
 from streamlit_ui.shared_views import render_status_badge_legend
 
 
@@ -94,6 +95,52 @@ def _split_mapping_explanation_lines(value: object) -> tuple[list[str], list[str
         else:
             general_lines.append(line)
     return general_lines, llm_lines
+
+
+def _auto_canonical_concept_label(canonical_details: dict | None) -> str:
+    canonical_details = canonical_details or {}
+    for scope in ("shared_concepts", "source_concepts", "target_concepts"):
+        labels = canonical_concept_labels({scope: canonical_details.get(scope) or []})
+        if labels:
+            return labels[0]
+    return ""
+
+
+def _canonical_concept_override_options(mapping: dict, candidates: list[dict] | None = None) -> list[str]:
+    options: list[str] = []
+    seen: set[str] = set()
+
+    def add_labels_from_details(details: dict | None) -> None:
+        details = details or {}
+        for scope in ("shared_concepts", "source_concepts", "target_concepts"):
+            for label in canonical_concept_labels({scope: details.get(scope) or []}):
+                if label and label not in seen:
+                    seen.add(label)
+                    options.append(label)
+
+    add_labels_from_details(mapping.get("canonical_details") or {})
+    for candidate in candidates or []:
+        add_labels_from_details(candidate.get("canonical_details") or {})
+    return options
+
+
+def _shared_canonical_target_candidates(ranked: dict) -> list[tuple[str, str]]:
+    candidates: list[tuple[str, str]] = []
+    for candidate in ranked.get("candidates", []):
+        target = str(candidate.get("target") or "").strip()
+        if not target:
+            continue
+        canonical_details = candidate.get("canonical_details") or {}
+        shared_concepts = canonical_details.get("shared_concepts") or []
+        if not shared_concepts:
+            continue
+        if all(isinstance(concept, str) for concept in shared_concepts):
+            labels = [str(concept).strip() for concept in shared_concepts if str(concept).strip()]
+        else:
+            labels = canonical_concept_labels({"shared_concepts": shared_concepts})
+        if labels:
+            candidates.append((target, ", ".join(labels)))
+    return sorted(dict(candidates).items(), key=lambda item: item[0])
 
 
 def _mapping_llm_proposal_confidence(
@@ -1627,6 +1674,73 @@ def display_trust_layer(
                     target_labels = canonical_concept_labels({"target_concepts": target_concepts})
                     if target_labels:
                         st.write(f"- Target concepts: {', '.join(target_labels)}")
+
+            manual_canonical_override_key = f"manual_canonical_concept_{source}"
+            if manual_canonical_override_key not in st.session_state:
+                st.session_state[manual_canonical_override_key] = str(
+                    entry.get("manual_canonical_concept") or _auto_canonical_concept_label(mapping.get("canonical_details"))
+                ).strip()
+            canonical_override_options = _canonical_concept_override_options(
+                mapping,
+                ranked.get("candidates") if isinstance(ranked, dict) else None,
+            )
+            if canonical_override_options:
+                selected_index = 0
+                current_value = str(st.session_state[manual_canonical_override_key] or "").strip()
+                if current_value in canonical_override_options:
+                    selected_index = canonical_override_options.index(current_value)
+                else:
+                    canonical_override_options.insert(0, current_value) if current_value else None
+                manual_canonical_concept = st.selectbox(
+                    "Canonical concept override",
+                    canonical_override_options,
+                    index=selected_index,
+                    key=manual_canonical_override_key,
+                    label_visibility="collapsed",
+                ).strip()
+            else:
+                manual_canonical_concept = st.text_input(
+                    "Canonical concept override",
+                    key=manual_canonical_override_key,
+                    placeholder="Enter or adjust the canonical concept label for this mapping.",
+                    label_visibility="collapsed",
+                ).strip()
+            entry["manual_canonical_concept"] = manual_canonical_concept
+            if manual_canonical_concept:
+                st.write("**Canonical path:**")
+                st.write(f"- {source} -> {manual_canonical_concept} -> {mapping.get('target') or 'unmapped'}")
+                if not (shared_concepts or source_concepts or target_concepts):
+                    st.caption(
+                        "Manual canonical concept set by reviewer. The system did not recognize a canonical concept for the current source/target pair."
+                    )
+                elif not shared_concepts:
+                    st.caption(
+                        "Manual canonical concept override is set. The system recognized source/target concepts, but they do not currently resolve to the same shared concept."
+                    )
+
+            same_concept_targets = _shared_canonical_target_candidates(mapping)
+            if same_concept_targets:
+                st.write("**Targets sharing source canonical concept:**")
+                for candidate_target, concept_labels in same_concept_targets:
+                    st.write(f"- {candidate_target} ({concept_labels})")
+                    if candidate_target != str(mapping.get("target") or "").strip():
+                        if st.button(
+                            f"Select {candidate_target}",
+                            key=f"select_canonical_target_{source}_{candidate_target}",
+                            help="Choose this target because it shares the same canonical concept with the source.",
+                            use_container_width=True,
+                        ):
+                            editor_state = st.session_state.setdefault("mapping_editor_state", {})
+                            entry = editor_state.setdefault(source, {})
+                            entry["target"] = candidate_target
+                            entry["status"] = "needs_review"
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": (
+                                    f"Selected target '{candidate_target}' for {source} because it shares the same canonical concept."
+                                ),
+                            }
+                            st.rerun()
 
             source_system, business_domain, integration_name = _current_hint_scope()
             st.write("**LLM mapping refine input:**")

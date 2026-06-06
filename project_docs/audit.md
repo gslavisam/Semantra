@@ -1,27 +1,5 @@
 Pre nego što dam zaključke, kratko skeniram realne signale van dokumentacije: veličinu/strukturu ključnih backend service-a, koliko testova zapravo postoji, i da li current_state.md ima delove o boundaries koje još nisam video. Tako audit neće biti samo prepričavanje dokumenata.    
 
-Read [](file:///d%3A/py_radno/Semantra/project_docs/current_state.md#200-200), lines 200 to 355
-
-Read [](file:///d%3A/py_radno/Semantra/backend/app/services)
-
-Read [](file:///d%3A/py_radno/Semantra/backend/tests)
-
-Read [](file:///d%3A/py_radno/Semantra/tests)
-
-Execution complete: Collect code/test size signals
-
-Ran terminal command: Get-ChildItem d:/py_radno/Semantra/backend/app/services -Filter *.py -File | ForEach-Object { [PSCustomObject]@{ File=$_.Name; Lines=(Get-Content $_.FullName | Measure-Object -Line).Lines } } | Sort-Object Lines -Descending | Select-Object -First 10 | Format-Table -AutoSize
-
-Ran terminal command: Get-ChildItem d:/py_radno/Semantra/backend/app/api/routes -Filter *.py -File | ForEach-Object { [PSCustomObject]@{ File=$_.Name; Lines=(Get-Content $_.FullName | Measure-Object -Line).Lines } } | Sort-Object Lines -Descending | Format-Table -AutoSize
-
-Ran terminal command: Get-ChildItem d:/py_radno/Semantra/streamlit_ui -Filter *.py -File | ForEach-Object { [PSCustomObject]@{ File=$_.Name; Lines=(Get-Content $_.FullName | Measure-Object -Line).Lines } } | Sort-Object Lines -Descending | Format-Table -AutoSize
-
-Ran terminal command: $backend = (Select-String -Path 'd:/py_radno/Semantra/backend/tests/*.py' -Pattern '^def test_' -AllMatches | Measure-Object).Count
-$ui = (Select-String -Path 'd:/py_radno/Semantra/tests/*.py' -Pattern '^def test_' -AllMatches | Measure-Object).Count
-"backend test functions: $backend"
-"ui test functions: $ui"
-
-Ran terminal command: $backend = (Select-String -Path 'D:/py_radno/Semantra/backend/tests/*.py' -Pattern '^def test_' -AllMatches | Measure-Object).Count ; $ui = (Select-String -Path 'D:/py_radno/Semantra/tests/*.py' -Pattern '^def test_' -AllMatches | Measure-Object).Count ; Write-Host "backend test functions: $backend" ; Write-Host "ui test functions: $ui"
 
 # Audit i preporuka — Semantra
 
@@ -110,3 +88,165 @@ Predlažem da naredni 3–4 talasa idu ovim redom, jer to istovremeno smanjuje r
 ## TL;DR
 
 Semantra je solidna pilot-ready aplikacija sa stvarnim governance enforcement-om i pristojnom test mrežom, ali je nakupila tehnički dug u par velikih servisa i UI fajlova, i još uvek ima fajl-backed canonical source-of-truth i in-memory job runtime. Najvrednije sledeće investicije su, redom: razbijanje god-object servisa i DB-only canonical authoring, pa durable job/status backend, pa novi `Epic 13D` discovery wave, a tek onda performance/precompute i LLM fusion.
+
+
+
+
+# 2026-06-06 Review
+Reviewing the app structure and key UX flows in `Workspace`, `Catalog`, `Benchmark`, and `Governance` to form a business/user-centric audit.
+
+## Business / User Flow Review
+
+I reviewed the current Semantra UI flow across Workspace, Catalog, Benchmark, and Governance by examining:
+
+- workspace_views.py
+- catalog_views.py
+- benchmark_views.py
+- governance.py
+- shared_views.py
+
+---
+
+## 1. Workspace Flow
+
+### Strengths
+- Clear section breakdown: `Setup → Review → Decisions → Output → Modelling Overview`
+- `render_workspace_tab()` is the single entrypoint, so the workflow is centralized and consistent.
+- Setup has strong upload + schema detection + companion metadata support.
+- Workspace Copilot provides section-aware guidance and handoffs.
+- The report builder already captures:
+  - executive summary
+  - scope/context
+  - business intent
+  - decision closure
+  - field-level signals
+  - graph evidence
+  - transformation rationale
+  - governance readiness
+
+### Observations
+- Workspace is quite rich and detailed, which is good for analysts but may overwhelm business users.
+- The `Selected Mapping and Transformation Summary` section is useful, but it can still feel dense if the table is large.
+- The report currently generates many sections; for business audiences, the top-level summary and “must know” bullets should be the most prominent.
+- `Review Evidence Highlights` and `Field-level Signals` are valuable, but they rely on `mapping_response` + session state, so users may still find the “selected mapping” section incomplete if the active mapping state is not fully initialized.
+
+### Potential UX improvements
+- Add a compact “current state” banner in Workspace showing:
+  - upload status
+  - review completeness
+  - open decisions count
+  - output block reason
+  - governance readiness
+- Make the report generation behavior more explicit when no mapping rows exist, to avoid a blank or “no rows” feeling.
+- For business users, consider collapsing the detailed markdown table behind a “Show mapping table” toggle.
+
+---
+
+## 2. Catalog Flow
+
+### Strengths
+- Good reuse guidance and workspace handoff messaging.
+- `_catalog_next_action_plan()` clearly maps catalog status to next actions in Workspace / Governance.
+- Field reuse shortlist and reuse-fit context are good for selective reuse decisions.
+- Catalog handoff logic is explicitly designed to keep the workspace context visible and prevent blind reuse.
+
+### Observations
+- The Catalog flow is business-oriented: it surfaces “open workspace handoff”, “review handoff”, and “governance handoff”.
+- It seems well-aligned to a process where catalog discovery feeds back into workspace decisions.
+- The current design may require better state visibility around “current loaded workspace snapshot vs catalog candidate” to avoid confusion.
+
+### Potential UX improvements
+- Add an explicit “Current Workspace Snapshot” card when comparing catalog candidates.
+- Show a small summary of:
+  - overlapping fields
+  - unmatched sources
+  - approval status
+  - governance risk
+- Emphasize that Catalog is a reuse/comparison surface, not the authoring surface.
+
+---
+
+## 3. Benchmark Flow
+
+### Strengths
+- The Benchmark page is clearly telemetry-focused.
+- It separates:
+  - saving current mapping as benchmark
+  - loading saved datasets
+  - running benchmark
+  - correction impact
+  - profile comparison
+  - explanation generation
+- It uses the governance helper to block benchmark saves until decisions are accepted, which is a strong business rule.
+
+### Observations
+- This is a good “quality evidence” flow for governance or audit use cases.
+- The current wording already positions benchmarks as evaluation/read-only rather than a place to edit mappings.
+
+### Potential UX improvements
+- Strengthen the label: “Benchmark quality review / audit evidence” to avoid confusion.
+- If possible, add a short “When to use Benchmarks” checklist:
+  - mapping decisions are accepted
+  - baseline is stable
+  - quality evidence is needed for governance
+- Consider a “ready to promote” indicator for benchmark datasets that have strong accuracy and correction-impact results.
+
+---
+
+## 4. Governance Flow
+
+### Strengths
+- Governance is implemented as guardrails and block reasons, not as the main mapping authoring flow.
+- `mapping_set_workspace_block_reason()` and `mapping_output_block_reason()` communicate why actions are blocked.
+- Catalog reuses governance handoff logic for status-based decisions.
+
+### Observations
+- Governance currently appears more like a safety layer than a full workflow surface.
+- That is okay, but business users may want a clearer governance readiness status in Workspace itself.
+- The Workspace report already includes a governance readiness section, which is good.
+
+### Potential UX improvements
+- Surface governance readiness prominently in:
+  - Workspace Output
+  - Modelling Overview report
+  - Catalog handoff panel
+- Add a straightforward card like:
+  - “Governance ready”
+  - “Needs approval”
+  - “Review canonical coverage first”
+- This would help business users know whether the current workspace state is ready for approval handoff.
+
+---
+
+## Overall Recommendations
+
+1. Keep the Workspace report strong, but make the top-level narrative even more business-first:
+   - “What changed”
+   - “What is still unresolved”
+   - “What should be approved next”
+
+2. In Workspace, make the navigation more explicit around “move to next stage”:
+   - review complete → decisions
+   - decisions accepted → output
+   - output contract ready → governance / catalog reuse
+
+3. In Catalog, ensure the reuse candidate and workspace comparison state are clearly labeled:
+   - “This catalog version is approved / draft”
+   - “This workspace snapshot includes X active decisions”
+   - “Reuse will import Y selected decisions”
+
+4. For Benchmarks, label it clearly as audit/quality evidence and keep users from trying to “edit mapping here.”
+
+5. For Governance, add a visible readiness indicator in Workspace and Catalog, rather than only using block messages.
+
+---
+
+## Conclusion
+
+The current app structure is quite solid. The strongest areas are:
+- Workflow segmentation in Workspace
+- Catalog reuse planning
+- Benchmark evidence separation
+- Governance block rules
+
+The main business/UX risk is complexity and information density. Simplifying the user-facing summaries and making the next action clearer will make the app more approachable for non-technical business users while preserving the strong technical capability underneath.
