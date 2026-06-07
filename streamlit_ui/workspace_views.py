@@ -845,7 +845,7 @@ def _workspace_modelling_decision_rationale(mapping_decision: dict) -> str:
     return ""
 
 
-def _workspace_modelling_key_decision_lines(mapping_decisions: list[dict], *, active_mapping_rows: list[dict] | None = None, max_items: int = 8) -> list[str]:
+def _workspace_modelling_key_decision_lines(mapping_decisions: list[dict], *, active_mapping_rows: list[dict] | None = None, max_items: int | None = None) -> list[str]:
     def _priority(item: dict) -> tuple[int, int]:
         status = str(item.get("status") or "needs_review").strip().lower() or "needs_review"
         resolution_type = str(item.get("resolution_type") or "direct_mapping").strip().lower() or "direct_mapping"
@@ -862,7 +862,7 @@ def _workspace_modelling_key_decision_lines(mapping_decisions: list[dict], *, ac
     }
 
     ordered = sorted(mapping_decisions, key=_priority, reverse=True)
-    selected = ordered[:max_items]
+    selected = ordered if max_items is None else ordered[:max_items]
     lines: list[str] = []
     for item in selected:
         source_name = _workspace_modelling_graph_source_label(item)
@@ -1075,7 +1075,7 @@ def _workspace_modelling_review_evidence_sort_key(item: dict) -> tuple[int, int,
     return (unresolved, canonical, -confidence, str(item.get("source") or ""))
 
 
-def _workspace_modelling_review_evidence_rows(mapping_response: dict | None, session_state: dict, *, max_items: int = 5) -> list[dict]:
+def _workspace_modelling_review_evidence_rows(mapping_response: dict | None, session_state: dict, *, max_items: int | None = None) -> list[dict]:
     rows = _workspace_modelling_active_mapping_rows(mapping_response, session_state)
     ranked = sorted(rows, key=_workspace_modelling_review_evidence_sort_key)
     evidence_rows: list[dict] = []
@@ -1092,7 +1092,7 @@ def _workspace_modelling_review_evidence_rows(mapping_response: dict | None, ses
                 "has_canonical": bool(_workspace_modelling_canonical_path_text(item)),
             }
         )
-        if len(evidence_rows) >= max_items:
+        if max_items is not None and len(evidence_rows) >= max_items:
             break
     return evidence_rows
 
