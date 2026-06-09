@@ -59,6 +59,7 @@ Semantra currently consists of:
 - a Streamlit product UI in `streamlit_app.py` and `streamlit_ui/*`
 - a SQLite persistence layer in `backend/semantra.sqlite3`
 - file-backed canonical/metadata seed inputs with DB-first runtime loading when the persisted seed is current
+- a complementary `semantra_agent` package that exposes the core runtime as a reusable Python SDK + backend adapter + agent integration layer for LangChain and LangGraph
 
 The main top-level UI areas are:
 

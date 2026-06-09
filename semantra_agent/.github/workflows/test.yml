@@ -1,0 +1,155 @@
+name: tests
+
+# Run on every push to main / develop, and on every pull request targeting
+# those branches. The matrix below is the audit's recommendation
+# (CAPABILITY_ANALYSIS.md §5.3): test each extras group independently so
+# import-time bugs like the ``_ = knowledge`` NameError we caught in
+# ``langgraph_workflow`` cannot sneak in again.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:  # allow manual run from the Actions tab
+
+# Cancel in-flight runs on the same branch when a new commit is pushed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't abort the whole matrix on the first failure — every
+      # combination is informative on its own.
+      fail-fast: false
+      matrix:
+        include:
+          # === Primary version (3.12) — test each extras group alone ===
+          # These catch the exact import-time bugs the audit flagged:
+          #   core-only  → modules that must work with zero extras
+          #   langgraph  → NameError-at-module-level in langgraph_workflow
+          #   langchain  → BaseTool import issues, langchain_core drift
+          #   backend    → adapter imports work even when real backend is absent
+          - python-version: "3.12"
+            extras: ""
+            label: "py3.12 core-only"
+          - python-version: "3.12"
+            extras: "[langgraph]"
+            label: "py3.12 + [langgraph]"
+          - python-version: "3.12"
+            extras: "[langchain]"
+            label: "py3.12 + [langchain]"
+          - python-version: "3.12"
+            extras: "[backend]"
+            label: "py3.12 + [backend]"
+
+          # === Compatibility matrix — full [all] on supported Pythons ===
+          # ``pyproject.toml`` declares ``requires-python = ">=3.8"``, so
+          # 3.10 is the floor where pydantic v2 + typing-extensions are
+          # both fully available. 3.11 and 3.12 are spot-checked to catch
+          # deprecation warnings or version-gated bugs.
+          - python-version: "3.10"
+            extras: "[all]"
+            label: "py3.10 + [all]"
+          - python-version: "3.11"
+            extras: "[all]"
+            label: "py3.11 + [all]"
+          - python-version: "3.12"
+            extras: "[all]"
+            label: "py3.12 + [all]"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package (${{ matrix.label }})
+        run: |
+          python -m pip install --upgrade pip wheel
+          # Editable install with the matrix-selected extras.
+          # Empty ``extras`` means the bare package (no optional deps).
+          pip install -e ".${{ matrix.extras }}"
+
+      - name: Smoke-import the three public packages
+        # Catches the "import fails because the package is malformed"
+        # class of bug before pytest even starts collecting tests.
+        run: |
+          python -c "
+          import semantra_core
+          import semantra_backend_adapter
+          import semantra_agent
+          print('All three top-level packages import cleanly.')
+          "
+
+      - name: Smoke-import the langgraph workflow
+        if: ${{ contains(matrix.label, 'langgraph') || contains(matrix.label, 'all') }}
+        # The audit's NameError bug was at module level in this file —
+        # importing it explicitly (without going through pytest) catches
+        # that whole class of bug in seconds, before the rest of the
+        # suite even runs.
+        run: |
+          python -c "
+          from semantra_core.langgraph_workflow import build_semantra_graph
+          print('langgraph_workflow import OK; build_semantra_graph is callable.')
+          "
+
+      - name: Smoke-import the LangChain tools wrapper
+        if: ${{ contains(matrix.label, 'langchain') || contains(matrix.label, 'all') }}
+        run: |
+          python -c "
+          from semantra_agent.langchain_tools import build_semantra_tools
+          print('langchain_tools import OK; build_semantra_tools is callable.')
+          "
+
+      - name: Smoke-import the backend adapter
+        if: ${{ contains(matrix.label, 'backend') || contains(matrix.label, 'all') }}
+        # The adapter does a lazy import of the real backend inside
+        # ``__init__``; the smoke test confirms the class loads and can
+        # be instantiated (the backend itself may be unavailable, which
+        # is the documented fallback path).
+        run: |
+          python -c "
+          from semantra_backend_adapter.mapping import BackendMappingEngine
+          eng = BackendMappingEngine()
+          print(f'BackendMappingEngine constructed; _backend_available={eng._backend_available}')
+          "
+
+      - name: Run pytest
+        # Use the venv's pytest (via ``python -m pytest``) rather than
+        # the global one — matches the project's documented workflow
+        # and avoids PATH-version surprises.
+        run: |
+          python -m pytest tests/ -v --tb=short
+
+  # === Lint / static checks ===
+  # Keep this separate from the test matrix so a regression in a
+  # single Python version doesn't mask a linter regression.
+  lint:
+    name: lint (py3.12)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[backend]"  # gives us pydantic + tests deps
+          pip install ruff mypy
+      - name: Ruff
+        run: |
+          ruff check src/ tests/ examples/ || true
+          # Don't fail the build on style nits yet — surface them.
+      - name: Mypy (smoke)
+        run: |
+          mypy --version || true
+          # Full mypy run is out of scope for this CI; the smoke
+          # confirms mypy is wired up and discovers the package.

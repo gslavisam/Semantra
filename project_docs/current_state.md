@@ -12,6 +12,7 @@ What Semantra is today:
 - a searchable catalog of approved integration knowledge and concept reuse
 - a benchmark and regression surface for measuring mapping quality changes
 - a deterministic-first product with bounded AI assistance rather than autonomous mapping
+- a complementary agentic SDK surface in `semantra_agent/` for scripted and agent-driven use cases, documented separately from the Streamlit product UI
 
 What Semantra is not yet:
 

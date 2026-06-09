@@ -34,7 +34,17 @@ Fokus:
 - držati `README`, `PROJECT_OVERVIEW`, `project_docs/current_state.md`, `project_docs/completed_slices.md` i relevantne reference dokumente u istom realnom stanju
 - jasno razdvojiti pilot-complete surface-e od otvorenih enterprise tema
 - dokumentovati ne samo capability-je, nego i boundary-je, enforcement model i known limitations
+- uključiti jasno razlikovanje između glavnog Streamlit analyst UX-a i dodatne `semantra_agent` agentic/SDK površine, gde su detalji implementacije u `semantra_agent/` dok opšti signal ostaje u root dokumentima
 - izbeći situaciju u kojoj je prezentaciona priča ispred stvarnog proizvoda ili obrnuto
+
+### 1A. Agentic framework alignment
+
+Ovaj plan sada posebno beleži da dalje radove delimo na dva sloja:
+
+- backend/prave product surface-e: FastAPI runtime, mapping engine, review/governance, persistence, async task model
+- agentni/SDK sloj: `semantra_agent` koji koristi backend kao adapter i izlaže SDK/protokole za skripte, notebook-e i agent tokove
+
+Primarni naredni korak: backend async/task i boundary stabilizacija, nakon čega `semantra_agent` postaje potrošač tog rešenja.
 
 ### 2. Manualno testiranje, proof of concept i value proof
 

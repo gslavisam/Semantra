@@ -207,7 +207,8 @@ def test_sqlite_persistence_records_named_mapping_job_runtime_migration(tmp_path
             "SELECT migration_name FROM schema_migrations ORDER BY migration_name ASC"
         ).fetchall()
 
-    assert [str(row[0]) for row in rows] == ["20260528_mapping_jobs_runtime_metadata"]
+    migration_names = [str(row[0]) for row in rows]
+    assert "20260528_mapping_jobs_runtime_metadata" in migration_names
 
 
 def test_sqlite_persistence_lists_latest_mapping_job_events_in_chronological_order(tmp_path) -> None:

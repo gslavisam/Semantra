@@ -36,7 +36,56 @@ Za svaki pravac radimo istim redosledom:
 
 ### 1. Produktizacija bounded guidance površina
 
-Status: pilot-validated; carry-forward only if new browser smoke or pilot runs expose drift.
+Status: pilot-validated; carry-forward only if new browser smoke ili pilot runs expose drift.
+
+### 2. Agentic framework alignment
+
+Status: active.
+
+Fokus:
+
+- dokumentovati `semantra_agent` kao paralelnu SDK/agenticu površinu u root dokumentima
+- držati detalje implementacije u `semantra_agent/README.md` i `semantra_agent/docs/`
+- izbeći da root dokumenti prepravljaju ili dupliraju implementacione detalje; oni treba da pokažu signal i boundary
+- potvrditi sledeći razvojni tok: backend async/task model prvo, onda SDK/adapter potrošač
+
+Operativni tracker:
+
+- [ ] ažurirati root `README.md` i `PROJECT_OVERVIEW.md` sa refleksijom `semantra_agent` kao komplementarne integracione površine
+- [ ] ažurirati `project_docs/plan.md`, `project_docs/epics.md`, `project_docs/implementation_checklists.md` sa jasnom podelom backend vs. agent/SDK sledećeg iteracionog toka
+- [ ] ažurirati `project_docs/current_state.md` sa kratkim stavom o sadašnjoj `semantra_agent` integraciji
+- [ ] dodati ili potvrditi `semantra_agent` smoke testove i CI usmerenje za agentic packaging ako još nije pokriveno
+- [ ] dokumentovati sledeći iteracioni razvoj za backend async task model i agent batch potrošnju
+
+### 3. Backend async task model + agentic async integration
+
+Status: ready to start.
+
+Napomena: prvi podkorak je backend inicijativa, ne agent. Agentic sloj dolazi kasnije i zavisi od backend async task modela.
+
+Fokus:
+
+- implementirati backend async task model i status endpoint-e
+- definisati backend async task API contract i status/poll/cancel endpoint-e
+- izgraditi async protokole u `semantra_core`
+- dopuniti `semantra_backend_adapter` da koristi nove async backend putanje
+- doraditi `langchain_tools` za async protokole i testove
+- napraviti agent batch demo koji paralelno mapira više izvora i proverava progres
+
+Operativni tracker:
+
+- [ ] definisati backend async task API contract i status/poll/cancel endpoint-e
+- [ ] implementirati backend async mapping job servis i status persistence
+- [ ] dodati `AsyncMappingEngine`, `AsyncLLMService` i eventualno `AsyncConnector` protokole u `semantra_core`
+- [ ] proširiti `semantra_backend_adapter` sa async adapter metodama i backend task potrošnjom
+- [ ] doraditi `semantra_agent/langchain_tools.py` da koristi async protokole kada su dostupni
+- [ ] dodati testove za async `langchain_tools` i adapter async path
+- [ ] napraviti demo / notebook koji pokreće paralelno više mapping batch poziva i prati progres
+- [ ] ažurirati dokumentaciju primera da prikaže novi async agent path
+
+### 4. Session continuity and resume-by-design
+
+Status: selected next discovery/design focus.
 
 Napomena:
 

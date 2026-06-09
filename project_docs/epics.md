@@ -56,6 +56,26 @@ Trenutno stanje:
 
 - canonical concepts, canonical-only mapping i canonical coverage su baza proizvoda
 
+### Epic 16: Agentic Framework and SDK Integration
+
+Status: implemented MVP; active doc/alignment focus.
+
+Trenutno stanje:
+
+- `semantra_agent` package is present and contains:
+  - `semantra_core`: reusable Pydantic models, service protocols, and reference implementations
+  - `semantra_backend_adapter`: lazy backend adapters for mapping, knowledge, LLM, and connector services
+  - `semantra_agent`: LangChain tool wrappers and LangGraph workflow helpers
+- the implementation is already available and can be consumed independently of the Streamlit UI
+- backend adapter uses `write_decision_log=False` for SDK mapping calls and preserves rich backend payloads through a validated conversion layer
+
+Otvoreno:
+
+- full docs alignment across root Semantra documentation and `semantra_agent/` docs
+- async protocol extension and agent batch scenarios for `MappingEngine` and `LLMService`
+- explicit product boundary and integration story so the SDK surface is seen as complementary, not a duplicate UI
+- agentic smoke tests and CI coverage for `langchain_tools` and `langgraph_workflow`
+
 ### Epic 6: Governance and Versioning
 
 Status: MVP completed.

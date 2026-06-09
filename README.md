@@ -17,6 +17,8 @@ It combines deterministic profiling and ranking with bounded AI assistance so a 
 
 The current product shape is a FastAPI backend plus a Streamlit product UI. It is already useful for demos, pilot workflows, and controlled analyst/governance review. It is not yet a production ETL runtime, scheduler, or connector-heavy integration platform.
 
+A complementary package lives in `semantra_agent/`: it exposes the core mapping, knowledge, and bounded LLM runtime as a reusable Python SDK with backend adapters and agent integration helpers for LangChain and LangGraph. That package is documented separately in `semantra_agent/README.md` and is intended as a programmatic integration surface rather than a replacement for the Streamlit analyst UI.
+
 ## Current Product Surface
 
 Top-level UI areas:
