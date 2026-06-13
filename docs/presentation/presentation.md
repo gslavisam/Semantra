@@ -62,6 +62,7 @@ What Semantra Is Today
 - FastAPI backend plus Streamlit product UI
 - deterministic-first mapping engine with bounded AI assistance
 - SQLite-backed artifact, catalog, and governance memory
+- complementary `semantra_agent` SDK in active development for scripted and agent-driven use cases
 
 **Key message:**
 Semantra is already useful in controlled analyst and pilot workflows today, even though it is not yet a production orchestration platform.
@@ -86,6 +87,9 @@ The product now has clear operator-facing areas rather than one generic review s
 
 **Talk track:**
 `Workspace` covers ingest, mapping, review, decisions, preview, code generation, and bounded `Workspace Copilot` guidance. `Governance` contains `Canonical Console` and stewardship workflows. `Catalog` supports search and reuse. `Benchmarks` measures quality. `System` supports runtime inspection and operational controls.
+
+**Sidebar note:**
+The UI also includes a multi-view sidebar for `System`, `WS Copilot`, `WS Brief`, `Help`, and `Reference`.
 
 ---
 
@@ -156,6 +160,7 @@ Governance Model Today
 - advisory preview before final approval
 - governance-gated code generation and transformation test execution
 - closed-review-only durable corrections
+- first pilot RBAC slice with role-based access for mapping and draft session surfaces
 
 **Key message:**
 Trust comes from explicit control points, not from pretending that all automation is safe by default.
@@ -211,6 +216,7 @@ Typical Workflow Story
 2. generate ranked mapping suggestions
 3. inspect trust layer and canonical paths
 4. review or override mappings
+4.5 optionally save draft sessions for continuity across review cycles
 5. preview transformations and generate code when accepted
 6. save governed mapping sets
 7. search and reuse existing work later through Catalog
@@ -232,6 +238,7 @@ Architecture Overview
 - modular Streamlit UI for product flows
 - SQLite persistence for governed artifacts and semantic memory
 - file-backed canonical seed inputs with DB-first runtime loading
+- complementary `semantra_agent` SDK layer for LangChain/LangGraph and scripted integration use cases
 
 **Key message:**
 The architecture is already structured for pilot-grade product growth, not just for a single script demo.
@@ -283,6 +290,7 @@ Where the Product Goes Next
 - manual pilot proof and value validation
 - repeatable live demo and presentation discipline
 - enterprise-wide hardening only after proven value
+- evolve the complementary `semantra_agent` SDK as part of the broader agentic integration surface
 
 **Key message:**
 The next step is to prove and package the value of the current product clearly before expanding it into a broader enterprise program.
@@ -314,4 +322,5 @@ If a live demo is included, use this sequence:
 2. `Workspace` to show draft-session continuity and active review context
 3. `Catalog` diff or stewardship handoff to show governed follow-up
 4. `Benchmarks` to show profile comparison and explanation
-5. use the broader `Workspace > Setup -> Review -> Decisions -> Output` walkthrough only as an extended technical appendix when the audience wants implementation depth
+5. `WS Copilot` to show bounded closure/readiness guidance in the live workflow
+6. use the broader `Workspace > Setup -> Review -> Decisions -> Output` walkthrough only as an extended technical appendix when the audience wants implementation depth
