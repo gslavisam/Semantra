@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.models.mapping import (
     AutoMappingResponse,
     BenchmarkExplanationRequest,
+    CanonicalGapCandidate,
     CatalogReuseFitRequest,
     CatalogReuseFitWorkspaceContext,
     MappingAnalysisOptions,
@@ -31,6 +32,7 @@ from app.services.llm_service import (
     LLMPromptEnvelope,
     StaticLLMProvider,
     build_artifact_refinement_prompt,
+    build_canonical_gap_prompt,
     build_transformation_spec_prompt,
     build_transformation_generator_prompt,
     build_validator_prompt_envelope,
@@ -155,7 +157,10 @@ def test_llm_transformation_logs_classified_failures(caplog: pytest.LogCaptureFi
             max_retries=1,
         )
 
-    assert result is None
+    assert result is not None
+    assert result.transformation_code == ""
+    assert any("invalid_json" in warning for warning in result.warnings)
+    assert "LLM did not produce a valid transformation payload" in result.reasoning[0]
     assert "invalid_json" in caplog.text
 
 
@@ -193,6 +198,28 @@ def test_validator_prompt_includes_description_aware_context_with_guardrails() -
     assert "strongest alternative was rejected" in prompt
 
 
+def test_canonical_gap_prompt_prefers_clear_concept_matches_over_no_action() -> None:
+    candidate = CanonicalGapCandidate(
+        source="MAKTX",
+        target="material_description",
+        confidence=0.7,
+        explanation=["Source labels suggest a clear material description concept."],
+        canonical_details={},
+    )
+
+    prompt = build_canonical_gap_prompt(
+        candidate=candidate,
+        nearest_concepts=[
+            {"concept_id": "material.description", "display_name": "Material Description", "aliases": ["material_description", "material description"]}
+        ],
+    )
+
+    assert "Treat source and target labels as primary evidence" in prompt
+    assert "Return no_action only when the candidate is genuinely ambiguous" in prompt
+    assert '"allowed_actions": ["existing_concept_alias", "new_canonical_concept", "no_action"]' in prompt
+    assert '"reject_no_action_unless_there_is_no_clear_concept_match": true' in prompt
+
+
 def test_validator_prompt_envelope_separates_system_task_and_payload() -> None:
     envelope = build_validator_prompt_envelope(
         source_field={"name": "AKONT", "sample_values": ["1000"]},
@@ -228,6 +255,19 @@ def test_request_llm_json_accepts_prompt_envelope_with_static_provider() -> None
     assert "SYSTEM:" in captured["prompt"]
     assert "TASK:" in captured["prompt"]
     assert "PAYLOAD:" in captured["prompt"]
+
+
+def test_request_llm_json_returns_raw_response_on_invalid_json() -> None:
+    provider = StaticLLMProvider("not-json")
+
+    response = request_llm_json(provider, "prompt", timeout_seconds=1.0, retries=1, operation_name="validator")
+
+    assert response is not None
+    raw_response, parsed = response
+    assert raw_response == "not-json"
+    assert parsed["error"] == "invalid_json"
+    assert parsed["raw_response"] == "not-json"
+    assert "error_message" in parsed
 
 
 def test_bounded_llm_timeout_uses_explicit_setting() -> None:

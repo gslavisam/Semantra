@@ -1,0 +1,6 @@
+Column,Description,Type,Sample Values
+col_1,Target account identifier with prefix semantics,string,C-1001|C-1002|C-1003
+col_2,Official customer or company name used by destination,string,Acme North|Contoso Trade|Fabrikam Retail
+col_3,Customer country code used for reporting and market segmentation,string,RS|CZ|HR
+col_4,Account tier or customer service level,string,Premium|Standard|Enterprise
+col_5,Contract or go-live date of the target customer record,date,2024-01-15|2023-11-08

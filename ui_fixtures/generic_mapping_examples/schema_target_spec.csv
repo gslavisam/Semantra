@@ -1,0 +1,6 @@
+Column,Description,Type,Example Values
+col_1,Canonical account identifier in destination system with prefix semantics,string,C-1001
+col_2,Customer or company name used for reporting and CRM,string,Acme North
+col_3,Customer country code for billing and market segmentation,string,RS
+col_4,Customer tier or service level classification,string,Premium
+col_5,Target customer record go-live or contract date,date,2024-01-15

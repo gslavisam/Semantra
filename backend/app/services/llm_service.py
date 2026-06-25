@@ -6,9 +6,9 @@ import json
 import logging
 import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib import parse, request
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from typing import Any, Callable, Protocol
 
 from app.core.config import settings
@@ -121,7 +121,7 @@ def _prompt_user_text(prompt: str | LLMPromptEnvelope) -> str:
 class LLMProvider(Protocol):
     """Protocol implemented by bounded LLM providers used throughout Semantra."""
 
-    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
         ...
 
 
@@ -131,7 +131,7 @@ class StaticLLMProvider:
 
     responder: Callable[[str], str] | str
 
-    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
         rendered_prompt = _prompt_text(prompt)
         if callable(self.responder):
             return self.responder(rendered_prompt)
@@ -146,7 +146,7 @@ class OpenAIResponsesProvider:
     model: str | None = None
     base_url: str | None = None
 
-    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
         if isinstance(prompt, LLMPromptEnvelope):
             input_payload: str | list[dict[str, object]] = []
             system_text = _prompt_system_text(prompt)
@@ -155,13 +155,14 @@ class OpenAIResponsesProvider:
             input_payload.append({"role": "user", "content": [{"type": "input_text", "text": _prompt_user_text(prompt)}]})
         else:
             input_payload = prompt
-        payload = json.dumps(
-            {
-                "model": self.model or settings.llm_model,
-                "input": input_payload,
-                "temperature": 0,
-            }
-        ).encode("utf-8")
+        payload_dict: dict[str, object] = {
+            "model": self.model or settings.llm_model,
+            "input": input_payload,
+            "temperature": 0,
+        }
+        if json_mode:
+            payload_dict["text"] = {"format": {"type": "json_object"}}
+        payload = json.dumps(payload_dict).encode("utf-8")
         headers = {
             "Content-Type": "application/json",
         }
@@ -185,11 +186,13 @@ class OllamaProvider:
     model: str
     base_url: str | None = None
 
-    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
         body: dict[str, object] = {"model": self.model, "prompt": _prompt_user_text(prompt), "stream": False}
         system_text = _prompt_system_text(prompt)
         if system_text:
             body["system"] = system_text
+        if json_mode:
+            body["format"] = "json"
         payload = json.dumps(body).encode("utf-8")
         http_request = request.Request(
             self.base_url or settings.ollama_base_url,
@@ -210,6 +213,7 @@ class LMStudioProvider:
 
     model: str | None
     base_url: str
+    _cached_model: str | None = field(default=None, repr=False, compare=False)
 
     def _chat_url(self) -> str:
         parsed_url = parse.urlparse(self.base_url)
@@ -253,23 +257,14 @@ class LMStudioProvider:
         configured_model = (self.model or "").strip()
         if configured_model and configured_model.lower() != "auto":
             return configured_model
+        if self._cached_model:
+            return self._cached_model
+        resolved = self.list_models(timeout_seconds)[0]
+        self._cached_model = resolved
+        return resolved
 
-        return self.list_models(timeout_seconds)[0]
-
-    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float) -> str:
-        model = self._resolve_model(timeout_seconds)
-        messages = []
-        system_text = _prompt_system_text(prompt)
-        if system_text:
-            messages.append({"role": "system", "content": system_text})
-        messages.append({"role": "user", "content": _prompt_user_text(prompt)})
-        payload = json.dumps(
-            {
-                "model": model,
-                "messages": messages,
-                "temperature": 0,
-            }
-        ).encode("utf-8")
+    def _make_chat_request(self, payload_dict: dict, timeout_seconds: float) -> str:
+        payload = json.dumps(payload_dict).encode("utf-8")
         http_request = request.Request(
             self._chat_url(),
             data=payload,
@@ -279,6 +274,33 @@ class LMStudioProvider:
         with request.urlopen(http_request, timeout=timeout_seconds) as response:
             body = json.loads(response.read().decode("utf-8"))
         return body["choices"][0]["message"]["content"]
+
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
+        model = self._resolve_model(timeout_seconds)
+        messages = []
+        system_text = _prompt_system_text(prompt)
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        messages.append({"role": "user", "content": _prompt_user_text(prompt)})
+        payload_dict: dict[str, object] = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0,
+        }
+        if json_mode:
+            payload_dict["response_format"] = {"type": "json_object"}
+        try:
+            return self._make_chat_request(payload_dict, timeout_seconds)
+        except HTTPError as exc:
+            # If json_mode caused a compatibility error (400/422), retry without it
+            if json_mode and exc.code in (400, 422):
+                logger.debug(
+                    "LM Studio rejected json_object response_format (HTTP %s); retrying without json_mode",
+                    exc.code,
+                )
+                payload_dict.pop("response_format", None)
+                return self._make_chat_request(payload_dict, timeout_seconds)
+            raise
 
 
 def summarize_llm_runtime() -> dict[str, object]:
@@ -439,14 +461,20 @@ class GeminiProvider:
     model: str
     base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
-    def generate(self, prompt: str, timeout_seconds: float) -> str:
-        payload = json.dumps(
-            {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0,
-            }
-        ).encode("utf-8")
+    def generate(self, prompt: str | LLMPromptEnvelope, timeout_seconds: float, *, json_mode: bool = False) -> str:
+        messages = []
+        system_text = _prompt_system_text(prompt)
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        messages.append({"role": "user", "content": _prompt_user_text(prompt)})
+        payload_dict: dict[str, object] = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": 0,
+        }
+        if json_mode:
+            payload_dict["response_format"] = {"type": "json_object"}
+        payload = json.dumps(payload_dict).encode("utf-8")
         http_request = request.Request(
             self.base_url,
             data=payload,
@@ -496,6 +524,73 @@ def classify_llm_error(error: Exception) -> str:
     return error.__class__.__name__.lower()
 
 
+def _build_llm_json_error_response(raw_response: str, error: Exception) -> tuple[str, dict]:
+    return (
+        raw_response,
+        {
+            "raw_response": raw_response,
+            "error": classify_llm_error(error),
+            "error_message": str(error),
+        },
+    )
+
+
+def _salvage_transformation_code(raw_response: str) -> str | None:
+    """Try regex-based extraction of transformation_code when JSON parsing produced empty/broken output.
+
+    Handles two common failure modes of small models:
+    - Properly escaped JSON string that somehow broke standard parsing
+    - Code with unescaped double quotes (e.g. df_source["col"]) inside the JSON value
+    """
+    if not raw_response:
+        return None
+
+    # Strategy 1: standard escaped JSON string value
+    match = re.search(r'"transformation_code"\s*:\s*"((?:[^"\\]|\\.)+)"', raw_response)
+    if match:
+        code = match.group(1)
+        code = code.replace('\\"', '"').replace('\\n', '\n').replace('\\t', '\t').replace('\\\\', '\\')
+        code = sanitize_generated_code(code.strip())
+        if code:
+            logger.debug("salvaged transformation_code via strategy-1 (escaped string)")
+            return code
+
+    # Strategy 2: code contains unescaped double quotes; grab up to next top-level key or closing brace
+    match = re.search(
+        r'"transformation_code"\s*:\s*"(.+?)"\s*(?:,\s*"(?:reasoning|warnings|error|code)"|(?:\s*\}))',
+        raw_response,
+        re.DOTALL,
+    )
+    if match:
+        code = sanitize_generated_code(match.group(1).strip())
+        if code:
+            logger.debug("salvaged transformation_code via strategy-2 (greedy up to next key)")
+            return code
+
+    return None
+
+
+def _build_transformation_generation_fallback(raw_response: str, error: str | None = None) -> TransformationGenerationResponse:
+    warning = (
+        f"LLM fallback: {error}."
+        if error
+        else "LLM fallback: invalid or incomplete transformation output."
+    )
+    snippet = raw_response.strip()
+    if len(snippet) > 800:
+        snippet = f"{snippet[:800]}..."
+    warnings = [warning]
+    if snippet:
+        warnings.append(f"raw_response: {snippet}")
+    return TransformationGenerationResponse(
+        transformation_code="",
+        reasoning=[
+            "LLM did not produce a valid transformation payload, so a fallback response is returned."
+        ],
+        warnings=warnings,
+    )
+
+
 def normalize_llm_list_field(value: object) -> list[str]:
     """Normalize a string-or-list LLM field into a list of strings."""
 
@@ -517,7 +612,7 @@ def request_llm_json(
 
     for attempt in range(retries):
         try:
-            raw_response = provider.generate(prompt, timeout_seconds)
+            raw_response = provider.generate(prompt, timeout_seconds, json_mode=True)
             return raw_response, parse_llm_json_payload(raw_response)
         except Exception as error:
             logger.warning(
@@ -528,7 +623,8 @@ def request_llm_json(
                 classify_llm_error(error),
                 error,
             )
-
+            if isinstance(error, json.JSONDecodeError) and attempt == retries - 1:
+                return _build_llm_json_error_response(raw_response, error)
         if attempt < retries - 1:
             time.sleep(0.05)
 
@@ -595,7 +691,7 @@ def parse_artifact_refinement_payload(raw_response: str) -> dict:
 
 
 def parse_llm_json_payload(raw_response: str) -> dict:
-    """Parse JSON from raw model output, tolerating markdown fences and leading prose."""
+    """Parse JSON from raw model output, tolerating markdown fences, leading prose, and repeated payload echoes."""
 
     candidates = [raw_response, strip_markdown_code_fences(raw_response)]
     for candidate in candidates:
@@ -605,10 +701,12 @@ def parse_llm_json_payload(raw_response: str) -> dict:
         try:
             return json.loads(normalized)
         except json.JSONDecodeError:
-            extracted = extract_first_json_object(normalized)
-            if extracted is None:
-                continue
-            return json.loads(extracted)
+            objects = extract_json_objects(normalized)
+            for obj in objects:
+                try:
+                    return json.loads(obj)
+                except json.JSONDecodeError:
+                    continue
     raise json.JSONDecodeError("Could not parse JSON from LLM response", raw_response, 0)
 
 
@@ -627,16 +725,18 @@ def strip_markdown_code_fences(raw_response: str) -> str:
     return "\n".join(lines).strip()
 
 
-def extract_first_json_object(raw_response: str) -> str | None:
-    """Extract the first balanced JSON object embedded in model output text."""
+def extract_json_objects(raw_response: str) -> list[str]:
+    """Extract all balanced JSON objects embedded in model output text."""
 
+    objects: list[str] = []
     start = raw_response.find("{")
     if start < 0:
-        return None
+        return objects
 
     depth = 0
     in_string = False
     escaping = False
+    object_start = None
     for index in range(start, len(raw_response)):
         char = raw_response[index]
         if in_string:
@@ -652,13 +752,30 @@ def extract_first_json_object(raw_response: str) -> str | None:
             in_string = True
             continue
         if char == "{":
+            if depth == 0:
+                object_start = index
             depth += 1
         elif char == "}":
             depth -= 1
-            if depth == 0:
-                return raw_response[start : index + 1]
+            if depth == 0 and object_start is not None:
+                objects.append(raw_response[object_start : index + 1])
+                object_start = None
 
-    return None
+    return objects
+
+
+def extract_first_json_object(raw_response: str) -> str | None:
+    """Extract the first balanced JSON object embedded in model output text."""
+
+    objects = extract_json_objects(raw_response)
+    return objects[0] if objects else None
+
+
+def extract_last_json_object(raw_response: str) -> str | None:
+    """Extract the last balanced JSON object embedded in model output text."""
+
+    objects = extract_json_objects(raw_response)
+    return objects[-1] if objects else None
 
 
 def truncate_prompt_text(value: object, max_length: int) -> str:
@@ -732,6 +849,15 @@ def call_validator(
         return None
 
     raw_response, parsed = response
+    if parsed.get("error"):
+        logger.warning(
+            "LLM validator response rejected (%s): %s",
+            parsed.get("error"),
+            parsed.get("error_message"),
+        )
+        logger.debug("LLM validator raw response: %s", raw_response)
+        return None
+
     try:
         # Accept both old and new keys for backward compatibility
         confidence = float(parsed.get("confidence_score", parsed.get("confidence", 0.5)))
@@ -784,15 +910,42 @@ def call_transformation_generator(
 
     response = request_llm_json(provider, prompt, timeout, retries, "transformation")
     if response is None:
-        return None
+        return _build_transformation_generation_fallback("", "no_response")
 
     _raw_response, parsed = response
+    if parsed.get("error"):
+        logger.warning(
+            "LLM transformation response rejected (%s): %s",
+            parsed.get("error"),
+            parsed.get("error_message"),
+        )
+        logger.debug("LLM transformation raw response: %s", _raw_response)
+        # Try to salvage transformation_code from the broken raw response
+        salvaged = _salvage_transformation_code(_raw_response)
+        if salvaged:
+            logger.info("Salvaged transformation_code from broken LLM response (%s)", parsed.get("error"))
+            return TransformationGenerationResponse(
+                transformation_code=salvaged,
+                reasoning=["Salvaged from partially-structured LLM response."],
+                warnings=[f"LLM response had parse issues ({parsed.get('error')}); code was salvaged via regex extraction."],
+            )
+        return _build_transformation_generation_fallback(_raw_response, parsed.get("error"))
+
     try:
         transformation_code = sanitize_generated_code(
             str(parsed.get("transformation_code") or parsed.get("code") or "").strip()
         )
         if not transformation_code:
-            return None
+            # JSON parsed OK but code field is empty — try to salvage anyway
+            salvaged = _salvage_transformation_code(_raw_response)
+            if salvaged:
+                logger.info("Salvaged transformation_code from empty field in valid JSON response")
+                return TransformationGenerationResponse(
+                    transformation_code=salvaged,
+                    reasoning=normalize_llm_list_field(parsed.get("reasoning") or parsed.get("explanation") or []),
+                    warnings=normalize_llm_list_field(parsed.get("warnings") or ["Code field was empty; salvaged via regex extraction."]),
+                )
+            return _build_transformation_generation_fallback(_raw_response, "empty_transformation_code")
 
         return TransformationGenerationResponse(
             transformation_code=transformation_code,
@@ -801,8 +954,7 @@ def call_transformation_generator(
         )
     except Exception as error:
         logger.warning("LLM transformation response rejected (%s): %s", classify_llm_error(error), error)
-
-    return None
+        return _build_transformation_generation_fallback(_raw_response, classify_llm_error(error))
 
 
 def call_transformation_spec_generator(
@@ -832,6 +984,15 @@ def call_transformation_spec_generator(
         return None
 
     _raw_response, parsed = response
+    if parsed.get("error"):
+        logger.warning(
+            "LLM transformation spec response rejected (%s): %s",
+            parsed.get("error"),
+            parsed.get("error_message"),
+        )
+        logger.debug("LLM transformation spec raw response: %s", _raw_response)
+        return None
+
     try:
         raw_spec = parsed.get("transformation_spec") or parsed.get("spec") or parsed
         proposed_spec = TransformationSpec.model_validate(raw_spec)
@@ -958,6 +1119,15 @@ def call_canonical_gap_assistant(
         return None
 
     raw_response, parsed = response
+    if parsed.get("error"):
+        logger.warning(
+            "LLM canonical gap response rejected (%s): %s",
+            parsed.get("error"),
+            parsed.get("error_message"),
+        )
+        logger.debug("LLM canonical gap raw response: %s", raw_response)
+        return None
+
     try:
         suggestion = CanonicalGapSuggestion(
             action=parsed.get("action", "no_action"),
@@ -1066,7 +1236,8 @@ def build_canonical_gap_prompt_envelope(
             "allowed_actions": ["existing_concept_alias", "new_canonical_concept", "no_action"],
             "do_not_invent_source_or_target_fields": True,
             "prefer_existing_concepts_when_semantically_correct": True,
-            "return_no_action_if_uncertain_or_generic": True,
+            "return_no_action_only_if_uncertain_or_generic": True,
+            "reject_no_action_unless_there_is_no_clear_concept_match": True,
         },
         "response_format": {
             "action": "existing_concept_alias | new_canonical_concept | no_action",
@@ -1096,16 +1267,8 @@ def build_transformation_generator_prompt_envelope(
         "source_field": sanitize_prompt_field_context(source_field),
         "target_field": sanitize_prompt_field_context(target_field),
         "user_instruction": user_instruction,
-        "rules": {
-            "json_only": True,
-            "language": "python-pandas",
-            "allowed_objects": ["df_source", "df_target", "pd"],
-            "allow_expression_only": True,
-            "description_truncation": MAX_PROMPT_DESCRIPTION_LENGTH,
-            "sample_values_limit": MAX_PROMPT_SAMPLE_VALUES,
-        },
         "response_format": {
-            "transformation_code": "string",
+            "transformation_code": "string (pandas expression or empty string for direct mapping)",
             "reasoning": ["short bullet points"],
             "warnings": ["short bullet points"],
         },

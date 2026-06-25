@@ -1,0 +1,9 @@
+This schema-only source definition uses generic column names and descriptive metadata only. It should be sufficient for an LLM or schema inference process to deduce business meaning without row-level values.
+
+- col_1: Legacy customer account key, likely integer-based.
+- col_2: Customer legal or trading name.
+- col_3: Source country code for the customer, probably ISO-3166 alpha-2.
+- col_4: Account activation or effective date.
+- col_5: Annual revenue, contract value, or business volume measure.
+
+The focus is on semantic understanding of each field from the description itself, rather than on actual sample rows.

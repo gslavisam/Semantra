@@ -1,0 +1,9 @@
+This schema-only target definition describes the destination account profile in a canonical system. There is no row content, so the destination meaning must be inferred from the text alone.
+
+- col_1: Canonical customer account identifier in the target system, with a prefixed format.
+- col_2: Customer/company name used by the destination business process.
+- col_3: Standard country code used for reporting and segmentation.
+- col_4: Customer tier, service level, or account classification.
+- col_5: Target record effective or contract date.
+
+The goal is to enable mapping and schema matching from source descriptions to destination descriptions without sample row values.

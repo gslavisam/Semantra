@@ -1,0 +1,9 @@
+Source dataset is legacy account master data for a sales system. The file uses generic column names while the descriptions explain real business meaning:
+
+- col_1: Unique numeric customer account ID in the source system.
+- col_2: Customer or company name as stored in the source.
+- col_3: Two-letter country code for the customer billing or operating region.
+- col_4: Account start or activation date.
+- col_5: Annual revenue, committed spend, or total account value in local currency.
+
+Use this description together with sample values to infer each source column meaning, the expected data types, and any additional signals such as date semantics and country code patterns.

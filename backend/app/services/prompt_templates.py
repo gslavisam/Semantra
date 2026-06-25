@@ -68,6 +68,8 @@ CANONICAL_GAP_PROMPT_TEMPLATE = PromptTemplate(
         "A mapping row is already selected, but its canonical path is missing.",
         "Suggest a controlled canonical overlay change only when it is well-supported by the provided source/target names, signals, and explanations.",
         "Use an existing concept if it fits. Propose a new canonical concept only for clear enterprise data concepts.",
+        "Treat source and target labels as primary evidence; if they describe a clear domain concept such as material description, material name, customer id, or order date, choose an existing or new canonical concept rather than no_action.",
+        "Return no_action only when the candidate is genuinely ambiguous, generic, or lacking a strong canonical concept signal.",
         "Return only valid JSON.",
     ),
     payload_label="PAYLOAD",
@@ -86,7 +88,8 @@ TRANSFORMATION_GENERATOR_PROMPT_TEMPLATE = PromptTemplate(
         "Return an expression when possible; use a full assignment only when the change truly requires it.",
         "Do not invent business rules, cleanup steps, or enrichment logic that is not supported by the instruction or payload.",
         "Use warnings to call out ambiguity or insufficient evidence instead of inventing transformation logic.",
-        "The transformation_code may be either a full assignment like df_target[\"target\"] = ... or just the right-hand expression.",
+        "The transformation_code may be either a full assignment like df_target['target'] = ... or just the right-hand expression.",
+        "IMPORTANT: Always use single quotes for Python string literals inside transformation_code (e.g. df_source['col'] not df_source[\"col\"]) so the value is safe inside a JSON string.",
     ),
     payload_label="PAYLOAD",
 )

@@ -2603,6 +2603,11 @@ def render_dataset_summary(label: str, handle: dict) -> None:
         width="stretch",
         hide_index=True,
     )
+    preview_rows = handle.get("preview_rows") or []
+    if preview_rows:
+        st.markdown("**Preview rows:**")
+        st.caption(f"Showing first {min(5, len(preview_rows))} of {len(preview_rows)} preview rows")
+        st.dataframe(preview_rows[:5], width="stretch", hide_index=True)
 
 
 def render_last_action_status() -> None:

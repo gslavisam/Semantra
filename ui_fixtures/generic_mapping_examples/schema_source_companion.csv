@@ -1,0 +1,6 @@
+Column,Description,Type,Sample Values
+col_1,Legacy customer account key,likely integer,1001
+col_2,Customer legal or trading name,string,Acme North
+col_3,Source country code for the customer,probably ISO-3166 alpha-2,RS
+col_4,Account activation or effective date,date,2024-01-15
+col_5,Annual revenue, contract value, or business volume measure,decimal,125000.50

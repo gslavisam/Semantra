@@ -29,8 +29,18 @@ def resolve_suggested_transformation_code(entry: dict | None, fallback_code: str
 def effective_transformation_code(source: str, session_state: dict, fallback_code: str | None = None) -> str | None:
     """Resolve the transformation code that is currently active for one source field."""
 
+    # Primary: widget-backed session state keys (present when Review tab is rendered)
     manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
-    if manual_code and session_state.get(f"manual_apply_{source}", False):
+    manual_apply = session_state.get(f"manual_apply_{source}", False)
+
+    # Fallback: mapping_editor_state entries (authoritative when widgets are not on screen)
+    editor_entry = (session_state.get("mapping_editor_state") or {}).get(source) or {}
+    if not manual_code:
+        manual_code = _normalized_text(editor_entry.get("manual_transformation_code"))
+    if not manual_apply:
+        manual_apply = bool(editor_entry.get("manual_apply_transformation", False))
+
+    if manual_code and manual_apply:
         return manual_code
 
     suggested_code = _normalized_text(fallback_code)
@@ -43,7 +53,15 @@ def transformation_mode(source: str, session_state: dict, fallback_code: str | N
     """Return whether a source field is using direct, suggested, or custom transformation logic."""
 
     manual_code = _normalized_text(session_state.get(f"manual_transform_{source}", ""))
-    if manual_code and session_state.get(f"manual_apply_{source}", False):
+    manual_apply = session_state.get(f"manual_apply_{source}", False)
+
+    editor_entry = (session_state.get("mapping_editor_state") or {}).get(source) or {}
+    if not manual_code:
+        manual_code = _normalized_text(editor_entry.get("manual_transformation_code"))
+    if not manual_apply:
+        manual_apply = bool(editor_entry.get("manual_apply_transformation", False))
+
+    if manual_code and manual_apply:
         return "custom"
 
     suggested_code = _normalized_text(fallback_code)

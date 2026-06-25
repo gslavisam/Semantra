@@ -1,0 +1,9 @@
+Target dataset represents the canonical account profile used by the destination system. The generic column names map to business concepts as follows:
+
+- col_1: Target account identifier with prefix semantics.
+- col_2: Official customer or company name.
+- col_3: Customer country code used for reporting and market segmentation.
+- col_4: Account tier or customer service level.
+- col_5: Contract or go-live date of the target customer record.
+
+The description is intended to help an LLM infer mapping rules from source content to the target domain, including the relationship between revenue-related source values and target account tiering.

@@ -1,0 +1,6 @@
+Column,Description,Type,Example Values
+col_1,Legacy system account identifier representing a customer record,integer,1001
+col_2,Customer or company legal name,string,Acme North
+col_3,Customer country code in ISO 3166-1 alpha-2 format,string,RS
+col_4,Account activation date in YYYY-MM-DD format,date,2024-01-15
+col_5,Annual revenue or committed spend in local currency,decimal,125000.50

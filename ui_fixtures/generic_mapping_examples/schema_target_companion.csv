@@ -1,0 +1,6 @@
+Column,Description,Type,Sample Values
+col_1,Canonical customer account identifier in destination system,string,C-1001
+col_2,Customer/company name for business processes,string,Acme North
+col_3,Standard country code used for reporting and segmentation,string,RS
+col_4,Customer tier, service level, or account classification,string,Premium
+col_5,Target record effective or contract date,date,2024-01-15

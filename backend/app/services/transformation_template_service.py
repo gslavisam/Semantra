@@ -31,6 +31,18 @@ TRANSFORMATION_TEMPLATES: list[TransformationTemplate] = [
         code_template='df_source["{source}"].astype(str).str.title()',
     ),
     TransformationTemplate(
+        template_id="add_prefix_c",
+        name="Add prefix C-",
+        description="Prepend the string 'C-' to the source value.",
+        code_template='df_source["{source}"].astype(str).apply(lambda v: "C-" + v if pd.notna(v) else v)',
+    ),
+    TransformationTemplate(
+        template_id="add_suffix_id",
+        name="Add suffix _ID",
+        description="Append the string '_ID' to the source value.",
+        code_template='df_source["{source}"].astype(str).apply(lambda v: v + "_ID" if pd.notna(v) else v)',
+    ),
+    TransformationTemplate(
         template_id="email_local_part_title",
         name="Email local-part to title",
         description="Extract the email local-part, replace dots with spaces, and title-case the result.",

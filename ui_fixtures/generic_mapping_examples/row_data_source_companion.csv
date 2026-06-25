@@ -1,0 +1,6 @@
+Column,Description,Type,Sample Values
+col_1,Unique numeric customer account ID in the source system,integer,1001|1002|1003
+col_2,Customer or company name as stored in the source,string,Acme North|Contoso Trade|Fabrikam Retail
+col_3,Two-letter country code for the customer billing or operating region,string,RS|CZ|HR
+col_4,Account start or activation date,date,2024-01-15|2023-11-08
+col_5,Annual revenue, committed spend, or total account value in local currency,decimal,125000.50|45200.00|78340.99

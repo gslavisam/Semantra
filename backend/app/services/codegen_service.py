@@ -14,6 +14,143 @@ from app.services.transformation_service import (
 )
 
 
+def _rhs_from_pandas_code(code: str, target: str) -> str:
+    """Strip a df_target assignment prefix and return the right-hand expression."""
+    stripped = code.strip()
+    m = re.match(r'^df_target\[".+?"\]\s*=\s*(.+)$', stripped, re.DOTALL)
+    return m.group(1).strip() if m else stripped
+
+
+def _try_translate_pandas_to_pyspark(custom_code: str, source: str, target: str) -> str | None:
+    """Translate known Pandas template patterns to PySpark F.* expressions.
+
+    Returns the PySpark column expression string (without trailing comma) or None when
+    the pattern is not recognised and a fallback is needed.
+    """
+    rhs = _rhs_from_pandas_code(custom_code, target)
+    src = re.escape(source)
+
+    # Direct column reference
+    if re.fullmatch(rf'df_source\["{src}"\]', rhs):
+        return f'F.col("{source}").alias("{target}")'
+
+    # str.strip()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.strip\(\)', rhs):
+        return f'F.trim(F.col("{source}").cast("string")).alias("{target}")'
+
+    # str.lower()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.lower\(\)', rhs):
+        return f'F.lower(F.col("{source}").cast("string")).alias("{target}")'
+
+    # str.upper()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.upper\(\)', rhs):
+        return f'F.upper(F.col("{source}").cast("string")).alias("{target}")'
+
+    # str.title() -> initcap
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.title\(\)', rhs):
+        return f'F.initcap(F.col("{source}").cast("string")).alias("{target}")'
+
+    # Add prefix: .apply(lambda v: "PREFIX" + v if pd.notna(v) else v)
+    m = re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.apply\(lambda v:\s*"(.+?)"\s*\+\s*v\s+if\s+pd\.notna\(v\)\s+else\s+v\)',
+        rhs,
+    )
+    if m:
+        prefix = m.group(1).replace('"', '\\"')
+        return f'F.concat(F.lit("{prefix}"), F.col("{source}").cast("string")).alias("{target}")'
+
+    # Add suffix: .apply(lambda v: v + "SUFFIX" if pd.notna(v) else v)
+    m = re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.apply\(lambda v:\s*v\s*\+\s*"(.+?)"\s+if\s+pd\.notna\(v\)\s+else\s+v\)',
+        rhs,
+    )
+    if m:
+        suffix = m.group(1).replace('"', '\\"')
+        return f'F.concat(F.col("{source}").cast("string"), F.lit("{suffix}")).alias("{target}")'
+
+    # Digits only: str.replace(r"\D+", "", regex=True)
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.replace\(r"\\\\D\\+",\s*"",\s*regex=True\)', rhs):
+        return f'F.regexp_replace(F.col("{source}").cast("string"), r"\\D+", "").alias("{target}")'
+
+    # Email local-part: .str.split("@").str[0].str.replace(".", " ", regex=False).str.title()
+    if re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.str\.split\("@"\)\.str\[0\]\.str\.replace\("\.",\s*" ",\s*regex=False\)\.str\.title\(\)',
+        rhs,
+    ):
+        return (
+            f'F.initcap(F.regexp_replace(F.split(F.col("{source}").cast("string"), "@").getItem(0), r"\\.", " "))'
+            f'.alias("{target}")'
+        )
+
+    return None
+
+
+def _try_translate_pandas_to_dbt_sql(
+    custom_code: str,
+    source: str,
+    target: str,
+    source_ref: str,
+    target_ref: str,
+) -> str | None:
+    """Translate known Pandas template patterns to dbt SQL column expressions.
+
+    Returns a SQL expression fragment (e.g. ``TRIM(stage.col) as tgt``) or None.
+    """
+    rhs = _rhs_from_pandas_code(custom_code, target)
+    src = re.escape(source)
+
+    # Direct column reference
+    if re.fullmatch(rf'df_source\["{src}"\]', rhs):
+        return f"{source_ref} as {target_ref}"
+
+    # str.strip()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.strip\(\)', rhs):
+        return f"TRIM(CAST({source_ref} AS VARCHAR)) as {target_ref}"
+
+    # str.lower()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.lower\(\)', rhs):
+        return f"LOWER(CAST({source_ref} AS VARCHAR)) as {target_ref}"
+
+    # str.upper()
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.upper\(\)', rhs):
+        return f"UPPER(CAST({source_ref} AS VARCHAR)) as {target_ref}"
+
+    # str.title() -> INITCAP
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.title\(\)', rhs):
+        return f"INITCAP(CAST({source_ref} AS VARCHAR)) as {target_ref}"
+
+    # Add prefix
+    m = re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.apply\(lambda v:\s*"(.+?)"\s*\+\s*v\s+if\s+pd\.notna\(v\)\s+else\s+v\)',
+        rhs,
+    )
+    if m:
+        prefix = m.group(1).replace("'", "''")
+        return f"CONCAT('{prefix}', CAST({source_ref} AS VARCHAR)) as {target_ref}"
+
+    # Add suffix
+    m = re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.apply\(lambda v:\s*v\s*\+\s*"(.+?)"\s+if\s+pd\.notna\(v\)\s+else\s+v\)',
+        rhs,
+    )
+    if m:
+        suffix = m.group(1).replace("'", "''")
+        return f"CONCAT(CAST({source_ref} AS VARCHAR), '{suffix}') as {target_ref}"
+
+    # Digits only
+    if re.fullmatch(rf'df_source\["{src}"\]\.astype\(str\)\.str\.replace\(r"\\\\D\\+",\s*"",\s*regex=True\)', rhs):
+        return f"REGEXP_REPLACE(CAST({source_ref} AS VARCHAR), '\\D+', '') as {target_ref}"
+
+    # Email local-part
+    if re.fullmatch(
+        rf'df_source\["{src}"\]\.astype\(str\)\.str\.split\("@"\)\.str\[0\]\.str\.replace\("\.",\s*" ",\s*regex=False\)\.str\.title\(\)',
+        rhs,
+    ):
+        return f"INITCAP(REPLACE(SPLIT_PART(CAST({source_ref} AS VARCHAR), '@', 1), '.', ' ')) as {target_ref}"
+
+    return None
+
+
 def generate_pandas_code(
     mapping_decisions: list[MappingDecision],
     transformation_spec: TransformationSpec | None = None,
@@ -85,6 +222,11 @@ def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
     if not custom_code:
         return f'F.col("{decision.source}").alias("{decision.target}")', warnings
 
+    # Try static pattern-based translation first
+    translated = _try_translate_pandas_to_pyspark(custom_code, decision.source, decision.target)
+    if translated is not None:
+        return translated, warnings
+
     statement = build_transformation_statement(decision)
     simple_direct_patterns = [
         rf'^df_target\["{re.escape(decision.target)}"\]\s*=\s*df_source\["{re.escape(decision.source)}"\]\s*$',
@@ -97,8 +239,9 @@ def _pyspark_column_expression(decision: MappingDecision) -> tuple[str, list]:
         build_transformation_warning(
             code="untranslated_custom_transformation",
             message=(
-                f"PySpark code generation could not translate custom transformation for {decision.source} -> {decision.target}. "
-                "Direct mapping was emitted instead."
+                f"PySpark code generation could not automatically translate the custom transformation for "
+                f"{decision.source} -> {decision.target}. Direct mapping was emitted; "
+                "use LLM Refine to produce a full PySpark equivalent."
             ),
             source=decision.source,
             target=decision.target,
@@ -166,6 +309,11 @@ def _dbt_select_expression(decision: MappingDecision) -> tuple[str, list]:
     if not custom_code:
         return f"{source_ref} as {target_ref}", warnings
 
+    # Try static pattern-based translation first
+    translated = _try_translate_pandas_to_dbt_sql(custom_code, decision.source, decision.target, source_ref, target_ref)
+    if translated is not None:
+        return translated, warnings
+
     statement = build_transformation_statement(decision)
     simple_direct_patterns = [
         rf'^df_target\["{re.escape(decision.target)}"\]\s*=\s*df_source\["{re.escape(decision.source)}"\]\s*$',
@@ -178,8 +326,9 @@ def _dbt_select_expression(decision: MappingDecision) -> tuple[str, list]:
         build_transformation_warning(
             code="untranslated_custom_transformation",
             message=(
-                f"dbt code generation could not translate custom transformation for {decision.source} -> {decision.target}. "
-                "Direct column mapping was emitted instead."
+                f"dbt code generation could not automatically translate the custom transformation for "
+                f"{decision.source} -> {decision.target}. Direct column mapping was emitted; "
+                "use LLM Refine to produce a full dbt SQL equivalent."
             ),
             source=decision.source,
             target=decision.target,

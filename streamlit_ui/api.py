@@ -338,6 +338,7 @@ def request_llm_transformation_suggestion(source: str, target: str, instruction:
             "target_column": target,
             "instruction": instruction.strip(),
         },
+        timeout=180.0,
     )
 
 

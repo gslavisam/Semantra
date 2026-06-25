@@ -880,7 +880,9 @@ def _section_label(title: str, detail: str | None = None) -> str:
 
 
 def _guidance_generation_detail(payload: dict | None) -> str:
-    metadata = (payload or {}).get("generation_metadata") or {}
+    if not isinstance(payload, dict):
+        return ""
+    metadata = payload.get("generation_metadata") or {}
     if not payload:
         return ""
     return "LLM" if metadata.get("used_llm") else "Fallback"
@@ -898,7 +900,9 @@ def _guidance_generation_metadata_caption(payload: dict | None) -> str:
     detail = _guidance_generation_detail(payload)
     if not detail:
         return ""
-    metadata = (payload or {}).get("generation_metadata") or {}
+    if not isinstance(payload, dict):
+        return detail
+    metadata = payload.get("generation_metadata") or {}
     fallback_suffix = " with fallback contract" if metadata.get("fallback_used") else ""
     return f"{detail}{fallback_suffix}"
 
@@ -1963,15 +1967,27 @@ def display_trust_layer(
                 ):
                     try:
                         generated = request_llm_transformation_suggestion(source, mapping.get("target") or "", llm_instruction)
-                        entry["manual_transformation_code"] = generated["transformation_code"]
+                        generated_code = generated.get("transformation_code", "").strip()
+                        entry["manual_transformation_code"] = generated_code
                         entry["generated_transformation_reasoning"] = generated.get("reasoning", [])
                         entry["generated_transformation_warnings"] = generated.get("warnings", [])
-                        st.session_state[f"manual_transform_{source}"] = generated["transformation_code"]
-                        st.session_state[f"manual_apply_{source}"] = False
-                        st.session_state["last_action"] = {
-                            "level": "success",
-                            "message": f"Generated an LLM transformation suggestion for {source} -> {mapping.get('target') or 'target'}.",
-                        }
+                        if generated_code:
+                            entry["manual_apply_transformation"] = True
+                            st.session_state[f"manual_transform_{source}"] = generated_code
+                            st.session_state[f"manual_apply_{source}"] = True
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": f"Generated and activated an LLM transformation suggestion for {source} → {mapping.get('target') or 'target'}.",
+                            }
+                        else:
+                            entry["manual_apply_transformation"] = False
+                            st.session_state[f"manual_apply_{source}"] = False
+                            fallback_warnings = generated.get("warnings", [])
+                            detail = " | ".join(fallback_warnings) if fallback_warnings else "The model did not produce usable code."
+                            st.session_state["last_action"] = {
+                                "level": "warning",
+                                "message": f"LLM returned no transformation code for {source}. {detail}",
+                            }
                         st.rerun()
                     except ValueError as error:
                         st.session_state["last_action"] = {"level": "warning", "message": str(error)}
@@ -2004,8 +2020,9 @@ def display_trust_layer(
                     if st.button("Apply template", key=f"apply_template_{source}", disabled=not mapping.get("target")):
                         template_code = materialize_transformation_template(selected_template, source, mapping.get("target") or "target_col")
                         entry["manual_transformation_code"] = template_code
+                        entry["manual_apply_transformation"] = True
                         st.session_state[f"manual_transform_{source}"] = template_code
-                        st.session_state[f"manual_apply_{source}"] = False
+                        st.session_state[f"manual_apply_{source}"] = True
                         st.session_state["last_action"] = {
                             "level": "success",
                             "message": f"Applied reusable transformation template '{selected_template_name}' for {source}.",
@@ -2037,12 +2054,15 @@ def display_trust_layer(
                             st.caption("Warnings: " + " | ".join(warnings))
                     st.markdown("You entered a custom transformation:")
                     st.code(manual_code, language="python")
-                    entry["manual_apply_transformation"] = st.checkbox(
+                    apply_checked = st.checkbox(
                         "Apply generated/custom transformation",
                         key=f"manual_apply_{source}",
+                        value=bool(entry.get("manual_apply_transformation", False)),
                     )
+                    entry["manual_apply_transformation"] = apply_checked
                 else:
                     entry["manual_apply_transformation"] = False
+                    st.session_state[f"manual_apply_{source}"] = False
 
             if score < 0.7:
                 st.warning("⚠️ Low confidence. Please review this mapping manually.")
@@ -2109,7 +2129,7 @@ def render_canonical_gap_assistant(mapping_response: dict, *, api_request) -> No
             st.caption(_canonical_gap_triage_intro_caption())
             if st.button(
                 "Refresh gap summary" if triage_summary else "Generate gap summary",
-                key="canonical_gap_triage_summary",
+                key="canonical_gap_triage_summary_button",
                 width="stretch",
             ):
                 try:
