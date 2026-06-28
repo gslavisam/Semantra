@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import httpx
 import streamlit as st
 import time
@@ -321,6 +322,34 @@ def _workspace_modelling_group_label(attribute_name: object) -> str:
 def _workspace_modelling_resolution_label(value: object) -> str:
     normalized = str(value or "direct_mapping").strip().lower() or "direct_mapping"
     return WORKSPACE_MODELLING_RESOLUTION_LABELS.get(normalized, normalized.replace("_", " ").title())
+
+
+def _workspace_parse_source_fields(value: object) -> list[str]:
+    parsed: list[str] = []
+    seen: set[str] = set()
+    for raw_value in str(value or "").split(","):
+        field_name = raw_value.strip()
+        if not field_name or field_name in seen:
+            continue
+        seen.add(field_name)
+        parsed.append(field_name)
+    return parsed
+
+
+def _workspace_extract_source_fields_from_rule(rule_text: str, available_source_fields: list[str]) -> list[str]:
+    """Extract source field names mentioned in a free-text rule by matching against available source fields."""
+    if not rule_text or not available_source_fields:
+        return []
+    rule_lower = rule_text.lower()
+    found: list[str] = []
+    seen: set[str] = set()
+    for field in available_source_fields:
+        normalized = field.lower().replace("_", " ").replace("-", " ")
+        if field.lower() in rule_lower or normalized in rule_lower:
+            if field not in seen:
+                seen.add(field)
+                found.append(field)
+    return found
 
 
 def _workspace_modelling_inferred_targets(mapping_decisions: list[dict], session_state: dict) -> list[str]:
@@ -1488,13 +1517,14 @@ def _workspace_build_mapping_report_markdown(
         {
             "target_field": str((item or {}).get("target_field") or "").strip(),
             "rule": str((item or {}).get("rule") or "").strip(),
+            "source_fields": ", ".join(str(f).strip() for f in ((item or {}).get("source_fields") or []) if str(f).strip()),
         }
         for item in (transformation_spec.get("field_rules") or [])
         if str((item or {}).get("target_field") or "").strip() or str((item or {}).get("rule") or "").strip()
     ]
     transformation_table = _workspace_modelling_markdown_table(
         transformation_rows,
-        [("target_field", "Target field"), ("rule", "Transformation rule")],
+        [("target_field", "Target field"), ("source_fields", "Source fields"), ("rule", "Transformation rule")],
     )
     business_intent_lines = _workspace_modelling_business_intent_lines(
         concept_model,
@@ -1862,12 +1892,17 @@ def _workspace_build_transformation_spec(mapping_decisions: list[dict], session_
     target_fields = _workspace_transformation_target_fields(mapping_decisions)
     field_rules = []
     for target_field in target_fields:
-        field_rules.append(
-            {
-                "target_field": target_field,
-                "rule": str(session_state.get(f"workspace_transformation_rule::{target_field}") or "").strip(),
-            }
+        rule_text = str(session_state.get(f"workspace_transformation_rule::{target_field}") or "").strip()
+        source_fields = _workspace_parse_source_fields(
+            session_state.get(f"workspace_transformation_source_fields::{target_field}") or ""
         )
+        field_rule = {
+            "target_field": target_field,
+            "rule": rule_text,
+        }
+        if source_fields:
+            field_rule["source_fields"] = source_fields
+        field_rules.append(field_rule)
     return {
         "target_grain": str(session_state.get("workspace_transformation_target_grain") or "").strip(),
         "global_rules": str(session_state.get("workspace_transformation_global_rules") or "").strip(),
@@ -1893,6 +1928,45 @@ def _workspace_ready_transformation_spec(mapping_decisions: list[dict], session_
     }
 
 
+def _workspace_import_transformation_spec_json(raw_json: str) -> dict:
+    parsed = json.loads(raw_json)
+    if not isinstance(parsed, dict):
+        raise ValueError("Transformation spec JSON must be an object.")
+
+    field_rules = []
+    for item in parsed.get("field_rules") or []:
+        if not isinstance(item, dict):
+            continue
+        target_field = str(item.get("target_field") or "").strip()
+        if not target_field:
+            continue
+        source_fields = [
+            str(source_field).strip()
+            for source_field in (item.get("source_fields") or [])
+            if str(source_field).strip()
+        ]
+        field_rules.append(
+            {
+                "target_field": target_field,
+                "rule": str(item.get("rule") or "").strip(),
+                "source_fields": source_fields,
+            }
+        )
+
+    return {
+        "target_grain": str(parsed.get("target_grain") or "").strip(),
+        "global_rules": str(parsed.get("global_rules") or "").strip(),
+        "defaults": str(parsed.get("defaults") or "").strip(),
+        "examples": str(parsed.get("examples") or "").strip(),
+        "target_fields": [
+            str(target_field).strip()
+            for target_field in (parsed.get("target_fields") or [])
+            if str(target_field).strip()
+        ],
+        "field_rules": field_rules,
+    }
+
+
 def _workspace_apply_transformation_spec_to_state(session_state: dict, spec: dict) -> None:
     session_state["workspace_transformation_target_grain"] = str(spec.get("target_grain") or "").strip()
     session_state["workspace_transformation_global_rules"] = str(spec.get("global_rules") or "").strip()
@@ -1900,13 +1974,18 @@ def _workspace_apply_transformation_spec_to_state(session_state: dict, spec: dic
     session_state["workspace_transformation_examples"] = str(spec.get("examples") or "").strip()
     valid_targets = {str(item).strip() for item in (spec.get("target_fields") or []) if str(item).strip()}
     for key in list(session_state.keys()):
-        if str(key).startswith("workspace_transformation_rule::"):
+        if str(key).startswith("workspace_transformation_rule::") or str(key).startswith(
+            "workspace_transformation_source_fields::"
+        ):
             session_state.pop(key, None)
     for item in spec.get("field_rules") or []:
         target_field = str((item or {}).get("target_field") or "").strip()
         rule = str((item or {}).get("rule") or "").strip()
         if target_field and target_field in valid_targets:
             session_state[f"workspace_transformation_rule::{target_field}"] = rule
+            source_fields = [str(source_field).strip() for source_field in (item or {}).get("source_fields", []) if str(source_field).strip()]
+            if source_fields:
+                session_state[f"workspace_transformation_source_fields::{target_field}"] = ", ".join(source_fields)
 
 
 def _workspace_transformation_summary_caption(summary: dict | None) -> str:
@@ -2006,7 +2085,9 @@ def _workspace_reset_transformation_design_state(session_state: dict) -> None:
     ):
         session_state.pop(key, None)
     for key in list(session_state.keys()):
-        if str(key).startswith("workspace_transformation_rule::"):
+        if str(key).startswith("workspace_transformation_rule::") or str(key).startswith(
+            "workspace_transformation_source_fields::"
+        ):
             session_state.pop(key, None)
 
 
@@ -2033,7 +2114,7 @@ def _render_workspace_transformation_design(mapping_decisions: list[dict], *, ap
             st.info(transformation_status["message"])
 
         st.caption(
-            "This first slice stores a reviewable structured spec in Workspace state. Preview and generated artifacts still use the current mapping/transformation contract until backend spec integration lands."
+            "Define the transformation contract here. When the spec is ready, Preview and code generation will reflect the rules and source-field context for each target field."
         )
 
         if not target_fields:
@@ -2068,6 +2149,13 @@ def _render_workspace_transformation_design(mapping_decisions: list[dict], *, ap
         )
         st.caption(f"Active target fields: {', '.join(target_fields)}")
 
+        available_source_fields: list[str] = [
+            str(col.get("name") or "").strip()
+            for col in (
+                (st.session_state.get("upload_response") or {}).get("source", {}).get("schema_profile", {}).get("columns") or []
+            )
+            if str(col.get("name") or "").strip()
+        ]
         for target_field in target_fields:
             st.text_area(
                 f"Rule for {target_field}",
@@ -2075,9 +2163,45 @@ def _render_workspace_transformation_design(mapping_decisions: list[dict], *, ap
                 placeholder=f"Describe how {target_field} is derived from source fields, defaults, or global rules.",
                 height=88,
             )
+            current_rule = str(st.session_state.get(f"workspace_transformation_rule::{target_field}") or "").strip()
+            current_source_fields_raw = str(st.session_state.get(f"workspace_transformation_source_fields::{target_field}") or "").strip()
+            auto_hint = _workspace_extract_source_fields_from_rule(current_rule, available_source_fields)
+            hint_text = f"Hint from rule: {', '.join(auto_hint)}" if auto_hint and not current_source_fields_raw else ""
+            st.text_input(
+                f"Source fields for {target_field}",
+                key=f"workspace_transformation_source_fields::{target_field}",
+                placeholder="first_name, last_name",
+                help=hint_text or "Comma-separated list of source fields that contribute to this target field.",
+            )
+            if hint_text:
+                st.caption(hint_text)
 
         if transformation_status["missing_fields"]:
             st.caption(f"Missing explicit field rules: {', '.join(transformation_status['missing_fields'])}")
+
+        st.caption("Or paste a structured JSON spec below and apply it directly to the editable form.")
+        import_json = st.text_area(
+            "Import transformation spec JSON",
+            key="workspace_transformation_spec_json_input",
+            placeholder='{"target_grain": "One row per material", "global_rules": "...", "defaults": "...", "examples": "...", "target_fields": ["material_number"], "field_rules": [{"target_field": "material_number", "rule": "Use MARA.MATNR", "source_fields": ["MARA.MATNR"]}] }',
+            height=140,
+        )
+        if st.button("Apply JSON spec", key="workspace_apply_transformation_spec_json", width="stretch"):
+            try:
+                imported_spec = _workspace_import_transformation_spec_json(import_json)
+                _workspace_apply_transformation_spec_to_state(st.session_state, imported_spec)
+                st.session_state.pop("workspace_transformation_spec_json_input", None)
+                st.session_state["last_action"] = {
+                    "level": "success",
+                    "message": "Applied the pasted transformation spec JSON to the editable form.",
+                }
+                st.rerun()
+            except (json.JSONDecodeError, ValueError) as error:
+                st.session_state["last_action"] = {
+                    "level": "error",
+                    "message": f"Invalid transformation spec JSON: {error}",
+                }
+                st.rerun()
 
         st.text_area(
             "Natural-language spec proposal",
@@ -3755,7 +3879,6 @@ def _render_workspace_section_content(
                 )
             if excluded_output_summary:
                 st.caption(excluded_output_summary)
-            _render_workspace_transformation_design(mapping_decisions, api_request=api_request)
             st.subheader("Artifact Generation")
             codegen_mode = st.radio(
                 "Artifact format",
@@ -3883,6 +4006,8 @@ def _render_workspace_section_content(
                                 "classification": item.get("classification"),
                                 "mode": item.get("mode"),
                                 "status": item.get("status"),
+                                "rule": item.get("spec_rule") or "",
+                                "source_fields": ", ".join(item.get("spec_source_fields") or []),
                                 "warning_codes": " | ".join(warning.get("code", "") for warning in item.get("warnings", [])),
                                 "warning_count": len(item.get("warnings", [])),
                             }
@@ -3896,6 +4021,14 @@ def _render_workspace_section_content(
                             st.caption(
                                 f"Classification: {item.get('classification')} | Mode: {item.get('mode')} | Status: {item.get('status')}"
                             )
+                            spec_rule = item.get("spec_rule") or ""
+                            if spec_rule:
+                                st.caption("Transformation Design rule")
+                                st.write(spec_rule)
+                            source_fields = item.get("spec_source_fields") or []
+                            if source_fields:
+                                st.caption("Source fields")
+                                st.write(", ".join(source_fields))
                             st.write("Before samples:", item.get("before_samples", []))
                             st.write("After samples:", item.get("after_samples", []))
                             warnings = item.get("warnings", [])
@@ -4041,6 +4174,8 @@ def _render_workspace_section_content(
                         st.rerun()
                 if not _workspace_llm_refinement_enabled():
                     st.caption("LLM refinement is unavailable until a reachable runtime provider is configured.")
+
+            _render_workspace_transformation_design(mapping_decisions, api_request=api_request)
 
 
 def render_workspace_tab(

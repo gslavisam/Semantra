@@ -14,6 +14,25 @@ from app.services.transformation_service import (
 )
 
 
+def _transformation_spec_header_comments(transformation_spec: TransformationSpec | None) -> list[str]:
+    if not transformation_spec:
+        return []
+    comments = ["# Transformation Design", "# Target grain: " + str(transformation_spec.target_grain or "").strip()]
+    if transformation_spec.global_rules:
+        comments.append("# Global rules: " + str(transformation_spec.global_rules or "").strip())
+    if transformation_spec.defaults:
+        comments.append("# Defaults: " + str(transformation_spec.defaults or "").strip())
+    if transformation_spec.examples:
+        comments.append("# Examples: " + str(transformation_spec.examples or "").strip())
+    for field_rule in transformation_spec.field_rules:
+        target_field = str(field_rule.target_field or "").strip()
+        rule = str(field_rule.rule or "").strip()
+        if not target_field and not rule:
+            continue
+        comments.append(f"# {target_field}: {rule}")
+    return comments
+
+
 def _rhs_from_pandas_code(code: str, target: str) -> str:
     """Strip a df_target assignment prefix and return the right-hand expression."""
     stripped = code.strip()
@@ -151,6 +170,25 @@ def _try_translate_pandas_to_dbt_sql(
     return None
 
 
+def _transformation_spec_header_comments(transformation_spec: TransformationSpec | None) -> list[str]:
+    if not transformation_spec:
+        return []
+    comments = ["# Transformation Design", "# Target grain: " + str(transformation_spec.target_grain or "").strip()]
+    if transformation_spec.global_rules:
+        comments.append("# Global rules: " + str(transformation_spec.global_rules or "").strip())
+    if transformation_spec.defaults:
+        comments.append("# Defaults: " + str(transformation_spec.defaults or "").strip())
+    if transformation_spec.examples:
+        comments.append("# Examples: " + str(transformation_spec.examples or "").strip())
+    for field_rule in transformation_spec.field_rules:
+        target_field = str(field_rule.target_field or "").strip()
+        rule = str(field_rule.rule or "").strip()
+        if not target_field and not rule:
+            continue
+        comments.append(f"# {target_field}: {rule}")
+    return comments
+
+
 def generate_pandas_code(
     mapping_decisions: list[MappingDecision],
     transformation_spec: TransformationSpec | None = None,
@@ -162,6 +200,8 @@ def generate_pandas_code(
         "",
         "df_target = pd.DataFrame()",
     ]
+    if transformation_spec:
+        lines.extend(_transformation_spec_header_comments(transformation_spec))
     warnings = []
 
     for decision in mapping_decisions:
@@ -259,11 +299,15 @@ def generate_pyspark_code(
 ) -> GeneratedArtifact:
     """Generate a PySpark starter artifact from reviewed mapping decisions."""
 
+    spec_comments = _transformation_spec_header_comments(transformation_spec)
+    pyspark_spec_comments = [c.replace("# ", "# ") for c in spec_comments]
     lines = [
         "from pyspark.sql import functions as F",
         "",
-        "df_target = df_source.select(",
     ]
+    if transformation_spec:
+        lines.extend(pyspark_spec_comments)
+    lines.append("df_target = df_source.select(")
     warnings = []
     select_lines: list[str] = []
 
@@ -340,6 +384,29 @@ def _dbt_select_expression(decision: MappingDecision) -> tuple[str, list]:
     return f"{source_ref} as {target_ref}", warnings
 
 
+def _transformation_spec_dbt_comments(transformation_spec: TransformationSpec | None) -> list[str]:
+    """Return SQL-style block comment lines for a dbt model header."""
+    if not transformation_spec:
+        return []
+    lines = ["/*", " * Transformation Design"]
+    if transformation_spec.target_grain:
+        lines.append(f" * Target grain: {transformation_spec.target_grain}")
+    if transformation_spec.global_rules:
+        lines.append(f" * Global rules: {transformation_spec.global_rules}")
+    if transformation_spec.defaults:
+        lines.append(f" * Defaults: {transformation_spec.defaults}")
+    if transformation_spec.examples:
+        lines.append(f" * Examples: {transformation_spec.examples}")
+    for field_rule in transformation_spec.field_rules:
+        target_field = str(field_rule.target_field or "").strip()
+        rule = str(field_rule.rule or "").strip()
+        if not target_field and not rule:
+            continue
+        lines.append(f" * {target_field}: {rule}")
+    lines.append(" */")
+    return lines
+
+
 def generate_dbt_code(
     mapping_decisions: list[MappingDecision],
     transformation_spec: TransformationSpec | None = None,
@@ -347,7 +414,11 @@ def generate_dbt_code(
     """Generate a dbt starter model from reviewed mapping decisions."""
 
     profile = current_dbt_codegen_profile()
-    lines = [
+    header = []
+    if transformation_spec:
+        header.extend(_transformation_spec_dbt_comments(transformation_spec))
+        header.append("")
+    lines = header + [
         f"{{{{ config(materialized='{profile.materialization}') }}}}",
         "",
         f"with {profile.source_cte_name} as (",
@@ -385,6 +456,7 @@ def generate_dbt_code(
     else:
         lines.append("    *")
     lines.append(f"from {profile.source_cte_name}")
+
 
     return GeneratedArtifact(
         language="sql-dbt",

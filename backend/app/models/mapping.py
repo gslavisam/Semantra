@@ -1458,6 +1458,7 @@ class TransformationSpecFieldRule(BaseModel):
 
     target_field: str
     rule: str = ""
+    source_fields: list[str] = Field(default_factory=list)
 
 
 class TransformationSpec(BaseModel):
@@ -1522,6 +1523,8 @@ class TransformationPreviewResult(BaseModel):
     before_samples: list[str] = Field(default_factory=list)
     after_samples: list[str] = Field(default_factory=list)
     warnings: list[TransformationPreviewWarning] = Field(default_factory=list)
+    spec_rule: str = ""
+    spec_source_fields: list[str] = Field(default_factory=list)
 
 
 class PreviewResponse(BaseModel):

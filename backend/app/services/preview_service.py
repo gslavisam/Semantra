@@ -26,7 +26,9 @@ def build_preview(
             transformation_spec_summary=transformation_spec_summary,
         )
 
-    transformed_rows, transformation_previews = build_transformed_target_frame(rows[:10], accepted)
+    transformed_rows, transformation_previews = build_transformed_target_frame(
+        rows[:10], accepted, transformation_spec=transformation_spec
+    )
     warnings_by_source: dict[str | None, list[str]] = {}
     for transformation_preview in transformation_previews:
         for warning in transformation_preview.warnings:

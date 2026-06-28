@@ -59,7 +59,11 @@ def normalize_transformation_spec(
         if not target_field or not rule or target_field not in target_lookup or target_field in seen_targets:
             continue
         seen_targets.add(target_field)
-        field_rules.append({"target_field": target_field, "rule": rule})
+        field_rule = {"target_field": target_field, "rule": rule}
+        source_fields = [str(source_field).strip() for source_field in (item.source_fields or []) if str(source_field).strip()]
+        if source_fields:
+            field_rule["source_fields"] = source_fields
+        field_rules.append(field_rule)
     return TransformationSpec(
         target_grain=str(base_spec.target_grain or "").strip(),
         global_rules=str(base_spec.global_rules or "").strip(),

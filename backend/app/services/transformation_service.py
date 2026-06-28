@@ -6,7 +6,13 @@ from typing import Any
 
 import pandas as pd
 
-from app.models.mapping import MappingDecision, TransformationPreviewResult, TransformationPreviewWarning
+from app.models.mapping import (
+    MappingDecision,
+    TransformationPreviewResult,
+    TransformationPreviewWarning,
+    TransformationSpec,
+    TransformationSpecFieldRule,
+)
 from app.models.schema import ColumnProfile
 from app.services.metadata_knowledge_service import metadata_knowledge_service
 from app.utils.normalization import normalize_name, tokenize_name
@@ -158,6 +164,7 @@ def classify_transformation_preview(mode: str, status: str, warnings: list[Trans
 def build_transformed_target_frame(
     rows: list[dict[str, object]],
     mapping_decisions: list[MappingDecision],
+    transformation_spec: TransformationSpec | None = None,
 ) -> tuple[list[dict[str, Any]], list[TransformationPreviewResult]]:
     """Apply mapping decisions to preview rows and collect transformation preview results."""
 
@@ -167,6 +174,11 @@ def build_transformed_target_frame(
     df_source = pd.DataFrame(rows)
     df_target = pd.DataFrame(index=df_source.index)
     preview_results: list[TransformationPreviewResult] = []
+    spec_lookup = {
+        str(rule.target_field or "").strip(): rule
+        for rule in (transformation_spec.field_rules if transformation_spec else [])
+        if str(rule.target_field or "").strip()
+    }
 
     execution_globals = {
         "__builtins__": SAFE_BUILTINS,
@@ -186,6 +198,12 @@ def build_transformed_target_frame(
                     mode="custom" if (decision.transformation_code or "").strip() else "direct",
                     status="fallback",
                     classification="risky",
+                    spec_rule=(spec_lookup.get(decision.target) or TransformationSpecFieldRule(target_field="", rule="")).rule if transformation_spec else "",
+                    spec_source_fields=(
+                        (spec_lookup.get(decision.target) or TransformationSpecFieldRule(target_field="", rule="")).source_fields
+                        if transformation_spec
+                        else []
+                    ),
                     warnings=[
                         build_transformation_warning(
                             code="missing_source_column",
@@ -326,6 +344,12 @@ def build_transformed_target_frame(
                 before_samples=sample_series_values(source_series),
                 after_samples=sample_series_values(after_series),
                 warnings=warnings,
+                spec_rule=(spec_lookup.get(decision.target) or TransformationSpecFieldRule(target_field="", rule="")).rule if transformation_spec else "",
+                spec_source_fields=(
+                    (spec_lookup.get(decision.target) or TransformationSpecFieldRule(target_field="", rule="")).source_fields
+                    if transformation_spec
+                    else []
+                ),
             )
         )
 

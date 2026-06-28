@@ -1,0 +1,64 @@
+{
+  "target_grain": "One row per material number",
+  "global_rules": "Use the most reliable source per attribute. If a primary source is empty, use fallback. Standardize codes and trim whitespace.",
+  "defaults": "If description missing, use material number. If lifecycle status missing, default to ACTIVE.",
+  "examples": "Example: material M-1001 with plant 1000 and base UoM EA.",
+  "target_fields": [
+    "material_number",
+    "material_description",
+    "material_group",
+    "base_uom",
+    "plant",
+    "valuation_class",
+    "gross_weight",
+    "net_weight",
+    "lifecycle_status"
+  ],
+  "field_rules": [
+    {
+      "target_field": "material_number",
+      "rule": "Use the canonical material identifier from the core material table.",
+      "source_fields": ["MARA.MATNR"]
+    },
+    {
+      "target_field": "material_description",
+      "rule": "Prefer the active-language description from MAKT; if missing, use MARA.MAKTX.",
+      "source_fields": ["MAKT.MAKTX", "MARA.MAKTX"]
+    },
+    {
+      "target_field": "material_group",
+      "rule": "Use the material group from the basic material master data.",
+      "source_fields": ["MARA.MATKL"]
+    },
+    {
+      "target_field": "base_uom",
+      "rule": "Use the base unit of measure from the material master; if missing, fallback to MARM.MEINS.",
+      "source_fields": ["MARA.MEINS", "MARM.MEINS"]
+    },
+    {
+      "target_field": "plant",
+      "rule": "Use the plant code from the plant-level table.",
+      "source_fields": ["MARC.WERKS"]
+    },
+    {
+      "target_field": "valuation_class",
+      "rule": "Use the valuation class from accounting data for the material and plant.",
+      "source_fields": ["MBEW.BKLAS"]
+    },
+    {
+      "target_field": "gross_weight",
+      "rule": "Use the gross weight from the material master.",
+      "source_fields": ["MARA.BRGEW"]
+    },
+    {
+      "target_field": "net_weight",
+      "rule": "Use the net weight from the material master when available.",
+      "source_fields": ["MARA.NTGEW"]
+    },
+    {
+      "target_field": "lifecycle_status",
+      "rule": "Use the lifecycle status from plant data; if absent, default to ACTIVE.",
+      "source_fields": ["MARC.LVORM"]
+    }
+  ]
+}

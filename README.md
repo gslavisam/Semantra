@@ -8,7 +8,7 @@ It combines deterministic profiling and ranking with bounded AI assistance so a 
 - generate explainable source-to-target or source-to-canonical mapping proposals
 - review explicit source -> concept -> target paths and canonical coverage
 - generate technical mapping analysis summaries and optional narration/audio
-- author transformations, preview output, and generate starter Pandas, PySpark, or dbt artifacts
+- author structured Transformation Design specs, preview output, and generate starter Pandas, PySpark, or dbt artifacts
 - refine generated artifacts through controlled LLM prompts with accept/discard workflow
 - persist governed mapping sets, benchmark datasets, transformation test sets, and correction history
 - manage canonical concepts, overlays, and stewardship workflows through a dedicated Canonical Console
@@ -48,6 +48,8 @@ Core implemented capabilities:
 - local decision-origin audit trail (`manual_mapping`, `llm_proposal`) surfaced in Active Decisions
 - mapping decision audit persistence through decision JSON export/import
 - per-row and batch LLM mapping refinement with transient field context and accept/revert controls
+- structured Transformation Design authoring with reusable target-grain, global rule, defaults, examples, and field-rule inputs
+- JSON-based import/apply of a structured transformation spec into the Transformation Design form
 - transformation generation, templates, advisory preview, and Pandas/PySpark/dbt starter generation
 - canonical-mode manual mapping and canonical-mode code generation against virtual canonical targets
 - LLM-based artifact refinement with split-view compare and accept/discard actions

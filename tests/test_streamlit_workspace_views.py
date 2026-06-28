@@ -1,7 +1,9 @@
 """Tests the main Streamlit workspace helpers and workflow glue logic."""
 
-import pytest
+import json
 from types import SimpleNamespace
+
+import pytest
 
 from streamlit_ui.workspace_views import (
     WORKSPACE_COPILOT_ACTIONS,
@@ -16,6 +18,7 @@ from streamlit_ui.workspace_views import (
     _workspace_modelling_review_summary,
     _workspace_build_transformation_spec,
     _workspace_apply_transformation_spec_to_state,
+    _workspace_import_transformation_spec_json,
     _workspace_concept_model_drift_summary,
     _workspace_copilot_chat_result,
     _workspace_copilot_context,
@@ -34,6 +37,7 @@ from streamlit_ui.workspace_views import (
     _workspace_codegen_block_reason,
     _workspace_codegen_format_label,
     _workspace_excluded_output_summary,
+    _workspace_extract_source_fields_from_rule,
     _workspace_generated_artifact_header,
     _workspace_generated_artifact_code_language,
     _workspace_llm_refinement_enabled,
@@ -745,6 +749,25 @@ def test_workspace_ready_transformation_spec_returns_none_until_ready() -> None:
     assert _workspace_ready_transformation_spec([{"target": "customer_id"}], session_state) is None
 
 
+def test_workspace_build_transformation_spec_includes_source_fields_for_derived_rules() -> None:
+    spec = _workspace_build_transformation_spec(
+        [{"target": "customer_name"}],
+        {
+            "workspace_transformation_target_grain": "One row per customer",
+            "workspace_transformation_rule::customer_name": "Join first_name and last_name.",
+            "workspace_transformation_source_fields::customer_name": "first_name, last_name",
+        },
+    )
+
+    assert spec["field_rules"] == [
+        {
+            "target_field": "customer_name",
+            "rule": "Join first_name and last_name.",
+            "source_fields": ["first_name", "last_name"],
+        }
+    ]
+
+
 def test_workspace_ready_transformation_spec_returns_spec_when_ready() -> None:
     session_state = {
         "workspace_transformation_target_grain": "One row per customer",
@@ -897,6 +920,29 @@ def test_resume_setup_saved_draft_restores_workspace_and_refreshes_list(monkeypa
     assert rerun_called["value"] is True
 
 
+def test_workspace_import_transformation_spec_json_builds_structured_spec() -> None:
+    raw_json = json.dumps(
+        {
+            "target_grain": "One row per customer",
+            "global_rules": "Deduplicate by customer_id.",
+            "defaults": "Trim whitespace.",
+            "examples": "N/A -> null",
+            "target_fields": ["customer_id", "customer_name"],
+            "field_rules": [
+                {"target_field": "customer_id", "rule": "Cast KUNNR to string.", "source_fields": ["cust_id"]},
+                {"target_field": "customer_name", "rule": "Join first_name and last_name.", "source_fields": ["first_name", "last_name"]},
+            ],
+        }
+    )
+
+    spec = _workspace_import_transformation_spec_json(raw_json)
+
+    assert spec["target_grain"] == "One row per customer"
+    assert spec["global_rules"] == "Deduplicate by customer_id."
+    assert spec["field_rules"][0]["source_fields"] == ["cust_id"]
+    assert spec["field_rules"][1]["source_fields"] == ["first_name", "last_name"]
+
+
 def test_workspace_apply_transformation_spec_to_state_replaces_existing_rules() -> None:
     session_state = {
         "workspace_transformation_rule::stale": "old",
@@ -932,6 +978,22 @@ def test_workspace_transformation_summary_caption_compacts_backend_summary() -> 
     assert _workspace_transformation_summary_caption(
         {"state": "ready", "described_count": 1, "target_count": 2, "missing_fields": ["country_code"]}
     ) == "Spec state: ready | described fields: 1/2 | missing: country_code"
+
+
+def test_workspace_extract_source_fields_from_rule_finds_matching_fields() -> None:
+    available = ["first_name", "last_name", "email", "cust_id"]
+    found = _workspace_extract_source_fields_from_rule("Join first_name and last_name.", available)
+    assert found == ["first_name", "last_name"]
+
+
+def test_workspace_extract_source_fields_from_rule_empty_when_no_match() -> None:
+    found = _workspace_extract_source_fields_from_rule("Use status code.", ["first_name", "last_name"])
+    assert found == []
+
+
+def test_workspace_extract_source_fields_from_rule_handles_empty_inputs() -> None:
+    assert _workspace_extract_source_fields_from_rule("", ["first_name"]) == []
+    assert _workspace_extract_source_fields_from_rule("some rule", []) == []
 
 
 def test_workspace_llm_refinement_enabled_requires_reachable_runtime(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,7 +2,7 @@
 
 ## Presentation Goal
 
-This presentation introduces Semantra as a pilot-ready semantic mapping and governance workbench, explains what the product already supports today, and positions it as a reusable delivery capability rather than a one-off demo tool.
+This presentation introduces Semantra as a pilot-ready semantic mapping and governance workbench, explains what the product already supports today, clarifies the concrete outputs it produces, highlights the emerging BA Mapping Report capability, and positions it as a reusable delivery capability rather than a one-off demo tool.
 
 Recommended duration:
 
@@ -34,38 +34,38 @@ Semantra is built to make mapping explainable, reviewable, and reusable. It is n
 
 ---
 
-## Slide 2. Why this exists
+## Slide 2. The problem
 
 **Title:**
-Why Semantra Exists
+The Problem
 
 **Slide bullets:**
 
-- schema mapping is slow and hard to reuse
-- projects often start from specs, SQL snapshots, or partial metadata, not only from clean row data
-- black-box LLM mapping is hard to trust in delivery work
-- organizations need reviewed mapping memory, not just one-off outputs
+- schema mapping is still slow, fragmented, and hard to reuse
+- teams start from specs, SQL snapshots, and partial metadata, not only clean sample data
+- one-off AI suggestions are hard to trust in delivery work
+- mapping knowledge often disappears after a project ends
 
 **Key message:**
-Semantra exists because integration teams need a structured alternative to spreadsheet-only mapping and uncontrolled AI mapping.
+Integration delivery needs a more structured and governable way to move from raw structures to reviewed decisions.
 
 ---
 
-## Slide 3. What Semantra is today
+## Slide 3. What Semantra provides
 
 **Title:**
-What Semantra Is Today
+What Semantra Provides
 
 **Slide bullets:**
 
-- pilot-ready semantic mapping and governance workbench
-- FastAPI backend plus Streamlit product UI
-- deterministic-first mapping engine with bounded AI assistance
-- SQLite-backed artifact, catalog, and governance memory
-- complementary `semantra_agent` SDK in active development for scripted and agent-driven use cases
+- a pilot-ready semantic mapping and governance workbench
+- explainable mapping suggestions with review checkpoints
+- governed artifacts, reusable catalog knowledge, and benchmark history
+- transformation starter code and output preview
+- a BA Mapping Report that turns the workspace outcome into a business-facing summary
 
 **Key message:**
-Semantra is already useful in controlled analyst and pilot workflows today, even though it is not yet a production orchestration platform.
+Semantra does not stop at suggestions; it helps teams produce a reviewable and reusable delivery outcome.
 
 ---
 
@@ -81,37 +81,59 @@ Main Product Surface
 - `Catalog`
 - `Benchmarks`
 - `System`
+- `Modelling / BA Report` (emerging)
 
 **Key message:**
 The product now has clear operator-facing areas rather than one generic review screen.
 
 **Talk track:**
-`Workspace` covers ingest, mapping, review, decisions, preview, code generation, and bounded `Workspace Copilot` guidance. `Governance` contains `Canonical Console` and stewardship workflows. `Catalog` supports search and reuse. `Benchmarks` measures quality. `System` supports runtime inspection and operational controls.
+`Workspace` covers ingest, mapping, review, decisions, preview, code generation, and bounded `Workspace Copilot` guidance. `Governance` contains `Canonical Console` and stewardship workflows. `Catalog` supports search and reuse. `Benchmarks` measures quality. `System` supports runtime inspection and operational controls. A new `Modelling / BA Report` view helps turn workspace evidence into a structured, analyst-ready summary.
 
 **Sidebar note:**
 The UI also includes a multi-view sidebar for `System`, `WS Copilot`, `WS Brief`, `Help`, and `Reference`.
 
 ---
 
-## Slide 5. Core value proposition
+## Slide 5. Why this matters
+
+**Title:**
+Why This Matters
+
+**Slide bullets:**
+
+- less rework across mapping and delivery cycles
+- clearer review and approval decisions
+- better traceability from source structure to target outcome
+- reusable semantic knowledge for future projects
+- a stronger handoff from analysis to implementation
+
+**Key message:**
+The real value is not only better mapping suggestions; it is less friction, more trust, and a stronger delivery package.
+
+**Talk track:**
+For a business analyst, delivery lead, or reviewer, the important outcome is not just a suggested mapping. It is a structured and explainable result that can be reviewed, approved, reused, and handed off with less rework and better traceability.
+
+---
+
+## Slide 6. Core value proposition
 
 **Title:**
 Core Value Proposition
 
 **Slide bullets:**
 
-- map faster
+- map faster with a more structured starting point
 - understand why a mapping was suggested
+- produce delivery-ready mapping summaries
 - review before generating durable artifacts
-- improve quality through governed feedback
-- reuse semantic knowledge across projects
+- improve quality through governed feedback and reusable report artifacts
 
 **Key message:**
-Semantra turns mapping from a one-time analyst task into a repeatable and improvable operating capability.
+Semantra turns mapping from a one-time analyst task into a repeatable and improvable operating capability, and the BA Mapping Report makes the outcome visible to business and delivery stakeholders.
 
 ---
 
-## Slide 6. How mapping decisions are produced
+## Slide 7. How mapping decisions are produced
 
 **Title:**
 How Mapping Decisions Are Produced
@@ -131,7 +153,7 @@ Semantra does not rely on one signal and does not let AI own the full mapping pr
 
 ---
 
-## Slide 7. Canonical layer and stewardship
+## Slide 8. Canonical layer and stewardship
 
 **Title:**
 Canonical Layer and Stewardship
@@ -148,7 +170,7 @@ The canonical layer is already an active governance surface, not only a future i
 
 ---
 
-## Slide 8. Governance model
+## Slide 9. Governance model
 
 **Title:**
 Governance Model Today
@@ -167,7 +189,7 @@ Trust comes from explicit control points, not from pretending that all automatio
 
 ---
 
-## Slide 9. Catalog and reuse
+## Slide 10. Catalog and reuse
 
 **Title:**
 Catalog as Reusable Memory
@@ -188,7 +210,7 @@ This is an important change in the story. The catalog is no longer only a future
 
 ---
 
-## Slide 10. Benchmarks and learning
+## Slide 11. Benchmarks and learning
 
 **Title:**
 Quality Measurement and Learning
@@ -205,7 +227,7 @@ Semantra measures and improves mapping quality instead of staying a stateless su
 
 ---
 
-## Slide 11. Typical workflow story
+## Slide 12. Typical workflow story
 
 **Title:**
 Typical Workflow Story
@@ -216,17 +238,17 @@ Typical Workflow Story
 2. generate ranked mapping suggestions
 3. inspect trust layer and canonical paths
 4. review or override mappings
-4.5 optionally save draft sessions for continuity across review cycles
-5. preview transformations and generate code when accepted
-6. save governed mapping sets
-7. search and reuse existing work later through Catalog
+5. review the derived BA Mapping Report and target contract
+6. preview transformations and generate code when accepted
+7. save governed mapping sets
+8. search and reuse existing work later through Catalog
 
 **Key message:**
 Semantra supports an end-to-end analyst loop, not only one ranking step.
 
 ---
 
-## Slide 12. Architecture overview
+## Slide 13. Architecture overview
 
 **Title:**
 Architecture Overview
@@ -245,24 +267,24 @@ The architecture is already structured for pilot-grade product growth, not just 
 
 ---
 
-## Slide 13. PMO service framing
+## Slide 14. PMO service framing
 
 **Title:**
 Semantra as a Delivery Capability
 
 **Slide bullets:**
 
-- usable in integration design, migration analysis, and canonical alignment work
-- outputs reviewed mappings, canonical findings, transformation starters, benchmarks, and reusable governed artifacts
+- usable in integration design, migration analysis, canonical alignment work, and analyst handoff
+- outputs reviewed mappings, canonical findings, transformation starters, benchmarks, reusable governed artifacts, and BA Mapping Reports
 - reduces repeated mapping effort across delivery streams
-- improves traceability and semantic reuse
+- improves traceability, semantic reuse, and delivery readiness
 
 **Key message:**
 Semantra can be framed not only as a tool, but as a reusable internal delivery capability.
 
 ---
 
-## Slide 14. Current boundaries
+## Slide 15. Current boundaries
 
 **Title:**
 What Semantra Is Not Yet
@@ -279,7 +301,7 @@ The current scope is intentionally focused. The product is strongest when positi
 
 ---
 
-## Slide 15. Next step
+## Slide 16. Next step
 
 **Title:**
 Where the Product Goes Next
@@ -289,6 +311,7 @@ Where the Product Goes Next
 - documentation aligned with the real current product
 - manual pilot proof and value validation
 - repeatable live demo and presentation discipline
+- mature the BA Mapping Report into an exportable approval and handoff artifact
 - enterprise-wide hardening only after proven value
 - evolve the complementary `semantra_agent` SDK as part of the broader agentic integration surface
 
@@ -297,7 +320,7 @@ The next step is to prove and package the value of the current product clearly b
 
 ---
 
-## Slide 16. Closing
+## Slide 17. Closing
 
 **Title:**
 Closing
@@ -307,10 +330,23 @@ Closing
 - Semantra makes mapping explainable
 - Semantra makes mapping reviewable
 - Semantra makes mapping reusable
-- Semantra turns semantic integration work into a governed delivery capability
+- Semantra turns semantic integration work into a governed delivery capability, including BA-ready reporting
 
 **Key message:**
 Semantra is the foundation for reusable semantic integration knowledge under analyst and stewardship control.
+
+---
+
+## Executive Summary
+
+**Bottom line:**
+Semantra helps integration teams move from fragmented mapping work to a governed, explainable, and reusable delivery process.
+
+**Three takeaways:**
+
+- it reduces the cost and rework of manual mapping by giving analysts a structured starting point
+- it makes decisions reviewable and traceable instead of opaque or one-off
+- it produces reusable artifacts, including a BA Mapping Report, that support delivery handoff and future projects
 
 ---
 
@@ -319,8 +355,9 @@ Semantra is the foundation for reusable semantic integration knowledge under ana
 If a live demo is included, use this sequence:
 
 1. `Catalog` to show approved reuse
-2. `Workspace` to show draft-session continuity and active review context
-3. `Catalog` diff or stewardship handoff to show governed follow-up
-4. `Benchmarks` to show profile comparison and explanation
-5. `WS Copilot` to show bounded closure/readiness guidance in the live workflow
-6. use the broader `Workspace > Setup -> Review -> Decisions -> Output` walkthrough only as an extended technical appendix when the audience wants implementation depth
+2. `Modelling / BA Report` to show the synthesized business-facing summary
+3. `Workspace` to show draft-session continuity and active review context
+4. `Catalog` diff or stewardship handoff to show governed follow-up
+5. `Benchmarks` to show profile comparison and explanation
+6. `WS Copilot` to show bounded closure/readiness guidance in the live workflow
+7. use the broader `Workspace > Setup -> Review -> Decisions -> Output` walkthrough only as an extended technical appendix when the audience wants implementation depth

@@ -193,6 +193,8 @@ Ovde radiš:
 
 - koristiš glavni `Workspace Copilot` panel za `Why is codegen blocked?` i `Explain output gating and warning priority`
 - `Generate preview`
+- `Transformation Design` sekcija za target grain, global rules, defaults, examples i field rules
+- `Import transformation spec JSON` i `Apply JSON spec` za uvoz strukturiranog spec-a van aplikacije
 - `Generate Pandas code`, `Generate PySpark code` ili `Generate dbt model`
 - `Refine with LLM` nad već generisanim artefaktom
 - save/list/run transformation test set tokove kada su odluke accepted

@@ -33,6 +33,8 @@ Today, Semantra uses optional AI only in controlled surfaces such as:
 - closed-set mapping validation in the ambiguity band
 - Mapping Analysis Overview, narration, and audio generation
 - transformation generation
+- structured Transformation Design authoring with target-grain, global rules, defaults, examples, and field-level rules
+- JSON-based import/apply of a structured transformation spec into the Transformation Design workflow
 - output artifact refinement
 - review queue planning
 - Workspace Copilot closure/readiness/output guidance across `Review`, `Decisions`, and `Output`
@@ -158,6 +160,8 @@ Implemented today:
 - safe batch apply mode for proposal subsets that pass conservative guardrails
 - decision export/import as JSON and Excel
 - reusable transformation templates and manual transformation editing
+- structured Transformation Design authoring with target-grain, global rules, defaults, examples, and field-rule input
+- JSON import/apply of a structured transformation spec directly into the Output transformation-design form
 - advisory preview over active mapping decisions
 - Pandas and PySpark starter code generation
 - structured transformation warnings and fallback behavior
