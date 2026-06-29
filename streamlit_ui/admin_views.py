@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import re
 from datetime import datetime
 from io import BytesIO, StringIO
 from collections.abc import Callable
@@ -240,6 +241,300 @@ def _filter_canonical_concepts_by_focus(concepts: list[dict] | None, focus: str 
     return filtered
 
 
+def _build_canonical_mapping_review_rows(
+    concept_details: list[dict] | None,
+    *,
+    target_system: str | None = None,
+) -> list[dict]:
+    """Create a compact review table for canonical concepts and their target field mappings."""
+
+    rows: list[dict] = []
+    for detail in concept_details or []:
+        concept = detail.get("concept") or {}
+        concept_id = _normalized_text(concept.get("concept_id"))
+        if not concept_id:
+            continue
+        field_contexts = detail.get("field_contexts") or []
+        if field_contexts:
+            for context in field_contexts:
+                target_object = _normalized_text(context.get("object_name"))
+                target_field = _normalized_text(context.get("field_name"))
+                mapping_note = _normalized_text(context.get("field_description")) or _normalized_text(context.get("note"))
+                if mapping_note:
+                    mapping_note = f"{target_object}/{target_field}: {mapping_note}" if target_object or target_field else mapping_note
+                rows.append(
+                    {
+                        "canonical_concept_id": concept_id,
+                        "canonical_display_name": _normalized_text(concept.get("display_name")),
+                        "target_system": _normalized_text(target_system) or "",
+                        "target_object": target_object,
+                        "target_field": target_field,
+                        "mapping_note": mapping_note,
+                    }
+                )
+        else:
+            rows.append(
+                {
+                    "canonical_concept_id": concept_id,
+                    "canonical_display_name": _normalized_text(concept.get("display_name")),
+                    "target_system": _normalized_text(target_system) or "",
+                    "target_object": "",
+                    "target_field": "Not yet mapped",
+                    "mapping_note": "No field-context mapping has been captured yet.",
+                }
+            )
+    return rows
+
+
+def _build_canonical_entity_mapping_review_rows(
+    concept_details: list[dict] | None,
+    *,
+    target_system: str | None = None,
+) -> list[dict]:
+    """Create one row per canonical concept for an entity-level review table."""
+
+    rows: list[dict] = []
+    for detail in concept_details or []:
+        concept = detail.get("concept") or {}
+        concept_id = _normalized_text(concept.get("concept_id"))
+        if not concept_id:
+            continue
+        field_contexts = detail.get("field_contexts") or []
+        first_context = field_contexts[0] if field_contexts else None
+        description = _normalized_text(concept.get("description")) or _normalized_text(concept.get("display_name"))
+        aliases = [
+            _normalized_text(alias)
+            for alias in concept.get("base_aliases", []) + concept.get("active_overlay_aliases", [])
+            if _normalized_text(alias)
+        ]
+        source_systems = [
+            _normalized_text(value)
+            for value in concept.get("source_systems", [])
+            if _normalized_text(value)
+        ]
+        business_domains = [
+            _normalized_text(value)
+            for value in concept.get("business_domains", [])
+            if _normalized_text(value)
+        ]
+        rows.append(
+            {
+                "canonical_concept_id": concept_id,
+                "canonical_display_name": _normalized_text(concept.get("display_name")),
+                "description": description,
+                "aliases": ", ".join(aliases) if aliases else "-",
+                "source_systems": ", ".join(source_systems) if source_systems else "-",
+                "business_domains": ", ".join(business_domains) if business_domains else "-",
+                "target_system": _normalized_text(target_system) or "",
+                "target_object": _normalized_text(first_context.get("object_name")) if first_context else "",
+                "target_field": _normalized_text(first_context.get("field_name")) if first_context else "Not yet mapped",
+                "mapping_note": (
+                    _normalized_text(first_context.get("field_description"))
+                    or _normalized_text(first_context.get("note"))
+                    or "No field-context mapping has been captured yet."
+                )
+                if first_context
+                else "No field-context mapping has been captured yet.",
+            }
+        )
+    return rows
+
+
+def _canonical_concept_text_tokens(concept: dict | None) -> set[str]:
+    """Tokenize canonical concept metadata into a compact set of normalized terms."""
+
+    concept_payload = concept or {}
+    tokens: set[str] = set()
+    synonym_map = {
+        "telephone": "phone",
+        "tel": "phone",
+        "mobile": "phone",
+        "phone": "phone",
+        "number": "number",
+        "num": "number",
+        "name": "name",
+        "id": "id",
+        "identifier": "id",
+        "customer": "customer",
+        "address": "address",
+        "city": "city",
+        "country": "country",
+        "postal": "postal",
+        "code": "code",
+        "date": "date",
+        "amount": "amount",
+        "currency": "currency",
+        "bank": "bank",
+        "account": "account",
+        "material": "material",
+        "vendor": "vendor",
+    }
+    for value in [
+        concept_payload.get("concept_id"),
+        concept_payload.get("display_name"),
+        concept_payload.get("description"),
+        *(concept_payload.get("base_aliases", []) or []),
+        *(concept_payload.get("active_overlay_aliases", []) or []),
+    ]:
+        text = _normalized_text(value).lower()
+        for raw_token in re.split(r"[^a-z0-9]+", text):
+            if not raw_token:
+                continue
+            normalized_token = synonym_map.get(raw_token, raw_token)
+            if normalized_token:
+                tokens.add(normalized_token)
+    return tokens
+
+
+def _suggest_canonical_entity_mapping_candidates(
+    review_details: list[dict] | None,
+    *,
+    candidate_details: list[dict] | None = None,
+    target_system: str | None = None,
+) -> list[dict]:
+    """Suggest likely target field candidates for unmapped canonical concepts using metadata overlap."""
+
+    suggestions: list[dict] = []
+    normalized_target_system = _normalized_text(target_system).lower()
+    for detail in review_details or []:
+        concept = detail.get("concept") or {}
+        concept_id = _normalized_text(concept.get("concept_id"))
+        if not concept_id or detail.get("field_contexts"):
+            continue
+
+        source_tokens = _canonical_concept_text_tokens(concept)
+        if not source_tokens:
+            continue
+
+        best_context: dict | None = None
+        best_score = 0.0
+        for candidate_detail in candidate_details or []:
+            candidate_concept = candidate_detail.get("concept") or {}
+            candidate_concept_id = _normalized_text(candidate_concept.get("concept_id"))
+            if not candidate_concept_id or candidate_concept_id == concept_id:
+                continue
+
+            candidate_tokens = _canonical_concept_text_tokens(candidate_concept)
+            if not candidate_tokens:
+                continue
+
+            overlap = len(source_tokens & candidate_tokens)
+            overlap_ratio = overlap / max(1, len(source_tokens | candidate_tokens))
+            metadata_score = min(95.0, 45.0 + overlap * 20.0 + overlap_ratio * 20.0)
+            for context in candidate_detail.get("field_contexts") or []:
+                context_system = _normalized_text(context.get("system")).lower()
+                if normalized_target_system and context_system and context_system != normalized_target_system:
+                    continue
+                target_object = _normalized_text(context.get("object_name"))
+                target_field = _normalized_text(context.get("field_name"))
+                if not target_object and not target_field:
+                    continue
+                context_score = metadata_score + (6.0 if target_object else 0.0) + (6.0 if target_field else 0.0)
+                if context_score > best_score:
+                    best_score = context_score
+                    best_context = context
+
+        if best_context is None:
+            continue
+
+        target_object = _normalized_text(best_context.get("object_name"))
+        target_field = _normalized_text(best_context.get("field_name"))
+        mapping_note = _normalized_text(best_context.get("field_description")) or _normalized_text(best_context.get("note"))
+        suggestions.append(
+            {
+                "canonical_concept_id": concept_id,
+                "canonical_display_name": _normalized_text(concept.get("display_name")),
+                "target_system": _normalized_text(target_system) or _normalized_text(best_context.get("system")) or "",
+                "target_object": target_object,
+                "target_field": target_field,
+                "mapping_note": mapping_note or "Likely SAP field candidate inferred from concept metadata.",
+                "confidence_pct": int(round(min(best_score, 95.0))),
+                "confidence_label": (
+                    "high"
+                    if best_score >= 80.0
+                    else "medium"
+                    if best_score >= 60.0
+                    else "low"
+                ),
+            }
+        )
+
+    return suggestions
+
+
+def _canonical_entity_review_unmapped_rows(rows: list[dict] | None) -> list[dict]:
+    """Return review rows that still have no target field mapping."""
+
+    return [
+        row
+        for row in rows or []
+        if _normalized_text(row.get("target_field")) in {"", "Not yet mapped"}
+    ]
+
+
+def _canonical_entity_review_rows_to_csv_bytes(rows: list[dict] | None) -> bytes:
+    """Serialize entity review rows into a CSV payload."""
+
+    fieldnames = [
+        "canonical_concept_id",
+        "canonical_display_name",
+        "description",
+        "aliases",
+        "source_systems",
+        "business_domains",
+        "target_system",
+        "target_object",
+        "target_field",
+        "mapping_note",
+    ]
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for row in rows or []:
+        writer.writerow({field: row.get(field, "") for field in fieldnames})
+    return buffer.getvalue().encode("utf-8")
+
+
+def _canonical_entity_review_rows_to_excel_bytes(rows: list[dict] | None) -> bytes:
+    """Serialize entity review rows into an Excel workbook payload."""
+
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "canonical_entity_review"
+    worksheet.append(
+        [
+            "canonical_concept_id",
+            "canonical_display_name",
+            "description",
+            "aliases",
+            "source_systems",
+            "business_domains",
+            "target_system",
+            "target_object",
+            "target_field",
+            "mapping_note",
+        ]
+    )
+    for row in rows or []:
+        worksheet.append([row.get(field, "") for field in [
+            "canonical_concept_id",
+            "canonical_display_name",
+            "description",
+            "aliases",
+            "source_systems",
+            "business_domains",
+            "target_system",
+            "target_object",
+            "target_field",
+            "mapping_note",
+        ]])
+    buffer = BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
 def _canonical_overlay_summary(runtime: dict | None, overlays: list[dict] | None) -> dict[str, object]:
     runtime_payload = runtime or {}
     overlay_rows = overlays or []
@@ -285,7 +580,6 @@ def _canonical_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
     for concept in concepts or []:
         base_aliases = [str(alias).strip() for alias in concept.get("base_aliases", []) if str(alias).strip()]
         overlay_aliases = [str(alias).strip() for alias in concept.get("active_overlay_aliases", []) if str(alias).strip()]
-        privacy = concept.get("privacy") or {}
         rows.append(
             {
                 "concept_id": concept.get("concept_id"),
@@ -293,12 +587,6 @@ def _canonical_concept_registry_rows(concepts: list[dict] | None) -> list[dict]:
                 "entity": concept.get("entity") or "",
                 "attribute": concept.get("attribute") or "",
                 "data_type": concept.get("data_type") or "",
-                "pii": "yes" if privacy.get("is_pii") else "no",
-                "gdpr_special": "yes" if privacy.get("is_gdpr_special_category") else "no",
-                "pii_tags": ", ".join(str(value).strip() for value in privacy.get("pii_categories", []) if str(value).strip()),
-                "data_subjects": ", ".join(
-                    str(value).strip() for value in privacy.get("data_subject_types", []) if str(value).strip()
-                ),
                 "source": concept.get("source") or "base",
                 "usage_count": concept.get("usage_count", 0),
                 "field_context_count": concept.get("field_context_count", 0),
@@ -2867,231 +3155,270 @@ def render_canonical_console_panel(
                         f"updated_at={_normalized_text(concept_governance_item.get('updated_at') or concept_governance_item.get('created_at')) or 'n/a'}"
                     )
 
-                st.write("**Quick link correction patch (overlay)**")
-                st.caption(
-                    "Create a one-row overlay patch from this concept detail to correct knowledge/vendor links without modifying the base glossary directly."
-                )
-                concept_id = _normalized_text(concept.get("concept_id"))
-                concept_systems = [
-                    _normalized_text(value)
-                    for value in concept.get("source_systems", [])
-                    if _normalized_text(value)
-                ]
-                concept_domains = [
-                    _normalized_text(value)
-                    for value in concept.get("business_domains", [])
-                    if _normalized_text(value)
-                ]
-                patch_columns = st.columns(3)
-                patch_entry_type = patch_columns[0].selectbox(
-                    "Patch type",
-                    options=["concept_alias", "field_alias", "synonym"],
-                    key=f"debug_patch_entry_type_{concept_id}",
-                    help="Use concept_alias for canonical/vendor linking, field_alias for source field naming, synonym for generic terminology normalization.",
-                )
-                patch_source_system = patch_columns[1].selectbox(
-                    "Source system",
-                    options=[""] + sorted(set(concept_systems + ["SAP", "QuickBooks"])),
-                    key=f"debug_patch_source_system_{concept_id}",
-                    format_func=lambda value: value or "(optional)",
-                )
-                patch_domain = patch_columns[2].selectbox(
-                    "Business domain",
-                    options=[""] + sorted(set(concept_domains)),
-                    key=f"debug_patch_domain_{concept_id}",
-                    format_func=lambda value: value or "(optional)",
-                )
-                patch_alias = st.text_input(
-                    "Alias / field token",
-                    value="",
-                    key=f"debug_patch_alias_{concept_id}",
-                    placeholder="Examples: ZWELS, payment office, LIKP.VSART",
-                    help="For vendor-specific field links, prefer a precise token such as TABLE.FIELD or field code.",
-                )
-                patch_note = st.text_input(
-                    "Patch note",
-                    value="",
-                    key=f"debug_patch_note_{concept_id}",
-                    placeholder="Why this link is valid (module/table semantics).",
-                )
-                patch_overlay_name = st.text_input(
-                    "Overlay patch version name",
-                    value=f"canonical-console-{concept_id}-patch-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
-                    key=f"debug_patch_overlay_name_{concept_id}",
-                )
-                create_patch_disabled = not _normalized_text(patch_alias)
-                if st.button(
-                    "Create overlay patch",
-                    width="stretch",
-                    key=f"debug_create_overlay_patch_{concept_id}",
-                    disabled=create_patch_disabled,
-                ):
-                    try:
-                        patch_bytes = _single_overlay_patch_bytes(
-                            entry_type=patch_entry_type,
-                            canonical_term=concept_id,
-                            alias=_normalized_text(patch_alias),
-                            domain=_normalized_text(patch_domain) or None,
-                            source_system=_normalized_text(patch_source_system) or None,
-                            note=_normalized_text(patch_note) or None,
+                with st.expander("Evidence & usage", expanded=False):
+                    st.caption(
+                        "Inspect how this concept is materialized in runtime field contexts and used by downstream catalog integrations."
+                    )
+                    context_patch_rows = _context_patch_ingest_rows(canonical_concept_detail)
+                    if context_patch_rows:
+                        st.write("**Context patch ingest status**")
+                        context_patch_columns = st.columns(3)
+                        context_patch_columns[0].metric("Context patch entries", len(context_patch_rows))
+                        context_patch_columns[1].metric(
+                            "Ingested",
+                            sum(1 for row in context_patch_rows if row.get("ingested") == "yes"),
                         )
-                        created_patch = api_request(
-                            "POST",
-                            "/knowledge/overlays",
-                            files={
-                                "file": (
-                                    f"{_normalized_text(patch_overlay_name) or 'canonical_console_patch'}.csv",
-                                    patch_bytes,
-                                    "text/csv",
-                                )
-                            },
-                            data={
-                                "name": _normalized_text(patch_overlay_name) or f"canonical-console-{concept_id}-patch",
-                                "created_by": _normalized_text(st.session_state.get("admin_token")) or "canonical-console",
-                            },
+                        context_patch_columns[2].metric(
+                            "Not ingested",
+                            sum(1 for row in context_patch_rows if row.get("ingested") == "no"),
                         )
-                        _refresh_canonical_console_knowledge_state(api_request=api_request)
-                        st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
-                        overlay_version = created_patch.get("version") or {}
-                        overlay_id = overlay_version.get("overlay_id")
-                        if overlay_id is not None:
-                            st.session_state["debug_selected_overlay_version"] = (
-                                f"#{overlay_id} | {overlay_version.get('name')} | {overlay_version.get('status')}"
-                            )
-                            st.session_state["debug_selected_knowledge_overlay"] = api_request(
-                                "GET",
-                                f"/knowledge/overlays/{overlay_id}",
-                            )
-                        st.session_state["last_action"] = {
-                            "level": "success",
-                            "message": (
-                                f"Created overlay patch '{overlay_version.get('name')}' with one {patch_entry_type} entry. "
-                                "Activate it in Overlay Management when ready."
-                            ),
-                        }
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Creating overlay patch failed: {error}",
-                        }
-                    st.rerun()
+                        st.caption(
+                            "Shows whether each active overlay context patch note is currently materialized into runtime field context."
+                        )
+                        st.dataframe(context_patch_rows, width="stretch", hide_index=True)
 
-                st.write("**Vendor context patch (overlay)**")
-                st.caption(
-                    "Capture system/object/field context in a dedicated patch row. This creates a field_alias overlay entry with an explicit context payload in the note."
-                )
-                context_columns = st.columns(3)
-                context_system = context_columns[0].selectbox(
-                    "Context system",
-                    options=sorted(set(["SAP", "QuickBooks"] + concept_systems)),
-                    key=f"debug_context_patch_system_{concept_id}",
-                )
-                context_object = context_columns[1].text_input(
-                    "Object / table",
-                    value="",
-                    key=f"debug_context_patch_object_{concept_id}",
-                    placeholder="Examples: LIKP, VBAK, Invoice",
-                )
-                context_field = context_columns[2].text_input(
-                    "Field",
-                    value="",
-                    key=f"debug_context_patch_field_{concept_id}",
-                    placeholder="Examples: VSART, TAXM1, DueDate",
-                )
-                context_desc_columns = st.columns(2)
-                context_object_description = context_desc_columns[0].text_input(
-                    "Object description",
-                    value="",
-                    key=f"debug_context_patch_object_desc_{concept_id}",
-                    placeholder="Optional object/table description",
-                )
-                context_field_description = context_desc_columns[1].text_input(
-                    "Field description",
-                    value="",
-                    key=f"debug_context_patch_field_desc_{concept_id}",
-                    placeholder="Optional field business description",
-                )
-                context_domain = st.selectbox(
-                    "Context business domain",
-                    options=[""] + sorted(set(concept_domains)),
-                    key=f"debug_context_patch_domain_{concept_id}",
-                    format_func=lambda value: value or "(optional)",
-                )
-                context_note = st.text_input(
-                    "Context patch note",
-                    value="",
-                    key=f"debug_context_patch_note_{concept_id}",
-                    placeholder="Why this vendor context should be linked to the concept.",
-                )
-                context_overlay_name = st.text_input(
-                    "Context overlay patch version name",
-                    value=f"canonical-console-{concept_id}-context-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
-                    key=f"debug_context_patch_overlay_name_{concept_id}",
-                )
-                context_alias = _context_alias_token(context_object, context_field)
-                create_context_patch_disabled = not _normalized_text(context_alias)
-                if st.button(
-                    "Create context patch",
-                    width="stretch",
-                    key=f"debug_create_context_patch_{concept_id}",
-                    disabled=create_context_patch_disabled,
-                ):
-                    try:
-                        context_patch_bytes = _single_overlay_patch_bytes(
-                            entry_type="field_alias",
-                            canonical_term=concept_id,
-                            alias=_normalized_text(context_alias),
-                            domain=_normalized_text(context_domain) or None,
-                            source_system=_normalized_text(context_system) or None,
-                            note=_context_note_payload(
-                                system=context_system,
-                                object_name=context_object,
-                                field_name=context_field,
-                                object_description=context_object_description,
-                                field_description=context_field_description,
-                                note=context_note,
-                            ),
-                        )
-                        created_context_patch = api_request(
-                            "POST",
-                            "/knowledge/overlays",
-                            files={
-                                "file": (
-                                    f"{_normalized_text(context_overlay_name) or 'canonical_console_context_patch'}.csv",
-                                    context_patch_bytes,
-                                    "text/csv",
+                    if canonical_concept_detail.get("field_contexts"):
+                        st.write("**Field contexts**")
+                        st.dataframe(canonical_concept_detail.get("field_contexts"), width="stretch", hide_index=True)
+                    if canonical_concept_detail.get("active_overlay_entries"):
+                        st.write("**Active overlay entries**")
+                        st.dataframe(canonical_concept_detail.get("active_overlay_entries"), width="stretch", hide_index=True)
+                    if canonical_concept_detail.get("integrations"):
+                        st.write("**Catalog usage**")
+                        st.dataframe(canonical_concept_detail.get("integrations"), width="stretch", hide_index=True)
+                    if canonical_concept_detail.get("audit_entries"):
+                        st.write("**Knowledge audit references**")
+                        st.dataframe(canonical_concept_detail.get("audit_entries"), width="stretch", hide_index=True)
+
+                with st.expander("Overlay patch actions", expanded=False):
+                    st.caption(
+                        "Create overlay patches that add aliases or vendor context for this concept without modifying the base glossary directly."
+                    )
+                    st.write("**Quick link correction patch (overlay)**")
+                    st.caption(
+                        "Create a one-row overlay patch from this concept detail to correct knowledge/vendor links without modifying the base glossary directly."
+                    )
+                    concept_id = _normalized_text(concept.get("concept_id"))
+                    concept_systems = [
+                        _normalized_text(value)
+                        for value in concept.get("source_systems", [])
+                        if _normalized_text(value)
+                    ]
+                    concept_domains = [
+                        _normalized_text(value)
+                        for value in concept.get("business_domains", [])
+                        if _normalized_text(value)
+                    ]
+                    patch_columns = st.columns(3)
+                    patch_entry_type = patch_columns[0].selectbox(
+                        "Patch type",
+                        options=["concept_alias", "field_alias", "synonym"],
+                        key=f"debug_patch_entry_type_{concept_id}",
+                        help="Use concept_alias for canonical/vendor linking, field_alias for source field naming, synonym for generic terminology normalization.",
+                    )
+                    patch_source_system = patch_columns[1].selectbox(
+                        "Source system",
+                        options=[""] + sorted(set(concept_systems + ["SAP", "QuickBooks"])),
+                        key=f"debug_patch_source_system_{concept_id}",
+                        format_func=lambda value: value or "(optional)",
+                    )
+                    patch_domain = patch_columns[2].selectbox(
+                        "Business domain",
+                        options=[""] + sorted(set(concept_domains)),
+                        key=f"debug_patch_domain_{concept_id}",
+                        format_func=lambda value: value or "(optional)",
+                    )
+                    patch_alias = st.text_input(
+                        "Alias / field token",
+                        value="",
+                        key=f"debug_patch_alias_{concept_id}",
+                        placeholder="Examples: ZWELS, payment office, LIKP.VSART",
+                        help="For vendor-specific field links, prefer a precise token such as TABLE.FIELD or field code.",
+                    )
+                    patch_note = st.text_input(
+                        "Patch note",
+                        value="",
+                        key=f"debug_patch_note_{concept_id}",
+                        placeholder="Why this link is valid (module/table semantics).",
+                    )
+                    patch_overlay_name = st.text_input(
+                        "Overlay patch version name",
+                        value=f"canonical-console-{concept_id}-patch-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                        key=f"debug_patch_overlay_name_{concept_id}",
+                    )
+                    create_patch_disabled = not _normalized_text(patch_alias)
+                    if st.button(
+                        "Create overlay patch",
+                        width="stretch",
+                        key=f"debug_create_overlay_patch_{concept_id}",
+                        disabled=create_patch_disabled,
+                    ):
+                        try:
+                            patch_bytes = _single_overlay_patch_bytes(
+                                entry_type=patch_entry_type,
+                                canonical_term=concept_id,
+                                alias=_normalized_text(patch_alias),
+                                domain=_normalized_text(patch_domain) or None,
+                                source_system=_normalized_text(patch_source_system) or None,
+                                note=_normalized_text(patch_note) or None,
+                            )
+                            created_patch = api_request(
+                                "POST",
+                                "/knowledge/overlays",
+                                files={
+                                    "file": (
+                                        f"{_normalized_text(patch_overlay_name) or 'canonical_console_patch'}.csv",
+                                        patch_bytes,
+                                        "text/csv",
+                                    )
+                                },
+                                data={
+                                    "name": _normalized_text(patch_overlay_name) or f"canonical-console-{concept_id}-patch",
+                                    "created_by": _normalized_text(st.session_state.get("admin_token")) or "canonical-console",
+                                },
+                            )
+                            _refresh_canonical_console_knowledge_state(api_request=api_request)
+                            st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                            overlay_version = created_patch.get("version") or {}
+                            overlay_id = overlay_version.get("overlay_id")
+                            if overlay_id is not None:
+                                st.session_state["debug_selected_overlay_version"] = (
+                                    f"#{overlay_id} | {overlay_version.get('name')} | {overlay_version.get('status')}"
                                 )
-                            },
-                            data={
-                                "name": _normalized_text(context_overlay_name) or f"canonical-console-{concept_id}-context",
-                                "created_by": _normalized_text(st.session_state.get("admin_token")) or "canonical-console",
-                            },
-                        )
-                        _refresh_canonical_console_knowledge_state(api_request=api_request)
-                        st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
-                        context_overlay_version = created_context_patch.get("version") or {}
-                        context_overlay_id = context_overlay_version.get("overlay_id")
-                        if context_overlay_id is not None:
-                            st.session_state["debug_selected_overlay_version"] = (
-                                f"#{context_overlay_id} | {context_overlay_version.get('name')} | {context_overlay_version.get('status')}"
+                                st.session_state["debug_selected_knowledge_overlay"] = api_request(
+                                    "GET",
+                                    f"/knowledge/overlays/{overlay_id}",
+                                )
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": (
+                                    f"Created overlay patch '{overlay_version.get('name')}' with one {patch_entry_type} entry. "
+                                    "Activate it in Overlay Management when ready."
+                                ),
+                            }
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Creating overlay patch failed: {error}",
+                            }
+                        st.rerun()
+
+                    st.write("**Vendor context patch (overlay)**")
+                    st.caption(
+                        "Capture system/object/field context in a dedicated patch row. This creates a field_alias overlay entry with an explicit context payload in the note."
+                    )
+                    context_columns = st.columns(3)
+                    context_system = context_columns[0].selectbox(
+                        "Context system",
+                        options=sorted(set(["SAP", "QuickBooks"] + concept_systems)),
+                        key=f"debug_context_patch_system_{concept_id}",
+                    )
+                    context_object = context_columns[1].text_input(
+                        "Object / table",
+                        value="",
+                        key=f"debug_context_patch_object_{concept_id}",
+                        placeholder="Examples: LIKP, VBAK, Invoice",
+                    )
+                    context_field = context_columns[2].text_input(
+                        "Field",
+                        value="",
+                        key=f"debug_context_patch_field_{concept_id}",
+                        placeholder="Examples: VSART, TAXM1, DueDate",
+                    )
+                    context_desc_columns = st.columns(2)
+                    context_object_description = context_desc_columns[0].text_input(
+                        "Object description",
+                        value="",
+                        key=f"debug_context_patch_object_desc_{concept_id}",
+                        placeholder="Optional object/table description",
+                    )
+                    context_field_description = context_desc_columns[1].text_input(
+                        "Field description",
+                        value="",
+                        key=f"debug_context_patch_field_desc_{concept_id}",
+                        placeholder="Optional field business description",
+                    )
+                    context_domain = st.selectbox(
+                        "Context business domain",
+                        options=[""] + sorted(set(concept_domains)),
+                        key=f"debug_context_patch_domain_{concept_id}",
+                        format_func=lambda value: value or "(optional)",
+                    )
+                    context_note = st.text_input(
+                        "Context patch note",
+                        value="",
+                        key=f"debug_context_patch_note_{concept_id}",
+                        placeholder="Why this vendor context should be linked to the concept.",
+                    )
+                    context_overlay_name = st.text_input(
+                        "Context overlay patch version name",
+                        value=f"canonical-console-{concept_id}-context-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                        key=f"debug_context_patch_overlay_name_{concept_id}",
+                    )
+                    context_alias = _context_alias_token(context_object, context_field)
+                    create_context_patch_disabled = not _normalized_text(context_alias)
+                    if st.button(
+                        "Create context patch",
+                        width="stretch",
+                        key=f"debug_create_context_patch_{concept_id}",
+                        disabled=create_context_patch_disabled,
+                    ):
+                        try:
+                            context_patch_bytes = _single_overlay_patch_bytes(
+                                entry_type="field_alias",
+                                canonical_term=concept_id,
+                                alias=_normalized_text(context_alias),
+                                domain=_normalized_text(context_domain) or None,
+                                source_system=_normalized_text(context_system) or None,
+                                note=_context_note_payload(
+                                    system=context_system,
+                                    object_name=context_object,
+                                    field_name=context_field,
+                                    object_description=context_object_description,
+                                    field_description=context_field_description,
+                                    note=context_note,
+                                ),
                             )
-                            st.session_state["debug_selected_knowledge_overlay"] = api_request(
-                                "GET",
-                                f"/knowledge/overlays/{context_overlay_id}",
+                            created_context_patch = api_request(
+                                "POST",
+                                "/knowledge/overlays",
+                                files={
+                                    "file": (
+                                        f"{_normalized_text(context_overlay_name) or 'canonical_console_context_patch'}.csv",
+                                        context_patch_bytes,
+                                        "text/csv",
+                                    )
+                                },
+                                data={
+                                    "name": _normalized_text(context_overlay_name) or f"canonical-console-{concept_id}-context",
+                                    "created_by": _normalized_text(st.session_state.get("admin_token")) or "canonical-console",
+                                },
                             )
-                        st.session_state["last_action"] = {
-                            "level": "success",
-                            "message": (
-                                f"Created context overlay patch '{context_overlay_version.get('name')}' "
-                                f"for {_normalized_text(context_system)} {context_alias}. Activate it in Overlay Management when ready."
-                            ),
-                        }
-                    except httpx.HTTPError as error:
-                        st.session_state["last_action"] = {
-                            "level": "error",
-                            "message": f"Creating context patch failed: {error}",
-                        }
-                    st.rerun()
+                            _refresh_canonical_console_knowledge_state(api_request=api_request)
+                            st.session_state["debug_knowledge_overlays"] = api_request("GET", "/knowledge/overlays")
+                            context_overlay_version = created_context_patch.get("version") or {}
+                            context_overlay_id = context_overlay_version.get("overlay_id")
+                            if context_overlay_id is not None:
+                                st.session_state["debug_selected_overlay_version"] = (
+                                    f"#{context_overlay_id} | {context_overlay_version.get('name')} | {context_overlay_version.get('status')}"
+                                )
+                                st.session_state["debug_selected_knowledge_overlay"] = api_request(
+                                    "GET",
+                                    f"/knowledge/overlays/{context_overlay_id}",
+                                )
+                            st.session_state["last_action"] = {
+                                "level": "success",
+                                "message": (
+                                    f"Created context overlay patch '{context_overlay_version.get('name')}' "
+                                    f"for {_normalized_text(context_system)} {context_alias}. Activate it in Overlay Management when ready."
+                                ),
+                            }
+                        except httpx.HTTPError as error:
+                            st.session_state["last_action"] = {
+                                "level": "error",
+                                "message": f"Creating context patch failed: {error}",
+                            }
+                        st.rerun()
 
                 if concept_pending_rows:
                     st.write("**Pending queue proposals for this concept**")
@@ -3170,36 +3497,168 @@ def render_canonical_console_panel(
                 else:
                     st.caption("No overlay promotion stewardship items currently target this concept.")
 
-                context_patch_rows = _context_patch_ingest_rows(canonical_concept_detail)
-                if context_patch_rows:
-                    st.write("**Context patch ingest status**")
-                    context_patch_columns = st.columns(3)
-                    context_patch_columns[0].metric("Context patch entries", len(context_patch_rows))
-                    context_patch_columns[1].metric(
-                        "Ingested",
-                        sum(1 for row in context_patch_rows if row.get("ingested") == "yes"),
+            with st.expander("Canonical mapping review", expanded=False):
+                st.caption(
+                    "Build an entity-style review table by selecting canonical concepts that belong to one data entity, such as material master, and inspect their SAP target mapping in one place."
+                )
+                review_columns = st.columns(2)
+                review_target_system = review_columns[0].text_input(
+                    "Target system",
+                    value="SAP",
+                    key=f"debug_canonical_review_target_system_{_normalized_text(concept.get('concept_id')) or 'selected'}",
+                    placeholder="Example: SAP",
+                )
+                review_concept_options = [
+                    _canonical_concept_option_label(item)
+                    for item in st.session_state.get("debug_canonical_concepts") or []
+                ]
+                selected_review_concepts = review_columns[1].multiselect(
+                    "Canonical concepts in this entity",
+                    options=review_concept_options,
+                    default=[_canonical_concept_option_label(concept)] if concept_id else [],
+                    key=f"debug_canonical_entity_review_concepts_{_normalized_text(concept.get('concept_id')) or 'selected'}",
+                    disabled=not review_concept_options,
+                )
+                review_details = []
+                concept_lookup = {
+                    _canonical_concept_option_label(item): item
+                    for item in st.session_state.get("debug_canonical_concepts") or []
+                    if _canonical_concept_option_label(item)
+                }
+                for label in selected_review_concepts:
+                    selected_item = concept_lookup.get(label)
+                    if selected_item is None:
+                        continue
+                    review_details.append(
+                        {
+                            "concept": {
+                                "concept_id": selected_item.get("concept_id"),
+                                "display_name": selected_item.get("display_name"),
+                                "description": selected_item.get("description") or "",
+                                "base_aliases": selected_item.get("base_aliases") or [],
+                                "active_overlay_aliases": selected_item.get("active_overlay_aliases") or [],
+                                "source_systems": selected_item.get("source_systems") or [],
+                                "business_domains": selected_item.get("business_domains") or [],
+                            },
+                            "field_contexts": [],
+                        }
                     )
-                    context_patch_columns[2].metric(
-                        "Not ingested",
-                        sum(1 for row in context_patch_rows if row.get("ingested") == "no"),
+                if not review_details and concept_id:
+                    review_details = [
+                        {
+                            "concept": concept,
+                            "field_contexts": canonical_concept_detail.get("field_contexts") or [],
+                        }
+                    ]
+                review_rows = _build_canonical_entity_mapping_review_rows(
+                    review_details,
+                    target_system=review_target_system,
+                )
+                if review_rows:
+                    review_export_columns = st.columns(2)
+                    review_export_columns[0].download_button(
+                        "Export CSV",
+                        data=_canonical_entity_review_rows_to_csv_bytes(review_rows),
+                        file_name=f"canonical_entity_review_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.csv",
+                        mime="text/csv",
+                        width="stretch",
                     )
-                    st.caption(
-                        "Shows whether each active overlay context patch note is currently materialized into runtime field context."
+                    review_export_columns[1].download_button(
+                        "Export Excel",
+                        data=_canonical_entity_review_rows_to_excel_bytes(review_rows),
+                        file_name=f"canonical_entity_review_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        width="stretch",
                     )
-                    st.dataframe(context_patch_rows, width="stretch", hide_index=True)
+                    st.dataframe(review_rows, width="stretch", hide_index=True)
 
-                if canonical_concept_detail.get("field_contexts"):
-                    st.write("**Field contexts**")
-                    st.dataframe(canonical_concept_detail.get("field_contexts"), width="stretch", hide_index=True)
-                if canonical_concept_detail.get("active_overlay_entries"):
-                    st.write("**Active overlay entries**")
-                    st.dataframe(canonical_concept_detail.get("active_overlay_entries"), width="stretch", hide_index=True)
-                if canonical_concept_detail.get("integrations"):
-                    st.write("**Catalog usage**")
-                    st.dataframe(canonical_concept_detail.get("integrations"), width="stretch", hide_index=True)
-                if canonical_concept_detail.get("audit_entries"):
-                    st.write("**Knowledge audit references**")
-                    st.dataframe(canonical_concept_detail.get("audit_entries"), width="stretch", hide_index=True)
+                    unmapped_rows = _canonical_entity_review_unmapped_rows(review_rows)
+                    review_suggestions_state_key = (
+                        f"debug_canonical_review_suggestions_{_normalized_text(concept.get('concept_id')) or 'selected'}"
+                    )
+                    if unmapped_rows:
+                        review_action_columns = st.columns(2)
+                        review_row_options = {
+                            f"{_normalized_text(row.get('canonical_display_name')) or _normalized_text(row.get('canonical_concept_id'))} [{_normalized_text(row.get('canonical_concept_id'))}]": row
+                            for row in unmapped_rows
+                        }
+                        selected_review_row_label = review_action_columns[0].selectbox(
+                            "Suggest candidates for",
+                            options=["All unmapped rows", *list(review_row_options.keys())],
+                            key=f"debug_canonical_review_selected_row_{_normalized_text(concept.get('concept_id')) or 'selected'}",
+                        )
+                        if review_action_columns[1].button(
+                            "Suggest for selected row",
+                            width="stretch",
+                            disabled=selected_review_row_label == "All unmapped rows" or not review_row_options,
+                        ):
+                            selected_row = review_row_options.get(selected_review_row_label, {})
+                            selected_concept_id = _normalized_text(selected_row.get("canonical_concept_id"))
+                            selected_review_details = [
+                                detail
+                                for detail in review_details
+                                if _normalized_text(detail.get("concept", {}).get("concept_id")) == selected_concept_id
+                            ]
+                            candidate_details: list[dict] = []
+                            for item in st.session_state.get("debug_canonical_concepts") or []:
+                                concept_id = _normalized_text(item.get("concept_id"))
+                                if not concept_id or concept_id == selected_concept_id:
+                                    continue
+                                try:
+                                    detail = api_request("GET", f"/knowledge/canonical-concepts/{concept_id}")
+                                except httpx.HTTPError:
+                                    continue
+                                if detail:
+                                    candidate_details.append(detail)
+                            st.session_state[review_suggestions_state_key] = _suggest_canonical_entity_mapping_candidates(
+                                selected_review_details,
+                                candidate_details=candidate_details,
+                                target_system=review_target_system,
+                            )
+                            st.session_state[f"{review_suggestions_state_key}_scope"] = selected_concept_id
+                            st.rerun()
+
+                        if review_action_columns[1].button(
+                            "Suggest for all unmapped rows",
+                            width="stretch",
+                            disabled=not unmapped_rows,
+                        ):
+                            candidate_details: list[dict] = []
+                            candidate_concept_ids = {
+                                _normalized_text(row.get("canonical_concept_id"))
+                                for row in review_rows
+                                if _normalized_text(row.get("canonical_concept_id"))
+                            }
+                            for item in st.session_state.get("debug_canonical_concepts") or []:
+                                concept_id = _normalized_text(item.get("concept_id"))
+                                if not concept_id or concept_id in candidate_concept_ids:
+                                    continue
+                                try:
+                                    detail = api_request("GET", f"/knowledge/canonical-concepts/{concept_id}")
+                                except httpx.HTTPError:
+                                    continue
+                                if detail:
+                                    candidate_details.append(detail)
+                            st.session_state[review_suggestions_state_key] = _suggest_canonical_entity_mapping_candidates(
+                                review_details,
+                                candidate_details=candidate_details,
+                                target_system=review_target_system,
+                            )
+                            st.session_state[f"{review_suggestions_state_key}_scope"] = "all_unmapped"
+                            st.rerun()
+
+                        review_suggestions = st.session_state.get(review_suggestions_state_key, [])
+                        if review_suggestions:
+                            st.caption("Likely SAP field candidates for the requested review scope")
+                            st.dataframe(review_suggestions, width="stretch", hide_index=True)
+                        else:
+                            st.info(
+                                "No likely SAP field candidates have been requested yet. Use one of the buttons above to generate them."
+                            )
+                    else:
+                        st.caption("No unmapped rows are currently available for suggestion.")
+                else:
+                    st.info("Select at least one canonical concept to build the entity review table.")
 
     if active_governance_section == "Stewardship":
         stewardship_header_actions = st.columns(1)

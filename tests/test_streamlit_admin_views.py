@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from unittest.mock import patch
+
+from openpyxl import load_workbook
 
 from streamlit_ui import admin_views
 
@@ -44,6 +47,177 @@ def test_filter_canonical_concepts_matches_alias_and_display_name() -> None:
 
     filtered_by_source_system = admin_views._filter_canonical_concepts(concepts, "sap")
     assert [item["concept_id"] for item in filtered_by_source_system] == ["customer.id"]
+
+
+def test_build_canonical_mapping_review_rows_uses_field_contexts() -> None:
+    concept_details = [
+        {
+            "concept": {"concept_id": "customer.id", "display_name": "Customer ID"},
+            "field_contexts": [
+                {
+                    "system": "SAP",
+                    "object_name": "KNA1",
+                    "field_name": "KUNNR",
+                    "category": "identifier",
+                    "field_description": "Customer number",
+                    "note": "Primary key",
+                }
+            ],
+        }
+    ]
+
+    rows = admin_views._build_canonical_mapping_review_rows(concept_details, target_system="SAP")
+
+    assert rows[0]["canonical_concept_id"] == "customer.id"
+    assert rows[0]["target_system"] == "SAP"
+    assert rows[0]["target_object"] == "KNA1"
+    assert rows[0]["target_field"] == "KUNNR"
+    assert "Customer number" in rows[0]["mapping_note"]
+
+
+def test_build_canonical_mapping_review_rows_falls_back_when_no_contexts() -> None:
+    concept_details = [
+        {
+            "concept": {"concept_id": "customer.name", "display_name": "Customer Name"},
+            "field_contexts": [],
+        }
+    ]
+
+    rows = admin_views._build_canonical_mapping_review_rows(concept_details, target_system="SAP")
+
+    assert rows[0]["canonical_concept_id"] == "customer.name"
+    assert rows[0]["target_field"] == "Not yet mapped"
+    assert rows[0]["mapping_note"] == "No field-context mapping has been captured yet."
+
+
+def test_build_canonical_entity_mapping_review_rows_groups_per_concept() -> None:
+    concept_details = [
+        {
+            "concept": {
+                "concept_id": "customer.id",
+                "display_name": "Customer ID",
+                "description": "Primary customer identifier",
+                "base_aliases": ["cust_id"],
+                "active_overlay_aliases": ["legacy_customer_identifier"],
+                "source_systems": ["SAP", "CRM"],
+                "business_domains": ["Customer", "Sales"],
+            },
+            "field_contexts": [
+                {
+                    "system": "SAP",
+                    "object_name": "KNA1",
+                    "field_name": "KUNNR",
+                    "field_description": "Customer number",
+                }
+            ],
+        },
+        {
+            "concept": {"concept_id": "customer.name", "display_name": "Customer Name"},
+            "field_contexts": [],
+        },
+    ]
+
+    rows = admin_views._build_canonical_entity_mapping_review_rows(concept_details, target_system="SAP")
+
+    assert len(rows) == 2
+    assert rows[0]["canonical_concept_id"] == "customer.id"
+    assert rows[0]["description"] == "Primary customer identifier"
+    assert rows[0]["aliases"] == "cust_id, legacy_customer_identifier"
+    assert rows[0]["source_systems"] == "SAP, CRM"
+    assert rows[0]["business_domains"] == "Customer, Sales"
+    assert rows[0]["target_object"] == "KNA1"
+    assert rows[0]["target_field"] == "KUNNR"
+    assert rows[1]["target_field"] == "Not yet mapped"
+
+
+def test_canonical_entity_review_unmapped_rows_filters_only_unmapped_rows() -> None:
+    rows = [
+        {
+            "canonical_concept_id": "customer.id",
+            "canonical_display_name": "Customer ID",
+            "target_field": "KUNNR",
+        },
+        {
+            "canonical_concept_id": "customer.phone",
+            "canonical_display_name": "Customer Phone",
+            "target_field": "Not yet mapped",
+        },
+    ]
+
+    unmapped_rows = admin_views._canonical_entity_review_unmapped_rows(rows)
+
+    assert [row["canonical_concept_id"] for row in unmapped_rows] == ["customer.phone"]
+
+
+def test_canonical_entity_review_rows_export_to_csv_and_excel_bytes() -> None:
+    rows = [
+        {
+            "canonical_concept_id": "customer.id",
+            "canonical_display_name": "Customer ID",
+            "description": "Primary customer identifier",
+            "aliases": "cust_id, legacy_customer_identifier",
+            "source_systems": "SAP, CRM",
+            "business_domains": "Customer, Sales",
+            "target_system": "SAP",
+            "target_object": "KNA1",
+            "target_field": "KUNNR",
+            "mapping_note": "Customer number",
+        }
+    ]
+
+    csv_bytes = admin_views._canonical_entity_review_rows_to_csv_bytes(rows)
+    assert b"canonical_concept_id" in csv_bytes
+    assert b"customer.id" in csv_bytes
+
+    excel_bytes = admin_views._canonical_entity_review_rows_to_excel_bytes(rows)
+    workbook = load_workbook(BytesIO(excel_bytes))
+    worksheet = workbook.active
+    assert worksheet.title == "canonical_entity_review"
+    assert worksheet["A1"].value == "canonical_concept_id"
+    assert worksheet["A2"].value == "customer.id"
+    assert worksheet["B2"].value == "Customer ID"
+
+
+def test_suggest_canonical_entity_mapping_candidates_ranks_related_field_contexts() -> None:
+    review_details = [
+        {
+            "concept": {
+                "concept_id": "customer.phone",
+                "display_name": "Customer Phone",
+                "description": "Primary phone number",
+                "base_aliases": ["phone"],
+            },
+            "field_contexts": [],
+        }
+    ]
+    candidate_details = [
+        {
+            "concept": {
+                "concept_id": "customer.mobile",
+                "display_name": "Customer Mobile",
+                "description": "Mobile telephone number",
+                "base_aliases": ["mobile"],
+            },
+            "field_contexts": [
+                {
+                    "system": "SAP",
+                    "object_name": "KNA1",
+                    "field_name": "TELF1",
+                    "field_description": "Telephone number",
+                }
+            ],
+        }
+    ]
+
+    suggestions = admin_views._suggest_canonical_entity_mapping_candidates(
+        review_details,
+        candidate_details=candidate_details,
+    )
+
+    assert suggestions[0]["canonical_concept_id"] == "customer.phone"
+    assert suggestions[0]["target_object"] == "KNA1"
+    assert suggestions[0]["target_field"] == "TELF1"
+    assert suggestions[0]["confidence_pct"] >= 50
 
 
 def test_overlay_activation_block_reason_requires_validated_status() -> None:
